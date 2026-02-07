@@ -1,0 +1,57 @@
+body{
+    background-color:#f4f6f9;
+    font-size:14px;
+}
+
+.container{ max-width:1300px; }
+
+.card{
+    border:none;
+    border-radius:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,.06);
+}
+
+.filter-card{
+    background:#fff;
+    border-radius:14px;
+    box-shadow:0 4px 14px rgba(0,0,0,.05);
+}
+
+.filter-card .form-label{
+    font-size:13px;
+    color:#555;
+}
+
+.table thead th{
+    font-size:13px;
+    color:#777;
+    border-bottom:1px solid #eee;
+}
+
+.table tbody tr{ transition:all .15s ease-in-out; }
+.table tbody tr:hover{ background-color:#f8f9fb; }
+
+.badge{
+    font-weight:500;
+    padding:6px 10px;
+    border-radius:8px;
+}
+
+.badge-stock{
+    background:#e7f6ee;
+    color:#198754;
+}
+
+.btn{
+    border-radius:10px;
+    font-size:13px;
+}
+
+.btn-sm{ padding:4px 10px; }
+
+.page-title{
+    font-weight:700;
+    font-size:18px;
+}
+
+.action-buttons .btn{ margin-left:4px; }
