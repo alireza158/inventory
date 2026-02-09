@@ -1,5 +1,8 @@
 @php
     $is = fn($name) => request()->routeIs($name) ? 'active' : '';
+
+    // برای active شدن گروه پیش‌فاکتور وقتی داخل هرکدوم از route هاش هستی
+    $preinvoiceOpen = request()->routeIs('preinvoice.*');
 @endphp
 
 <div class="bg-white border-end p-3" style="width: 260px">
@@ -33,5 +36,55 @@
            href="{{ route('stocktake.index') }}">
             انبارگردانی
         </a>
+
+        {{-- =========================
+             پیش‌فاکتور
+        ========================= --}}
+        <div class="mt-3">
+            <div class="text-muted small mb-2">پیش‌فاکتور</div>
+
+            <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $preinvoiceOpen ? 'active' : '' }}"
+               data-bs-toggle="collapse"
+               href="#preinvoiceMenu"
+               role="button"
+               aria-expanded="{{ $preinvoiceOpen ? 'true' : 'false' }}"
+               aria-controls="preinvoiceMenu">
+                <span>پیش‌فاکتور</span>
+                <span class="small">▾</span>
+            </a>
+
+            <div class="collapse {{ $preinvoiceOpen ? 'show' : '' }}" id="preinvoiceMenu">
+                <div class="list-group list-group-flush ms-2 mt-1">
+                    <a class="list-group-item list-group-item-action {{ $is('preinvoice.create') }}"
+                       href="{{ route('preinvoice.create') }}">
+                        ➕ ایجاد پیش‌فاکتور
+                    </a>
+
+                    <a class="list-group-item list-group-item-action {{ $is('preinvoice.draft.index') }}"
+                       href="{{ route('preinvoice.draft.index') }}">
+                        📝 پیش‌نویس‌ها
+                    </a>
+
+                    {{-- اگر داری: لیست پیش‌فاکتورهای نهایی --}}
+                    {{-- <a class="list-group-item list-group-item-action {{ $is('preinvoice.index') }}"
+                       href="{{ route('preinvoice.index') }}">
+                        📄 پیش‌فاکتورهای ثبت‌شده
+                    </a> --}}
+                </div>
+
+
+
+            </div>
+            <a class="list-group-item list-group-item-action {{ $is('customers.*') }}"
+            href="{{ route('customers.index') }}">
+           مشتریان
+         </a>
+         <a class="list-group-item list-group-item-action {{ $is('invoices.*') }}"
+   href="{{ route('invoices.index') }}">
+   فاکتورها
+</a>
+
+        </div>
+
     </div>
 </div>

@@ -1,0 +1,137 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="container">
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <div class="h5 fw-bold mb-0">👥 مشتریان</div>
+      <div class="text-muted small">لیست مشتری‌ها + مانده حساب</div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+      <form class="d-flex gap-2" method="GET" action="{{ route('customers.index') }}">
+        <input class="form-control" name="q" value="{{ $q ?? '' }}" placeholder="جستجو نام/فامیل/موبایل">
+        <button class="btn btn-primary">جستجو</button>
+      </form>
+
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createCustomerModal">
+        ➕ ساخت مشتری
+      </button>
+    </div>
+  </div>
+
+  @if(session('success'))
+    <div class="alert alert-success">{{ session('success') }}</div>
+  @endif
+
+  @if ($errors->any())
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+      </ul>
+    </div>
+  @endif
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>نام</th>
+            <th>موبایل</th>
+            <th>آدرس</th>
+            <th class="text-nowrap">بدهکار</th>
+            <th class="text-nowrap">بستانکار</th>
+            <th class="text-nowrap">مانده</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($customers as $c)
+            <tr>
+              <td>{{ $c->id }}</td>
+              <td>{{ trim(($c->first_name ?? '').' '.($c->last_name ?? '')) ?: '—' }}</td>
+              <td class="text-nowrap">{{ $c->mobile }}</td>
+              <td style="max-width: 360px">{{ $c->address ?: '—' }}</td>
+              <td class="text-nowrap">{{ number_format((int)($c->debt ?? 0)) }}</td>
+              <td class="text-nowrap">{{ number_format((int)($c->credit ?? 0)) }}</td>
+              <td class="text-nowrap fw-bold">{{ number_format((int)($c->balance ?? 0)) }}</td>
+            </tr>
+          @empty
+            <tr><td colspan="7" class="text-center text-muted py-4">مشتری یافت نشد</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    {{ $customers->links() }}
+  </div>
+
+</div>
+
+{{-- ✅ Modal ساخت مشتری --}}
+<div class="modal fade" id="createCustomerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" method="POST" action="{{ route('customers.store') }}">
+      @csrf
+
+      <div class="modal-header">
+        <div class="fw-bold">➕ ساخت مشتری</div>
+        <button type="button" class="btn-close ms-0" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label">نام</label>
+            <input class="form-control" name="first_name" value="{{ old('first_name') }}">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">فامیل</label>
+            <input class="form-control" name="last_name" value="{{ old('last_name') }}">
+          </div>
+
+          <div class="col-md-12">
+            <label class="form-label">موبایل *</label>
+            <input class="form-control" name="mobile" value="{{ old('mobile') }}" required>
+            <div class="form-text">ترجیحاً یکتا باشد.</div>
+          </div>
+
+          <div class="col-md-12">
+            <label class="form-label">آدرس</label>
+            <textarea class="form-control" name="address" rows="2">{{ old('address') }}</textarea>
+          </div>
+
+          {{-- اگر province/city داری بعداً می‌تونی اضافه کنی --}}
+          {{-- <input type="hidden" name="province_id" value="..."> --}}
+          {{-- <input type="hidden" name="city_id" value="..."> --}}
+        </div>
+
+        {{-- اگر خواستی خطای ولیدیشن فقط برای مودال نشون بدی، باید error bag جدا بسازی --}}
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">بستن</button>
+        <button type="submit" class="btn btn-primary">ثبت مشتری</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{-- ✅ اگر خطای validation از store برگشت، مودال خودکار باز شود --}}
+@if ($errors->any() && old('mobile'))
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const el = document.getElementById('createCustomerModal');
+      if (!el) return;
+      const m = new bootstrap.Modal(el);
+      m.show();
+    });
+  </script>
+@endif
+
+@endsection

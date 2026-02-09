@@ -78,6 +78,67 @@ use App\Http\Controllers\CategoryController;
 Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])
     ->name('categories.quickStore');
 
+
+
+
+
+    use App\Http\Controllers\PreinvoiceController;
+    use App\Http\Controllers\PreinvoiceApiController;
+
+    Route::middleware(['auth'])->group(function () {
+
+        // صفحات
+        Route::get('/preinvoice/create', [PreinvoiceController::class, 'create'])->name('preinvoice.create');
+        Route::post('/preinvoice/draft', [PreinvoiceController::class, 'saveDraft'])->name('preinvoice.draft.save');
+
+        Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->name('preinvoice.draft.index');
+        Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->name('preinvoice.draft.edit');
+        Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->name('preinvoice.draft.update');
+
+        // API های لوکال (DB-based) برای JS صفحه
+        Route::prefix('preinvoice/api')->group(function () {
+            Route::get('/products', [PreinvoiceApiController::class, 'products']);
+            Route::get('/products/{product}', [PreinvoiceApiController::class, 'product']);
+            Route::get('/area', [PreinvoiceApiController::class, 'area']);
+            Route::get('/shippings', [PreinvoiceApiController::class, 'shippings']);
+        });
+    });
+
+    use App\Http\Controllers\CustomerController;
+    use App\Http\Controllers\CustomerApiController;
+
+    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+
+    // API برای سرچ و ساخت سریع داخل پیش‌فاکتور
+    Route::prefix('preinvoice/api')->group(function () {
+        Route::get('/customers', [CustomerApiController::class, 'search'])->name('api.customers.search');
+        Route::post('/customers', [CustomerApiController::class, 'store'])->name('api.customers.store');
+        Route::get('/customers/{customer}', [CustomerApiController::class, 'show'])->name('api.customers.show');
+    });
+    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+    Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+
+
+    use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\InvoiceNoteController;
+use App\Http\Controllers\ChequeController;
+
+Route::prefix('invoices')->group(function () {
+    Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('/{uuid}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::post('/{uuid}/status', [InvoiceController::class, 'updateStatus'])->name('invoices.status');
+
+    Route::post('/{uuid}/payments', [InvoicePaymentController::class, 'store'])->name('invoices.payments.store');
+    Route::post('/{uuid}/notes', [InvoiceNoteController::class, 'store'])->name('invoices.notes.store');
+
+    Route::post('/payments/{payment}/cheque', [ChequeController::class, 'store'])->name('cheques.store');
+});
+
+
+Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])
+    ->name('preinvoice.draft.finalize');
+
 require __DIR__.'/auth.php';
 
 

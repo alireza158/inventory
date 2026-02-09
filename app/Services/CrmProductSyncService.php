@@ -20,123 +20,138 @@ class CrmProductSyncService
         $req = Http::timeout(30)->retry(3, 500);
 
         $token = config('services.ariya_crm.token');
-        if (!empty($token)) $req = $req->withToken($token);
-
-        $payload = $req->get($url)->throw()->json();
-
-        $items = Arr::get($payload, 'data.items.data', []);
-        if (!is_array($items)) $items = [];
+        if (!empty($token)) {
+            $req = $req->withToken($token);
+        }
 
         $created = 0;
         $updated = 0;
         $failed  = 0;
 
-        foreach ($items as $item) {
-            try {
-                DB::transaction(function () use ($item, &$created, &$updated) {
+        $nextUrl = $url;
 
-                    $externalId = (string) Arr::get($item, 'ariya_id');
-                    $name       = (string) Arr::get($item, 'title');
-                    $basePrice  = (int) (Arr::get($item, 'base_price') ?? 0);
-                    $baseQty    = (int) (Arr::get($item, 'base_quantity') ?? 0);
+        while ($nextUrl) {
+            $payload = $req->get($nextUrl)->throw()->json();
 
-                    $varieties  = Arr::get($item, 'varieties', []);
-                    if (!is_array($varieties)) $varieties = [];
+            $items = Arr::get($payload, 'data.items.data', []);
+            if (!is_array($items)) $items = [];
 
-                    $sku = 'ARIYA-' . $externalId;
-                    $categoryId = 1;
+            foreach ($items as $item) {
+                try {
+                    DB::transaction(function () use ($item, &$created, &$updated) {
 
-                    $product = Product::where('sku', $sku)->first();
-                    $isExisting = (bool) $product;
+                        $externalId = (string) Arr::get($item, 'ariya_id');
+                        $name       = (string) Arr::get($item, 'title');
+                        $basePrice  = (int) (Arr::get($item, 'base_price') ?? 0);
+                        $baseQty    = (int) (Arr::get($item, 'base_quantity') ?? 0);
 
-                    $product = Product::updateOrCreate(
-                        ['sku' => $sku],
-                        [
-                            'external_id' => $externalId ?: null,
-                            'category_id' => $categoryId,
-                            'name'        => $name,
-                            'synced_at'   => Carbon::now(),
-                        ]
-                    );
+                        $varieties  = Arr::get($item, 'varieties', []);
+                        if (!is_array($varieties)) $varieties = [];
 
-                    // --- اگر variety داریم: آنها را در جدول جدا ذخیره کن
-                    if (count($varieties)) {
-                        $rows = [];
-                        $keepKeys = []; // برای حذف مدل‌هایی که دیگر در CRM نیستند
+                        $sku = 'ARIYA-' . $externalId;
+                        $categoryId = 1;
 
-                        foreach ($varieties as $v) {
-                            $varietyId  = Arr::get($v, 'id');           // اگر CRM این فیلد را دارد
-                            $uniqueKey  = Arr::get($v, 'unique_key');   // اگر CRM می‌دهد
-                            $modelName  = (string) (Arr::get($v, 'model_name') ?? Arr::get($v, 'title') ?? 'unknown');
-                            $sellPrice  = (int) (Arr::get($v, 'price') ?? 0);
-                            $qty        = (int) (Arr::get($v, 'quantity') ?? 0);
+                        $existing = Product::where('sku', $sku)->first();
+                        $isExisting = (bool) $existing;
 
-                            // کلید تشخیص یکتا: variety_id اگر هست، وگرنه unique_key
-                            $identity = $varietyId ? ('vid:' . $varietyId) : ('uk:' . (string)$uniqueKey);
-                            $keepKeys[] = $identity;
-
-                            $rows[] = [
-                                'product_id'   => $product->id,
-                                'variant_name' => $modelName,
-                                'variety_id'   => $varietyId,
-                                'unique_key'   => $uniqueKey,
-                                'sell_price'   => max(0, $sellPrice),
-                                'buy_price'    => null, // اگر CRM buy_price دارد اینجا map کن
-                                'stock'        => max(0, $qty),
-                                'reserved'     => 0,
-                                'synced_at'    => Carbon::now(),
-                                'created_at'   => Carbon::now(),
-                                'updated_at'   => Carbon::now(),
-                            ];
-                        }
-
-                        // upsert با کلید درست
-                        // اگر variety_id همیشه هست:
-                        ProductVariant::upsert(
-                            $rows,
-                            ['product_id', 'variety_id'],
-                            ['variant_name','unique_key','sell_price','buy_price','stock','reserved','synced_at','updated_at']
+                        $product = Product::updateOrCreate(
+                            ['sku' => $sku],
+                            [
+                                'external_id' => $externalId ?: null,
+                                'category_id' => $categoryId,
+                                'name'        => $name,
+                                'synced_at'   => Carbon::now(),
+                                // اینا رو بعداً از مدل‌ها/پایه آپدیت می‌کنیم
+                                'price'       => 0,
+                                'stock'       => 0,
+                            ]
                         );
 
-                        // اگر variety_id ممکنه null باشه، بهتره دو مسیر بذاری:
-                        // 1) آنهایی که variety_id دارند را با کلید variety_id upsert
-                        // 2) آنهایی که variety_id ندارند را با کلید unique_key upsert
-                        // (اگه خواستی، همین را برات دقیق‌تر می‌کنم.)
+                        if (count($varieties)) {
+                            $now = Carbon::now();
 
-                        // محاسبه قیمت/موجودی محصول از روی variants
-                        $stock = ProductVariant::where('product_id', $product->id)->sum('stock');
-                        $minPrice = ProductVariant::where('product_id', $product->id)->min('sell_price');
+                            $rowsByVarietyId = [];
+                            $rowsByUniqueKey = [];
 
-                        $product->update([
-                            'stock' => max(0, (int)$stock),
-                            'price' => max(0, (int)($minPrice ?? $basePrice)),
-                        ]);
+                            foreach ($varieties as $v) {
+                                // ✅ فیلد درست طبق payload شما
+                                $varietyId = Arr::get($v, 'variety_id'); // نه id
+                                $uniqueKey = (string) (Arr::get($v, 'unique_key') ?? '');
+                                $modelName = (string) (Arr::get($v, 'model_name') ?? Arr::get($v, 'title') ?? 'unknown');
+                                $sellPrice = (int) (Arr::get($v, 'price') ?? 0);
+                                $qty       = (int) (Arr::get($v, 'quantity') ?? 0);
 
-                        // (اختیاری) پاک کردن مدل‌هایی که دیگر در CRM نیستند
-                        // اینجا چون کلید ترکیبی پیچیده‌ست، معمولاً با variety_id انجام می‌دن:
-                        // ProductVariant::where('product_id',$product->id)->whereNotIn('variety_id',$varietyIds)->delete();
+                                $row = [
+                                    'product_id'   => $product->id,
+                                    'variant_name' => $modelName,
+                                    'variety_id'   => $varietyId ?: null,
+                                    'unique_key'   => $uniqueKey ?: null,
+                                    'sell_price'   => max(0, $sellPrice),
+                                    'buy_price'    => null,
+                                    'stock'        => max(0, $qty),
+                                    'reserved'     => 0,
+                                    'synced_at'    => $now,
+                                    'created_at'   => $now,
+                                    'updated_at'   => $now,
+                                ];
 
-                    } else {
-                        // --- اگر variety نداریم: خود محصول ساده است
-                        $product->update([
-                            'stock' => max(0, $baseQty),
-                            'price' => max(0, $basePrice),
-                        ]);
+                                if (!empty($varietyId)) {
+                                    $rowsByVarietyId[] = $row;
+                                } else {
+                                    // اگر variety_id نداریم، باید با unique_key یکتا کنیم
+                                    if ($uniqueKey !== '') {
+                                        $rowsByUniqueKey[] = $row;
+                                    }
+                                }
+                            }
 
-                        // (اختیاری) اگر قبلاً variant داشت، پاکش کن:
-                        // ProductVariant::where('product_id',$product->id)->delete();
-                    }
+                            if (count($rowsByVarietyId)) {
+                                ProductVariant::upsert(
+                                    $rowsByVarietyId,
+                                    ['product_id', 'variety_id'],
+                                    ['variant_name','unique_key','sell_price','buy_price','stock','reserved','synced_at','updated_at']
+                                );
+                            }
 
-                    if ($isExisting) $updated++; else $created++;
-                });
+                            if (count($rowsByUniqueKey)) {
+                                ProductVariant::upsert(
+                                    $rowsByUniqueKey,
+                                    ['product_id', 'unique_key'],
+                                    ['variant_name','variety_id','sell_price','buy_price','stock','reserved','synced_at','updated_at']
+                                );
+                            }
 
-            } catch (\Throwable $e) {
-                $failed++;
-                Log::error('CRM product sync failed', [
-                    'external_id' => Arr::get($item, 'ariya_id'),
-                    'error' => $e->getMessage(),
-                ]);
+                            // جمع‌بندی محصول
+                            $stock = (int) ProductVariant::where('product_id', $product->id)->sum('stock');
+                            $minPrice = ProductVariant::where('product_id', $product->id)->min('sell_price');
+
+                            $product->update([
+                                'stock' => max(0, $stock),
+                                'price' => max(0, (int)($minPrice ?? $basePrice)),
+                            ]);
+
+                        } else {
+                            // محصول بدون مدل
+                            $product->update([
+                                'stock' => max(0, $baseQty),
+                                'price' => max(0, $basePrice),
+                            ]);
+                        }
+
+                        if ($isExisting) $updated++; else $created++;
+                    });
+
+                } catch (\Throwable $e) {
+                    $failed++;
+                    Log::error('CRM product sync failed', [
+                        'external_id' => Arr::get($item, 'ariya_id'),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
+
+            // ✅ pagination
+            $nextUrl = Arr::get($payload, 'data.items.next_page_url');
         }
 
         return compact('created', 'updated', 'failed');
