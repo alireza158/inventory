@@ -45,6 +45,7 @@
             <th class="text-nowrap">بدهکار</th>
             <th class="text-nowrap">بستانکار</th>
             <th class="text-nowrap">مانده</th>
+            <th class="text-nowrap">عملیات</th>
           </tr>
         </thead>
         <tbody>
@@ -57,9 +58,63 @@
               <td class="text-nowrap">{{ number_format((int)($c->debt ?? 0)) }}</td>
               <td class="text-nowrap">{{ number_format((int)($c->credit ?? 0)) }}</td>
               <td class="text-nowrap fw-bold">{{ number_format((int)($c->balance ?? 0)) }}</td>
+              <td class="text-nowrap">
+                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editCustomerModal{{ $c->id }}">
+                  ویرایش
+                </button>
+
+                <form method="POST" action="{{ route('customers.destroy', $c) }}" class="d-inline"
+                      onsubmit="return confirm('مشتری حذف شود؟')">
+                  @csrf
+                  @method('DELETE')
+                  <button class="btn btn-sm btn-outline-danger">حذف</button>
+                </form>
+              </td>
             </tr>
+
+            <div class="modal fade" id="editCustomerModal{{ $c->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <form class="modal-content" method="POST" action="{{ route('customers.update', $c) }}">
+                  @csrf
+                  @method('PUT')
+
+                  <div class="modal-header">
+                    <div class="fw-bold">✏️ ویرایش مشتری #{{ $c->id }}</div>
+                    <button type="button" class="btn-close ms-0" data-bs-dismiss="modal"></button>
+                  </div>
+
+                  <div class="modal-body">
+                    <div class="row g-2">
+                      <div class="col-md-6">
+                        <label class="form-label">نام</label>
+                        <input class="form-control" name="first_name" value="{{ old('first_name', $c->first_name) }}">
+                      </div>
+
+                      <div class="col-md-6">
+                        <label class="form-label">فامیل</label>
+                        <input class="form-control" name="last_name" value="{{ old('last_name', $c->last_name) }}">
+                      </div>
+
+                      <div class="col-md-12">
+                        <label class="form-label">موبایل *</label>
+                        <input class="form-control" name="mobile" value="{{ old('mobile', $c->mobile) }}" required>
+                      </div>
+
+                      <div class="col-md-12">
+                        <label class="form-label">آدرس</label>
+                        <textarea class="form-control" name="address" rows="2">{{ old('address', $c->address) }}</textarea>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="modal-footer">
+                    <button class="btn btn-primary">ذخیره تغییرات</button>
+                  </div>
+                </form>
+              </div>
+            </div>
           @empty
-            <tr><td colspan="7" class="text-center text-muted py-4">مشتری یافت نشد</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">مشتری یافت نشد</td></tr>
           @endforelse
         </tbody>
       </table>
@@ -72,7 +127,6 @@
 
 </div>
 
-{{-- ✅ Modal ساخت مشتری --}}
 <div class="modal fade" id="createCustomerModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form class="modal-content" method="POST" action="{{ route('customers.store') }}">
@@ -105,33 +159,13 @@
             <label class="form-label">آدرس</label>
             <textarea class="form-control" name="address" rows="2">{{ old('address') }}</textarea>
           </div>
-
-          {{-- اگر province/city داری بعداً می‌تونی اضافه کنی --}}
-          {{-- <input type="hidden" name="province_id" value="..."> --}}
-          {{-- <input type="hidden" name="city_id" value="..."> --}}
         </div>
-
-        {{-- اگر خواستی خطای ولیدیشن فقط برای مودال نشون بدی، باید error bag جدا بسازی --}}
       </div>
 
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">بستن</button>
-        <button type="submit" class="btn btn-primary">ثبت مشتری</button>
+        <button class="btn btn-primary">ثبت مشتری</button>
       </div>
     </form>
   </div>
 </div>
-
-{{-- ✅ اگر خطای validation از store برگشت، مودال خودکار باز شود --}}
-@if ($errors->any() && old('mobile'))
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const el = document.getElementById('createCustomerModal');
-      if (!el) return;
-      const m = new bootstrap.Modal(el);
-      m.show();
-    });
-  </script>
-@endif
-
 @endsection

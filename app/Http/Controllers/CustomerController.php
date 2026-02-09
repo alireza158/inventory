@@ -37,21 +37,50 @@ class CustomerController extends Controller
                 'required',
                 'string',
                 'max:20',
-                // اگر می‌خوای موبایل یکتا باشه:
                 Rule::unique('customers', 'mobile'),
             ],
             'address'    => ['nullable', 'string', 'max:1000'],
+            'province_id'=> ['nullable', 'integer'],
+            'city_id'    => ['nullable', 'integer'],
         ]);
 
-        Customer::create([
-            'first_name' => $data['first_name'] ?? null,
-            'last_name'  => $data['last_name'] ?? null,
-            'mobile'     => $data['mobile'],
-            'address'    => $data['address'] ?? null,
-        ]);
+        Customer::create($data);
 
         return redirect()
             ->route('customers.index')
             ->with('success', '✅ مشتری با موفقیت ساخته شد.');
+    }
+
+    public function update(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'first_name' => ['nullable', 'string', 'max:255'],
+            'last_name'  => ['nullable', 'string', 'max:255'],
+            'mobile'     => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('customers', 'mobile')->ignore($customer->id),
+            ],
+            'address'    => ['nullable', 'string', 'max:1000'],
+            'province_id'=> ['nullable', 'integer'],
+            'city_id'    => ['nullable', 'integer'],
+        ]);
+
+        $customer->update($data);
+
+        return redirect()
+            ->route('customers.index')
+            ->with('success', '✅ اطلاعات مشتری ویرایش شد.');
+    }
+
+    public function destroy(Customer $customer)
+    {
+        $title = trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? '')) ?: $customer->mobile;
+        $customer->delete();
+
+        return redirect()
+            ->route('customers.index')
+            ->with('success', "✅ مشتری {$title} حذف شد.");
     }
 }

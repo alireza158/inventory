@@ -63,6 +63,13 @@
       <div class="section-title mb-3">👤 اطلاعات مشتری</div>
 
       <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label fw-semibold">انتخاب مشتری (اختیاری)</label>
+          <select id="customer_select" class="form-select"></select>
+          <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', '') }}">
+          <div class="hint mt-2" id="customer_balance_hint"></div>
+        </div>
+
         <div class="col-md-6">
           <label class="form-label fw-semibold">شماره موبایل</label>
           <input type="text" name="customer_mobile" id="customer_mobile" class="form-control"
@@ -186,6 +193,8 @@
     product:   "{{ url('/preinvoice/api/products') }}", // /{id}
     area:      "{{ url('/preinvoice/api/area') }}",
     shippings: "{{ url('/preinvoice/api/shippings') }}",
+    customers: "{{ url('/preinvoice/api/customers') }}",
+    customer:  "{{ url('/preinvoice/api/customers') }}", // /{id}
   };
 </script>
 
@@ -259,6 +268,77 @@ function fillShippingSelect() {
 
 function formatPrice(val){ const n=Number(val); if(!Number.isFinite(n)) return ''; return n.toLocaleString('fa-IR'); }
 
+function setCustomerLocation(provinceId, cityId) {
+  const provinceSelect = document.getElementById('province_id');
+  const citySelect = document.getElementById('city_id');
+
+  if (provinceId) {
+    provinceSelect.value = String(provinceId);
+    if (window.jQuery) $(provinceSelect).trigger('change.select2');
+    fillCitiesByProvinceId(provinceId);
+  }
+
+  if (cityId) {
+    citySelect.value = String(cityId);
+    if (window.jQuery) $(citySelect).trigger('change.select2');
+  }
+}
+
+function initCustomerSelect() {
+  const customerSelect = document.getElementById('customer_select');
+  const customerIdInput = document.getElementById('customer_id');
+  const hint = document.getElementById('customer_balance_hint');
+
+  if (!customerSelect || !window.jQuery || !window.jQuery.fn?.select2) return;
+
+  $(customerSelect).select2({
+    width: '100%',
+    dir: 'rtl',
+    placeholder: 'جستجو مشتری با نام/موبایل...',
+    allowClear: true,
+    minimumInputLength: 2,
+    ajax: {
+      url: API.customers,
+      dataType: 'json',
+      delay: 250,
+      data: params => ({ q: params.term || '' }),
+      processResults: resp => {
+        const items = resp?.data?.customers || [];
+        return {
+          results: items.map(c => ({
+            id: c.id,
+            text: `${(c.first_name || '').trim()} ${(c.last_name || '').trim()} - ${c.mobile}`.trim()
+          }))
+        };
+      }
+    }
+  });
+
+  $(customerSelect).on('select2:select', async function (e) {
+    const customerId = e.params?.data?.id || null;
+    customerIdInput.value = customerId || '';
+    if (!customerId) return;
+
+    const res = await fetch(`${API.customer}/${customerId}`, { headers: { 'Accept':'application/json' } });
+    const json = await res.json();
+    const c = json?.data?.customer || null;
+    if (!c) return;
+
+    document.getElementById('customer_name').value = `${(c.first_name || '').trim()} ${(c.last_name || '').trim()}`.trim();
+    document.getElementById('customer_mobile').value = c.mobile || '';
+    document.getElementById('customer_address').value = c.address || '';
+
+    setCustomerLocation(c.province_id, c.city_id);
+
+    hint.textContent = `مانده حساب: ${(Number(c.balance || 0)).toLocaleString()} تومان`;
+  });
+
+  $(customerSelect).on('select2:clear', function () {
+    customerIdInput.value = '';
+    hint.textContent = '';
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const shippingSelect = document.getElementById('shipping_id');
   const provinceSelect = document.getElementById('province_id');
@@ -272,6 +352,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadShippings();
   fillShippingSelect();
+
+  initCustomerSelect();
+
+  const oldCustomerId = parseInt(document.getElementById('customer_id')?.value || 0);
+  if (oldCustomerId > 0) {
+    try {
+      const res = await fetch(`${API.customer}/${oldCustomerId}`, { headers: { 'Accept':'application/json' } });
+      const json = await res.json();
+      const c = json?.data?.customer || null;
+      if (c) {
+        const customerSelect = document.getElementById('customer_select');
+        const txt = `${(c.first_name || '').trim()} ${(c.last_name || '').trim()} - ${c.mobile}`.trim();
+        const option = new Option(txt, c.id, true, true);
+        customerSelect.appendChild(option);
+        if (window.jQuery) $(customerSelect).trigger('change');
+
+        setCustomerLocation(c.province_id, c.city_id);
+        const hint = document.getElementById('customer_balance_hint');
+        if (hint) hint.textContent = `مانده حساب: ${(Number(c.balance || 0)).toLocaleString()} تومان`;
+      }
+    } catch (e) {}
+  }
 
   provinceSelect.addEventListener('change', () => {
     fillCitiesByProvinceId(provinceSelect.value);
