@@ -117,12 +117,15 @@ Route::post('/categories/quick-store', [CategoryController::class, 'quickStore']
     });
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+    Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+    Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
 
 
     use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoicePaymentController;
 use App\Http\Controllers\InvoiceNoteController;
 use App\Http\Controllers\ChequeController;
+use App\Http\Controllers\ActivityLogController;
 
 Route::prefix('invoices')->group(function () {
     Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');
@@ -139,6 +142,10 @@ Route::prefix('invoices')->group(function () {
 Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])
     ->name('preinvoice.draft.finalize');
 
-require __DIR__.'/auth.php';
+Route::middleware(['auth'])->group(function () {
+    Route::get('/activity-logs', [ActivityLogController::class, 'index'])
+        ->name('activity-logs.index');
+});
 
+require __DIR__.'/auth.php';
 
