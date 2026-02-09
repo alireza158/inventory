@@ -84,11 +84,6 @@
    فاکتورها
 </a>
 
-        <a class="list-group-item list-group-item-action {{ $is('activity-logs.index') }}"
-           href="{{ route('activity-logs.index') }}">
-            لاگ فعالیت‌ها
-        </a>
-
         </div>
 
     </div>
