@@ -6,6 +6,17 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'انبارداری') }}</title>
+    <script src="{{ asset('lib/jquery.min.js') }}"></script>
+
+    <!-- اگر select2 داری -->
+    <script src="{{ asset('lib/select2.min.js') }}"></script>
+
+    <!-- وابستگی اصلی دیت‌پیکر -->
+    <script src="{{ asset('lib/persian-date.min.js') }}"></script>
+    <script src="{{ asset('lib/persian-datepicker.min.js') }}"></script>
+
+    <!-- Bootstrap (اختیاری، فقط اگر نیاز داری) -->
+    <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}">

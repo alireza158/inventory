@@ -13,9 +13,9 @@ class InvoicePaymentController extends Controller
         $data = $request->validate([
             'method' => 'required|in:cash,card,cheque',
             'amount' => 'required|integer|min:1',
-            'paid_at' => 'nullable|date',
+            'paid_at' => 'nullable|date', // yyyy-mm-dd
             'note' => 'nullable|string|max:2000',
-            'receipt_image' => 'nullable|image|max:4096', // 4MB
+            'receipt_image' => 'nullable|image|max:4096',
         ]);
 
         $path = null;
@@ -23,15 +23,17 @@ class InvoicePaymentController extends Controller
             $path = $request->file('receipt_image')->store('invoices/receipts', 'public');
         }
 
-        $payment = $invoice->payments()->create([
+        // ✅ اگر خالی بود، امروز ثبت شود
+        $paidAt = $data['paid_at'] ?? now()->toDateString();
+
+        $invoice->payments()->create([
             'method' => $data['method'],
-            'amount' => (int)$data['amount'],
-            'paid_at' => $data['paid_at'] ?? null,
+            'amount' => (int) $data['amount'],
+            'paid_at' => $paidAt,
             'note' => $data['note'] ?? null,
             'receipt_image' => $path,
         ]);
 
-        // اگر پرداخت چکی بود، بعدش از route جدا cheque رو ثبت می‌کنی
         return back()->with('success','✅ پرداخت ثبت شد.');
     }
 }

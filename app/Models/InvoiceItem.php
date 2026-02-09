@@ -19,4 +19,14 @@ class InvoiceItem extends Model
     {
         return $this->belongsTo(Invoice::class);
     }
+    public function product()
+{
+    return $this->belongsTo(\App\Models\Product::class);
+}
+
+public function variant()
+{
+    return $this->belongsTo(\App\Models\ProductVariant::class, 'variant_id');
+}
+
 }
