@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Purchase;
 use App\Models\StockMovement;
 use App\Models\Supplier;
@@ -24,8 +26,9 @@ class PurchaseController extends Controller
     public function create()
     {
         $suppliers = Supplier::orderBy('name')->get();
+        $products = Product::with('variants')->orderBy('name')->get();
 
-        return view('purchases.create', compact('suppliers'));
+        return view('purchases.create', compact('suppliers', 'products'));
     }
 
     public function store(Request $request)
@@ -34,9 +37,12 @@ class PurchaseController extends Controller
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'note' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.code' => ['required', 'string', 'max:100'],
+            'items.*.variant_name' => ['required', 'string', 'max:255'],
             'items.*.buy_price' => ['required', 'integer', 'min:0'],
             'items.*.sell_price' => ['required', 'integer', 'min:0'],
         ]);
@@ -58,40 +64,85 @@ class PurchaseController extends Controller
                 $sellPrice = (int) $item['sell_price'];
                 $lineTotal = $quantity * $buyPrice;
 
-                $product = Product::where('sku', $item['code'])
-                    ->orWhere('code', $item['code'])
-                    ->lockForUpdate()
-                    ->first();
+                $product = null;
 
-                if ($product) {
-                    $before = (int) $product->stock;
-                    $after = $before + $quantity;
+                if (!empty($item['product_id'])) {
+                    $product = Product::whereKey($item['product_id'])->lockForUpdate()->first();
+                }
 
+                if (!$product) {
+                    $product = Product::where('sku', $item['code'])
+                        ->orWhere('code', $item['code'])
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if (!$product) {
+                    $defaultCategory = Category::query()->orderBy('id')->first();
+
+                    if (!$defaultCategory) {
+                        abort(422, 'برای ثبت خرید جدید، ابتدا حداقل یک دسته‌بندی کالا بسازید.');
+                    }
+
+                    $product = Product::create([
+                        'category_id' => $defaultCategory->id,
+                        'name' => $item['name'],
+                        'sku' => $item['code'],
+                        'code' => $item['code'],
+                        'stock' => 0,
+                        'reserved' => 0,
+                        'unit' => 'عدد',
+                        'price' => 0,
+                    ]);
+                } else {
                     $product->update([
                         'name' => $item['name'],
                         'sku' => $item['code'],
                         'code' => $item['code'],
+                    ]);
+                }
+
+                $variant = null;
+
+                if (!empty($item['variant_id'])) {
+                    $variant = ProductVariant::where('product_id', $product->id)
+                        ->where('id', $item['variant_id'])
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if (!$variant) {
+                    $variant = ProductVariant::where('product_id', $product->id)
+                        ->where('variant_name', $item['variant_name'])
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if ($variant) {
+                    $before = (int) $variant->stock;
+                    $after = $before + $quantity;
+
+                    $variant->update([
+                        'variant_name' => $item['variant_name'],
+                        'buy_price' => $buyPrice,
+                        'sell_price' => $sellPrice,
                         'stock' => $after,
-                        'price' => $sellPrice,
-                        'buy_retail' => $buyPrice,
-                        'sale_retail' => $sellPrice,
                     ]);
                 } else {
                     $before = 0;
                     $after = $quantity;
 
-                    $product = Product::create([
-                        'name' => $item['name'],
-                        'sku' => $item['code'],
-                        'code' => $item['code'],
+                    $variant = ProductVariant::create([
+                        'product_id' => $product->id,
+                        'variant_name' => $item['variant_name'],
+                        'buy_price' => $buyPrice,
+                        'sell_price' => $sellPrice,
                         'stock' => $after,
                         'reserved' => 0,
-                        'unit' => 'عدد',
-                        'price' => $sellPrice,
-                        'buy_retail' => $buyPrice,
-                        'sale_retail' => $sellPrice,
                     ]);
                 }
+
+                $this->recalcProductSummary($product);
 
                 StockMovement::create([
                     'product_id' => $product->id,
@@ -102,13 +153,15 @@ class PurchaseController extends Controller
                     'stock_before' => $before,
                     'stock_after' => $after,
                     'reference' => 'PUR-'.$purchase->id,
-                    'note' => 'ثبت خرید کالا',
+                    'note' => 'ثبت خرید کالا - مدل: '.$item['variant_name'],
                 ]);
 
                 $purchase->items()->create([
                     'product_id' => $product->id,
+                    'product_variant_id' => $variant->id,
                     'product_name' => $item['name'],
                     'product_code' => $item['code'],
+                    'variant_name' => $item['variant_name'],
                     'quantity' => $quantity,
                     'buy_price' => $buyPrice,
                     'sell_price' => $sellPrice,
@@ -121,6 +174,27 @@ class PurchaseController extends Controller
             $purchase->update(['total_amount' => $totalAmount]);
         });
 
-        return redirect()->route('purchases.index')->with('success', 'خرید کالا با موفقیت ثبت شد.');
+        return redirect()->route('purchases.index')->with('success', 'خرید کالا با موفقیت ثبت شد و با بخش کالاها همگام‌سازی شد.');
+    }
+
+    private function recalcProductSummary(Product $product): void
+    {
+        $product->load('variants');
+
+        if ($product->variants->count() === 0) {
+            $product->update([
+                'stock' => 0,
+                'price' => 0,
+            ]);
+            return;
+        }
+
+        $stock = (int) $product->variants->sum('stock');
+        $minPrice = (int) $product->variants->min('sell_price');
+
+        $product->update([
+            'stock' => max(0, $stock),
+            'price' => max(0, $minPrice),
+        ]);
     }
 }

@@ -32,13 +32,19 @@
                 </div>
             </div>
 
+            <div class="alert alert-info py-2 small">
+                در هر ردیف می‌توانید ابتدا از کالاهای موجود انتخاب کنید یا نام/کد محصول جدید وارد کنید؛ سپس مدل (Variant) همان کالا را ثبت کنید.
+            </div>
+
             <div class="table-responsive">
                 <table class="table table-bordered align-middle" id="itemsTable">
                     <thead>
                         <tr>
-                            <th>اسم محصول</th>
-                            <th>تعداد محصول</th>
-                            <th>کد محصول</th>
+                            <th style="min-width:180px">انتخاب کالا (اختیاری)</th>
+                            <th style="min-width:180px">اسم محصول</th>
+                            <th style="min-width:140px">کد محصول</th>
+                            <th style="min-width:180px">مدل محصول</th>
+                            <th>تعداد</th>
                             <th>قیمت خرید</th>
                             <th>قیمت فروش</th>
                             <th>جمع</th>
@@ -49,7 +55,7 @@
                 </table>
             </div>
 
-            <button type="button" class="btn btn-outline-primary" id="addRowBtn">+ افزودن محصول</button>
+            <button type="button" class="btn btn-outline-primary" id="addRowBtn">+ افزودن ردیف مدل</button>
 
             <div class="d-flex justify-content-end mt-3">
                 <div class="fw-bold fs-5">قیمت کل خرید: <span id="totalAmount">0</span> ریال</div>
@@ -64,18 +70,52 @@
 
 <script>
 (function () {
+    const products = @json($products->map(function ($p) {
+        return [
+            'id' => $p->id,
+            'name' => $p->name,
+            'code' => $p->code ?: $p->sku,
+            'variants' => $p->variants->map(function ($v) {
+                return [
+                    'id' => $v->id,
+                    'name' => $v->variant_name,
+                    'buy_price' => (int) ($v->buy_price ?? 0),
+                    'sell_price' => (int) ($v->sell_price ?? 0),
+                ];
+            })->values(),
+        ];
+    })->values());
+
     const tbody = document.querySelector('#itemsTable tbody');
     const addBtn = document.getElementById('addRowBtn');
     const totalEl = document.getElementById('totalAmount');
 
+    function productOptions() {
+        return `<option value="">کالای جدید/بدون انتخاب</option>${products.map((p) =>
+            `<option value="${p.id}">${p.name} (${p.code || '-'})</option>`
+        ).join('')}`;
+    }
+
     function rowTemplate(index) {
         return `
         <tr>
-            <td><input class="form-control" name="items[${index}][name]" required></td>
+            <td>
+                <select class="form-select product-select" name="items[${index}][product_id]">
+                    ${productOptions()}
+                </select>
+            </td>
+            <td><input class="form-control product-name" name="items[${index}][name]" required></td>
+            <td><input class="form-control product-code" name="items[${index}][code]" required></td>
+            <td>
+                <input type="hidden" class="variant-id" name="items[${index}][variant_id]">
+                <div class="d-flex gap-2">
+                    <select class="form-select variant-select" style="max-width: 170px;"></select>
+                    <input class="form-control variant-name" name="items[${index}][variant_name]" placeholder="نام مدل" required>
+                </div>
+            </td>
             <td><input type="number" min="1" class="form-control qty" name="items[${index}][quantity]" value="1" required></td>
-            <td><input class="form-control" name="items[${index}][code]" required></td>
             <td><input type="number" min="0" class="form-control buy" name="items[${index}][buy_price]" value="0" required></td>
-            <td><input type="number" min="0" class="form-control" name="items[${index}][sell_price]" value="0" required></td>
+            <td><input type="number" min="0" class="form-control sell" name="items[${index}][sell_price]" value="0" required></td>
             <td class="line-total">0</td>
             <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">حذف</button></td>
         </tr>`;
@@ -93,17 +133,67 @@
         totalEl.textContent = total.toLocaleString('fa-IR');
     }
 
+    function fillVariants(tr, productId) {
+        const variantSelect = tr.querySelector('.variant-select');
+        variantSelect.innerHTML = '<option value="">مدل جدید</option>';
+        tr.querySelector('.variant-id').value = '';
+
+        if (!productId) return;
+
+        const product = products.find((p) => String(p.id) === String(productId));
+        if (!product) return;
+
+        product.variants.forEach((v) => {
+            variantSelect.insertAdjacentHTML('beforeend', `<option value="${v.id}" data-name="${v.name}" data-buy="${v.buy_price}" data-sell="${v.sell_price}">${v.name}</option>`);
+        });
+    }
+
     function addRow() {
         const index = tbody.querySelectorAll('tr').length;
         tbody.insertAdjacentHTML('beforeend', rowTemplate(index));
-        recalc();
     }
 
     addBtn.addEventListener('click', addRow);
 
+    tbody.addEventListener('change', (e) => {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+
+        if (e.target.classList.contains('product-select')) {
+            const productId = e.target.value;
+            const product = products.find((p) => String(p.id) === String(productId));
+
+            if (product) {
+                tr.querySelector('.product-name').value = product.name || '';
+                tr.querySelector('.product-code').value = product.code || '';
+            }
+
+            fillVariants(tr, productId);
+        }
+
+        if (e.target.classList.contains('variant-select')) {
+            const opt = e.target.selectedOptions[0];
+            const variantId = opt?.value || '';
+
+            tr.querySelector('.variant-id').value = variantId;
+
+            if (variantId) {
+                tr.querySelector('.variant-name').value = opt.dataset.name || '';
+                tr.querySelector('.buy').value = opt.dataset.buy || 0;
+                tr.querySelector('.sell').value = opt.dataset.sell || 0;
+                recalc();
+            }
+        }
+    });
+
     tbody.addEventListener('input', (e) => {
         if (e.target.classList.contains('qty') || e.target.classList.contains('buy')) {
             recalc();
+        }
+
+        if (e.target.classList.contains('variant-name')) {
+            const tr = e.target.closest('tr');
+            tr.querySelector('.variant-id').value = '';
         }
     });
 
