@@ -61,12 +61,16 @@ class PurchaseController extends Controller
                 'user_id' => auth()->id(),
                 'purchased_at' => now(),
                 'note' => $data['note'] ?? null,
+                'subtotal_amount' => 0,
+                'discount_type' => $data['invoice_discount_type'] ?? null,
+                'discount_value' => (int) ($data['invoice_discount_value'] ?? 0),
+                'total_discount' => 0,
                 'total_amount' => 0,
             ]);
 
-            $totalAmount = $this->applyItems($purchase, $data['items']);
+            $summary = $this->applyItems($purchase, $data);
 
-            $purchase->update(['total_amount' => $totalAmount]);
+            $purchase->update($summary);
         });
 
         return redirect()->route('purchases.index')->with('success', 'خرید کالا با موفقیت ثبت شد.');
@@ -83,11 +87,13 @@ class PurchaseController extends Controller
                 'supplier_id' => $data['supplier_id'],
                 'note' => $data['note'] ?? null,
                 'user_id' => auth()->id(),
+                'discount_type' => $data['invoice_discount_type'] ?? null,
+                'discount_value' => (int) ($data['invoice_discount_value'] ?? 0),
             ]);
 
-            $totalAmount = $this->applyItems($purchase, $data['items']);
+            $summary = $this->applyItems($purchase, $data);
 
-            $purchase->update(['total_amount' => $totalAmount]);
+            $purchase->update($summary);
         });
 
         return redirect()->route('purchases.index')->with('success', 'سند خرید با موفقیت ویرایش شد.');
@@ -98,6 +104,10 @@ class PurchaseController extends Controller
         return $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'note' => ['nullable', 'string', 'max:1000'],
+
+            'invoice_discount_type' => ['nullable', 'in:amount,percent'],
+            'invoice_discount_value' => ['nullable', 'integer', 'min:0'],
+
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
@@ -107,18 +117,26 @@ class PurchaseController extends Controller
             'items.*.variant_name' => ['required', 'string', 'max:255'],
             'items.*.buy_price' => ['required', 'integer', 'min:0'],
             'items.*.sell_price' => ['required', 'integer', 'min:0'],
+            'items.*.discount_type' => ['nullable', 'in:amount,percent'],
+            'items.*.discount_value' => ['nullable', 'integer', 'min:0'],
         ]);
     }
 
-    private function applyItems(Purchase $purchase, array $items): int
+    private function applyItems(Purchase $purchase, array $data): array
     {
-        $totalAmount = 0;
+        $subtotalAmount = 0;
+        $itemsDiscountTotal = 0;
 
-        foreach ($items as $item) {
+        foreach ($data['items'] as $item) {
             $quantity = (int) $item['quantity'];
             $buyPrice = (int) $item['buy_price'];
             $sellPrice = (int) $item['sell_price'];
-            $lineTotal = $quantity * $buyPrice;
+            $lineSubtotal = $quantity * $buyPrice;
+
+            $itemDiscountType = $item['discount_type'] ?? null;
+            $itemDiscountValue = (int) ($item['discount_value'] ?? 0);
+            $itemDiscountAmount = $this->calculateDiscount($lineSubtotal, $itemDiscountType, $itemDiscountValue);
+            $lineTotal = max(0, $lineSubtotal - $itemDiscountAmount);
 
             $product = $this->resolveOrCreateProduct($item);
 
@@ -149,13 +167,46 @@ class PurchaseController extends Controller
                 'quantity' => $quantity,
                 'buy_price' => $buyPrice,
                 'sell_price' => $sellPrice,
+                'line_subtotal' => $lineSubtotal,
+                'discount_type' => $itemDiscountType,
+                'discount_value' => $itemDiscountValue,
+                'discount_amount' => $itemDiscountAmount,
                 'line_total' => $lineTotal,
             ]);
 
-            $totalAmount += $lineTotal;
+            $subtotalAmount += $lineSubtotal;
+            $itemsDiscountTotal += $itemDiscountAmount;
         }
 
-        return $totalAmount;
+        $baseAfterItemDiscount = max(0, $subtotalAmount - $itemsDiscountTotal);
+        $invoiceDiscountType = $data['invoice_discount_type'] ?? null;
+        $invoiceDiscountValue = (int) ($data['invoice_discount_value'] ?? 0);
+        $invoiceDiscountAmount = $this->calculateDiscount($baseAfterItemDiscount, $invoiceDiscountType, $invoiceDiscountValue);
+
+        $totalDiscount = $itemsDiscountTotal + $invoiceDiscountAmount;
+        $totalAmount = max(0, $subtotalAmount - $totalDiscount);
+
+        return [
+            'subtotal_amount' => $subtotalAmount,
+            'discount_type' => $invoiceDiscountType,
+            'discount_value' => $invoiceDiscountValue,
+            'total_discount' => $totalDiscount,
+            'total_amount' => $totalAmount,
+        ];
+    }
+
+    private function calculateDiscount(int $baseAmount, ?string $discountType, int $discountValue): int
+    {
+        if ($baseAmount <= 0 || !$discountType || $discountValue <= 0) {
+            return 0;
+        }
+
+        if ($discountType === 'percent') {
+            $value = min($discountValue, 100);
+            return (int) floor($baseAmount * $value / 100);
+        }
+
+        return min($discountValue, $baseAmount);
     }
 
     private function resolveOrCreateProduct(array $item): Product
@@ -180,7 +231,6 @@ class PurchaseController extends Controller
         }
 
         if ($product) {
-            // برای جلوگیری از ساخت محصول تکراری، وقتی محصول انتخاب/پیدا شد SKU را تغییر نمی‌دهیم.
             $product->update([
                 'name' => $item['name'],
             ]);

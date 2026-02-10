@@ -10,15 +10,19 @@
     <div class="card-body">
         <form method="POST" action="{{ route('suppliers.store') }}" class="row g-3 align-items-end">
             @csrf
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <label class="form-label">نام تامین‌کننده</label>
                 <input name="name" class="form-control" required>
             </div>
-            <div class="col-md-5">
-                <label class="form-label">شماره تماس (اختیاری)</label>
-                <input name="phone" class="form-control">
+            <div class="col-md-3">
+                <label class="form-label">شماره تماس</label>
+                <input name="phone" class="form-control" required>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-4">
+                <label class="form-label">آدرس</label>
+                <input name="address" class="form-control" required>
+            </div>
+            <div class="col-md-1">
                 <button class="btn btn-primary w-100">ثبت</button>
             </div>
         </form>
@@ -32,6 +36,7 @@
                 <tr>
                     <th>نام</th>
                     <th>شماره تماس</th>
+                    <th>آدرس</th>
                     <th>تاریخ ثبت</th>
                 </tr>
             </thead>
@@ -40,10 +45,11 @@
                     <tr>
                         <td>{{ $supplier->name }}</td>
                         <td>{{ $supplier->phone ?: '-' }}</td>
+                        <td>{{ $supplier->address ?: '-' }}</td>
                         <td>{{ $supplier->created_at->format('Y/m/d') }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="3" class="text-center text-muted py-4">تامین‌کننده‌ای ثبت نشده است.</td></tr>
+                    <tr><td colspan="4" class="text-center text-muted py-4">تامین‌کننده‌ای ثبت نشده است.</td></tr>
                 @endforelse
             </tbody>
         </table>

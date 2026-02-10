@@ -6,6 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class PurchaseItem extends Model
 {
+    protected $casts = [
+        'line_subtotal' => 'integer',
+        'discount_value' => 'integer',
+        'discount_amount' => 'integer',
+        'line_total' => 'integer',
+    ];
+
     protected $fillable = [
         'purchase_id',
         'product_id',
@@ -16,6 +23,10 @@ class PurchaseItem extends Model
         'quantity',
         'buy_price',
         'sell_price',
+        'line_subtotal',
+        'discount_type',
+        'discount_value',
+        'discount_amount',
         'line_total',
     ];
 
