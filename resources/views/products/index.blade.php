@@ -217,47 +217,51 @@
                                 </tr>
 
                                 {{-- Variants Row --}}
-                                @if($hasVariants)
-                                <tr class="collapse" id="{{ $collapseId }}">
-                                    <td colspan="8" class="bg-light">
-                                        <div class="p-2">
-                                            <div class="small text-muted mb-2">مدل‌های این محصول:</div>
+                               {{-- Variants Row --}}
+@if($hasVariants)
+<tr>
+    <td colspan="8" class="bg-light p-0">
+        <div class="collapse" id="{{ $collapseId }}">
+            <div class="p-2">
+                <div class="small text-muted mb-2">مدل‌های این محصول:</div>
 
-                                            <div class="table-responsive">
-                                                <table class="table table-sm table-bordered align-middle mb-0">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>#</th>
-                                                            <th>نام مدل</th>
-                                                            <th>موجودی</th>
-                                                            <th>قیمت فروش</th>
-                                                            <th>قیمت خرید</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach($p->variants as $i => $v)
-                                                            <tr>
-                                                                <td>{{ $i + 1 }}</td>
-                                                                <td class="fw-semibold">{{ $v->variant_name }}</td>
-                                                                <td>
-                                                                    @if((int)$v->stock === 0)
-                                                                        <span class="badge text-bg-danger">0</span>
-                                                                    @else
-                                                                        <span class="badge text-bg-secondary">{{ $v->stock }}</span>
-                                                                    @endif
-                                                                </td>
-                                                                <td>{{ number_format((int)$v->sell_price) }} تومان</td>
-                                                                <td>{{ $v->buy_price !== null ? number_format((int)$v->buy_price) . ' تومان' : '—' }}</td>
-                                                            </tr>
-                                                        @endforeach
-                                                    </tbody>
-                                                </table>
-                                            </div>
-
-                                        </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>نام مدل</th>
+                                <th>موجودی</th>
+                                <th>قیمت فروش</th>
+                                <th>قیمت خرید</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($p->variants as $i => $v)
+                                <tr>
+                                    <td>{{ $i + 1 }}</td>
+                                    <td class="fw-semibold">{{ $v->variant_name }}</td>
+                                    <td>
+                                        @if((int)$v->stock === 0)
+                                            <span class="badge text-bg-danger">0</span>
+                                        @else
+                                            <span class="badge text-bg-secondary">{{ $v->stock }}</span>
+                                        @endif
                                     </td>
+                                    <td>{{ number_format((int)$v->sell_price) }} تومان</td>
+                                    <td>{{ $v->buy_price !== null ? number_format((int)$v->buy_price) . ' تومان' : '—' }}</td>
                                 </tr>
-                                @endif
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </td>
+</tr>
+@endif
+
 
                             @empty
                                 <tr>
@@ -274,6 +278,21 @@
 
     </div>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(btn => {
+        const targetSel = btn.getAttribute('data-bs-target');
+        const el = document.querySelector(targetSel);
+        if (!el) return;
+
+        // initial state
+        btn.textContent = el.classList.contains('show') ? '−' : '+';
+
+        el.addEventListener('shown.bs.collapse', () => btn.textContent = '−');
+        el.addEventListener('hidden.bs.collapse', () => btn.textContent = '+');
+      });
+    });
+    </script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
