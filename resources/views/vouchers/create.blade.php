@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="page-title mb-0">ثبت حواله</h4>
+    <h4 class="page-title mb-0">ثبت حواله انبار</h4>
     <a class="btn btn-outline-secondary" href="{{ route('vouchers.index') }}">بازگشت</a>
 </div>
 
@@ -59,7 +59,7 @@
                 </div>
 
                 <div class="col-12">
-                    <button class="btn btn-primary">ثبت حواله</button>
+                    <button class="btn btn-primary">ثبت حواله انبار</button>
                 </div>
             </div>
         </form>
