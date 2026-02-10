@@ -38,12 +38,55 @@
     })->values()->all();
 @endphp
 
+<style>
+    .purchase-form-compact .form-control,
+    .purchase-form-compact .form-select {
+        height: 34px;
+        padding: .25rem .5rem;
+        font-size: .9rem;
+    }
+
+    .purchase-form-compact .table > :not(caption) > * > * {
+        padding: .35rem .4rem;
+        vertical-align: middle;
+        font-size: .88rem;
+    }
+
+    .purchase-form-compact .btn {
+        padding: .28rem .6rem;
+        font-size: .85rem;
+    }
+
+    .purchase-form-compact .qty,
+    .purchase-form-compact .buy,
+    .purchase-form-compact .sell {
+        max-width: 80px;
+        text-align: center;
+    }
+
+    .purchase-form-compact .line-total {
+        min-width: 72px;
+        font-weight: 600;
+    }
+
+    .purchase-form-compact input[type=number]::-webkit-outer-spin-button,
+    .purchase-form-compact input[type=number]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .purchase-form-compact input[type=number] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="page-title mb-0">{{ $isEdit ? 'ویرایش سند خرید' : 'ثبت خرید جدید' }}</h4>
-    <a class="btn btn-outline-secondary" href="{{ route('purchases.index') }}">بازگشت</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ route('purchases.index') }}">بازگشت</a>
 </div>
 
-<div class="card">
+<div class="card purchase-form-compact">
     <div class="card-body">
         <form method="POST" action="{{ $formAction }}" id="purchaseForm">
             @csrf
@@ -51,11 +94,11 @@
                 @method('PUT')
             @endif
 
-            <div class="row g-3 mb-3">
+            <div class="row g-2 mb-2">
                 <div class="col-md-6">
                     <label class="form-label">تامین‌کننده</label>
-                    <div class="d-flex gap-2">
-                        <select class="form-select" name="supplier_id" required>
+                    <div class="d-flex gap-1">
+                        <select class="form-select form-select-sm" name="supplier_id" required>
                             <option value="">انتخاب کنید...</option>
                             @foreach($suppliers as $supplier)
                                 <option value="{{ $supplier->id }}" @selected(old('supplier_id', $purchase->supplier_id ?? null)==$supplier->id)>
@@ -63,12 +106,12 @@
                                 </option>
                             @endforeach
                         </select>
-                        <a href="{{ route('suppliers.index') }}" class="btn btn-outline-dark">مدیریت تامین‌کننده‌ها</a>
+                        <a href="{{ route('suppliers.index') }}" class="btn btn-sm btn-outline-dark">مدیریت تامین‌کننده‌ها</a>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">توضیحات (اختیاری)</label>
-                    <input class="form-control" name="note" value="{{ old('note', $purchase->note ?? '') }}">
+                    <input class="form-control form-control-sm" name="note" value="{{ old('note', $purchase->note ?? '') }}">
                 </div>
             </div>
 
@@ -77,7 +120,7 @@
             </div>
 
             <div class="table-responsive">
-                <table class="table table-bordered align-middle" id="itemsTable">
+                <table class="table table-sm table-bordered align-middle mb-0" id="itemsTable">
                     <thead>
                         <tr>
                             <th style="min-width:180px">انتخاب کالا (اختیاری)</th>
@@ -97,8 +140,8 @@
             </div>
 
             <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn btn-outline-primary" id="addRowBtn">+ افزودن ردیف جدید</button>
-                <button type="button" class="btn btn-outline-secondary" id="addVariantForSameProductBtn">+ افزودن مدل برای همین محصول</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">+ افزودن ردیف جدید</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="addVariantForSameProductBtn">+ افزودن مدل برای همین محصول</button>
             </div>
 
             <div class="d-flex justify-content-end mt-3">
@@ -106,7 +149,7 @@
             </div>
 
             <div class="mt-4">
-                <button class="btn btn-primary">{{ $isEdit ? 'ذخیره تغییرات سند خرید' : 'ثبت نهایی خرید' }}</button>
+                <button class="btn btn-sm btn-primary">{{ $isEdit ? 'ذخیره تغییرات سند خرید' : 'ثبت نهایی خرید' }}</button>
             </div>
         </form>
     </div>
@@ -146,24 +189,24 @@
         return `
         <tr>
             <td>
-                <select class="form-select product-select" name="items[${index}][product_id]">
+                <select class="form-select form-select-sm product-select" name="items[${index}][product_id]">
                     ${productOptions(productId)}
                 </select>
             </td>
-            <td><input class="form-control product-name" name="items[${index}][name]" value="${item.name ?? ''}" required></td>
-            <td><input class="form-control product-code" name="items[${index}][code]" value="${item.code ?? ''}" required></td>
+            <td><input class="form-control form-control-sm product-name" name="items[${index}][name]" value="${item.name ?? ''}" required></td>
+            <td><input class="form-control form-control-sm product-code" name="items[${index}][code]" value="${item.code ?? ''}" required></td>
             <td>
                 <input type="hidden" class="variant-id" name="items[${index}][variant_id]" value="${variantId}">
-                <div class="d-flex gap-2">
-                    <select class="form-select variant-select" style="max-width: 170px;">
+                <div class="d-flex gap-1">
+                    <select class="form-select form-select-sm variant-select" style="max-width: 170px;">
                         ${variantOptions(productId, variantId)}
                     </select>
-                    <input class="form-control variant-name" name="items[${index}][variant_name]" value="${item.variant_name ?? ''}" placeholder="نام مدل" required>
+                    <input class="form-control form-control-sm variant-name" name="items[${index}][variant_name]" value="${item.variant_name ?? ''}" placeholder="نام مدل" required>
                 </div>
             </td>
-            <td><input type="number" min="1" class="form-control qty" name="items[${index}][quantity]" value="${item.quantity ?? 1}" required></td>
-            <td><input type="number" min="0" class="form-control buy" name="items[${index}][buy_price]" value="${item.buy_price ?? 0}" required></td>
-            <td><input type="number" min="0" class="form-control sell" name="items[${index}][sell_price]" value="${item.sell_price ?? 0}" required></td>
+            <td><input type="number" min="1" class="form-control form-control-sm qty" name="items[${index}][quantity]" value="${item.quantity ?? 1}" required></td>
+            <td><input type="number" min="0" class="form-control form-control-sm buy" name="items[${index}][buy_price]" value="${item.buy_price ?? 0}" required></td>
+            <td><input type="number" min="0" class="form-control form-control-sm sell" name="items[${index}][sell_price]" value="${item.sell_price ?? 0}" required></td>
             <td class="line-total">0</td>
             <td><button type="button" class="btn btn-sm btn-outline-secondary duplicate-variant-row">+ مدل</button></td>
             <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">حذف</button></td>
