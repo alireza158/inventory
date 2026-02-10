@@ -16,7 +16,7 @@ use App\Models\ProductVariant;
 use App\Models\StockMovement;
 use App\Observers\ActivityObserver;
 use Illuminate\Support\ServiceProvider;
-
+use Illuminate\Pagination\Paginator;
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -38,5 +38,6 @@ class AppServiceProvider extends ServiceProvider
         InvoiceNote::observe(ActivityObserver::class);
         Cheque::observe(ActivityObserver::class);
         StockMovement::observe(ActivityObserver::class);
+        Paginator::useBootstrapFive(); // یا useBootstrapFour()
     }
 }
