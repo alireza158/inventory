@@ -13,14 +13,43 @@ use Illuminate\Support\Facades\DB;
 
 class PurchaseController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $purchases = Purchase::with('supplier')
-            ->withCount('items')
-            ->latest('purchased_at')
-            ->paginate(20);
+        $supplierId = $request->integer('supplier_id');
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+        $minTotalToman = $request->filled('min_total') ? (int) $request->get('min_total') : null;
+        $maxTotalToman = $request->filled('max_total') ? (int) $request->get('max_total') : null;
 
-        return view('purchases.index', compact('purchases'));
+        $query = Purchase::with('supplier')
+            ->withCount('items')
+            ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
+            ->when($dateFrom, fn ($q) => $q->whereDate('purchased_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('purchased_at', '<=', $dateTo));
+
+        if (!is_null($minTotalToman)) {
+            $query->where('total_amount', '>=', $minTotalToman * 10);
+        }
+
+        if (!is_null($maxTotalToman)) {
+            $query->where('total_amount', '<=', $maxTotalToman * 10);
+        }
+
+        $totalAllAmount = (int) Purchase::sum('total_amount');
+        $totalFilteredAmount = (int) (clone $query)->sum('total_amount');
+
+        $purchases = $query->latest('purchased_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $suppliers = Supplier::orderBy('name')->get();
+
+        return view('purchases.index', compact(
+            'purchases',
+            'suppliers',
+            'totalAllAmount',
+            'totalFilteredAmount'
+        ));
     }
 
     public function show(Purchase $purchase)
