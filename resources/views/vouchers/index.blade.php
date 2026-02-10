@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="page-title mb-0">خرید کالا / حواله‌ها</h4>
+    <h4 class="page-title mb-0">حواله‌ها</h4>
     <a class="btn btn-primary" href="{{ route('vouchers.create') }}">+ ثبت حواله</a>
 </div>
 
