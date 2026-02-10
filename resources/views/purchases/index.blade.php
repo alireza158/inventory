@@ -94,6 +94,11 @@
                         <td class="text-end">
                             <a href="{{ route('purchases.show', $purchase) }}" class="btn btn-sm btn-outline-secondary">مشاهده</a>
                             <a href="{{ route('purchases.edit', $purchase) }}" class="btn btn-sm btn-outline-primary">ویرایش</a>
+                            <form method="POST" action="{{ route('purchases.destroy', $purchase) }}" class="d-inline" onsubmit="return confirm('از حذف این سند خرید مطمئن هستید؟')">
+                                @csrf
+                                @method('DELETE')
+                                <button class="btn btn-sm btn-outline-danger">حذف</button>
+                            </form>
                         </td>
                     </tr>
                 @empty

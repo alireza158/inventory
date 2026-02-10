@@ -128,6 +128,16 @@ class PurchaseController extends Controller
         return redirect()->route('purchases.index')->with('success', 'سند خرید با موفقیت ویرایش شد.');
     }
 
+    public function destroy(Purchase $purchase)
+    {
+        DB::transaction(function () use ($purchase) {
+            $this->rollbackPurchase($purchase);
+            $purchase->delete();
+        });
+
+        return redirect()->route('purchases.index')->with('success', 'سند خرید با موفقیت حذف شد.');
+    }
+
     private function validatePayload(Request $request): array
     {
         return $request->validate([
