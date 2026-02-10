@@ -121,6 +121,9 @@ class PurchaseController extends Controller
             $lineTotal = $quantity * $buyPrice;
 
             $product = $this->resolveOrCreateProduct($item);
+
+            $before = 0;
+            $after = 0;
             $variant = $this->resolveOrCreateVariant($product, $item, $buyPrice, $sellPrice, $quantity, $before, $after);
 
             $this->recalcProductSummary($product);
