@@ -22,15 +22,24 @@
             کالاها
         </a>
 
-        <a class="list-group-item list-group-item-action {{ $is('vouchers.*') }}"
-           href="{{ route('vouchers.index') }}">
-            خرید کالا / حواله‌ها
-        </a>
+        <div class="mt-2">
+            <div class="text-muted small mb-2">خرید کالا / حواله‌ها</div>
 
-        <a class="list-group-item list-group-item-action {{ $is('movements.index') }}"
-           href="{{ route('movements.index') }}">
-            گردش انبار
-        </a>
+            <a class="list-group-item list-group-item-action {{ $is('purchases.*') }}"
+               href="{{ route('purchases.index') }}">
+                خرید کالا
+            </a>
+
+            <a class="list-group-item list-group-item-action {{ $is('vouchers.*') }}"
+               href="{{ route('vouchers.index') }}">
+                حواله‌ها
+            </a>
+
+            <a class="list-group-item list-group-item-action {{ $is('movements.index') }}"
+               href="{{ route('movements.index') }}">
+                انبارها
+            </a>
+        </div>
 
         <a class="list-group-item list-group-item-action {{ $is('stocktake.index') }}"
            href="{{ route('stocktake.index') }}">
