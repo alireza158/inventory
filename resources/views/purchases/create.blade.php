@@ -68,9 +68,8 @@
     </div>
 </div>
 
-<script>
-(function () {
-    const products = @json($products->map(function ($p) {
+@php
+    $productsPayload = $products->map(function ($p) {
         return [
             'id' => $p->id,
             'name' => $p->name,
@@ -82,9 +81,14 @@
                     'buy_price' => (int) ($v->buy_price ?? 0),
                     'sell_price' => (int) ($v->sell_price ?? 0),
                 ];
-            })->values(),
+            })->values()->all(),
         ];
-    })->values());
+    })->values()->all();
+@endphp
+
+<script>
+(function () {
+    const products = @json($productsPayload);
 
     const tbody = document.querySelector('#itemsTable tbody');
     const addBtn = document.getElementById('addRowBtn');
