@@ -88,6 +88,7 @@
                             <th>قیمت خرید</th>
                             <th>قیمت فروش</th>
                             <th>جمع</th>
+                            <th>مدل بیشتر</th>
                             <th>حذف</th>
                         </tr>
                     </thead>
@@ -164,6 +165,7 @@
             <td><input type="number" min="0" class="form-control buy" name="items[${index}][buy_price]" value="${item.buy_price ?? 0}" required></td>
             <td><input type="number" min="0" class="form-control sell" name="items[${index}][sell_price]" value="${item.sell_price ?? 0}" required></td>
             <td class="line-total">0</td>
+            <td><button type="button" class="btn btn-sm btn-outline-secondary duplicate-variant-row">+ مدل</button></td>
             <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">حذف</button></td>
         </tr>`;
     }
@@ -256,6 +258,23 @@
     });
 
     tbody.addEventListener('click', (e) => {
+        if (e.target.classList.contains('duplicate-variant-row')) {
+            const tr = e.target.closest('tr');
+            const cloneItem = {
+                product_id: tr.querySelector('.product-select')?.value || '',
+                name: tr.querySelector('.product-name')?.value || '',
+                code: tr.querySelector('.product-code')?.value || '',
+                variant_id: '',
+                variant_name: '',
+                quantity: 1,
+                buy_price: 0,
+                sell_price: 0,
+            };
+
+            addRow(cloneItem);
+            return;
+        }
+
         if (e.target.classList.contains('remove-row')) {
             e.target.closest('tr').remove();
             recalc();
