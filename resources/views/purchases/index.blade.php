@@ -16,6 +16,7 @@
                         <th>تامین‌کننده</th>
                         <th>مبلغ کل خرید</th>
                         <th>تعداد آیتم</th>
+                        <th class="text-end">عملیات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -25,9 +26,13 @@
                         <td>{{ $purchase->supplier?->name }}</td>
                         <td>{{ number_format($purchase->total_amount) }} ریال</td>
                         <td>{{ $purchase->items_count }}</td>
+                        <td class="text-end">
+                            <a href="{{ route('purchases.show', $purchase) }}" class="btn btn-sm btn-outline-secondary">مشاهده</a>
+                            <a href="{{ route('purchases.edit', $purchase) }}" class="btn btn-sm btn-outline-primary">ویرایش</a>
+                        </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="text-center text-muted py-5">هنوز خریدی ثبت نشده است.</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted py-5">هنوز خریدی ثبت نشده است.</td></tr>
                 @endforelse
                 </tbody>
             </table>
