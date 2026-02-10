@@ -92,6 +92,40 @@
   });
 </script>
 
+
+<script>
+  function initPersianDatepickers(){
+    if (!window.jQuery || !$.fn.persianDatepicker || !window.persianDate) return;
+
+    $('input[type="date"]').each(function(){
+      const el = this;
+      if (el.dataset.faDateBound === '1') return;
+      el.dataset.faDateBound = '1';
+
+      const currentValue = el.value || '';
+      el.type = 'text';
+      el.setAttribute('autocomplete', 'off');
+
+      $(el).persianDatepicker({
+        autoClose: true,
+        format: 'YYYY/MM/DD',
+        initialValueType: 'gregorian',
+        persianDigit: false,
+        formatter: function(unixDate){
+          if (!unixDate) return '';
+          return new persianDate(unixDate).toCalendar('gregorian').format('YYYY-MM-DD');
+        }
+      });
+
+      if (currentValue) {
+        el.value = currentValue;
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', initPersianDatepickers);
+</script>
+
 @stack('scripts')
 </body>
 </html>
