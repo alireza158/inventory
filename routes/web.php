@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceNoteController;
 use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\ModelListController;
 use App\Http\Controllers\PreinvoiceApiController;
 use App\Http\Controllers\PreinvoiceController;
 use App\Http\Controllers\ProductController;
@@ -39,6 +40,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/products/import', [ProductImportController::class, 'import'])->name('products.import');
     Route::get('/products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
     Route::post('/products/sync-crm', [ProductController::class, 'syncCrm'])->name('products.sync.crm');
+
+
+    Route::get('/model-lists', [ModelListController::class, 'index'])->name('model-lists.index');
+    Route::post('/model-lists', [ModelListController::class, 'store'])->name('model-lists.store');
+    Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
 
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
 
