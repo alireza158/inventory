@@ -5,6 +5,7 @@
     $preinvoiceOpen = request()->routeIs('preinvoice.*');
     $productsOpen = request()->routeIs('products.*');
     $categoriesOpen = request()->routeIs('categories.*');
+    $suppliersOpen = request()->routeIs('suppliers.*');
 @endphp
 
 <div class="bg-white border-end p-3" style="width: 260px">
@@ -69,6 +70,30 @@
 
         <div class="mt-2">
             <div class="text-muted small mb-2">خرید کالا / حواله‌ها</div>
+
+            <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $suppliersOpen ? 'active' : '' }}"
+               data-bs-toggle="collapse"
+               href="#suppliersMenu"
+               role="button"
+               aria-expanded="{{ $suppliersOpen ? 'true' : 'false' }}"
+               aria-controls="suppliersMenu">
+                <span>تامین‌کنندگان</span>
+                <span class="small">▾</span>
+            </a>
+
+            <div class="collapse {{ $suppliersOpen ? 'show' : '' }}" id="suppliersMenu">
+                <div class="list-group list-group-flush ms-2 mt-1">
+                    <a class="list-group-item list-group-item-action {{ $is('suppliers.index') }}"
+                       href="{{ route('suppliers.index') }}">
+                        لیست تامین‌کنندگان
+                    </a>
+
+                    <a class="list-group-item list-group-item-action {{ $is('suppliers.index') }}"
+                       href="{{ route('suppliers.index') }}#add-supplier-form">
+                        ➕ افزودن تامین‌کننده
+                    </a>
+                </div>
+            </div>
 
             <a class="list-group-item list-group-item-action {{ $is('purchases.*') }}"
                href="{{ route('purchases.index') }}">

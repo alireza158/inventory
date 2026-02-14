@@ -6,7 +6,7 @@
     <a class="btn btn-outline-secondary" href="{{ route('purchases.create') }}">بازگشت به خرید جدید</a>
 </div>
 
-<div class="card mb-3">
+<div class="card mb-3" id="add-supplier-form">
     <div class="card-body">
         <form method="POST" action="{{ route('suppliers.store') }}" class="row g-3 align-items-end">
             @csrf
