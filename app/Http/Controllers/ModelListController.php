@@ -42,7 +42,8 @@ class ModelListController extends Controller
             ->select('variant_name')
             ->whereNotNull('variant_name')
             ->where('variant_name', '<>', '')
-            ->distinct()
+            ->groupBy('variant_name')
+            ->orderBy('variant_name')
             ->chunk(500, function ($variants) use (&$count) {
                 foreach ($variants as $variant) {
                     [$brand, $modelName] = self::splitVariantName($variant->variant_name);
