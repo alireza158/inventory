@@ -61,6 +61,15 @@
         </button>
       </div>
 
+
+      <datalist id="modelListOptions">
+        @foreach($modelListOptions as $brand => $items)
+          @foreach($items as $item)
+            <option value="{{ $item->label }}">{{ $brand }}</option>
+          @endforeach
+        @endforeach
+      </datalist>
+
       <div class="table-responsive">
         <table class="table table-sm align-middle" id="variantsTable">
           <thead>
@@ -82,7 +91,7 @@
               <tr>
                 <td>
                   <input type="hidden" name="variants[{{ $i }}][id]" value="{{ $v['id'] ?? '' }}">
-                  <input class="form-control" name="variants[{{ $i }}][variant_name]" value="{{ $v['variant_name'] ?? '' }}">
+                  <input list="modelListOptions" class="form-control" name="variants[{{ $i }}][variant_name]" value="{{ $v['variant_name'] ?? '' }}" placeholder="مثلاً Samsung - S24 Ultra">
                 </td>
                 <td><input class="form-control" type="number" min="0" name="variants[{{ $i }}][sell_price]" value="{{ $v['sell_price'] ?? 0 }}"></td>
                 <td><input class="form-control" type="number" min="0" name="variants[{{ $i }}][buy_price]" value="{{ $v['buy_price'] ?? '' }}"></td>
@@ -113,7 +122,7 @@ function addVariantRow() {
   tr.innerHTML = `
     <td>
       <input type="hidden" name="variants[${i}][id]" value="">
-      <input class="form-control" name="variants[${i}][variant_name]" value="">
+      <input list="modelListOptions" class="form-control" name="variants[${i}][variant_name]" value="" placeholder="مثلاً Samsung - S24 Ultra">
     </td>
     <td><input class="form-control" type="number" min="0" name="variants[${i}][sell_price]" value="0"></td>
     <td><input class="form-control" type="number" min="0" name="variants[${i}][buy_price]" value=""></td>
