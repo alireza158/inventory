@@ -85,6 +85,7 @@
             @php
               $oldVariants = old('variants');
               $variants = is_array($oldVariants) ? $oldVariants : $product->variants->toArray();
+              $modelListItems = is_iterable($modelListOptions) ? $modelListOptions : [];
             @endphp
 
             @foreach($variants as $i => $v)
@@ -95,7 +96,7 @@
                     @if(!empty($v['variant_name']))
                       <option value="{{ $v['variant_name'] }}" selected>{{ $v['variant_name'] }}</option>
                     @endif
-                    @foreach($modelListOptions as $model)
+                    @foreach($modelListItems as $model)
                       <option value="{{ $model }}">{{ $model }}</option>
                     @endforeach
                   </select>
@@ -120,7 +121,7 @@
 
 <script>
 let variantIndex = {{ count(is_array(old('variants')) ? old('variants') : $product->variants) }};
-const modelOptions = @json($modelListOptions->values());
+const modelOptions = @json(collect($modelListItems)->values());
 
 function buildModelOptionsHtml(selected = '') {
   let html = '<option value=""></option>';

@@ -78,7 +78,11 @@
             </tr>
           </thead>
           <tbody>
-            @php $oldVariants = old('variants', []); @endphp
+            @php
+              $oldVariantsRaw = old('variants', []);
+              $oldVariants = is_array($oldVariantsRaw) ? $oldVariantsRaw : [];
+              $modelListItems = is_iterable($modelListOptions) ? $modelListOptions : [];
+            @endphp
             @foreach($oldVariants as $i => $v)
               <tr>
                 <td>
@@ -86,7 +90,7 @@
                     @if(!empty($v['variant_name']))
                       <option value="{{ $v['variant_name'] }}" selected>{{ $v['variant_name'] }}</option>
                     @endif
-                    @foreach($modelListOptions as $model)
+                    @foreach($modelListItems as $model)
                       <option value="{{ $model }}">{{ $model }}</option>
                     @endforeach
                   </select>
@@ -111,7 +115,7 @@
 
 <script>
 let variantIndex = {{ count(old('variants', [])) }};
-const modelOptions = @json($modelListOptions->values());
+const modelOptions = @json(collect($modelListItems)->values());
 
 function buildModelOptionsHtml(selected = '') {
   let html = '<option value=""></option>';
