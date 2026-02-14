@@ -59,7 +59,9 @@ $query = Product::query()->with(['category', 'variants']);
         $categories = Category::orderBy('name')->get();
         $modelListOptions = ModelList::query()
             ->orderBy('model_name')
-            ->pluck('model_name');
+            ->pluck('model_name')
+            ->values()
+            ->all();
 
         return view('products.create', compact('categories', 'modelListOptions'));
     }
@@ -119,7 +121,9 @@ $query = Product::query()->with(['category', 'variants']);
         $categories = Category::orderBy('name')->get();
         $modelListOptions = ModelList::query()
             ->orderBy('model_name')
-            ->pluck('model_name');
+            ->pluck('model_name')
+            ->values()
+            ->all();
 
         return view('products.edit', compact('product', 'categories', 'modelListOptions'));
     }
