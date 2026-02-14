@@ -5,160 +5,8 @@
     $toToman = fn($rial) => number_format((int) floor(((int) $rial) / 10));
 @endphp
 
-<style>
-    :root{
-        --ink: #0b1220;
-        --navy: #071a3a;
-        --blue: #0d6efd;
-        --blue2:#0a58ca;
-        --soft: #f6f9ff;
-        --soft2:#eef4ff;
-        --border: #dbe6ff;
-        --shadow: 0 10px 28px rgba(7, 26, 58, .10);
-        --shadow2:0 6px 14px rgba(7, 26, 58, .08);
-    }
 
-    .purchase-page-wrap{
-        background: #fff;
-        border-radius: 18px;
-        padding: 14px;
-    }
 
-    .purchase-topbar{
-        background: linear-gradient(90deg, var(--navy), var(--blue2));
-        border-radius: 16px;
-        padding: 12px 14px;
-        box-shadow: var(--shadow2);
-        color: #fff;
-        margin-bottom: 14px;
-    }
-    .purchase-topbar .page-title{ color:#fff; margin:0; }
-    .purchase-topbar .btn{ border-radius: 12px; }
-    .purchase-topbar .btn-light{
-        background: rgba(255,255,255,.92);
-        border: none;
-        color: var(--navy);
-        font-weight: 700;
-    }
-    .purchase-topbar .btn-light:hover{ filter: brightness(0.98); }
-
-    /* stat cards */
-    .stat-card{
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        box-shadow: var(--shadow2);
-        overflow: hidden;
-        background: #fff;
-        position: relative;
-    }
-    .stat-card::before{
-        content:"";
-        position:absolute;
-        inset:0 auto 0 0;
-        width:7px;
-        background: linear-gradient(180deg, var(--navy), var(--blue));
-    }
-    .stat-card .card-body{ padding: 14px; }
-    .stat-card .label{
-        color: rgba(32, 62, 122, 0.65);
-        font-size: .8rem;
-    }
-    .stat-card .value{
-        color: var(--ink);
-        font-weight: 700;
-        font-size: 1.1rem;
-    }
-
-    /* filter card */
-    .filter-card{
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        box-shadow: var(--shadow2);
-        background: linear-gradient(180deg, var(--soft), #fff);
-    }
-    .filter-card .card-body{ padding: 14px; }
-    .filter-card .form-label{
-        color: rgba(33, 61, 117, 0.7);
-        font-size: .85rem;
-        margin-bottom: .35rem;
-    }
-    .filter-card .form-control,
-    .filter-card .form-select{
-        height: 40px;
-        font-size: .9rem;
-        border-radius: 12px;
-        border: 1px solid rgba(44, 70, 122, 0.12);
-        background: #fff;
-        color: var(--ink);
-    }
-    .filter-card .form-control:focus,
-    .filter-card .form-select:focus{
-        outline: none;
-        border-color: rgba(13,110,253,.65);
-        box-shadow: 0 0 0 .25rem rgba(255, 255, 255, 1);
-    }
-    .filter-actions .btn{ border-radius: 12px; }
-    .filter-actions .btn-primary{
-        background: linear-gradient(90deg, var(--blue2), var(--blue));
-        border: none;
-        box-shadow: 0 10px 20px rgba(13,110,253,.18);
-    }
-
-    /* table card */
-    .table-card{
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        box-shadow: var(--shadow);
-        overflow: hidden;
-        background: #fff;
-    }
-    .table-card .card-body{ padding: 0; }
-
-    .table-card .table{ margin:0; }
-    .table-card thead th{
-        background: linear-gradient(90deg, rgba(18, 95, 226, 0.95), rgba(10,88,202,.95));
-        color: #fff;
-        border: none;
-        font-weight: 800;
-        font-size: .9rem;
-        padding: 12px 10px;
-        white-space: nowrap;
-    }
-    .table-card tbody td{
-        padding: 12px 10px;
-        vertical-align: middle;
-        color: rgba(11,18,32,.88);
-    }
-    .table-card tbody tr:hover{
-        background: rgba(13,110,253,.06);
-    }
-
-    .badge-items{
-        background: rgba(7,26,58,.10);
-        color: var(--navy);
-        border: 1px solid rgba(7,26,58,.12);
-        padding: .35rem .55rem;
-        border-radius: 999px;
-        font-weight: 800;
-    }
-
-    .amount-strong{
-        color: var(--ink);
-        font-weight: 900;
-    }
-
-    .action-btns .btn{ border-radius: 12px; }
-    .action-btns .btn-outline-secondary:hover,
-    .action-btns .btn-outline-primary:hover{
-        background: rgba(13,110,253,.06);
-        border-color: rgba(13,110,253,.45);
-    }
-
-    /* pagination */
-    .pagination{
-        margin-bottom: 0;
-    }
-</style>
 
 <div class="purchase-page-wrap">
 
@@ -225,7 +73,7 @@
         </div>
     </form>
 
-    <div class="card table-card">
+    <div class="card shadow-sm">
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-hover align-middle">

@@ -1,57 +1,624 @@
-body{
-    background-color:#f4f6f9;
-    font-size:14px;
+/* =========================
+   Modern Admin Theme (RTL-friendly) + Purchase Page
+   ========================= */
+
+/* ---------- Tokens ---------- */
+:root{
+    --bg: #f6f8fc;
+    --card: rgba(255,255,255,.92);
+    --text: #0f172a;
+    --muted: #64748b;
+    --border: rgba(15,23,42,.08);
+
+    --primary: #4f46e5;          /* indigo */
+    --primary-2: #2563eb;        /* blue */
+    --primary-soft: rgba(79,70,229,.12);
+
+    --success:#16a34a;
+    --success-soft: rgba(22,163,74,.12);
+
+    --danger:#ef4444;
+    --danger-soft: rgba(239,68,68,.12);
+
+    --warning:#f59e0b;
+    --warning-soft: rgba(245,158,11,.14);
+
+    --shadow-sm: 0 10px 22px rgba(2,6,23,.06);
+    --shadow-md: 0 18px 50px rgba(2,6,23,.10);
+
+    --radius: 18px;
+    --radius-sm: 12px;
+  }
+
+  /* ---------- Base ---------- */
+  body{
+    background:
+      radial-gradient(1000px 500px at 10% 10%, rgba(79,70,229,.10), transparent 60%),
+      radial-gradient(900px 500px at 90% 0%, rgba(37,99,235,.10), transparent 55%),
+      radial-gradient(900px 600px at 50% 100%, rgba(22,163,74,.06), transparent 55%),
+      var(--bg);
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .container{ max-width: 1320px; }
+
+  /* ---------- Cards ---------- */
+  .card,
+  .filter-card,
+  .stat-card,
+  .table-card{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(10px);
+  }
+
+  .card{ overflow: hidden; }
+
+  .card-header{
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+  }
+
+  .card-body{ padding: 16px; }
+
+  /* ---------- Page title ---------- */
+  .page-title{
+    font-weight: 900;
+    font-size: 20px;
+    letter-spacing: -.3px;
+    position: relative;
+    padding-right: 12px; /* RTL underline */
+  }
+
+  .page-title::before{
+    content:"";
+    position:absolute;
+    right: 0;
+    top: 6px;
+    width: 6px;
+    height: 18px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--primary), var(--primary-2));
+    box-shadow: 0 10px 20px rgba(79,70,229,.25);
+  }
+
+  /* ---------- Forms ---------- */
+  .filter-card .form-label{
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .form-control,
+  .form-select{
+    border-radius: 14px;
+    border: 1px solid rgba(15,23,42,.10);
+    padding: 10px 12px;
+    font-size: 13px;
+    background: rgba(255,255,255,.96);
+    transition: all .15s ease;
+  }
+
+  .form-control::placeholder{ color: rgba(100,116,139,.9); }
+
+  .form-control:focus,
+  .form-select:focus{
+    border-color: rgba(79,70,229,.35);
+    box-shadow: 0 0 0 5px rgba(79,70,229,.14);
+  }
+
+  /* input-group nicer */
+  .input-group .form-control:first-child{
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+  .input-group .form-control:last-child{
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 9px 14px;
+    transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease, border-color .12s ease;
+  }
+
+  .btn:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(2,6,23,.12);
+  }
+  .btn:active{ transform: translateY(0); box-shadow: none; }
+
+  .btn-sm{ padding: 6px 12px; border-radius: 12px; }
+
+  /* primary */
+  .btn-primary{
+    border: none;
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    box-shadow: 0 10px 22px rgba(79,70,229,.22);
+  }
+  .btn-primary:hover{ box-shadow: 0 16px 34px rgba(79,70,229,.28); }
+
+  /* outline variants */
+  .btn-outline-primary{
+    border-color: rgba(79,70,229,.35);
+    color: var(--primary);
+  }
+  .btn-outline-primary:hover{
+    background: var(--primary-soft);
+    border-color: rgba(79,70,229,.45);
+    color: var(--primary);
+  }
+
+  .btn-outline-success{
+    border-color: rgba(22,163,74,.35);
+    color: var(--success);
+  }
+  .btn-outline-success:hover{
+    background: var(--success-soft);
+    border-color: rgba(22,163,74,.45);
+    color: var(--success);
+  }
+
+  .btn-outline-secondary{ border-color: rgba(100,116,139,.28); }
+  .btn-outline-secondary:hover{
+    background: rgba(100,116,139,.10);
+    border-color: rgba(100,116,139,.35);
+  }
+
+  .btn-outline-dark{ border-color: rgba(15,23,42,.20); }
+  .btn-outline-dark:hover{
+    background: rgba(15,23,42,.06);
+    border-color: rgba(15,23,42,.26);
+  }
+
+  .btn-outline-danger{
+    border-color: rgba(239,68,68,.35);
+    color: var(--danger);
+  }
+  .btn-outline-danger:hover{
+    background: var(--danger-soft);
+    border-color: rgba(239,68,68,.45);
+    color: var(--danger);
+  }
+
+  /* ---------- Tables ---------- */
+  .table{
+    margin-bottom: 0;
+    border-color: transparent;
+  }
+
+  .table thead th{
+    font-size: 12.5px;
+    color: var(--muted);
+    background: linear-gradient(to bottom, rgba(255,255,255,.8), rgba(248,250,252,.9));
+    border-bottom: 1px solid var(--border);
+    padding: 13px 14px;
+    font-weight: 800;
+    position: sticky; /* optional */
+    top: 0;
+    z-index: 2;
+  }
+
+  .table tbody td{
+    padding: 13px 14px;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(15,23,42,.06);
+  }
+
+  .table tbody tr{
+    transition: background-color .12s ease;
+  }
+  .table tbody tr:hover{ background: rgba(79,70,229,.04); }
+
+  /* nicer striped */
+  .table-striped>tbody>tr:nth-of-type(odd)>*{
+    --bs-table-accent-bg: rgba(2,6,23,.015);
+  }
+
+  /* ---------- Badges ---------- */
+  .badge{
+    font-weight: 800;
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    letter-spacing: .1px;
+    border: 1px solid transparent;
+  }
+
+  .badge-soft-primary{
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-color: rgba(79,70,229,.18);
+  }
+  .badge-soft-success{
+    background: var(--success-soft);
+    color: var(--success);
+    border-color: rgba(22,163,74,.18);
+  }
+  .badge-soft-danger{
+    background: var(--danger-soft);
+    color: var(--danger);
+    border-color: rgba(239,68,68,.18);
+  }
+  .badge-soft-secondary{
+    background: rgba(100,116,139,.10);
+    color: #334155;
+    border-color: rgba(100,116,139,.18);
+  }
+
+  /* ---------- Alerts ---------- */
+  .alert.alert-light{
+    background: rgba(255,255,255,.8);
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ---------- Category sidebar tree ---------- */
+  #catTree a{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    color: var(--text);
+    text-decoration: none;
+    transition: background-color .12s ease, transform .12s ease;
+  }
+  #catTree a:hover{
+    background: rgba(79,70,229,.06);
+    transform: translateY(-1px);
+  }
+  #catTree .active > a,
+  #catTree a.active{
+    background: rgba(79,70,229,.10);
+    color: var(--primary);
+    border: 1px solid rgba(79,70,229,.18);
+  }
+
+  #catSearch{ background: rgba(255,255,255,.95); }
+
+  /* collapse (+/-) */
+  [data-bs-toggle="collapse"].btn-outline-secondary{
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 12px;
+    display: inline-grid;
+    place-items: center;
+    font-weight: 900;
+  }
+
+  /* variants section */
+  tr > td.bg-light{ background: rgba(2,6,23,.02) !important; }
+  .collapse .table-bordered{ border-color: rgba(15,23,42,.08); }
+  .collapse .table-bordered th,
+  .collapse .table-bordered td{
+    border-color: rgba(15,23,42,.08) !important;
+  }
+
+  /* actions spacing RTL-friendly */
+  .action-buttons .btn{ margin-right: 6px; margin-left: 0; }
+
+  /* sticky perf */
+  .sticky-top{ will-change: transform; }
+
+  /* =========================
+     Purchase Page (specific)
+     ========================= */
+  .purchase-page-wrap{
+    background: transparent; /* از body بک‌گراند می‌گیره */
+    padding: 0;
+  }
+
+  .purchase-topbar{
+    background: radial-gradient(900px 220px at 90% 0%, rgba(255,255,255,.18), transparent 55%),
+                linear-gradient(135deg, var(--primary), var(--primary-2));
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-md);
+    color: #fff;
+    margin-bottom: 14px;
+  }
+
+  .purchase-topbar .page-title{ color: #fff; margin: 0; }
+  .purchase-topbar .page-title::before{ display:none; } /* تو topbar دیگه لازم نیست */
+
+  .purchase-topbar .btn-light{
+    background: rgba(255,255,255,.92);
+    border: none;
+    color: #1e293b;
+    font-weight: 800;
+  }
+  .purchase-topbar .btn-light:hover{ filter: brightness(.98); }
+
+  /* stat card accent */
+  .stat-card{ position: relative; }
+  .stat-card::before{
+    content:"";
+    position:absolute;
+    inset: 0 0 auto 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--primary), var(--primary-2));
+  }
+  .stat-card .label{ color: var(--muted); font-size: 12.5px; font-weight: 700; }
+  .stat-card .value{ font-weight: 950; font-size: 18px; color: var(--text); }
+
+  /* filter actions layout */
+  .filter-actions .btn{ border-radius: 14px; }
+
+  /* purchase table head: اگر می‌خوای رنگی باشه */
+  .table-card thead th{
+    background: linear-gradient(135deg, rgba(79,70,229,.95), rgba(37,99,235,.95));
+    color: #fff;
+    border-bottom: none;
+  }
+
+  /* custom badge in purchase list */
+  .badge-items{
+    background: rgba(79,70,229,.12);
+    color: var(--primary);
+    border: 1px solid rgba(79,70,229,.18);
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-weight: 900;
+    min-width: 44px;
+    display: inline-flex;
+    justify-content: center;
+  }
+
+  .amount-strong{ font-weight: 950; color: var(--text); }
+
+  /* action buttons in purchase list */
+  .action-btns .btn{
+    border-radius: 12px;
+    padding: 6px 12px;
+    font-weight: 800;
+  }
+
+  /* pagination nicer */
+  .pagination{ margin-bottom: 0; }
+  .page-link{
+    border-radius: 999px !important;
+    margin: 0 3px;
+    border: 1px solid rgba(15,23,42,.10);
+    color: rgba(15,23,42,.78);
+    font-weight: 800;
+    box-shadow: none;
+  }
+  .page-item.active .page-link{
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    border: none;
+  }
+
+  /* responsive */
+  @media (max-width: 768px){
+    .purchase-topbar{
+      flex-direction: column;
+      gap: 10px;
+      align-items: stretch !important;
+    }
+    .purchase-topbar .btn{ width: 100%; }
+    .filter-actions{ flex-direction: column; }
+    .filter-actions .btn{ width: 100%; }
+  }
+
+
+
+/* =========================================
+   Purchase Page Override (Safe / Scoped)
+   - Base theme remains the FIRST CSS
+   - This only affects purchase page area
+   ========================================= */
+
+/* متغیرها فقط داخل صفحه خرید */
+.purchase-page-wrap{
+  --ink: #0b1220;
+  --navy: #071a3a;
+  --blue: #0d6efd;
+  --blue2:#0a58ca;
+  --soft: #f6f9ff;
+  --soft2:#eef4ff;
+  --border2: #dbe6ff;
+  --shadow: 0 10px 28px rgba(7, 26, 58, .10);
+  --shadow2:0 6px 14px rgba(7, 26, 58, .08);
 }
 
-.container{ max-width:1300px; }
-
-.card{
-    border:none;
-    border-radius:14px;
-    box-shadow:0 6px 18px rgba(0,0,0,.06);
+/* wrapper */
+.purchase-page-wrap{
+  background: #fff;          /* فقط برای بخش خرید */
+  border-radius: 18px;
+  padding: 14px;
 }
 
-.filter-card{
-    background:#fff;
-    border-radius:14px;
-    box-shadow:0 4px 14px rgba(0,0,0,.05);
+/* topbar */
+
+.purchase-page-wrap .purchase-topbar .page-title{ color:#fff; margin:0; }
+.purchase-page-wrap .purchase-topbar .btn{ border-radius: 12px; }
+.purchase-page-wrap .purchase-topbar .btn-outline-light{
+  border-color: rgba(255,255,255,.55);
+  color:#fff;
+}
+.purchase-page-wrap .purchase-topbar .btn-outline-light:hover{
+  background: rgba(255,255,255,.12);
+  color:#fff;
 }
 
-.filter-card .form-label{
-    font-size:13px;
-    color:#555;
+/* کارت فرم خرید */
+.purchase-page-wrap .purchase-form.card{
+  background:#fff;
+  border: 1px solid var(--border2);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.purchase-page-wrap .purchase-form .card-body{
+  background:#fff;
+  color: var(--ink);
 }
 
-.table thead th{
-    font-size:13px;
-    color:#777;
-    border-bottom:1px solid #eee;
+.purchase-page-wrap .purchase-form .form-label{
+  color: rgba(11,18,32,.75);
+  font-size: .85rem;
+  margin-bottom: .35rem;
 }
 
-.table tbody tr{ transition:all .15s ease-in-out; }
-.table tbody tr:hover{ background-color:#f8f9fb; }
-
-.badge{
-    font-weight:500;
-    padding:6px 10px;
-    border-radius:8px;
+/* Inputs */
+.purchase-page-wrap .purchase-form .form-control,
+.purchase-page-wrap .purchase-form .form-select{
+  height: 40px;
+  font-size: .9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(11,18,32,.12);
+  background:#fff;
+  color: var(--ink);
+}
+.purchase-page-wrap .purchase-form .form-control::placeholder{
+  color: rgba(11,18,32,.35);
+}
+.purchase-page-wrap .purchase-form .form-control:focus,
+.purchase-page-wrap .purchase-form .form-select:focus{
+  outline:none;
+  border-color: rgba(13,110,253,.65);
+  box-shadow: 0 0 0 .25rem rgba(13,110,253,.18);
 }
 
-.badge-stock{
-    background:#e7f6ee;
-    color:#198754;
+/* Alert */
+.purchase-page-wrap .purchase-form .alert{
+  background: linear-gradient(180deg, rgba(13,110,253,.10), rgba(13,110,253,.06));
+  border: 1px solid rgba(13,110,253,.22);
+  color: rgba(11,18,32,.85);
+  border-radius: 14px;
 }
 
-.btn{
-    border-radius:10px;
-    font-size:13px;
+/* Buttons override only in purchase wrap */
+.purchase-page-wrap .btn{ border-radius: 12px; }
+
+.purchase-page-wrap .btn-outline-dark{
+  border-color: rgba(11,18,32,.22);
+  color: var(--ink);
+}
+.purchase-page-wrap .btn-outline-dark:hover{
+  border-color: rgba(13,110,253,.45);
+  background: rgba(13,110,253,.06);
+  color: var(--ink);
 }
 
-.btn-sm{ padding:4px 10px; }
-
-.page-title{
-    font-weight:700;
-    font-size:18px;
+.purchase-page-wrap .btn-outline-secondary{
+  border-color: rgba(11,18,32,.18);
+  color: rgba(11,18,32,.78);
+}
+.purchase-page-wrap .btn-outline-secondary:hover{
+  border-color: rgba(13,110,253,.45);
+  background: rgba(13,110,253,.06);
+  color: var(--ink);
 }
 
-.action-buttons .btn{ margin-left:4px; }
+.purchase-page-wrap .btn-primary{
+  background: linear-gradient(90deg, var(--blue2), var(--blue));
+  border:none;
+  box-shadow: 0 10px 20px rgba(13,110,253,.18);
+}
+
+/* آیتم‌های لیست خرید (اگر داری) */
+.purchase-page-wrap .purchase-item{
+  border: 1px solid rgba(13,110,253,.18);
+  border-radius: 16px;
+  padding: .9rem;
+  background:#fff;
+  box-shadow: var(--shadow2);
+  position: relative;
+  overflow: hidden;
+}
+.purchase-page-wrap .purchase-item::before{
+  content:"";
+  position:absolute;
+  inset:0 auto 0 0;
+  width:7px;
+  background: linear-gradient(180deg, var(--navy), var(--blue));
+}
+.purchase-page-wrap .purchase-item.is-even{
+  background: linear-gradient(180deg, var(--soft2), #fff);
+  border-color: rgba(7,26,58,.10);
+}
+.purchase-page-wrap .purchase-item.is-even::before{
+  background: linear-gradient(180deg, var(--blue2), #00a3ff);
+}
+.purchase-page-wrap .purchase-item + .purchase-item{ margin-top: 1rem; }
+.purchase-page-wrap .purchase-item:hover{
+  border-color: rgba(13,110,253,.35);
+  box-shadow: 0 14px 26px rgba(7,26,58,.12);
+  transform: translateY(-1px);
+  transition: .18s ease;
+}
+
+/* head/meta داخل آیتم */
+.purchase-page-wrap .row-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.6rem;
+  padding: .5rem .65rem;
+  margin: -0.15rem -0.15rem .8rem -0.15rem;
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(7,26,58,.06), rgba(13,110,253,.06));
+  border: 1px dashed rgba(13,110,253,.20);
+}
+
+.purchase-page-wrap .row-meta{
+  font-size: .78rem;
+  color: rgba(11,18,32,.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55%;
+}
+.purchase-page-wrap .purchase-item .label{
+  font-size: .75rem;
+  color: rgba(11,18,32,.65);
+  margin-bottom: .25rem;
+}
+.purchase-page-wrap .purchase-item .line-total{
+  font-weight: 900;
+  font-size: .92rem;
+  min-height: 40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--navy), rgba(7,26,58,.90));
+  color:#fff;
+  border: 1px solid rgba(7,26,58,.12);
+}
+
+/* hr فقط داخل صفحه خرید */
+.purchase-page-wrap hr{
+  border-top: 1px solid rgba(7,26,58,.10);
+  opacity: 1;
+}
+
+/* option متن سیاه برای خوانایی (فقط داخل خرید) */
+.purchase-page-wrap option{ color:#111; }
+
+/* حذف spinner number فقط داخل فرم خرید */
+.purchase-page-wrap .purchase-form input[type=number]::-webkit-outer-spin-button,
+.purchase-page-wrap .purchase-form input[type=number]::-webkit-inner-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+.purchase-page-wrap .purchase-form input[type=number]{
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
