@@ -3,6 +3,8 @@
 
     // برای active شدن گروه پیش‌فاکتور وقتی داخل هرکدوم از route هاش هستی
     $preinvoiceOpen = request()->routeIs('preinvoice.*');
+    $productsOpen = request()->routeIs('products.*');
+    $categoriesOpen = request()->routeIs('categories.*');
 @endphp
 
 <div class="bg-white border-end p-3" style="width: 260px">
@@ -17,10 +19,53 @@
             داشبورد
         </a>
 
-        <a class="list-group-item list-group-item-action {{ $is('products.*') }}"
-           href="{{ route('products.index') }}">
-            کالاها
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $productsOpen ? 'active' : '' }}"
+           data-bs-toggle="collapse"
+           href="#productsMenu"
+           role="button"
+           aria-expanded="{{ $productsOpen ? 'true' : 'false' }}"
+           aria-controls="productsMenu">
+            <span>کالاها</span>
+            <span class="small">▾</span>
         </a>
+
+        <div class="collapse {{ $productsOpen ? 'show' : '' }}" id="productsMenu">
+            <div class="list-group list-group-flush ms-2 mt-1">
+                <a class="list-group-item list-group-item-action {{ $is('products.index') }}"
+                   href="{{ route('products.index') }}">
+                    کلیه کالاها
+                </a>
+
+                <a class="list-group-item list-group-item-action {{ $is('products.create') }}"
+                   href="{{ route('products.create') }}">
+                    ➕ افزودن کالا
+                </a>
+            </div>
+        </div>
+
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $categoriesOpen ? 'active' : '' }}"
+           data-bs-toggle="collapse"
+           href="#categoriesMenu"
+           role="button"
+           aria-expanded="{{ $categoriesOpen ? 'true' : 'false' }}"
+           aria-controls="categoriesMenu">
+            <span>دسته‌بندی‌ها</span>
+            <span class="small">▾</span>
+        </a>
+
+        <div class="collapse {{ $categoriesOpen ? 'show' : '' }}" id="categoriesMenu">
+            <div class="list-group list-group-flush ms-2 mt-1">
+                <a class="list-group-item list-group-item-action {{ $is('categories.index') }}"
+                   href="{{ route('categories.index') }}">
+                    لیست دسته‌بندی‌ها
+                </a>
+
+                <a class="list-group-item list-group-item-action {{ $is('categories.create') }}"
+                   href="{{ route('categories.create') }}">
+                    ➕ افزودن دسته‌بندی
+                </a>
+            </div>
+        </div>
 
         <div class="mt-2">
             <div class="text-muted small mb-2">خرید کالا / حواله‌ها</div>

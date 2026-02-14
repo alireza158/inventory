@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
 
     // Products + stock
     Route::resource('products', ProductController::class)->except(['show']);
+    Route::resource('categories', CategoryController::class)->except(['show']);
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
     Route::get('/products/import', [ProductImportController::class, 'show'])->name('products.import.show');
     Route::post('/products/import', [ProductImportController::class, 'import'])->name('products.import');
