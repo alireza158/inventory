@@ -6,6 +6,7 @@
     $productsOpen = request()->routeIs('products.*');
     $categoriesOpen = request()->routeIs('categories.*');
     $suppliersOpen = request()->routeIs('suppliers.*');
+    $modelListsOpen = request()->routeIs('model-lists.*');
 @endphp
 
 <div class="bg-white border-end p-3" style="width: 260px">
@@ -67,6 +68,12 @@
                 </a>
             </div>
         </div>
+
+
+        <a class="list-group-item list-group-item-action {{ $modelListsOpen ? 'active' : '' }}"
+           href="{{ route('model-lists.index') }}">
+            مدل لیست‌ها
+        </a>
 
         <div class="mt-2">
             <div class="text-muted small mb-2">خرید کالا / حواله‌ها</div>
