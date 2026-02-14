@@ -61,6 +61,15 @@
         </button>
       </div>
 
+
+      <datalist id="modelListOptions">
+        @foreach($modelListOptions as $brand => $items)
+          @foreach($items as $item)
+            <option value="{{ $item->label }}">{{ $brand }}</option>
+          @endforeach
+        @endforeach
+      </datalist>
+
       <div class="table-responsive">
         <table class="table table-sm align-middle" id="variantsTable">
           <thead>
