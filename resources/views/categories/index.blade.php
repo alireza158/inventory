@@ -40,7 +40,9 @@
             </table>
         </div>
 
-        <div class="mt-3">{{ $categories->links() }}</div>
+        @if(method_exists($categories, 'links'))
+            <div class="mt-3">{{ $categories->links() }}</div>
+        @endif
     </div>
 </div>
 @endsection
