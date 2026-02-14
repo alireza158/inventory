@@ -81,7 +81,9 @@
             @php
               $oldVariantsRaw = old('variants', []);
               $oldVariants = is_array($oldVariantsRaw) ? $oldVariantsRaw : [];
-              $modelListItems = is_iterable($modelListOptions) ? $modelListOptions : [];
+              $modelListItems = is_iterable($modelListOptions)
+                ? $modelListOptions
+                : (is_string($modelListOptions) ? array_filter(array_map('trim', explode(',', $modelListOptions))) : []);
             @endphp
             @foreach($oldVariants as $i => $v)
               <tr>
@@ -114,7 +116,7 @@
 </div>
 
 <script>
-let variantIndex = {{ count(old('variants', [])) }};
+let variantIndex = {{ count(is_array(old('variants')) ? old('variants') : []) }};
 const modelOptions = @json(collect($modelListItems)->values());
 
 function buildModelOptionsHtml(selected = '') {

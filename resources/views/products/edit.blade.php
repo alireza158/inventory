@@ -85,7 +85,9 @@
             @php
               $oldVariants = old('variants');
               $variants = is_array($oldVariants) ? $oldVariants : $product->variants->toArray();
-              $modelListItems = is_iterable($modelListOptions) ? $modelListOptions : [];
+              $modelListItems = is_iterable($modelListOptions)
+                ? $modelListOptions
+                : (is_string($modelListOptions) ? array_filter(array_map('trim', explode(',', $modelListOptions))) : []);
             @endphp
 
             @foreach($variants as $i => $v)
