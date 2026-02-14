@@ -91,7 +91,14 @@
               <tr>
                 <td>
                   <input type="hidden" name="variants[{{ $i }}][id]" value="{{ $v['id'] ?? '' }}">
-                  <input list="modelListOptions" class="form-control" name="variants[{{ $i }}][variant_name]" value="{{ $v['variant_name'] ?? '' }}" placeholder="مثلاً Samsung - S24 Ultra">
+                  <select class="form-select model-select" name="variants[{{ $i }}][variant_name]" required>
+                    @if(!empty($v['variant_name']))
+                      <option value="{{ $v['variant_name'] }}" selected>{{ $v['variant_name'] }}</option>
+                    @endif
+                    @foreach($modelListOptions as $model)
+                      <option value="{{ $model }}">{{ $model }}</option>
+                    @endforeach
+                  </select>
                 </td>
                 <td><input class="form-control" type="number" min="0" name="variants[{{ $i }}][sell_price]" value="{{ $v['sell_price'] ?? 0 }}"></td>
                 <td><input class="form-control" type="number" min="0" name="variants[{{ $i }}][buy_price]" value="{{ $v['buy_price'] ?? '' }}"></td>
@@ -113,6 +120,43 @@
 
 <script>
 let variantIndex = {{ count(is_array(old('variants')) ? old('variants') : $product->variants) }};
+const modelOptions = @json($modelListOptions->values());
+
+function buildModelOptionsHtml(selected = '') {
+  let html = '<option value=""></option>';
+  for (const model of modelOptions) {
+    const isSelected = model === selected ? 'selected' : '';
+    html += `<option value="${model}" ${isSelected}>${model}</option>`;
+  }
+
+  if (selected && !modelOptions.includes(selected)) {
+    html += `<option value="${selected}" selected>${selected}</option>`;
+  }
+
+  return html;
+}
+
+function initModelSelects(context = document) {
+  if (!window.jQuery || !$.fn.select2) return;
+
+  $(context).find('.model-select').each(function () {
+    if ($(this).hasClass('select2-hidden-accessible')) {
+      return;
+    }
+
+    $(this).select2({
+      width: '100%',
+      placeholder: 'جستجو یا انتخاب مدل...',
+      allowClear: true,
+      tags: true,
+      dir: 'rtl',
+      language: {
+        noResults: () => 'مدلی پیدا نشد',
+        searching: () => 'در حال جستجو...'
+      }
+    });
+  });
+}
 
 function addVariantRow() {
   const tbody = document.querySelector('#variantsTable tbody');
@@ -122,7 +166,9 @@ function addVariantRow() {
   tr.innerHTML = `
     <td>
       <input type="hidden" name="variants[${i}][id]" value="">
-      <input list="modelListOptions" class="form-control" name="variants[${i}][variant_name]" value="" placeholder="مثلاً Samsung - S24 Ultra">
+      <select class="form-select model-select" name="variants[${i}][variant_name]" required>
+        ${buildModelOptionsHtml('')}
+      </select>
     </td>
     <td><input class="form-control" type="number" min="0" name="variants[${i}][sell_price]" value="0"></td>
     <td><input class="form-control" type="number" min="0" name="variants[${i}][buy_price]" value=""></td>
@@ -130,6 +176,7 @@ function addVariantRow() {
     <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">×</button></td>
   `;
   tbody.appendChild(tr);
+  initModelSelects(tr);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -140,6 +187,8 @@ document.addEventListener('DOMContentLoaded', () => {
   generateBtn?.addEventListener('click', () => {
     if (barcodeInput) barcodeInput.value = randomBarcode();
   });
+
+  initModelSelects(document);
 });
 
 </script>

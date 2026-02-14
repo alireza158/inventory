@@ -58,10 +58,8 @@ $query = Product::query()->with(['category', 'variants']);
     {
         $categories = Category::orderBy('name')->get();
         $modelListOptions = ModelList::query()
-            ->orderBy('brand')
             ->orderBy('model_name')
-            ->get()
-            ->groupBy('brand');
+            ->pluck('model_name');
 
         return view('products.create', compact('categories', 'modelListOptions'));
     }
@@ -120,10 +118,8 @@ $query = Product::query()->with(['category', 'variants']);
         $product->load('variants');
         $categories = Category::orderBy('name')->get();
         $modelListOptions = ModelList::query()
-            ->orderBy('brand')
             ->orderBy('model_name')
-            ->get()
-            ->groupBy('brand');
+            ->pluck('model_name');
 
         return view('products.edit', compact('product', 'categories', 'modelListOptions'));
     }
@@ -257,17 +253,12 @@ $query = Product::query()->with(['category', 'variants']);
 
     private function syncVariantWithModelList(?string $variantName): void
     {
-        if (!$variantName) {
-            return;
-        }
-
-        [$brand, $modelName] = \App\Http\Controllers\ModelListController::splitVariantName($variantName);
-        if ($brand === '' || $modelName === '') {
+        $modelName = trim((string) $variantName);
+        if ($modelName === '') {
             return;
         }
 
         ModelList::firstOrCreate([
-            'brand' => $brand,
             'model_name' => $modelName,
         ]);
     }
