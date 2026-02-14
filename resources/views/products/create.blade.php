@@ -58,11 +58,50 @@
       </div>
 
 
+      @php
+        $rawModelListItems = is_iterable($modelListOptions)
+          ? $modelListOptions
+          : (is_string($modelListOptions) ? array_filter(array_map('trim', explode(',', $modelListOptions))) : []);
+
+        $modelListItems = collect($rawModelListItems)
+          ->flatMap(function ($item) {
+            if (is_array($item) && isset($item['label'])) {
+              return [$item['label']];
+            }
+
+            if (is_object($item) && isset($item->label)) {
+              return [$item->label];
+            }
+
+            if (is_string($item)) {
+              return [$item];
+            }
+
+            if (is_iterable($item)) {
+              return collect($item)
+                ->map(function ($nestedItem) {
+                  if (is_array($nestedItem) && isset($nestedItem['label'])) {
+                    return $nestedItem['label'];
+                  }
+
+                  if (is_object($nestedItem) && isset($nestedItem->label)) {
+                    return $nestedItem->label;
+                  }
+
+                  return is_string($nestedItem) ? $nestedItem : null;
+                });
+            }
+
+            return [];
+          })
+          ->filter()
+          ->values()
+          ->all();
+      @endphp
+
       <datalist id="modelListOptions">
-        @foreach($modelListOptions as $brand => $items)
-          @foreach($items as $item)
-            <option value="{{ $item->label }}">{{ $brand }}</option>
-          @endforeach
+        @foreach($modelListItems as $model)
+          <option value="{{ $model }}"></option>
         @endforeach
       </datalist>
 
@@ -81,9 +120,6 @@
             @php
               $oldVariantsRaw = old('variants', []);
               $oldVariants = is_array($oldVariantsRaw) ? $oldVariantsRaw : [];
-              $modelListItems = is_iterable($modelListOptions)
-                ? $modelListOptions
-                : (is_string($modelListOptions) ? array_filter(array_map('trim', explode(',', $modelListOptions))) : []);
             @endphp
             @foreach($oldVariants as $i => $v)
               <tr>
