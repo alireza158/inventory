@@ -12,11 +12,12 @@ class PreinvoiceApiController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $items = Product::query()
-            ->select(['id', 'name', 'sku', 'price', 'stock'])
+            ->select(['id', 'name', 'sku', 'barcode', 'price', 'stock'])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('name', 'like', "%{$q}%")
-                       ->orWhere('sku', 'like', "%{$q}%");
+                       ->orWhere('sku', 'like', "%{$q}%")
+                       ->orWhere('barcode', 'like', "%{$q}%");
                 });
             })
             ->orderBy('name')
@@ -26,6 +27,7 @@ class PreinvoiceApiController extends Controller
                 'id' => $p->id,
                 'title' => $p->name,
                 'sku' => $p->sku,
+                'barcode' => $p->barcode,
                 'price' => (int) ($p->price ?? 0),
                 'quantity' => (int) ($p->stock ?? 0),
             ])
@@ -48,6 +50,7 @@ class PreinvoiceApiController extends Controller
         $payload = [
             'id' => $product->id,
             'title' => $product->name,
+            'barcode' => $product->barcode,
             'price' => (int) ($product->price ?? 0),
             'quantity' => (int) ($product->stock ?? 0),
             'varieties' => $product->variants->map(fn($v) => [

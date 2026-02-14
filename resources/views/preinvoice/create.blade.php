@@ -136,7 +136,10 @@
           <div class="hint">می‌تونی آیتم جدید اضافه کنی یا تعداد/مدل‌ها را تغییر بدی.</div>
         </div>
 
-        <button type="submit" class="btn btn-primary">💾 ذخیره پیش‌نویس</button>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <input type="text" id="barcodeScanner" class="form-control" style="min-width:260px" placeholder="اسکن بارکد و Enter...">
+          <button type="submit" class="btn btn-primary">💾 ذخیره پیش‌نویس</button>
+        </div>
       </div>
 
       <div id="productRows" class="p-3 p-md-4"></div>
@@ -409,7 +412,7 @@ function fillProductSelect(selectEl) {
   allProducts.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = `${p.title} (${formatPrice(p.price)} تومان)`;
+    opt.textContent = `${p.title} (${formatPrice(p.price)} تومان)${p.barcode ? ` - ${p.barcode}` : ''}`;
     selectEl.appendChild(opt);
   });
 }
@@ -451,6 +454,26 @@ function setStockUI(row, stockQty) {
     badge.className = 'badge bg-danger stock-badge';
     badge.textContent = 'ناموجود';
   }
+}
+
+
+function addProductByBarcode(rawBarcode) {
+  const barcode = String(rawBarcode || '').trim();
+  if (!barcode) return false;
+
+  const product = allProducts.find(p => String(p.barcode || '').trim() === barcode);
+  if (!product) return false;
+
+  const row = addProductRow();
+  const productSelect = row.querySelector('.product-select');
+  productSelect.value = String(product.id);
+  if (window.jQuery) {
+    $(productSelect).val(String(product.id)).trigger('change');
+  } else {
+    productSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  return true;
 }
 
 function updateTotal() {
@@ -533,6 +556,7 @@ function addProductRow(prefill = null) {
   }
 
   updateTotal();
+  return row;
 }
 
 document.addEventListener('change', async (e) => {
@@ -616,6 +640,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   addProductRow();
   document.getElementById('addRow').addEventListener('click', () => addProductRow());
+
+  const barcodeScanner = document.getElementById('barcodeScanner');
+  barcodeScanner?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+
+    const ok = addProductByBarcode(barcodeScanner.value);
+    if (!ok) {
+      barcodeScanner.classList.add('is-invalid');
+      setTimeout(() => barcodeScanner.classList.remove('is-invalid'), 1200);
+      return;
+    }
+
+    barcodeScanner.value = '';
+    barcodeScanner.classList.remove('is-invalid');
+  });
+
   updateTotal();
 });
 </script>

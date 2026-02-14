@@ -136,7 +136,10 @@
           <div class="section-title mb-1">🛍️ محصولات</div>
           <div class="hint">آیتم‌ها را تغییر بده و ذخیره کن.</div>
         </div>
-        <button type="submit" class="btn btn-primary">💾 ذخیره تغییرات</button>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <input type="text" id="barcodeScanner" class="form-control" style="min-width:260px" placeholder="اسکن بارکد و Enter...">
+          <button type="submit" class="btn btn-primary">💾 ذخیره تغییرات</button>
+        </div>
       </div>
 
       <div id="productRows" class="p-3 p-md-4"></div>
@@ -335,7 +338,7 @@ function fillProductSelect(selectEl){
   allProducts.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = `${(p.title ?? '').trim()} (${formatPrice(p.price)} تومان)`;
+    opt.textContent = `${(p.title ?? '').trim()} (${formatPrice(p.price)} تومان)${p.barcode ? ` - ${p.barcode}` : ''}`;
     selectEl.appendChild(opt);
   });
 }
@@ -368,6 +371,26 @@ function setStockUI(row, stockQty){
     badge.textContent = 'ناموجود';
   }
 }
+function addProductByBarcode(rawBarcode){
+  const barcode = String(rawBarcode || '').trim();
+  if (!barcode) return false;
+
+  const product = allProducts.find(p => String(p.barcode || '').trim() === barcode);
+  if (!product) return false;
+
+  const row = addProductRow();
+  const productSelect = row.querySelector('.product-select');
+  productSelect.value = String(product.id);
+
+  if (window.jQuery) {
+    $(productSelect).val(String(product.id)).trigger('change');
+  } else {
+    productSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  return true;
+}
+
 function updateTotal(){
   const discount = Number(document.getElementById('discount')?.value || 0) || 0;
   const shipping = Number(document.getElementById('shipping_price')?.value || 0) || 0;
@@ -469,6 +492,7 @@ function addProductRow(prefill = null){
 
   renumberRows();
   updateTotal();
+  return row;
 }
 
 /* =========================
@@ -655,6 +679,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   document.getElementById('addRow').addEventListener('click', () => addProductRow());
+
+  const barcodeScanner = document.getElementById('barcodeScanner');
+  barcodeScanner?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+
+    const ok = addProductByBarcode(barcodeScanner.value);
+    if (!ok) {
+      barcodeScanner.classList.add('is-invalid');
+      setTimeout(() => barcodeScanner.classList.remove('is-invalid'), 1200);
+      return;
+    }
+
+    barcodeScanner.value = '';
+    barcodeScanner.classList.remove('is-invalid');
+  });
   updateTotal();
 
   // ✅ اگر ردیفی بدون prefill ایجاد شد ولی محصول داشت، change رو صدا بزن

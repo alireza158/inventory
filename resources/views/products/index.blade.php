@@ -32,8 +32,8 @@
 
                 <div class="row g-3 align-items-end">
                     <div class="col-md-5">
-                        <label class="form-label">جستجو (نام یا SKU)</label>
-                        <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً کابل یا KB-1001">
+                        <label class="form-label">جستجو (نام، SKU یا بارکد)</label>
+                        <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً کابل، KB-1001 یا 123456789012">
                     </div>
 
                     <div class="col-md-3">
@@ -90,6 +90,7 @@
                                 <th>#</th>
                                 <th>نام</th>
                                 <th>SKU</th>
+                                <th>بارکد</th>
                                 <th>دسته‌بندی</th>
                                 <th>موجودی</th>
                                 <th>قیمت</th>
@@ -124,6 +125,7 @@
                                     <td>{{ $p->id }}</td>
                                     <td class="fw-semibold">{{ $p->name }}</td>
                                     <td><span class="badge text-bg-secondary">{{ $p->sku }}</span></td>
+                                    <td><span class="badge text-bg-light border">{{ $p->barcode ?: "—" }}</span></td>
                                     <td>{{ $p->category?->name }}</td>
 
                                     <td>
@@ -152,7 +154,7 @@
                                {{-- Variants Row --}}
 @if($hasVariants)
 <tr>
-    <td colspan="8" class="bg-light p-0">
+    <td colspan="9" class="bg-light p-0">
         <div class="collapse" id="{{ $collapseId }}">
             <div class="p-2">
                 <div class="small text-muted mb-2">مدل‌های این محصول:</div>
@@ -197,7 +199,7 @@
 
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-5">هیچ محصولی ثبت نشده 📦</td>
+                                    <td colspan="9" class="text-center text-muted py-5">هیچ محصولی ثبت نشده 📦</td>
                                 </tr>
                             @endforelse
                         </tbody>

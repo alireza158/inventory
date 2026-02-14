@@ -20,6 +20,15 @@
           <input name="sku" class="form-control" value="{{ old('sku', $product->sku) }}">
         </div>
 
+
+        <div class="col-md-6">
+          <label class="form-label">بارکد</label>
+          <div class="input-group">
+            <input id="barcode_input" name="barcode" class="form-control" value="{{ old('barcode', $product->barcode) }}" placeholder="بارکد">
+            <button type="button" class="btn btn-outline-secondary" id="generateBarcodeBtn">تولید رندوم</button>
+          </div>
+        </div>
+
         <div class="col-md-6">
           <label class="form-label">دسته‌بندی</label>
           <select name="category_id" class="form-select">
@@ -113,5 +122,16 @@ function addVariantRow() {
   `;
   tbody.appendChild(tr);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const barcodeInput = document.getElementById('barcode_input');
+  const generateBtn = document.getElementById('generateBarcodeBtn');
+  const randomBarcode = () => String(Math.floor(100000000000 + Math.random() * 900000000000));
+
+  generateBtn?.addEventListener('click', () => {
+    if (barcodeInput) barcodeInput.value = randomBarcode();
+  });
+});
+
 </script>
 @endsection
