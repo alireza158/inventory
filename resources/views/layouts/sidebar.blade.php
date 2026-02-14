@@ -88,10 +88,7 @@
                         لیست تامین‌کنندگان
                     </a>
 
-                    <a class="list-group-item list-group-item-action {{ $is('suppliers.index') }}"
-                       href="{{ route('suppliers.index') }}#add-supplier-form">
-                        ➕ افزودن تامین‌کننده
-                    </a>
+
                 </div>
             </div>
 

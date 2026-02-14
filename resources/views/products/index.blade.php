@@ -1,78 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="row g-3">
 
-    {{-- Right Side: Category Tree --}}
-    <div class="col-lg-3">
-        <div class="card shadow-sm sticky-top" style="top: 90px;">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                   {{-- Quick Add Category --}}
-<form method="POST" action="{{ route('categories.quickStore') }}" class="mb-3">
-    @csrf
-
-    <input type="hidden" name="redirect_to" value="{{ url()->current() }}">
-
-    <div class="mb-2">
-        <input name="name" class="form-control form-control-sm"
-               placeholder="نام دسته جدید..."
-               value="{{ old('name') }}" required>
-        @error('name')
-            <div class="text-danger small mt-1">{{ $message }}</div>
-        @enderror
-    </div>
-
-    <div class="mb-2">
-        <select name="parent_id" class="form-select form-select-sm">
-            <option value="">— دسته اصلی —</option>
-            @foreach($categoryTree as $root)
-                <option value="{{ $root->id }}" @selected(old('parent_id') == $root->id)>
-                    {{ $root->name }}
-                </option>
-
-                {{-- زیر دسته‌ها (تا 3 سطح مثل درخت شما) --}}
-                @foreach($root->children as $c1)
-                    <option value="{{ $c1->id }}" @selected(old('parent_id') == $c1->id)>
-                        └─ {{ $c1->name }}
-                    </option>
-
-                    @foreach($c1->children as $c2)
-                        <option value="{{ $c2->id }}" @selected(old('parent_id') == $c2->id)>
-                            └── {{ $c2->name }}
-                        </option>
-
-                        @foreach($c2->children as $c3)
-                            <option value="{{ $c3->id }}" @selected(old('parent_id') == $c3->id)>
-                                └─── {{ $c3->name }}
-                            </option>
-                        @endforeach
-                    @endforeach
-                @endforeach
-            @endforeach
-        </select>
-
-        @error('parent_id')
-            <div class="text-danger small mt-1">{{ $message }}</div>
-        @enderror
-    </div>
-
-    <button class="btn btn-sm btn-primary w-100">+ افزودن دسته</button>
-</form>
-
-                </div>
-
-                <input id="catSearch" class="form-control form-control-sm mb-3" placeholder="جستجو دسته...">
-
-                <div id="catTree">
-                    @include('categories._tree', ['nodes' => $categoryTree])
-                </div>
-            </div>
-        </div>
-    </div>
 
     {{-- Main Content --}}
-    <div class="col-lg-9">
+    <div class="col-lg-11">
 
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h4 class="page-title mb-0">کالاها</h4>
