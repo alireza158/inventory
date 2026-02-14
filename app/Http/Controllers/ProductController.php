@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\ProductVariant;
+use App\Models\ModelList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\CrmProductSyncService;
@@ -56,7 +57,13 @@ $query = Product::query()->with(['category', 'variants']);
     public function create()
     {
         $categories = Category::orderBy('name')->get();
-        return view('products.create', compact('categories'));
+        $modelListOptions = ModelList::query()
+            ->orderBy('model_name')
+            ->pluck('model_name')
+            ->values()
+            ->all();
+
+        return view('products.create', compact('categories', 'modelListOptions'));
     }
 
     public function store(Request $request)
@@ -98,6 +105,8 @@ $query = Product::query()->with(['category', 'variants']);
                     'stock'        => (int) $v['stock'],
                     'reserved'     => 0,
                 ]);
+
+                $this->syncVariantWithModelList($v['variant_name']);
             }
 
             $this->recalcProductSummary($product);
@@ -110,7 +119,13 @@ $query = Product::query()->with(['category', 'variants']);
     {
         $product->load('variants');
         $categories = Category::orderBy('name')->get();
-        return view('products.edit', compact('product', 'categories'));
+        $modelListOptions = ModelList::query()
+            ->orderBy('model_name')
+            ->pluck('model_name')
+            ->values()
+            ->all();
+
+        return view('products.edit', compact('product', 'categories', 'modelListOptions'));
     }
 
     public function update(Request $request, Product $product)
@@ -153,6 +168,8 @@ $query = Product::query()->with(['category', 'variants']);
                     'buy_price'    => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
                     'stock'        => (int) $v['stock'],
                 ];
+
+                $this->syncVariantWithModelList($v['variant_name']);
 
                 if (!empty($v['id'])) {
                     $variant = ProductVariant::where('product_id', $product->id)
@@ -234,6 +251,19 @@ $query = Product::query()->with(['category', 'variants']);
         $product->update([
             'stock' => max(0, $stock),
             'price' => max(0, $minPrice),
+        ]);
+    }
+
+
+    private function syncVariantWithModelList(?string $variantName): void
+    {
+        $modelName = trim((string) $variantName);
+        if ($modelName === '') {
+            return;
+        }
+
+        ModelList::firstOrCreate([
+            'model_name' => $modelName,
         ]);
     }
 
