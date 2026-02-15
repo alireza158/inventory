@@ -22,6 +22,7 @@ use App\Http\Controllers\StockMovementReportController;
 use App\Http\Controllers\StocktakeController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\WarehouseController;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 
@@ -55,6 +56,17 @@ Route::middleware('auth')->group(function () {
     Route::get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
     Route::get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
     Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
+    Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
+    Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
+    Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
+
+    Route::get('/warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
+    Route::get('/warehouses/{warehouse}/edit', [WarehouseController::class, 'edit'])->name('warehouses.edit');
+    Route::put('/warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
+    Route::delete('/warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+    Route::get('/warehouses/{warehouse}/personnel', [WarehouseController::class, 'personnelIndex'])->name('warehouses.personnel.index');
+    Route::post('/warehouses/{warehouse}/personnel', [WarehouseController::class, 'personnelStore'])->name('warehouses.personnel.store');
+    Route::get('/warehouses/{warehouse}/personnel/{personnel}', [WarehouseController::class, 'personnelShow'])->name('warehouses.personnel.show');
 
     Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');
     Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
