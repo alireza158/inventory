@@ -39,4 +39,9 @@ return [
     'token'    => env('ARIYA_CRM_TOKEN'),
     ],
 
+    'external_sync' => [
+        'base_url' => env('EXTERNAL_SYNC_BASE_URL', 'https://crm.ariyajanebi.ir'),
+        'token' => env('EXTERNAL_SYNC_TOKEN'),
+    ],
+
 ];
