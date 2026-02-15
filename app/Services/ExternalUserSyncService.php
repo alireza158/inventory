@@ -41,26 +41,69 @@ class ExternalUserSyncService
             ];
         }
 
-        $users = Arr::get($response, 'data');
-
-        if (!is_array($users)) {
-            $users = Arr::get($response, 'users');
-        }
-
-        if (is_array($users) && Arr::isAssoc($users) && Arr::has($users, 'items')) {
-            $users = Arr::get($users, 'items');
-        }
-
-        if (!is_array($users)) {
-            $users = is_array($response) && array_is_list($response) ? $response : [];
-        }
-
-        $users = array_values(array_filter($users, fn ($item) => is_array($item)));
+        $users = $this->extractUsersFromResponse($response);
 
         return [
             'users' => $users,
             'error' => null,
         ];
+    }
+
+
+    private function extractUsersFromResponse(mixed $response): array
+    {
+        if (!is_array($response)) {
+            return [];
+        }
+
+        $candidates = [
+            Arr::get($response, 'data'),
+            Arr::get($response, 'users'),
+            Arr::get($response, 'items'),
+            $response,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $users = $this->normalizeUserCollection($candidate);
+
+            if ($users !== []) {
+                return $users;
+            }
+        }
+
+        return [];
+    }
+
+    private function normalizeUserCollection(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        if (Arr::isAssoc($value) && Arr::has($value, 'items')) {
+            return $this->normalizeUserCollection(Arr::get($value, 'items'));
+        }
+
+        if (array_is_list($value) && $value !== []) {
+            if ($this->isUserRecord($value[0] ?? null)) {
+                return array_values(array_filter($value, fn ($item) => $this->isUserRecord($item)));
+            }
+
+            $flattened = [];
+
+            foreach ($value as $item) {
+                $flattened = array_merge($flattened, $this->normalizeUserCollection($item));
+            }
+
+            return $flattened;
+        }
+
+        return $this->isUserRecord($value) ? [$value] : [];
+    }
+
+    private function isUserRecord(mixed $value): bool
+    {
+        return is_array($value) && Arr::has($value, 'id') && Arr::has($value, 'name');
     }
 
     public function syncUsers(): array
@@ -76,7 +119,9 @@ class ExternalUserSyncService
 
         $users = $fetched['users'];
 
-        DB::transaction(function () use ($users) {
+        $syncedCount = 0;
+
+        DB::transaction(function () use ($users, &$syncedCount) {
             foreach ($users as $externalUser) {
                 $externalId = (int) Arr::get($externalUser, 'id');
 
@@ -106,6 +151,7 @@ class ExternalUserSyncService
                 }
 
                 $user->syncRoles($roles);
+                $syncedCount++;
             }
 
             foreach ($users as $externalUser) {
@@ -135,7 +181,7 @@ class ExternalUserSyncService
         });
 
         return [
-            'synced_count' => count($users),
+            'synced_count' => $syncedCount,
             'error' => null,
         ];
     }
