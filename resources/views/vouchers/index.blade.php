@@ -28,33 +28,31 @@
                 <thead>
                     <tr>
                         <th>زمان</th>
-                        <th>محصول</th>
-                        <th>نوع</th>
-                        <th>علت</th>
-                        <th>تعداد</th>
                         <th>شماره حواله</th>
+                        <th>از انبار</th>
+                        <th>به انبار</th>
+                        <th>مبلغ سند</th>
                         <th>کاربر</th>
+                        <th>عملیات</th>
                     </tr>
                 </thead>
                 <tbody>
                 @forelse($vouchers as $m)
                     <tr>
-                        <td class="text-muted small">{{ $m->created_at->format('Y/m/d H:i') }}</td>
-                        <td class="fw-semibold">
-                            {{ $m->product?->name }}
-                            <div class="text-muted small">{{ $m->product?->sku }}</div>
-                        </td>
-                        <td>
-                            @if($m->type==='in')
-                                <span class="badge text-bg-success">ورود</span>
-                            @else
-                                <span class="badge text-bg-danger">خروج</span>
-                            @endif
-                        </td>
-                        <td class="text-muted">{{ $m->reason }}</td>
-                        <td class="fw-bold">{{ $m->quantity }}</td>
-                        <td class="text-muted">{{ $m->reference }}</td>
+                        <td class="text-muted small">{{ $m->transferred_at?->format('Y/m/d H:i') }}</td>
+                        <td class="text-muted">{{ $m->reference ?: ('TR-'.$m->id) }}</td>
+                        <td class="fw-semibold">{{ $m->fromWarehouse?->name }}</td>
+                        <td class="fw-semibold">{{ $m->toWarehouse?->name }}</td>
+                        <td class="fw-bold">{{ number_format($m->total_amount) }}</td>
                         <td class="text-muted">{{ $m->user?->name }}</td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.edit', $m) }}">ویرایش</a>
+                            <form method="POST" action="{{ route('vouchers.destroy', $m) }}" class="d-inline" onsubmit="return confirm('از حذف حواله مطمئن هستید؟')">
+                                @csrf
+                                @method('DELETE')
+                                <button class="btn btn-sm btn-outline-danger">حذف</button>
+                            </form>
+                        </td>
                     </tr>
                 @empty
                     <tr><td colspan="7" class="text-center text-muted py-5">حواله‌ای ثبت نشده.</td></tr>
