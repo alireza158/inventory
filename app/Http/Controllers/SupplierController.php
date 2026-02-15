@@ -9,9 +9,7 @@ class SupplierController extends Controller
 {
     public function index()
     {
-        $suppliers = Supplier::latest()->paginate(20);
-
-        return view('suppliers.index', compact('suppliers'));
+        return redirect()->route('persons.index');
     }
 
     public function store(Request $request)
