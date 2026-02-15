@@ -5,7 +5,7 @@
     $preinvoiceOpen = request()->routeIs('preinvoice.*');
     $productsOpen = request()->routeIs('products.*');
     $categoriesOpen = request()->routeIs('categories.*');
-    $peopleOpen = request()->routeIs('persons.*') || request()->routeIs('customers.*') || request()->routeIs('suppliers.*');
+    $peopleOpen = request()->routeIs('persons.*') || request()->routeIs('customers.*') || request()->routeIs('suppliers.*') || request()->routeIs('users.*');
     $modelListsOpen = request()->routeIs('model-lists.*');
 @endphp
 
@@ -81,6 +81,11 @@
             <a class="list-group-item list-group-item-action {{ $peopleOpen ? 'active' : '' }}"
                href="{{ route('persons.index') }}">
                 اشخاص
+            </a>
+
+            <a class="list-group-item list-group-item-action {{ $is('users.*') }}"
+               href="{{ route('users.index') }}">
+                کاربران
             </a>
 
             <a class="list-group-item list-group-item-action {{ $is('purchases.*') }}"
