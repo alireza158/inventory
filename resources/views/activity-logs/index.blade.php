@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@php
+  use Morilog\Jalali\Jalalian;
+@endphp
+
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">لاگ فعالیت‌ها</h4>
@@ -38,7 +42,7 @@
             <thead class="table-light">
                 <tr>
                     <th>#</th>
-                    <th>زمان (میلادی)</th>
+                    <th>زمان (شمسی)</th>
                     <th>کاربر</th>
                     <th>عملیات</th>
                     <th>رکورد</th>
@@ -49,7 +53,7 @@
                 @forelse($logs as $log)
                     <tr>
                         <td>{{ $log->id }}</td>
-                        <td dir="ltr" class="text-nowrap">{{ optional($log->occurred_at)->format('Y-m-d H:i:s') }}</td>
+                        <td dir="ltr" class="text-nowrap">{{ $log->occurred_at ? Jalalian::fromDateTime($log->occurred_at)->format('Y/m/d H:i:s') : '—' }}</td>
                         <td>{{ $log->user?->name ?? 'سیستم' }}</td>
                         <td><span class="badge bg-secondary">{{ $log->action }}</span></td>
                         <td dir="ltr">

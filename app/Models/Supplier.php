@@ -9,7 +9,11 @@ class Supplier extends Model
     protected $fillable = [
         'name',
         'phone',
+        'province',
+        'city',
         'address',
+        'postal_code',
+        'additional_notes',
     ];
 
     public function purchases()

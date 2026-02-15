@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceNoteController;
 use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ModelListController;
 use App\Http\Controllers\PreinvoiceApiController;
 use App\Http\Controllers\PreinvoiceController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\StockMovementReportController;
 use App\Http\Controllers\StocktakeController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
 
@@ -76,6 +78,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
     Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
 
+    Route::get('/persons', [PersonController::class, 'index'])->name('persons.index');
+    Route::post('/persons', [PersonController::class, 'store'])->name('persons.store');
+
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
 
@@ -119,6 +124,10 @@ Route::middleware('auth')->group(function () {
 
     // Activity logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
+
+    // Users (External CRM)
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
 });
 
 require __DIR__.'/auth.php';

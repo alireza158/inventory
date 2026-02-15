@@ -11,9 +11,9 @@
     <!-- اگر select2 داری -->
     <script src="{{ asset('lib/select2.min.js') }}"></script>
 
-    <!-- وابستگی اصلی دیت‌پیکر -->
-    <script src="{{ asset('lib/persian-date.min.js') }}"></script>
-    <script src="{{ asset('lib/persian-datepicker.min.js') }}"></script>
+    <!-- Jalali Datepicker -->
+    <link rel="stylesheet" href="{{ asset('lib/jalalidatepicker.min.css') }}">
+    <script src="{{ asset('lib/jalalidatepicker.min.js') }}"></script>
 
     <!-- Bootstrap (اختیاری، فقط اگر نیاز داری) -->
     <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
@@ -105,36 +105,124 @@
 
 
 <script>
-  function initPersianDatepickers(){
-    if (!window.jQuery || !$.fn.persianDatepicker || !window.persianDate) return;
+  function initJalaliDatepickers(){
+    if (!window.jalaliDatepicker) return;
 
-    $('input[type="date"]').each(function(){
-      const el = this;
+    function div(a, b) { return ~~(a / b); }
+    function pad(v) { return String(v).padStart(2, '0'); }
+
+    function gregorianToJalali(gy, gm, gd) {
+      const g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+      let jy = (gy <= 1600) ? 0 : 979;
+      gy -= (gy <= 1600) ? 621 : 1600;
+      const gy2 = (gm > 2) ? (gy + 1) : gy;
+      let days = (365 * gy) + div(gy2 + 3, 4) - div(gy2 + 99, 100) + div(gy2 + 399, 400) - 80 + gd + g_d_m[gm - 1];
+      jy += 33 * div(days, 12053);
+      days %= 12053;
+      jy += 4 * div(days, 1461);
+      days %= 1461;
+      if (days > 365) {
+        jy += div(days - 1, 365);
+        days = (days - 1) % 365;
+      }
+      const jm = (days < 186) ? 1 + div(days, 31) : 7 + div(days - 186, 30);
+      const jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+      return [jy, jm, jd];
+    }
+
+    function jalaliToGregorian(jy, jm, jd) {
+      jy += 1595;
+      let days = -355668 + (365 * jy) + div(jy, 33) * 8 + div((jy % 33) + 3, 4) + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+      let gy = 400 * div(days, 146097);
+      days %= 146097;
+      if (days > 36524) {
+        gy += 100 * div(--days, 36524);
+        days %= 36524;
+        if (days >= 365) days++;
+      }
+      gy += 4 * div(days, 1461);
+      days %= 1461;
+      if (days > 365) {
+        gy += div(days - 1, 365);
+        days = (days - 1) % 365;
+      }
+      let gd = days + 1;
+      const sal_a = [0,31,((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+      let gm = 0;
+      for (gm = 1; gm <= 12 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
+      return [gy, gm, gd];
+    }
+
+    function gregorianStringToJalali(str) {
+      const datePart = (str || '').split('T')[0] || '';
+      const m = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return '';
+      const j = gregorianToJalali(Number(m[1]), Number(m[2]), Number(m[3]));
+      return `${j[0]}/${pad(j[1])}/${pad(j[2])}`;
+    }
+
+    function jalaliStringToGregorian(str) {
+      const m = (str || '').trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+      if (!m) return '';
+      const g = jalaliToGregorian(Number(m[1]), Number(m[2]), Number(m[3]));
+      return `${g[0]}-${pad(g[1])}-${pad(g[2])}`;
+    }
+
+    function bindDateInput(el){
       if (el.dataset.faDateBound === '1') return;
       el.dataset.faDateBound = '1';
 
-      const currentValue = el.value || '';
+      const isDateTime = el.type === 'datetime-local';
+      const initialGregorian = el.value || '';
+      const initialTime = isDateTime && initialGregorian.includes('T')
+        ? initialGregorian.split('T')[1].slice(0,5)
+        : '';
+
       el.type = 'text';
       el.setAttribute('autocomplete', 'off');
+      el.setAttribute('dir', 'ltr');
 
-      $(el).persianDatepicker({
-        autoClose: true,
-        format: 'YYYY/MM/DD',
-        initialValueType: 'gregorian',
-        persianDigit: false,
-        formatter: function(unixDate){
-          if (!unixDate) return '';
-          return new persianDate(unixDate).toCalendar('gregorian').format('YYYY-MM-DD');
-        }
-      });
+      el.setAttribute('data-jdp', '');
+      if (!isDateTime) el.setAttribute('data-jdp-only-date', '');
 
-      if (currentValue) {
-        el.value = currentValue;
+      if (initialGregorian) {
+        const jalali = gregorianStringToJalali(initialGregorian);
+        el.value = isDateTime ? `${jalali} ${initialTime}`.trim() : jalali;
       }
+
+      const form = el.closest('form');
+      if (!form || form.dataset.faDateSubmitBound === '1') return;
+      form.dataset.faDateSubmitBound = '1';
+
+      form.addEventListener('submit', function(){
+        form.querySelectorAll('input[data-fa-date-bound="1"]').forEach(function(dateInput){
+          const raw = (dateInput.value || '').trim();
+          if (!raw) return;
+
+          const [datePart, timePart] = raw.split(' ');
+          const gregorianDate = jalaliStringToGregorian(datePart);
+          if (!gregorianDate) return;
+
+          dateInput.value = dateInput.dataset.faOriginalType === 'datetime-local' && timePart
+            ? `${gregorianDate}T${timePart}`
+            : gregorianDate;
+        });
+      });
+    }
+
+    document.querySelectorAll('input[type="date"], input[type="datetime-local"]').forEach(function(el){
+      el.dataset.faOriginalType = el.type;
+      bindDateInput(el);
+    });
+
+    jalaliDatepicker.startWatch({
+      minDate: 'attr',
+      maxDate: 'attr',
+      time: true
     });
   }
 
-  document.addEventListener('DOMContentLoaded', initPersianDatepickers);
+  document.addEventListener('DOMContentLoaded', initJalaliDatepickers);
 </script>
 
 @stack('scripts')
