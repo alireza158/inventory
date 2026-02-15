@@ -228,9 +228,18 @@ function initSelect2(selectEl, placeholder) {
   if (!window.jQuery || !window.jQuery.fn?.select2) return;
   const $el = $(selectEl);
   if ($el.hasClass('select2-hidden-accessible')) {
+    $el.off('select2:select select2:clear');
     $el.select2('destroy');
   }
   $el.select2({ width:'100%', dir:'rtl', placeholder, allowClear:true, dropdownParent: $el.closest('.modal') });
+  $el.on('select2:select select2:clear', function(){ this.dispatchEvent(new Event('change',{bubbles:true})); });
+}
+
+function setSelectDisabled(selectEl, disabled) {
+  selectEl.disabled = disabled;
+  if (window.jQuery && $(selectEl).hasClass('select2-hidden-accessible')) {
+    $(selectEl).prop('disabled', disabled).trigger('change.select2');
+  }
 }
 
 function setProvinceOptions(selectEl) {
@@ -245,9 +254,10 @@ function setProvinceOptions(selectEl) {
 
 function setCityOptions(selectEl, provinceId, selectedCityId = null) {
   const province = provinces.find((p) => Number(p.id) === Number(provinceId));
+  const cities = province?.cities ?? province?.city ?? [];
   selectEl.innerHTML = '<option value=""></option>';
 
-  (province?.cities ?? []).forEach((c) => {
+  cities.forEach((c) => {
     const opt = document.createElement('option');
     opt.value = c.id;
     opt.textContent = c.name;
@@ -255,7 +265,7 @@ function setCityOptions(selectEl, provinceId, selectedCityId = null) {
     selectEl.appendChild(opt);
   });
 
-  selectEl.disabled = (province?.cities ?? []).length === 0;
+  setSelectDisabled(selectEl, cities.length === 0);
   if (window.jQuery) $(selectEl).trigger('change.select2');
 }
 
@@ -276,6 +286,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   setProvinceOptions(createProvince);
   setProvinceOptions(editProvince);
+  setCityOptions(createCity, null, null);
+  setCityOptions(editCity, null, null);
 
   initSelect2(createProvince, 'انتخاب استان...');
   initSelect2(createCity, 'انتخاب شهر...');
