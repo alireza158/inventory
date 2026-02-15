@@ -2,28 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\ExternalUserSyncService;
 
 class UserController extends Controller
 {
-    public function index(ExternalUserSyncService $externalUserSyncService)
+    public function index()
     {
-        $result = $externalUserSyncService->fetchUsers();
+        $users = User::query()
+            ->with(['roles', 'manager'])
+            ->orderBy('name')
+            ->get();
 
-        $users = $result['users'];
-        $error = $result['error'];
-
-        return view('users.index', compact('users', 'error'));
+        return view('users.index', compact('users'));
     }
 
     public function sync(ExternalUserSyncService $externalUserSyncService)
     {
-        $result = $externalUserSyncService->fetchUsers();
+        $result = $externalUserSyncService->syncUsers();
 
         if (!empty($result['error'])) {
             return redirect()->route('users.index')->with('sync_error', $result['error']);
         }
 
-        return redirect()->route('users.index')->with('sync_success', 'سینک کاربران با موفقیت انجام شد. تعداد کاربران: ' . count($result['users']));
+        return redirect()->route('users.index')->with('sync_success', 'سینک کاربران با موفقیت انجام شد. تعداد کاربران: ' . $result['synced_count']);
     }
 }

@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Spatie\Permission\Models\Role;
 
 class ExternalUserSyncService
 {
@@ -58,5 +61,93 @@ class ExternalUserSyncService
             'users' => $users,
             'error' => null,
         ];
+    }
+
+    public function syncUsers(): array
+    {
+        $fetched = $this->fetchUsers();
+
+        if (!empty($fetched['error'])) {
+            return [
+                'synced_count' => 0,
+                'error' => $fetched['error'],
+            ];
+        }
+
+        $users = $fetched['users'];
+
+        DB::transaction(function () use ($users) {
+            foreach ($users as $externalUser) {
+                $externalId = (int) Arr::get($externalUser, 'id');
+
+                if ($externalId <= 0) {
+                    continue;
+                }
+
+                $user = User::query()->updateOrCreate(
+                    ['external_crm_id' => $externalId],
+                    [
+                        'name' => (string) Arr::get($externalUser, 'name', 'بدون نام'),
+                        'email' => $this->resolveEmail($externalUser, $externalId),
+                        'phone' => Arr::get($externalUser, 'phone'),
+                        'password' => (string) Arr::get($externalUser, 'password_hash', bcrypt('ChangeMe123!')),
+                    ]
+                );
+
+                $roles = Arr::get($externalUser, 'roles', []);
+                $roles = is_array($roles) ? array_values(array_filter($roles, fn ($role) => is_string($role) && $role !== '')) : [];
+
+                if ($roles === []) {
+                    $roles = ['User'];
+                }
+
+                foreach ($roles as $roleName) {
+                    Role::findOrCreate($roleName, 'web');
+                }
+
+                $user->syncRoles($roles);
+            }
+
+            foreach ($users as $externalUser) {
+                $externalId = (int) Arr::get($externalUser, 'id');
+                $managerExternalId = (int) Arr::get($externalUser, 'manager_id');
+
+                if ($externalId <= 0) {
+                    continue;
+                }
+
+                $user = User::query()->where('external_crm_id', $externalId)->first();
+
+                if (!$user) {
+                    continue;
+                }
+
+                $managerId = null;
+
+                if ($managerExternalId > 0) {
+                    $managerId = User::query()
+                        ->where('external_crm_id', $managerExternalId)
+                        ->value('id');
+                }
+
+                $user->update(['manager_id' => $managerId]);
+            }
+        });
+
+        return [
+            'synced_count' => count($users),
+            'error' => null,
+        ];
+    }
+
+    private function resolveEmail(array $externalUser, int $externalId): string
+    {
+        $email = trim((string) Arr::get($externalUser, 'email', ''));
+
+        if ($email !== '') {
+            return $email;
+        }
+
+        return sprintf('crm_user_%d@local.inventory', $externalId);
     }
 }
