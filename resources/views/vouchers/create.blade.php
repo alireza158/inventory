@@ -11,6 +11,22 @@
             'personnel_asset_code' => $it->personnel_asset_code,
         ])->values()->all()
         : []);
+
+    $categoriesJson = $categories->map(function ($c) {
+        return [
+            'id' => $c->id,
+            'name' => $c->name,
+        ];
+    })->values();
+
+    $productsJson = $products->map(function ($p) {
+        return [
+            'id' => $p->id,
+            'name' => $p->name,
+            'sku' => $p->sku,
+            'category_id' => $p->category_id,
+        ];
+    })->values();
 @endphp
 
 @section('content')
@@ -88,8 +104,8 @@
 </div>
 
 <script>
-    const categories = @json($categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values());
-    const products = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'category_id' => $p->category_id])->values());
+    const categories = @json($categoriesJson);
+    const products = @json($productsJson);
     const initialItems = @json($initialItems);
 
     const tbody = document.querySelector('#itemsTable tbody');
