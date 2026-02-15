@@ -8,6 +8,7 @@ use App\Models\ProductVariant;
 use App\Models\Purchase;
 use App\Models\StockMovement;
 use App\Models\Supplier;
+use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -197,6 +198,8 @@ class PurchaseController extends Controller
                 'note' => 'ثبت/ویرایش خرید کالا - مدل: ' . $item['variant_name'],
             ]);
 
+            WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $product->id, $quantity);
+
             $purchase->items()->create([
                 'product_id' => $product->id,
                 'product_variant_id' => $variant->id,
@@ -373,6 +376,8 @@ class PurchaseController extends Controller
             $variant->update([
                 'stock' => (int) $variant->stock - (int) $item->quantity,
             ]);
+
+            WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $variant->product_id, -((int) $item->quantity));
 
             $affectedProductIds[] = $variant->product_id;
         }
