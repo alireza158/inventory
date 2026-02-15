@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@php
+  use Morilog\Jalali\Jalalian;
+@endphp
+
 @section('content')
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -33,7 +37,7 @@
               <td>{{ $o->customer_name }}</td>
               <td>{{ $o->customer_mobile }}</td>
               <td>{{ number_format((int)$o->total_price) }}</td>
-              <td>{{ $o->created_at?->format('Y-m-d H:i') }}</td>
+              <td>{{ $o->created_at ? Jalalian::fromDateTime($o->created_at)->format('Y/m/d H:i') : '—' }}</td>
               <td>
                 <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش</a>
               </td>
