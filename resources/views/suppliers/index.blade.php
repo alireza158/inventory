@@ -1,6 +1,9 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    use Morilog\Jalali\Jalalian;
+@endphp
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="page-title mb-0">تامین‌کننده‌ها</h4>
     <a class="btn btn-outline-secondary" href="{{ route('purchases.create') }}">بازگشت به خرید جدید</a>
@@ -74,7 +77,7 @@
                         <td>{{ $supplier->address ?: '-' }}</td>
                         <td>{{ $supplier->postal_code ?: '-' }}</td>
                         <td>{{ $supplier->additional_notes ?: '-' }}</td>
-                        <td>{{ $supplier->created_at->format('Y/m/d') }}</td>
+                        <td>{{ $supplier->created_at ? Jalalian::fromDateTime($supplier->created_at)->format('Y/m/d') : '-' }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="7" class="text-center text-muted py-4">تامین‌کننده‌ای ثبت نشده است.</td></tr>
