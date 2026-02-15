@@ -19,7 +19,11 @@ class SupplierController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:20'],
-            'address' => ['required', 'string', 'max:500'],
+            'province' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'postal_code' => ['nullable', 'string', 'max:20'],
+            'additional_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
         Supplier::create($data);

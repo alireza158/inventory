@@ -12,15 +12,31 @@
             @csrf
             <div class="col-md-4">
                 <label class="form-label">نام تامین‌کننده</label>
-                <input name="name" class="form-control" required>
+                <input name="name" class="form-control" value="{{ old('name') }}" required>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">شماره تماس</label>
-                <input name="phone" class="form-control" required>
+                <input name="phone" class="form-control" value="{{ old('phone') }}" required>
             </div>
-            <div class="col-md-4">
-                <label class="form-label">آدرس</label>
-                <input name="address" class="form-control" required>
+            <div class="col-md-2">
+                <label class="form-label">استان (اختیاری)</label>
+                <input name="province" class="form-control" value="{{ old('province') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">شهر (اختیاری)</label>
+                <input name="city" class="form-control" value="{{ old('city') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">آدرس (اختیاری)</label>
+                <input name="address" class="form-control" value="{{ old('address') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">کد پستی (اختیاری)</label>
+                <input name="postal_code" class="form-control" value="{{ old('postal_code') }}">
+            </div>
+            <div class="col-md-11">
+                <label class="form-label">توضیحات اضافی (اختیاری)</label>
+                <textarea name="additional_notes" class="form-control" rows="2">{{ old('additional_notes') }}</textarea>
             </div>
             <div class="col-md-1">
                 <button class="btn btn-primary w-100">ثبت</button>
@@ -36,7 +52,10 @@
                 <tr>
                     <th>نام</th>
                     <th>شماره تماس</th>
+                    <th>استان/شهر</th>
                     <th>آدرس</th>
+                    <th>کد پستی</th>
+                    <th>توضیحات اضافی</th>
                     <th>تاریخ ثبت</th>
                 </tr>
             </thead>
@@ -45,11 +64,20 @@
                     <tr>
                         <td>{{ $supplier->name }}</td>
                         <td>{{ $supplier->phone ?: '-' }}</td>
+                        <td>
+                            @if($supplier->province || $supplier->city)
+                                {{ $supplier->province ?: '-' }} / {{ $supplier->city ?: '-' }}
+                            @else
+                                -
+                            @endif
+                        </td>
                         <td>{{ $supplier->address ?: '-' }}</td>
+                        <td>{{ $supplier->postal_code ?: '-' }}</td>
+                        <td>{{ $supplier->additional_notes ?: '-' }}</td>
                         <td>{{ $supplier->created_at->format('Y/m/d') }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="text-center text-muted py-4">تامین‌کننده‌ای ثبت نشده است.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted py-4">تامین‌کننده‌ای ثبت نشده است.</td></tr>
                 @endforelse
             </tbody>
         </table>
