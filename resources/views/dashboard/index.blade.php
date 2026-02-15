@@ -1,9 +1,13 @@
 @extends('layouts.app')
 
+@php
+  use Morilog\Jalali\Jalalian;
+@endphp
+
 @section('content')
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h4 class="page-title mb-0">داشبورد</h4>
-    <div class="text-muted small">آخرین بروزرسانی: {{ now()->format('Y/m/d H:i') }}</div>
+    <div class="text-muted small">آخرین بروزرسانی: {{ Jalalian::fromDateTime(now())->format('Y/m/d H:i') }}</div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -75,7 +79,7 @@
                         <tbody>
                             @forelse(($latestMovements ?? []) as $m)
                                 <tr>
-                                    <td class="text-muted small">{{ $m->created_at->format('Y/m/d H:i') }}</td>
+                                    <td class="text-muted small">{{ Jalalian::fromDateTime($m->created_at)->format('Y/m/d H:i') }}</td>
                                     <td class="fw-semibold">
                                         {{ $m->product?->name }}
                                         <div class="text-muted small">{{ $m->product?->sku }}</div>
