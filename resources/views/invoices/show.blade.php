@@ -340,13 +340,6 @@
   </div>
 </div>
 
-{{-- Persian Datepicker assets --}}
-<link rel="stylesheet" href="{{ asset('lib/persian-datepicker.min.css') }}">
-
-{{-- خیلی مهم: اگر در layout jQuery لود نیست، باید قبل این‌ها بیاد.
-     اگر در layout هست، اینجا چیزی اضافه نکن. --}}
-<script src="{{ asset('lib/persian-date.min.js') }}"></script>
-<script src="{{ asset('lib/persian-datepicker.min.js') }}"></script>
 <script>
     (function(){
       const view = document.getElementById('amount_view');
@@ -402,72 +395,62 @@
     </script>
 
 <script>
-    (function () {
-      // اگر jQuery نیست، تاریخ شمسی کار نمی‌کند
-      if (!window.jQuery) {
-        console.error('jQuery is not loaded. Persian datepicker needs jQuery.');
-        return;
+  (function () {
+    if (!window.jalaliDatepicker) return;
+
+    const jalaliInput = document.getElementById('paid_at_jalali');
+    const gregorianInput = document.getElementById('paid_at');
+    if (!jalaliInput || !gregorianInput) return;
+
+    function div(a, b) { return ~~(a / b); }
+    function pad(v) { return String(v).padStart(2, '0'); }
+    function jalaliToGregorian(jy, jm, jd) {
+      jy += 1595;
+      let days = -355668 + (365 * jy) + div(jy, 33) * 8 + div((jy % 33) + 3, 4) + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+      let gy = 400 * div(days, 146097);
+      days %= 146097;
+      if (days > 36524) {
+        gy += 100 * div(--days, 36524);
+        days %= 36524;
+        if (days >= 365) days++;
       }
+      gy += 4 * div(days, 1461);
+      days %= 1461;
+      if (days > 365) {
+        gy += div(days - 1, 365);
+        days = (days - 1) % 365;
+      }
+      let gd = days + 1;
+      const sal_a = [0,31,((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+      let gm = 0;
+      for (gm = 1; gm <= 12 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
+      return [gy, gm, gd];
+    }
 
-      window.jQuery(function ($) {
-        if (!$.fn.persianDatepicker) {
-          console.error('persianDatepicker not loaded');
-          return;
-        }
-        if (typeof persianDate === 'undefined') {
-          console.error('persianDate (persian-date.min.js) not loaded');
-          return;
-        }
+    function jalaliStringToGregorian(str) {
+      const m = (str || '').trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+      if (!m) return '';
+      const g = jalaliToGregorian(Number(m[1]), Number(m[2]), Number(m[3]));
+      return `${g[0]}-${pad(g[1])}-${pad(g[2])}`;
+    }
 
-        const $jalali = $('#paid_at_jalali');
-        const $greg = $('#paid_at');
-        const $form = $jalali.closest('form');
+    jalaliInput.setAttribute('data-jdp', '');
+    jalaliInput.setAttribute('data-jdp-only-date', '');
+    jalaliInput.setAttribute('autocomplete', 'off');
+    jalaliDatepicker.startWatch();
 
-        function jalaliToGregorianYmd(j) {
-          if (!j) return '';
-          const parts = String(j).split('/');
-          if (parts.length !== 3) return '';
+    function syncPaidAt() {
+      gregorianInput.value = jalaliStringToGregorian(jalaliInput.value);
+    }
 
-          const jy = parseInt(parts[0], 10);
-          const jm = parseInt(parts[1], 10);
-          const jd = parseInt(parts[2], 10);
-          if (!jy || !jm || !jd) return '';
+    jalaliInput.addEventListener('change', syncPaidAt);
+    jalaliInput.addEventListener('input', syncPaidAt);
 
-          // خروجی: [gy, gm, gd]
-          const g = new persianDate([jy, jm, jd]).toCalendar('gregorian').toArray();
-          const gy = g[0];
-          const gm = String(g[1]).padStart(2, '0');
-          const gd = String(g[2]).padStart(2, '0');
-
-          return `${gy}-${gm}-${gd}`;
-        }
-
-        // datepicker
-        $jalali.persianDatepicker({
-          format: 'YYYY/MM/DD',
-          initialValue: false,
-          autoClose: true,
-          observer: true,
-          toolbox: { calendarSwitch: { enabled: false } }
-        });
-
-        // هر وقت تغییر کرد
-        function syncPaidAt() {
-          const j = $jalali.val();
-          const g = jalaliToGregorianYmd(j);
-          $greg.val(g);
-          // برای دیباگ:
-          // console.log('jalali:', j, 'greg:', g);
-        }
-
-        $jalali.on('change input', syncPaidAt);
-
-        // ✅ خیلی مهم: قبل submit هم یکبار sync کن
-        $form.on('submit', function () {
-          syncPaidAt();
-        });
-      });
-    })();
-  </script>
+    const form = jalaliInput.closest('form');
+    if (form) {
+      form.addEventListener('submit', syncPaidAt);
+    }
+  })();
+</script>
 
 @endsection
