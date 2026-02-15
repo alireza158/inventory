@@ -127,6 +127,7 @@ Route::middleware('auth')->group(function () {
 
     // Users (External CRM)
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
 });
 
 require __DIR__.'/auth.php';

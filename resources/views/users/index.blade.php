@@ -1,9 +1,24 @@
 <x-app-layout>
     <div class="container py-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1 class="h4 mb-0">کاربران</h1>
-            <span class="text-muted small">منبع: سرویس خارجی CRM</span>
+        <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+            <div>
+                <h1 class="h4 mb-0">کاربران</h1>
+                <span class="text-muted small">منبع: سرویس خارجی CRM</span>
+            </div>
+
+            <form method="POST" action="{{ route('users.sync') }}">
+                @csrf
+                <button type="submit" class="btn btn-primary btn-sm">سینک کاربران</button>
+            </form>
         </div>
+
+        @if(session('sync_success'))
+            <div class="alert alert-success">{{ session('sync_success') }}</div>
+        @endif
+
+        @if(session('sync_error'))
+            <div class="alert alert-danger">{{ session('sync_error') }}</div>
+        @endif
 
         @if($error)
             <div class="alert alert-danger">{{ $error }}</div>
