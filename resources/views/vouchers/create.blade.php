@@ -5,9 +5,9 @@
     $formAction = $isEdit ? route('vouchers.update', $voucher) : route('vouchers.store');
     $initialItems = old('items', $isEdit
         ? $voucher->items->map(fn($it) => [
+            'category_id' => $it->product?->category_id,
             'product_id' => $it->product_id,
             'quantity' => $it->quantity,
-            'unit_price' => $it->unit_price,
             'personnel_asset_code' => $it->personnel_asset_code,
         ])->values()->all()
         : []);
@@ -15,7 +15,7 @@
 
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="page-title mb-0">{{ $isEdit ? 'ویرایش حواله انبار' : 'ثبت حواله انبار' }}</h4>
+    <h4 class="page-title mb-0">{{ $isEdit ? 'ویرایش سند حواله' : 'ثبت سند حواله' }}</h4>
     <a class="btn btn-outline-secondary" href="{{ route('vouchers.index') }}">بازگشت</a>
 </div>
 
@@ -51,12 +51,12 @@
                     <input name="transferred_at" type="datetime-local" class="form-control" value="{{ old('transferred_at', optional($voucher->transferred_at ?? now())->format('Y-m-d\TH:i')) }}" required>
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">شماره حواله (اختیاری)</label>
                     <input name="reference" class="form-control" value="{{ old('reference', $voucher->reference ?? null) }}" placeholder="مثلاً 123">
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-12">
                     <label class="form-label">توضیحات (اختیاری)</label>
                     <input name="note" class="form-control" value="{{ old('note', $voucher->note ?? null) }}">
                 </div>
@@ -66,10 +66,10 @@
                         <table class="table align-middle" id="itemsTable">
                             <thead>
                                 <tr>
-                                    <th>محصول</th>
+                                    <th>دسته‌بندی</th>
+                                    <th>کالا</th>
                                     <th>تعداد</th>
-                                    <th>مبلغ واحد</th>
-                                    <th class="asset-col" style="display:none;">کد ۴ رقمی اموال</th>
+                                    <th class="asset-col" style="display:none;">کد اموال ۴ رقمی</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -80,42 +80,78 @@
                 </div>
 
                 <div class="col-12">
-                    <button class="btn btn-primary">{{ $isEdit ? 'ذخیره تغییرات' : 'ثبت حواله انبار' }}</button>
+                    <button class="btn btn-primary">{{ $isEdit ? 'ذخیره تغییرات سند' : 'ثبت سند حواله' }}</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
+
 <script>
-    const products = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku])->values());
+    const categories = @json($categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name])->values());
+    const products = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'category_id' => $p->category_id])->values());
     const initialItems = @json($initialItems);
+
     const tbody = document.querySelector('#itemsTable tbody');
     const addBtn = document.getElementById('addItemBtn');
     const toWarehouse = document.getElementById('toWarehouse');
 
-    function rowTemplate(i, item = null){
+    function productOptions(categoryId, selectedProductId) {
+        const filtered = products.filter(p => String(p.category_id) === String(categoryId || ''));
+        return [`<option value="">انتخاب...</option>`]
+            .concat(filtered.map(p => `<option value="${p.id}" ${String(selectedProductId || '') === String(p.id) ? 'selected' : ''}>${p.name} (${p.sku ?? ''})</option>`))
+            .join('');
+    }
+
+    function rowTemplate(i, item = null) {
+        const selectedCategoryId = item?.category_id || '';
+        const selectedProductId = item?.product_id || '';
+
         return `<tr>
-            <td><select name="items[${i}][product_id]" class="form-select" required>
-                <option value="">انتخاب...</option>
-                ${products.map(p => `<option value="${p.id}" ${String(item?.product_id || '') === String(p.id) ? 'selected' : ''}>${p.name} (${p.sku ?? ''})</option>`).join('')}
-            </select></td>
+            <td>
+                <select name="items[${i}][category_id]" class="form-select category-select" data-row="${i}" required>
+                    <option value="">انتخاب...</option>
+                    ${categories.map(c => `<option value="${c.id}" ${String(selectedCategoryId) === String(c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}
+                </select>
+            </td>
+            <td>
+                <select name="items[${i}][product_id]" class="form-select product-select" required>
+                    ${productOptions(selectedCategoryId, selectedProductId)}
+                </select>
+            </td>
             <td><input name="items[${i}][quantity]" type="number" min="1" class="form-control" value="${item?.quantity || 1}" required></td>
-            <td><input name="items[${i}][unit_price]" type="number" min="0" class="form-control" value="${item?.unit_price || 0}"></td>
             <td class="asset-col" style="display:none;"><input name="items[${i}][personnel_asset_code]" class="form-control" pattern="\\d{4}" maxlength="4" value="${item?.personnel_asset_code || ''}"></td>
             <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td>
         </tr>`;
     }
-    function addRow(item = null){
+
+    function bindCategoryEvents() {
+        tbody.querySelectorAll('.category-select').forEach((select) => {
+            if (select.dataset.bound === '1') return;
+            select.dataset.bound = '1';
+            select.addEventListener('change', (e) => {
+                const tr = e.target.closest('tr');
+                const productSelect = tr.querySelector('.product-select');
+                productSelect.innerHTML = productOptions(e.target.value, null);
+            });
+        });
+    }
+
+    function addRow(item = null) {
         tbody.insertAdjacentHTML('beforeend', rowTemplate(tbody.querySelectorAll('tr').length, item));
-        toggleAsset();
+        bindCategoryEvents();
+        toggleAssetCode();
     }
-    function toggleAsset(){
+
+    function toggleAssetCode() {
         const selected = toWarehouse.selectedOptions[0];
-        const isPersonnel = selected && selected.dataset.type === 'personnel';
-        document.querySelectorAll('.asset-col').forEach(el => el.style.display = isPersonnel ? '' : 'none');
+        const isPersonnelDestination = selected && selected.dataset.type === 'personnel';
+        document.querySelectorAll('.asset-col').forEach(el => el.style.display = isPersonnelDestination ? '' : 'none');
     }
+
     addBtn.addEventListener('click', () => addRow());
-    toWarehouse.addEventListener('change', toggleAsset);
+    toWarehouse.addEventListener('change', toggleAssetCode);
+
     if (initialItems.length) {
         initialItems.forEach(item => addRow(item));
     } else {

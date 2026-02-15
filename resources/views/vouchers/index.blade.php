@@ -10,8 +10,8 @@
     <div class="card-body">
         <div class="row g-3 align-items-end">
             <div class="col-md-6">
-                <label class="form-label">جستجو (نام / SKU / شماره حواله)</label>
-                <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً GR-1004 یا حواله 123">
+                <label class="form-label">جستجو (شماره حواله / نام انبار مبدا / نام انبار مقصد)</label>
+                <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً حواله 123 یا انبار مرکزی">
             </div>
             <div class="col-md-6 d-flex gap-2">
                 <button class="btn btn-primary">اعمال</button>

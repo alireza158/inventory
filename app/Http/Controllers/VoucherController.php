@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
@@ -14,9 +15,9 @@ class VoucherController extends Controller
 {
     public function index(Request $request)
     {
-        $q = trim((string)$request->get('q', ''));
+        $q = trim((string) $request->get('q', ''));
 
-        $vouchers = WarehouseTransfer::with(['fromWarehouse','toWarehouse','user'])
+        $vouchers = WarehouseTransfer::with(['fromWarehouse', 'toWarehouse', 'user'])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where('reference', 'like', "%{$q}%")
                     ->orWhereHas('fromWarehouse', fn ($w) => $w->where('name', 'like', "%{$q}%"))
@@ -31,19 +32,22 @@ class VoucherController extends Controller
 
     public function create()
     {
-        $products = Product::orderBy('name')->get();
-        $warehouses = Warehouse::where('is_active', true)->orderBy('name')->get();
+        $categories = Category::orderBy('name')->get();
+        $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $warehouses = $this->selectableWarehouses();
         $voucher = null;
-        return view('vouchers.create', compact('products', 'warehouses', 'voucher'));
+
+        return view('vouchers.create', compact('categories', 'products', 'warehouses', 'voucher'));
     }
 
     public function edit(WarehouseTransfer $voucher)
     {
-        $products = Product::orderBy('name')->get();
-        $warehouses = Warehouse::where('is_active', true)->orderBy('name')->get();
-        $voucher->load('items');
+        $categories = Category::orderBy('name')->get();
+        $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $warehouses = $this->selectableWarehouses();
+        $voucher->load('items.product');
 
-        return view('vouchers.create', compact('voucher', 'products', 'warehouses'));
+        return view('vouchers.create', compact('voucher', 'categories', 'products', 'warehouses'));
     }
 
     public function store(Request $request)
@@ -54,7 +58,7 @@ class VoucherController extends Controller
             $this->createTransfer($data);
         });
 
-        return redirect()->route('vouchers.index')->with('success', 'حواله ثبت شد و موجودی بروزرسانی شد.');
+        return redirect()->route('vouchers.index')->with('success', 'سند حواله ثبت شد.');
     }
 
     public function update(Request $request, WarehouseTransfer $voucher)
@@ -68,7 +72,7 @@ class VoucherController extends Controller
             $this->createTransfer($data);
         });
 
-        return redirect()->route('vouchers.index')->with('success', 'حواله با موفقیت ویرایش شد.');
+        return redirect()->route('vouchers.index')->with('success', 'سند حواله با موفقیت ویرایش شد.');
     }
 
     public function destroy(WarehouseTransfer $voucher)
@@ -78,23 +82,35 @@ class VoucherController extends Controller
             $voucher->delete();
         });
 
-        return back()->with('success', 'حواله حذف شد و موجودی انبارها برگشت داده شد.');
+        return back()->with('success', 'سند حواله حذف شد.');
     }
 
     private function validateTransfer(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'from_warehouse_id' => ['required', 'exists:warehouses,id', 'different:to_warehouse_id'],
             'to_warehouse_id' => ['required', 'exists:warehouses,id'],
             'transferred_at' => ['required', 'date'],
             'reference' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.category_id' => ['required', 'exists:categories,id'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['nullable', 'integer', 'min:0'],
             'items.*.personnel_asset_code' => ['nullable', 'digits:4'],
         ]);
+
+        foreach ($data['items'] as $index => $item) {
+            $belongsToCategory = Product::whereKey($item['product_id'])
+                ->where('category_id', $item['category_id'])
+                ->exists();
+
+            if (!$belongsToCategory) {
+                abort(422, "ردیف " . ($index + 1) . ": کالا در دسته‌بندی انتخابی نیست.");
+            }
+        }
+
+        return $data;
     }
 
     private function createTransfer(array $data): WarehouseTransfer
@@ -114,15 +130,15 @@ class VoucherController extends Controller
         $sum = 0;
 
         foreach ($data['items'] as $item) {
+            $product = Product::findOrFail($item['product_id']);
             $qty = (int) $item['quantity'];
-            $unitPrice = (int) ($item['unit_price'] ?? 0);
+            $unitPrice = (int) ($product->price ?? 0);
             $lineTotal = $qty * $unitPrice;
             $sum += $lineTotal;
 
             WarehouseStockService::change((int) $data['from_warehouse_id'], (int) $item['product_id'], -$qty);
             WarehouseStockService::change((int) $data['to_warehouse_id'], (int) $item['product_id'], $qty);
 
-            $product = Product::findOrFail($item['product_id']);
             $before = (int) $product->stock;
 
             $transfer->items()->create([
@@ -130,7 +146,7 @@ class VoucherController extends Controller
                 'quantity' => $qty,
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
-                'personnel_asset_code' => $toWarehouse->isPersonnelWarehouse() ? ($item['personnel_asset_code'] ?? null) : null,
+                'personnel_asset_code' => $toWarehouse->isPersonnelLeaf() ? ($item['personnel_asset_code'] ?? null) : null,
             ]);
 
             StockMovement::create([
@@ -162,5 +178,17 @@ class VoucherController extends Controller
 
         $reference = $transfer->reference ?: ('TR-' . $transfer->id);
         StockMovement::where('reason', 'transfer')->where('reference', $reference)->delete();
+    }
+
+    private function selectableWarehouses()
+    {
+        return Warehouse::query()
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->where('type', '!=', 'personnel')
+                    ->orWhereNotNull('parent_id');
+            })
+            ->orderBy('name')
+            ->get();
     }
 }

@@ -10,12 +10,23 @@ class Warehouse extends Model
         'name',
         'type',
         'personnel_name',
+        'parent_id',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    public function parent()
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
 
     public function stocks()
     {
@@ -36,5 +47,14 @@ class Warehouse extends Model
     {
         return $this->type === 'personnel';
     }
-}
 
+    public function isPersonnelRoot(): bool
+    {
+        return $this->type === 'personnel' && is_null($this->parent_id);
+    }
+
+    public function isPersonnelLeaf(): bool
+    {
+        return $this->type === 'personnel' && !is_null($this->parent_id);
+    }
+}

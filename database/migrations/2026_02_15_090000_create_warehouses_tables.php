@@ -54,6 +54,7 @@ return new class extends Migration {
             ['name' => 'انبار مرکزی', 'type' => 'central', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
             ['name' => 'انبار مرجوعی', 'type' => 'return', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
             ['name' => 'انبار ضایعات', 'type' => 'scrap', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'انبار پرسنل', 'type' => 'personnel', 'personnel_name' => null, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
         ]);
     }
 
