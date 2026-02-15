@@ -55,18 +55,22 @@
 
                         <div class="col-md-4">
                             <label class="form-label">استان (اختیاری)</label>
-                            <input name="province"
-                                   class="form-control @error('province') is-invalid @enderror"
-                                   value="{{ old('province') }}">
-                            @error('province') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <select name="province_id"
+                                    id="supplier_province_id"
+                                    class="form-select @error('province_id') is-invalid @enderror">
+                                <option value=""></option>
+                            </select>
+                            @error('province_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
                         <div class="col-md-4">
                             <label class="form-label">شهر (اختیاری)</label>
-                            <input name="city"
-                                   class="form-control @error('city') is-invalid @enderror"
-                                   value="{{ old('city') }}">
-                            @error('city') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <select name="city_id"
+                                    id="supplier_city_id"
+                                    class="form-select @error('city_id') is-invalid @enderror">
+                                <option value=""></option>
+                            </select>
+                            @error('city_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
                         <div class="col-md-12">
@@ -148,5 +152,75 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 @endif
+
+@push('scripts')
+<script>
+const SUPPLIER_AREA_API = "{{ url('/preinvoice/api/area') }}";
+
+function supplierInitSelect2(selectEl, placeholder) {
+    if (!window.jQuery || !window.jQuery.fn?.select2) return;
+    const $el = $(selectEl);
+    if ($el.hasClass('select2-hidden-accessible')) {
+        $el.off('select2:select select2:clear');
+        $el.select2('destroy');
+    }
+    $el.select2({ width:'100%', dir:'rtl', placeholder, allowClear:true, dropdownParent: $el.closest('.modal') });
+    $el.on('select2:select select2:clear', function(){ this.dispatchEvent(new Event('change',{bubbles:true})); });
+}
+
+document.addEventListener('DOMContentLoaded', async function () {
+    const provinceSelect = document.getElementById('supplier_province_id');
+    const citySelect = document.getElementById('supplier_city_id');
+    const oldProvinceId = {{ old('province_id') ? (int) old('province_id') : 'null' }};
+    const oldCityId = {{ old('city_id') ? (int) old('city_id') : 'null' }};
+    if (!provinceSelect || !citySelect) return;
+
+    let provinces = [];
+    try {
+        const res = await fetch(SUPPLIER_AREA_API, { headers: { 'Accept': 'application/json' } });
+        const json = await res.json();
+        provinces = json?.data?.provinces ?? [];
+    } catch (e) {
+        provinces = [];
+    }
+
+    provinceSelect.innerHTML = '<option value=""></option>';
+    provinces.forEach((province) => {
+        const option = document.createElement('option');
+        option.value = province.id;
+        option.textContent = province.name;
+        if (oldProvinceId && Number(option.value) === Number(oldProvinceId)) {
+            option.selected = true;
+        }
+        provinceSelect.appendChild(option);
+    });
+
+    const setCityOptions = (provinceId, selectedCityId = null) => {
+        const province = provinces.find((p) => Number(p.id) === Number(provinceId));
+        const cities = province?.cities ?? [];
+
+        citySelect.innerHTML = '<option value=""></option>';
+        cities.forEach((city) => {
+            const option = document.createElement('option');
+            option.value = city.id;
+            option.textContent = city.name;
+            if (selectedCityId && Number(selectedCityId) === Number(city.id)) option.selected = true;
+            citySelect.appendChild(option);
+        });
+        citySelect.disabled = cities.length === 0;
+        if (window.jQuery) $(citySelect).trigger('change.select2');
+    };
+
+    provinceSelect.addEventListener('change', function () {
+        setCityOptions(this.value, null);
+    });
+
+    setCityOptions(provinceSelect.value, oldCityId);
+
+    supplierInitSelect2(provinceSelect, 'انتخاب استان...');
+    supplierInitSelect2(citySelect, 'انتخاب شهر...');
+});
+</script>
+@endpush
 
 @endsection
