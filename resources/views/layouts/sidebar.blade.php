@@ -109,8 +109,8 @@
                 حواله‌ها
             </a>
 
-            <a class="list-group-item list-group-item-action {{ $is('movements.index') }}"
-               href="{{ route('movements.index') }}">
+            <a class="list-group-item list-group-item-action {{ $is('warehouses.*') }}"
+               href="{{ route('warehouses.index') }}">
                 انبارها
             </a>
         </div>
