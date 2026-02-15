@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Spatie\Permission\Models\Role;
 
 class ExternalUserSyncService
 {
@@ -38,25 +41,159 @@ class ExternalUserSyncService
             ];
         }
 
-        $users = Arr::get($response, 'data');
-
-        if (!is_array($users)) {
-            $users = Arr::get($response, 'users');
-        }
-
-        if (is_array($users) && Arr::isAssoc($users) && Arr::has($users, 'items')) {
-            $users = Arr::get($users, 'items');
-        }
-
-        if (!is_array($users)) {
-            $users = is_array($response) && array_is_list($response) ? $response : [];
-        }
-
-        $users = array_values(array_filter($users, fn ($item) => is_array($item)));
+        $users = $this->extractUsersFromResponse($response);
 
         return [
             'users' => $users,
             'error' => null,
         ];
+    }
+
+
+    private function extractUsersFromResponse(mixed $response): array
+    {
+        if (!is_array($response)) {
+            return [];
+        }
+
+        $candidates = [
+            Arr::get($response, 'data'),
+            Arr::get($response, 'users'),
+            Arr::get($response, 'items'),
+            $response,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $users = $this->normalizeUserCollection($candidate);
+
+            if ($users !== []) {
+                return $users;
+            }
+        }
+
+        return [];
+    }
+
+    private function normalizeUserCollection(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        if (Arr::isAssoc($value) && Arr::has($value, 'items')) {
+            return $this->normalizeUserCollection(Arr::get($value, 'items'));
+        }
+
+        if (array_is_list($value) && $value !== []) {
+            if ($this->isUserRecord($value[0] ?? null)) {
+                return array_values(array_filter($value, fn ($item) => $this->isUserRecord($item)));
+            }
+
+            $flattened = [];
+
+            foreach ($value as $item) {
+                $flattened = array_merge($flattened, $this->normalizeUserCollection($item));
+            }
+
+            return $flattened;
+        }
+
+        return $this->isUserRecord($value) ? [$value] : [];
+    }
+
+    private function isUserRecord(mixed $value): bool
+    {
+        return is_array($value) && Arr::has($value, 'id') && Arr::has($value, 'name');
+    }
+
+    public function syncUsers(): array
+    {
+        $fetched = $this->fetchUsers();
+
+        if (!empty($fetched['error'])) {
+            return [
+                'synced_count' => 0,
+                'error' => $fetched['error'],
+            ];
+        }
+
+        $users = $fetched['users'];
+
+        $syncedCount = 0;
+
+        DB::transaction(function () use ($users, &$syncedCount) {
+            foreach ($users as $externalUser) {
+                $externalId = (int) Arr::get($externalUser, 'id');
+
+                if ($externalId <= 0) {
+                    continue;
+                }
+
+                $user = User::query()->updateOrCreate(
+                    ['external_crm_id' => $externalId],
+                    [
+                        'name' => (string) Arr::get($externalUser, 'name', 'بدون نام'),
+                        'email' => $this->resolveEmail($externalUser, $externalId),
+                        'phone' => Arr::get($externalUser, 'phone'),
+                        'password' => (string) Arr::get($externalUser, 'password_hash', bcrypt('ChangeMe123!')),
+                    ]
+                );
+
+                $roles = Arr::get($externalUser, 'roles', []);
+                $roles = is_array($roles) ? array_values(array_filter($roles, fn ($role) => is_string($role) && $role !== '')) : [];
+
+                if ($roles === []) {
+                    $roles = ['User'];
+                }
+
+                foreach ($roles as $roleName) {
+                    Role::findOrCreate($roleName, 'web');
+                }
+
+                $user->syncRoles($roles);
+                $syncedCount++;
+            }
+
+            foreach ($users as $externalUser) {
+                $externalId = (int) Arr::get($externalUser, 'id');
+                $managerExternalId = (int) Arr::get($externalUser, 'manager_id');
+
+                if ($externalId <= 0) {
+                    continue;
+                }
+
+                $user = User::query()->where('external_crm_id', $externalId)->first();
+
+                if (!$user) {
+                    continue;
+                }
+
+                $managerId = null;
+
+                if ($managerExternalId > 0) {
+                    $managerId = User::query()
+                        ->where('external_crm_id', $managerExternalId)
+                        ->value('id');
+                }
+
+                $user->update(['manager_id' => $managerId]);
+            }
+        });
+
+        return [
+            'synced_count' => $syncedCount,
+            'error' => null,
+        ];
+    }
+
+    private function resolveEmail(array $externalUser, int $externalId): string
+    {
+        $email = trim((string) Arr::get($externalUser, 'email', ''));
+
+        if ($email !== '') {
+            return $email;
+        }
+
+        return sprintf('crm_user_%d@local.inventory', $externalId);
     }
 }
