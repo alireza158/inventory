@@ -23,6 +23,11 @@ class ExternalUserSyncService
             $response = Http::timeout(30)
                 ->retry(2, 400)
                 ->withToken($token)
+                ->withHeaders([
+                    'EXTERNAL_SYNC_TOKEN' => $token,
+                    'X-External-Sync-Token' => $token,
+                ])
+                ->acceptJson()
                 ->get($baseUrl . '/external/users')
                 ->throw()
                 ->json();
@@ -37,6 +42,10 @@ class ExternalUserSyncService
 
         if (!is_array($users)) {
             $users = Arr::get($response, 'users');
+        }
+
+        if (is_array($users) && Arr::isAssoc($users) && Arr::has($users, 'items')) {
+            $users = Arr::get($users, 'items');
         }
 
         if (!is_array($users)) {
