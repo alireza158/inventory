@@ -8,7 +8,7 @@ class Customer extends Model
 {
     protected $fillable = [
         'first_name','last_name','mobile',
-        'address','province_id','city_id',
+        'address','postal_code','extra_description','province_id','city_id',
         'opening_balance',
     ];
 
@@ -17,7 +17,6 @@ class Customer extends Model
         return $this->hasMany(CustomerLedger::class);
     }
 
-    // بدهکار/بستانکار/مانده از ledger
     public function scopeWithBalance($q)
     {
         return $q->withSum(['ledgers as debit_sum' => fn($x)=>$x->where('type','debit')], 'amount')
@@ -28,9 +27,14 @@ class Customer extends Model
     {
         $debit = (int)($this->debit_sum ?? 0);
         $credit = (int)($this->credit_sum ?? 0);
-        return (int)$this->opening_balance + $debit - $credit; // + بدهکار، - بستانکار
+        return (int)$this->opening_balance + $debit - $credit;
     }
 
     public function getDebtAttribute()   { return max($this->balance, 0); }
     public function getCreditAttribute() { return max(-$this->balance, 0); }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return trim((string) ($this->first_name ?? ''));
+    }
 }

@@ -108,29 +108,92 @@
   function initPersianDatepickers(){
     if (!window.jQuery || !$.fn.persianDatepicker || !window.persianDate) return;
 
-    $('input[type="date"]').each(function(){
-      const el = this;
+    function gregorianToJalali(gregorianDate) {
+      if (!gregorianDate) return '';
+
+      const datePart = gregorianDate.split('T')[0] || '';
+      const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return '';
+
+      const gy = Number(match[1]);
+      const gm = Number(match[2]);
+      const gd = Number(match[3]);
+
+      return new persianDate()
+        .toCalendar('gregorian')
+        .parse(gy, gm, gd)
+        .toCalendar('persian')
+        .format('YYYY/MM/DD');
+    }
+
+    function jalaliToGregorian(jalaliDate) {
+      if (!jalaliDate) return '';
+
+      const match = jalaliDate.trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+      if (!match) return '';
+
+      const jy = Number(match[1]);
+      const jm = Number(match[2]);
+      const jd = Number(match[3]);
+
+      return new persianDate([jy, jm, jd])
+        .toCalendar('persian')
+        .toCalendar('gregorian')
+        .format('YYYY-MM-DD');
+    }
+
+    function bindDateInput(el){
       if (el.dataset.faDateBound === '1') return;
       el.dataset.faDateBound = '1';
 
-      const currentValue = el.value || '';
+      const isDateTime = el.type === 'datetime-local';
+      const initialGregorian = el.value || '';
+      const initialTime = isDateTime && initialGregorian.includes('T')
+        ? initialGregorian.split('T')[1].slice(0,5)
+        : '';
+
       el.type = 'text';
       el.setAttribute('autocomplete', 'off');
+      el.setAttribute('dir', 'ltr');
 
       $(el).persianDatepicker({
         autoClose: true,
-        format: 'YYYY/MM/DD',
-        initialValueType: 'gregorian',
+        format: isDateTime ? 'YYYY/MM/DD HH:mm' : 'YYYY/MM/DD',
+        timePicker: { enabled: isDateTime },
+        calendar: { persian: { locale: 'fa' } },
+        initialValue: false,
         persianDigit: false,
-        formatter: function(unixDate){
-          if (!unixDate) return '';
-          return new persianDate(unixDate).toCalendar('gregorian').format('YYYY-MM-DD');
-        }
+        toolbox: { calendarSwitch: { enabled: false } }
       });
 
-      if (currentValue) {
-        el.value = currentValue;
+      if (initialGregorian) {
+        const jalali = gregorianToJalali(initialGregorian);
+        el.value = isDateTime ? `${jalali} ${initialTime}`.trim() : jalali;
       }
+
+      const form = el.closest('form');
+      if (!form || form.dataset.faDateSubmitBound === '1') return;
+      form.dataset.faDateSubmitBound = '1';
+
+      form.addEventListener('submit', function(){
+        form.querySelectorAll('input[data-fa-date-bound="1"]').forEach(function(dateInput){
+          const raw = (dateInput.value || '').trim();
+          if (!raw) return;
+
+          const [datePart, timePart] = raw.split(' ');
+          const gregorianDate = jalaliToGregorian(datePart);
+          if (!gregorianDate) return;
+
+          dateInput.value = dateInput.dataset.faOriginalType === 'datetime-local' && timePart
+            ? `${gregorianDate}T${timePart}`
+            : gregorianDate;
+        });
+      });
+    }
+
+    $('input[type="date"], input[type="datetime-local"]').each(function(){
+      this.dataset.faOriginalType = this.type;
+      bindDateInput(this);
     });
   }
 

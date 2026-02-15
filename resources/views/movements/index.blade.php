@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@php
+  use Morilog\Jalali\Jalalian;
+@endphp
+
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="page-title mb-0">گردش انبار</h4>
@@ -70,7 +74,7 @@
         <tbody>
           @forelse($movements as $m)
             <tr>
-              <td class="text-muted small">{{ $m->created_at->format('Y/m/d H:i') }}</td>
+              <td class="text-muted small">{{ Jalalian::fromDateTime($m->created_at)->format('Y/m/d H:i') }}</td>
               <td class="fw-semibold">
                 {{ $m->product?->name }}
                 <div class="text-muted small">{{ $m->product?->sku }}</div>

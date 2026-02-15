@@ -37,7 +37,6 @@
                         @endforeach
                     </select>
                 </div>
-
                 <div class="col-md-3">
                     <label class="form-label">انبار مقصد</label>
                     <select name="to_warehouse_id" class="form-select" id="toWarehouse" required>
@@ -47,7 +46,6 @@
                         @endforeach
                     </select>
                 </div>
-
                 <div class="col-md-3">
                     <label class="form-label">تاریخ حواله</label>
                     <input name="transferred_at" type="datetime-local" class="form-control" value="{{ old('transferred_at', optional($voucher->transferred_at ?? now())->format('Y-m-d\TH:i')) }}" required>
