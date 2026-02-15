@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceNoteController;
 use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ModelListController;
 use App\Http\Controllers\PreinvoiceApiController;
 use App\Http\Controllers\PreinvoiceController;
@@ -75,6 +76,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/purchases/{purchase}/edit', [PurchaseController::class, 'edit'])->name('purchases.edit');
     Route::put('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
     Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
+
+    Route::get('/persons', [PersonController::class, 'index'])->name('persons.index');
+    Route::post('/persons', [PersonController::class, 'store'])->name('persons.store');
 
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');

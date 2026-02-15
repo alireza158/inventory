@@ -69,7 +69,7 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <a href="{{ route('suppliers.index') }}" class="btn btn-sm btn-outline-dark">مدیریت تامین‌کننده‌ها</a>
+                            <a href="{{ route('persons.index') }}" class="btn btn-sm btn-outline-dark">مدیریت اشخاص</a>
                         </div>
                     </div>
                     <div class="col-md-6">

@@ -5,7 +5,7 @@
     $preinvoiceOpen = request()->routeIs('preinvoice.*');
     $productsOpen = request()->routeIs('products.*');
     $categoriesOpen = request()->routeIs('categories.*');
-    $suppliersOpen = request()->routeIs('suppliers.*');
+    $peopleOpen = request()->routeIs('persons.*') || request()->routeIs('customers.*') || request()->routeIs('suppliers.*');
     $modelListsOpen = request()->routeIs('model-lists.*');
 @endphp
 
@@ -78,26 +78,10 @@
         <div class="mt-2">
             <div class="text-muted small mb-2">خرید کالا / حواله‌ها</div>
 
-            <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $suppliersOpen ? 'active' : '' }}"
-               data-bs-toggle="collapse"
-               href="#suppliersMenu"
-               role="button"
-               aria-expanded="{{ $suppliersOpen ? 'true' : 'false' }}"
-               aria-controls="suppliersMenu">
-                <span>تامین‌کنندگان</span>
-                <span class="small">▾</span>
+            <a class="list-group-item list-group-item-action {{ $peopleOpen ? 'active' : '' }}"
+               href="{{ route('persons.index') }}">
+                اشخاص
             </a>
-
-            <div class="collapse {{ $suppliersOpen ? 'show' : '' }}" id="suppliersMenu">
-                <div class="list-group list-group-flush ms-2 mt-1">
-                    <a class="list-group-item list-group-item-action {{ $is('suppliers.index') }}"
-                       href="{{ route('suppliers.index') }}">
-                        لیست تامین‌کنندگان
-                    </a>
-
-
-                </div>
-            </div>
 
             <a class="list-group-item list-group-item-action {{ $is('purchases.*') }}"
                href="{{ route('purchases.index') }}">
@@ -158,10 +142,6 @@
 
 
             </div>
-            <a class="list-group-item list-group-item-action {{ $is('customers.*') }}"
-            href="{{ route('customers.index') }}">
-           مشتریان
-         </a>
          <a class="list-group-item list-group-item-action {{ $is('invoices.*') }}"
    href="{{ route('invoices.index') }}">
    فاکتورها
