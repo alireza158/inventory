@@ -71,20 +71,9 @@ class PreinvoiceApiController extends Controller
 
     public function area()
     {
-        // اگر Province/City تو DB داری، اینجا از DB بده.
-        // فعلا یک نمونه‌ی ساده (خودت جایگزین کن)
         return response()->json([
             'data' => [
-                'provinces' => [
-                    [
-                        'id' => 1,
-                        'name' => 'تهران',
-                        'cities' => [
-                            ['id' => 10, 'name' => 'تهران'],
-                            ['id' => 11, 'name' => 'ری'],
-                        ],
-                    ],
-                ],
+                'provinces' => config('iran.provinces', []),
             ],
         ]);
     }
