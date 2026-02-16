@@ -532,6 +532,36 @@
 }
 
 /* آیتم‌های لیست خرید (اگر داری) */
+
+
+.purchase-page-wrap .purchase-product-group{
+  border: 1px solid rgba(13,110,253,.2);
+  border-radius: 16px;
+  background:#fff;
+  box-shadow: var(--shadow2);
+  padding: .9rem;
+}
+.purchase-page-wrap .purchase-product-group + .purchase-product-group{ margin-top: 1rem; }
+.purchase-page-wrap .group-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.6rem;
+  padding: .5rem .65rem;
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(7,26,58,.06), rgba(13,110,253,.06));
+  border: 1px dashed rgba(13,110,253,.20);
+  margin-bottom:.75rem;
+}
+.purchase-page-wrap .group-title{
+  font-weight: 700;
+  color: var(--ink);
+}
+.purchase-page-wrap .purchase-model-row + .purchase-model-row{
+  border-top: 1px solid rgba(7,26,58,.12);
+  margin-top: .8rem;
+  padding-top: .8rem;
+}
 .purchase-page-wrap .purchase-item{
   border: 1px solid rgba(13,110,253,.18);
   border-radius: 16px;
@@ -584,12 +614,14 @@
   text-overflow: ellipsis;
   max-width: 55%;
 }
-.purchase-page-wrap .purchase-item .label{
+.purchase-page-wrap .purchase-item .label,
+.purchase-page-wrap .purchase-product-group .label{
   font-size: .75rem;
   color: rgba(11,18,32,.65);
   margin-bottom: .25rem;
 }
-.purchase-page-wrap .purchase-item .line-total{
+.purchase-page-wrap .purchase-item .line-total,
+.purchase-page-wrap .purchase-model-row .line-total{
   font-weight: 900;
   font-size: .92rem;
   min-height: 40px;
