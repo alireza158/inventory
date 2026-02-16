@@ -16,19 +16,17 @@
     </div>
 
     <div class="row g-3 mb-3">
-        <div class="col-md-6">
+        <div class="col-12">
             <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="label">مبلغ کل خریدها تا الان</div>
-                    <div class="value">{{ $toToman($totalAllAmount) }} تومان</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card stat-card h-100">
-                <div class="card-body">
-                    <div class="label">مبلغ کل نتیجه فیلتر</div>
-                    <div class="value">{{ $toToman($totalFilteredAmount) }} تومان</div>
+                <div class="card-body d-flex flex-wrap gap-4 justify-content-between align-items-center">
+                    <div>
+                        <div class="label">جمع کل خریدها تا الان (قیمت خرید)</div>
+                        <div class="value">{{ $toToman($totalAllAmount) }} تومان</div>
+                    </div>
+                    <div>
+                        <div class="label">تعداد لیست خریدها</div>
+                        <div class="value">{{ number_format($totalAllCount) }}</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -56,16 +54,8 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">حداقل مبلغ فاکتور (تومان)</label>
-                    <input type="number" min="0" name="min_total" class="form-control" value="{{ request('min_total') }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">حداکثر مبلغ فاکتور (تومان)</label>
-                    <input type="number" min="0" name="max_total" class="form-control" value="{{ request('max_total') }}">
-                </div>
 
-                <div class="col-md-9 d-flex gap-2 filter-actions">
+                <div class="col-md-3 d-flex gap-2 filter-actions">
                     <button class="btn btn-primary">جستجو</button>
                     <a href="{{ route('purchases.index') }}" class="btn btn-outline-secondary">حذف فیلتر</a>
                 </div>
