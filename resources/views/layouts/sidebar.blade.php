@@ -37,11 +37,6 @@
                    href="{{ route('products.index') }}">
                     کلیه کالاها
                 </a>
-
-                <a class="list-group-item list-group-item-action {{ $is('products.create') }}"
-                   href="{{ route('products.create') }}">
-                    ➕ افزودن کالا
-                </a>
             </div>
         </div>
 

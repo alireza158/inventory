@@ -80,12 +80,19 @@
 
 
 
-                <div id="itemsList"></div>
+                <div id="purchaseTabs" class="purchase-tabs d-none"></div>
+                <div id="itemsList" class="mt-2"></div>
 
                 <div class="d-flex gap-2 flex-wrap mt-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">+ افزودن ردیف جدید</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addVariantForSameProductBtn">+ افزودن مدل برای همین محصول</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">+ افزودن کالای جدید</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addVariantForSameProductBtn">+ افزودن مدل در تب فعال</button>
                 </div>
+
+                <datalist id="purchaseModelListOptions">
+                    @foreach(($modelLists ?? collect()) as $modelName)
+                        <option value="{{ $modelName }}"></option>
+                    @endforeach
+                </datalist>
 
                 <hr>
 
@@ -122,6 +129,7 @@
     const products = @json($productsPayload);
     const initialItems = @json($initialItems);
 
+    const purchaseTabs = document.getElementById('purchaseTabs');
     const itemsList = document.getElementById('itemsList');
     const addBtn = document.getElementById('addRowBtn');
     const addSameProductBtn = document.getElementById('addVariantForSameProductBtn');
@@ -131,6 +139,8 @@
     const totalEl = document.getElementById('totalAmount');
     const invoiceDiscountTypeEl = document.getElementById('invoiceDiscountType');
     const invoiceDiscountValueEl = document.getElementById('invoiceDiscountValue');
+
+    let activeGroupId = null;
 
     function productOptions(selected = '') {
         return `<option value="">کالای جدید/بدون انتخاب</option>${products.map((p) =>
@@ -154,14 +164,15 @@
         return Math.min(v, base);
     }
 
-    function itemTemplate(index, item = {}) {
+    function itemTemplate(index, item = {}, groupId = null) {
         const productId = item.product_id || '';
         const variantId = item.variant_id || '';
         const rowDiscountType = item.discount_type || '';
         const rowDiscountValue = item.discount_value || 0;
+        const rowGroupId = groupId || item.group_id || `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
         return `
-        <div class="purchase-item ${index % 2 === 1 ? 'is-even' : ''}" data-row>
+        <div class="purchase-item ${index % 2 === 1 ? 'is-even' : ''}" data-row data-group-id="${rowGroupId}">
             <div class="row-head">
                 <div class="row-badge">
                     <span>ردیف</span>
@@ -196,7 +207,7 @@
                         <select class="form-select form-select-sm variant-select" style="max-width:180px;">
                             ${variantOptions(productId, variantId)}
                         </select>
-                        <input class="form-control form-control-sm variant-name" name="items[${index}][variant_name]" value="${item.variant_name ?? ''}" placeholder="نام مدل" required>
+                        <input class="form-control form-control-sm variant-name" list="purchaseModelListOptions" name="items[${index}][variant_name]" value="${item.variant_name ?? ''}" placeholder="نام مدل" required>
                     </div>
                 </div>
             </div>
@@ -238,8 +249,58 @@
         </div>`;
     }
 
-    function setName(el, newName){
+    function setName(el, newName) {
         if (el && el.getAttribute('name')) el.setAttribute('name', newName);
+    }
+
+    function buildGroupLabel(row) {
+        return row.querySelector('.product-name')?.value?.trim() || 'کالای جدید';
+    }
+
+    function renderTabs() {
+        const rows = Array.from(itemsList.querySelectorAll('[data-row]'));
+
+        if (rows.length === 0) {
+            purchaseTabs.innerHTML = '';
+            purchaseTabs.classList.add('d-none');
+            activeGroupId = null;
+            return;
+        }
+
+        const groups = [];
+
+        rows.forEach((row) => {
+            const groupId = row.dataset.groupId;
+            if (!groupId) return;
+
+            const existing = groups.find((group) => group.id === groupId);
+            if (existing) {
+                existing.count += 1;
+                return;
+            }
+
+            groups.push({
+                id: groupId,
+                label: buildGroupLabel(row),
+                count: 1,
+            });
+        });
+
+        if (!activeGroupId || !groups.some((group) => group.id === activeGroupId)) {
+            activeGroupId = groups[groups.length - 1].id;
+        }
+
+        purchaseTabs.classList.remove('d-none');
+        purchaseTabs.innerHTML = groups.map((group) => `
+            <button type="button" class="purchase-tab-btn ${group.id === activeGroupId ? 'is-active' : ''}" data-group-tab="${group.id}">
+                ${group.label}
+                <span class="badge bg-light text-dark">${group.count.toLocaleString('fa-IR')}</span>
+            </button>
+        `).join('');
+
+        rows.forEach((row) => {
+            row.classList.toggle('d-none', row.dataset.groupId !== activeGroupId);
+        });
     }
 
     function reindexRows() {
@@ -259,16 +320,18 @@
             if (mv) mv.textContent = vn.trim() || '—';
 
             setName(row.querySelector('.product-select'), `items[${idx}][product_id]`);
-            setName(row.querySelector('.product-name'),   `items[${idx}][name]`);
-            setName(row.querySelector('.product-code'),   `items[${idx}][code]`);
-            setName(row.querySelector('.variant-id'),     `items[${idx}][variant_id]`);
-            setName(row.querySelector('.variant-name'),   `items[${idx}][variant_name]`);
-            setName(row.querySelector('.qty'),            `items[${idx}][quantity]`);
-            setName(row.querySelector('.buy'),            `items[${idx}][buy_price]`);
-            setName(row.querySelector('.sell'),           `items[${idx}][sell_price]`);
+            setName(row.querySelector('.product-name'), `items[${idx}][name]`);
+            setName(row.querySelector('.product-code'), `items[${idx}][code]`);
+            setName(row.querySelector('.variant-id'), `items[${idx}][variant_id]`);
+            setName(row.querySelector('.variant-name'), `items[${idx}][variant_name]`);
+            setName(row.querySelector('.qty'), `items[${idx}][quantity]`);
+            setName(row.querySelector('.buy'), `items[${idx}][buy_price]`);
+            setName(row.querySelector('.sell'), `items[${idx}][sell_price]`);
             setName(row.querySelector('.row-discount-type'), `items[${idx}][discount_type]`);
-            setName(row.querySelector('.discount-value'),    `items[${idx}][discount_value]`);
+            setName(row.querySelector('.discount-value'), `items[${idx}][discount_value]`);
         });
+
+        renderTabs();
     }
 
     function recalc() {
@@ -306,18 +369,32 @@
         totalEl.textContent = total.toLocaleString('fa-IR');
     }
 
-    function addItem(item = {}) {
+    function addItem(item = {}, groupId = null) {
         const index = itemsList.querySelectorAll('[data-row]').length;
-        itemsList.insertAdjacentHTML('beforeend', itemTemplate(index, item));
+        itemsList.insertAdjacentHTML('beforeend', itemTemplate(index, item, groupId));
+
+        if (groupId) {
+            activeGroupId = groupId;
+        }
+
         reindexRows();
         recalc();
     }
 
     function addVariantForSameProduct() {
-        const rows = itemsList.querySelectorAll('[data-row]');
-        if (rows.length === 0) return addItem();
+        const rows = Array.from(itemsList.querySelectorAll('[data-row]'));
+        if (rows.length === 0) {
+            addItem({}, `group-${Date.now()}`);
+            return;
+        }
 
-        const last = rows[rows.length - 1];
+        const groupRows = activeGroupId
+            ? rows.filter((row) => row.dataset.groupId === activeGroupId)
+            : rows;
+
+        const last = groupRows[groupRows.length - 1] || rows[rows.length - 1];
+        const groupId = last.dataset.groupId || `group-${Date.now()}`;
+
         addItem({
             product_id: last.querySelector('.product-select')?.value || '',
             name: last.querySelector('.product-name')?.value || '',
@@ -329,11 +406,19 @@
             sell_price: 0,
             discount_type: '',
             discount_value: 0,
-        });
+        }, groupId);
     }
 
-    addBtn.addEventListener('click', () => addItem());
+    addBtn.addEventListener('click', () => addItem({}, `group-${Date.now()}`));
     addSameProductBtn.addEventListener('click', addVariantForSameProduct);
+
+    purchaseTabs.addEventListener('click', (e) => {
+        const tabBtn = e.target.closest('[data-group-tab]');
+        if (!tabBtn) return;
+
+        activeGroupId = tabBtn.dataset.groupTab;
+        renderTabs();
+    });
 
     itemsList.addEventListener('change', (e) => {
         const row = e.target.closest('[data-row]');
@@ -409,7 +494,7 @@
                 sell_price: 0,
                 discount_type: '',
                 discount_value: 0,
-            });
+            }, row.dataset.groupId || null);
             return;
         }
 
@@ -424,9 +509,12 @@
     invoiceDiscountValueEl.addEventListener('input', recalc);
 
     if (Array.isArray(initialItems) && initialItems.length > 0) {
-        initialItems.forEach((item) => addItem(item));
+        initialItems.forEach((item, idx) => {
+            const groupId = item.group_id || `group-init-${idx}`;
+            addItem(item, groupId);
+        });
     } else {
-        addItem();
+        addItem({}, `group-${Date.now()}`);
     }
 })();
 </script>
