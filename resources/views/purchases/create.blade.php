@@ -86,6 +86,12 @@
                     <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">+ افزودن محصول</button>
                 </div>
 
+                <datalist id="purchaseModelListOptions">
+                    @foreach(($modelLists ?? collect()) as $modelName)
+                        <option value="{{ $modelName }}"></option>
+                    @endforeach
+                </datalist>
+
                 <hr>
 
                 <div class="row g-2 align-items-end">
@@ -122,6 +128,7 @@
     const modelLists = @json(($modelLists ?? collect())->values()->all());
     const initialItems = @json($initialItems);
 
+    const purchaseTabs = document.getElementById('purchaseTabs');
     const itemsList = document.getElementById('itemsList');
     const addBtn = document.getElementById('addRowBtn');
 
@@ -130,6 +137,8 @@
     const totalEl = document.getElementById('totalAmount');
     const invoiceDiscountTypeEl = document.getElementById('invoiceDiscountType');
     const invoiceDiscountValueEl = document.getElementById('invoiceDiscountValue');
+
+    let activeGroupId = null;
 
     function productOptions(selected = '') {
         return `<option value="">کالای جدید/بدون انتخاب</option>${products.map((p) =>
@@ -327,6 +336,8 @@
             setName(row.querySelector('.row-discount-type'), `items[${idx}][discount_type]`);
             setName(row.querySelector('.discount-value'), `items[${idx}][discount_value]`);
         });
+
+        renderTabs();
     }
 
     function recalc() {
