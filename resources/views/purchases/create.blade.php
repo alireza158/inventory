@@ -125,6 +125,7 @@
 <script>
 (function () {
     const products = @json($productsPayload);
+    const modelLists = @json(($modelLists ?? collect())->values()->all());
     const initialItems = @json($initialItems);
 
     const purchaseTabs = document.getElementById('purchaseTabs');
@@ -154,6 +155,22 @@
         ).join('')}`;
     }
 
+    function modelListOptions(selected = '') {
+        const normalizedSelected = String(selected || '').trim();
+        const hasSelectedInList = modelLists.some((name) => String(name).trim() === normalizedSelected);
+
+        const options = modelLists.map((name) => {
+            const value = String(name).trim();
+            return `<option value="${value}" ${value === normalizedSelected ? 'selected' : ''}>${value}</option>`;
+        });
+
+        if (normalizedSelected !== '' && !hasSelectedInList) {
+            options.unshift(`<option value="${normalizedSelected}" selected>${normalizedSelected}</option>`);
+        }
+
+        return `<option value="">انتخاب/جستجوی مدل</option>${options.join('')}`;
+    }
+
     function calculateDiscount(base, type, value) {
         const v = Number(value || 0);
         if (!type || v <= 0 || base <= 0) return 0;
@@ -166,7 +183,10 @@
         return `
         <div class="purchase-product-group" data-group-id="${groupId}">
             <div class="group-head">
-                <div class="group-title">محصول</div>
+                <div class="group-title">
+                    <span class="group-index-badge">1</span>
+                    <span class="group-title-text">محصول 1</span>
+                </div>
                 <div class="group-actions d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary add-model-row">+ افزودن مدل لیست</button>
                     <button type="button" class="btn btn-sm btn-outline-danger remove-product-group">حذف محصول</button>
@@ -214,7 +234,9 @@
                         <select class="form-select form-select-sm variant-select" style="max-width:180px;">
                             ${variantOptions(productId, variantId)}
                         </select>
-                        <input class="form-control form-control-sm variant-name" list="purchaseModelListOptions" name="items[][variant_name]" value="${item.variant_name ?? ''}" placeholder="نام مدل" required>
+                        <select class="form-select form-select-sm variant-name variant-name-select" name="items[][variant_name]" required>
+                            ${modelListOptions(item.variant_name || "")}
+                        </select>
                     </div>
                 </div>
                 <div class="col-md-1">
@@ -272,8 +294,36 @@
         });
     }
 
+    function initModelSelect(el) {
+        if (!el || typeof window.jQuery === 'undefined') return;
+
+        const $el = window.jQuery(el);
+        if (typeof $el.select2 !== 'function') return;
+        if ($el.data('select2')) return;
+
+        $el.select2({
+            width: '100%',
+            dir: 'rtl',
+            placeholder: 'مدل را جستجو یا انتخاب کنید',
+            tags: true,
+        });
+    }
+
+    function reindexGroups() {
+        const groups = Array.from(itemsList.querySelectorAll('[data-group-id]'));
+        groups.forEach((groupEl, idx) => {
+            const humanIndex = (idx + 1).toLocaleString('fa-IR');
+            const badge = groupEl.querySelector('.group-index-badge');
+            const title = groupEl.querySelector('.group-title-text');
+            if (badge) badge.textContent = humanIndex;
+            if (title) title.textContent = `محصول ${humanIndex}`;
+        });
+    }
+
     function reindexRows() {
         const rows = Array.from(itemsList.querySelectorAll('[data-row]'));
+        reindexGroups();
+
         rows.forEach((row, idx) => {
             setName(row.querySelector('.product-id-input'), `items[${idx}][product_id]`);
             setName(row.querySelector('.product-name-input'), `items[${idx}][name]`);
@@ -344,6 +394,8 @@
         if (!groupEl) return;
         const modelsWrap = groupEl.querySelector('[data-models]');
         modelsWrap.insertAdjacentHTML('beforeend', modelRowTemplate(item));
+        const modelSelect = modelsWrap.querySelector('[data-row]:last-child .variant-name-select');
+        initModelSelect(modelSelect);
         syncGroupFieldsToRows(groupEl);
         reindexRows();
         recalc();
@@ -404,11 +456,30 @@
             row.querySelector('.variant-id').value = variantId;
 
             if (variantId) {
-                row.querySelector('.variant-name').value = opt.dataset.name || '';
+                const variantNameEl = row.querySelector('.variant-name');
+                const variantName = opt.dataset.name || '';
+
+                if (variantNameEl && variantName && !Array.from(variantNameEl.options).some((option) => option.value === variantName)) {
+                    variantNameEl.insertAdjacentHTML('beforeend', `<option value="${variantName}">${variantName}</option>`);
+                }
+
+                if (variantNameEl) {
+                    variantNameEl.value = variantName;
+                    if (typeof window.jQuery !== 'undefined') {
+                        window.jQuery(variantNameEl).trigger('change.select2');
+                    }
+                }
+
                 row.querySelector('.buy').value = opt.dataset.buy || 0;
                 row.querySelector('.sell').value = opt.dataset.sell || 0;
             }
 
+            recalc();
+        }
+
+        if (e.target.classList.contains('variant-name-select')) {
+            const row = e.target.closest('[data-row]');
+            if (row) row.querySelector('.variant-id').value = '';
             recalc();
         }
 
@@ -425,11 +496,6 @@
             e.target.classList.contains('discount-value')
         ) {
             recalc();
-        }
-
-        if (e.target.classList.contains('variant-name')) {
-            const row = e.target.closest('[data-row]');
-            if (row) row.querySelector('.variant-id').value = '';
         }
 
         if (
