@@ -3,8 +3,30 @@
 @section('content')
 
 
-    {{-- Main Content --}}
-    <div class="col-lg-11">
+    <div class="row g-3">
+        <div class="col-lg-3">
+            <div class="card shadow-sm sticky-top" style="top: 90px;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">انتخاب دسته‌بندی</h6>
+                        <a href="{{ route('products.index', request()->except(['category_id', 'page'])) }}" class="small text-decoration-none">همه</a>
+                    </div>
+
+                    <input type="text" id="catSearch" class="form-control form-control-sm mb-3" placeholder="جستجو در دسته‌ها...">
+
+                    <div id="catTree">
+                        @include('categories._tree', ['nodes' => $categoryTree])
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        افزودن دسته‌بندی از منوی «دسته‌بندی‌ها» در سایدبار انجام می‌شود.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Main Content --}}
+        <div class="col-lg-9">
 
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h4 class="page-title mb-0">کالاها</h4>
@@ -17,8 +39,6 @@
 
                 <a class="btn btn-outline-dark" href="{{ route('movements.index') }}">گردش انبار</a>
                 <a class="btn btn-outline-secondary" href="{{ route('products.import.template') }}">دانلود نمونه</a>
-                <a class="btn btn-outline-primary" href="{{ route('products.import.show') }}">ایمپورت اکسل</a>
-                <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن محصول</a>
             </div>
         </div>
 
@@ -210,8 +230,8 @@
             </div>
         </div>
 
+        </div>
     </div>
-</div>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
       document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(btn => {
