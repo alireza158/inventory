@@ -191,11 +191,14 @@ class VoucherController extends Controller
     private function selectableWarehouses()
     {
         return Warehouse::query()
+            ->with('parent')
             ->where('is_active', true)
             ->where(function ($query) {
                 $query->where('type', '!=', 'personnel')
                     ->orWhereNotNull('parent_id');
             })
+            ->orderByRaw('CASE WHEN parent_id IS NULL THEN 0 ELSE 1 END')
+            ->orderBy('parent_id')
             ->orderBy('name')
             ->get();
     }
