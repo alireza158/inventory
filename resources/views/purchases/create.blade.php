@@ -80,11 +80,10 @@
 
 
 
-                <div id="itemsList"></div>
+                <div id="itemsList" class="mt-2"></div>
 
                 <div class="d-flex gap-2 flex-wrap mt-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">+ افزودن ردیف جدید</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addVariantForSameProductBtn">+ افزودن مدل برای همین محصول</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">+ افزودن محصول</button>
                 </div>
 
                 <hr>
@@ -120,11 +119,11 @@
 <script>
 (function () {
     const products = @json($productsPayload);
+    const modelLists = @json(($modelLists ?? collect())->values()->all());
     const initialItems = @json($initialItems);
 
     const itemsList = document.getElementById('itemsList');
     const addBtn = document.getElementById('addRowBtn');
-    const addSameProductBtn = document.getElementById('addVariantForSameProductBtn');
 
     const subtotalEl = document.getElementById('subtotalAmount');
     const totalDiscountEl = document.getElementById('totalDiscountAmount');
@@ -147,6 +146,22 @@
         ).join('')}`;
     }
 
+    function modelListOptions(selected = '') {
+        const normalizedSelected = String(selected || '').trim();
+        const hasSelectedInList = modelLists.some((name) => String(name).trim() === normalizedSelected);
+
+        const options = modelLists.map((name) => {
+            const value = String(name).trim();
+            return `<option value="${value}" ${value === normalizedSelected ? 'selected' : ''}>${value}</option>`;
+        });
+
+        if (normalizedSelected !== '' && !hasSelectedInList) {
+            options.unshift(`<option value="${normalizedSelected}" selected>${normalizedSelected}</option>`);
+        }
+
+        return `<option value="">انتخاب/جستجوی مدل</option>${options.join('')}`;
+    }
+
     function calculateDiscount(base, type, value) {
         const v = Number(value || 0);
         if (!type || v <= 0 || base <= 0) return 0;
@@ -154,120 +169,163 @@
         return Math.min(v, base);
     }
 
-    function itemTemplate(index, item = {}) {
+    function productGroupTemplate(groupId, data = {}) {
+        const productId = data.product_id || '';
+        return `
+        <div class="purchase-product-group" data-group-id="${groupId}">
+            <div class="group-head">
+                <div class="group-title">
+                    <span class="group-index-badge">1</span>
+                    <span class="group-title-text">محصول 1</span>
+                </div>
+                <div class="group-actions d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary add-model-row">+ افزودن مدل لیست</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-product-group">حذف محصول</button>
+                </div>
+            </div>
+
+            <div class="row g-2 mb-2 group-product-fields">
+                <div class="col-md-4">
+                    <div class="label">انتخاب کالا</div>
+                    <select class="form-select form-select-sm group-product-select">
+                        ${productOptions(productId)}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <div class="label">اسم محصول (مثل گارد)</div>
+                    <input class="form-control form-control-sm group-product-name" value="${data.name ?? ''}" required>
+                </div>
+                <div class="col-md-4">
+                    <div class="label">کد محصول</div>
+                    <input class="form-control form-control-sm group-product-code" value="${data.code ?? ''}" required>
+                </div>
+            </div>
+
+            <div class="group-models" data-models></div>
+        </div>`;
+    }
+
+    function modelRowTemplate(item = {}) {
         const productId = item.product_id || '';
         const variantId = item.variant_id || '';
         const rowDiscountType = item.discount_type || '';
         const rowDiscountValue = item.discount_value || 0;
 
         return `
-        <div class="purchase-item ${index % 2 === 1 ? 'is-even' : ''}" data-row>
-            <div class="row-head">
-                <div class="row-badge">
-                    <span>ردیف</span>
-                    <span class="row-index">${(index + 1).toLocaleString('fa-IR')}</span>
-                </div>
-                <div class="row-meta">
-                    <span class="meta-product">${(item.name ?? '').trim() || '—'}</span>
-                    <span class="text-muted"> / </span>
-                    <span class="meta-variant">${(item.variant_name ?? '').trim() || '—'}</span>
-                </div>
-            </div>
+        <div class="purchase-model-row" data-row>
+            <div class="row g-2 align-items-end">
+                <input type="hidden" class="product-id-input" name="items[][product_id]" value="${productId}">
+                <input type="hidden" class="product-name-input" name="items[][name]" value="${item.name ?? ''}">
+                <input type="hidden" class="product-code-input" name="items[][code]" value="${item.code ?? ''}">
 
-            <div class="row g-2 mb-2">
                 <div class="col-md-3">
-                    <div class="label">انتخاب کالا</div>
-                    <select class="form-select form-select-sm product-select" name="items[${index}][product_id]">
-                        ${productOptions(productId)}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <div class="label">اسم محصول</div>
-                    <input class="form-control form-control-sm product-name" name="items[${index}][name]" value="${item.name ?? ''}" required>
-                </div>
-                <div class="col-md-2">
-                    <div class="label">کد محصول</div>
-                    <input class="form-control form-control-sm product-code" name="items[${index}][code]" value="${item.code ?? ''}" required>
-                </div>
-                <div class="col-md-5">
-                    <div class="label">مدل محصول</div>
-                    <input type="hidden" class="variant-id" name="items[${index}][variant_id]" value="${variantId}">
+                    <div class="label">مدل لیست</div>
+                    <input type="hidden" class="variant-id" name="items[][variant_id]" value="${variantId}">
                     <div class="d-flex gap-2">
                         <select class="form-select form-select-sm variant-select" style="max-width:180px;">
                             ${variantOptions(productId, variantId)}
                         </select>
-                        <input class="form-control form-control-sm variant-name" name="items[${index}][variant_name]" value="${item.variant_name ?? ''}" placeholder="نام مدل" required>
+                        <select class="form-select form-select-sm variant-name variant-name-select" name="items[][variant_name]" required>
+                            ${modelListOptions(item.variant_name || "")}
+                        </select>
                     </div>
                 </div>
-            </div>
-
-            <div class="row g-2 align-items-end">
                 <div class="col-md-1">
                     <div class="label">تعداد</div>
-                    <input type="number" min="1" class="form-control form-control-sm qty" name="items[${index}][quantity]" value="${item.quantity ?? 1}" required>
+                    <input type="number" min="1" class="form-control form-control-sm qty" name="items[][quantity]" value="${item.quantity ?? 1}" required>
                 </div>
                 <div class="col-md-2">
                     <div class="label">قیمت خرید</div>
-                    <input type="number" min="0" class="form-control form-control-sm buy" name="items[${index}][buy_price]" value="${item.buy_price ?? 0}" required>
+                    <input type="number" min="0" class="form-control form-control-sm buy" name="items[][buy_price]" value="${item.buy_price ?? 0}" required>
                 </div>
                 <div class="col-md-2">
                     <div class="label">قیمت فروش</div>
-                    <input type="number" min="0" class="form-control form-control-sm sell" name="items[${index}][sell_price]" value="${item.sell_price ?? 0}" required>
+                    <input type="number" min="0" class="form-control form-control-sm sell" name="items[][sell_price]" value="${item.sell_price ?? 0}" required>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <div class="label">نوع تخفیف</div>
-                    <select class="form-select form-select-sm row-discount-type" name="items[${index}][discount_type]">
+                    <select class="form-select form-select-sm row-discount-type" name="items[][discount_type]">
                         <option value="">—</option>
                         <option value="amount" ${rowDiscountType==='amount'?'selected':''}>مبلغی</option>
                         <option value="percent" ${rowDiscountType==='percent'?'selected':''}>درصدی</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <div class="label">مقدار تخفیف</div>
-                    <input type="number" min="0" class="form-control form-control-sm discount-value" name="items[${index}][discount_value]" value="${rowDiscountValue}">
+                    <input type="number" min="0" class="form-control form-control-sm discount-value" name="items[][discount_value]" value="${rowDiscountValue}">
                 </div>
                 <div class="col-md-1">
                     <div class="label">جمع نهایی</div>
                     <div class="line-total">0</div>
                 </div>
-                <div class="col-md-2 text-end d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary duplicate-variant-row">+ مدل</button>
+                <div class="col-md-1 text-end">
                     <button type="button" class="btn btn-sm btn-outline-danger remove-row">حذف</button>
                 </div>
             </div>
         </div>`;
     }
 
-    function setName(el, newName){
+    function setName(el, newName) {
         if (el && el.getAttribute('name')) el.setAttribute('name', newName);
+    }
+
+    function syncGroupFieldsToRows(groupEl) {
+        const productId = groupEl.querySelector('.group-product-select')?.value || '';
+        const name = groupEl.querySelector('.group-product-name')?.value || '';
+        const code = groupEl.querySelector('.group-product-code')?.value || '';
+
+        groupEl.querySelectorAll('[data-row]').forEach((row) => {
+            row.querySelector('.product-id-input').value = productId;
+            row.querySelector('.product-name-input').value = name;
+            row.querySelector('.product-code-input').value = code;
+
+            const variantSelect = row.querySelector('.variant-select');
+            const currentVariantId = row.querySelector('.variant-id').value || '';
+            variantSelect.innerHTML = variantOptions(productId, currentVariantId);
+        });
+    }
+
+    function initModelSelect(el) {
+        if (!el || typeof window.jQuery === 'undefined') return;
+
+        const $el = window.jQuery(el);
+        if (typeof $el.select2 !== 'function') return;
+        if ($el.data('select2')) return;
+
+        $el.select2({
+            width: '100%',
+            dir: 'rtl',
+            placeholder: 'مدل را جستجو یا انتخاب کنید',
+            tags: true,
+        });
+    }
+
+    function reindexGroups() {
+        const groups = Array.from(itemsList.querySelectorAll('[data-group-id]'));
+        groups.forEach((groupEl, idx) => {
+            const humanIndex = (idx + 1).toLocaleString('fa-IR');
+            const badge = groupEl.querySelector('.group-index-badge');
+            const title = groupEl.querySelector('.group-title-text');
+            if (badge) badge.textContent = humanIndex;
+            if (title) title.textContent = `محصول ${humanIndex}`;
+        });
     }
 
     function reindexRows() {
         const rows = Array.from(itemsList.querySelectorAll('[data-row]'));
+        reindexGroups();
 
         rows.forEach((row, idx) => {
-            row.classList.toggle('is-even', idx % 2 === 1);
-
-            const badge = row.querySelector('.row-index');
-            if (badge) badge.textContent = (idx + 1).toLocaleString('fa-IR');
-
-            const mp = row.querySelector('.meta-product');
-            const mv = row.querySelector('.meta-variant');
-            const pn = row.querySelector('.product-name')?.value || '—';
-            const vn = row.querySelector('.variant-name')?.value || '—';
-            if (mp) mp.textContent = pn.trim() || '—';
-            if (mv) mv.textContent = vn.trim() || '—';
-
-            setName(row.querySelector('.product-select'), `items[${idx}][product_id]`);
-            setName(row.querySelector('.product-name'),   `items[${idx}][name]`);
-            setName(row.querySelector('.product-code'),   `items[${idx}][code]`);
-            setName(row.querySelector('.variant-id'),     `items[${idx}][variant_id]`);
-            setName(row.querySelector('.variant-name'),   `items[${idx}][variant_name]`);
-            setName(row.querySelector('.qty'),            `items[${idx}][quantity]`);
-            setName(row.querySelector('.buy'),            `items[${idx}][buy_price]`);
-            setName(row.querySelector('.sell'),           `items[${idx}][sell_price]`);
+            setName(row.querySelector('.product-id-input'), `items[${idx}][product_id]`);
+            setName(row.querySelector('.product-name-input'), `items[${idx}][name]`);
+            setName(row.querySelector('.product-code-input'), `items[${idx}][code]`);
+            setName(row.querySelector('.variant-id'), `items[${idx}][variant_id]`);
+            setName(row.querySelector('.variant-name'), `items[${idx}][variant_name]`);
+            setName(row.querySelector('.qty'), `items[${idx}][quantity]`);
+            setName(row.querySelector('.buy'), `items[${idx}][buy_price]`);
+            setName(row.querySelector('.sell'), `items[${idx}][sell_price]`);
             setName(row.querySelector('.row-discount-type'), `items[${idx}][discount_type]`);
-            setName(row.querySelector('.discount-value'),    `items[${idx}][discount_value]`);
+            setName(row.querySelector('.discount-value'), `items[${idx}][discount_value]`);
         });
     }
 
@@ -306,70 +364,117 @@
         totalEl.textContent = total.toLocaleString('fa-IR');
     }
 
-    function addItem(item = {}) {
-        const index = itemsList.querySelectorAll('[data-row]').length;
-        itemsList.insertAdjacentHTML('beforeend', itemTemplate(index, item));
+    function addProductGroup(data = {}, withInitialModel = true) {
+        const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        itemsList.insertAdjacentHTML('beforeend', productGroupTemplate(groupId, data));
+        const groupEl = itemsList.querySelector(`[data-group-id="${groupId}"]`);
+
+        if (withInitialModel) {
+            addModelRow(groupEl, data);
+        }
+
+        syncGroupFieldsToRows(groupEl);
+        reindexRows();
+        recalc();
+        return groupEl;
+    }
+
+    function addModelRow(groupEl, item = {}) {
+        if (!groupEl) return;
+        const modelsWrap = groupEl.querySelector('[data-models]');
+        modelsWrap.insertAdjacentHTML('beforeend', modelRowTemplate(item));
+        const modelSelect = modelsWrap.querySelector('[data-row]:last-child .variant-name-select');
+        initModelSelect(modelSelect);
+        syncGroupFieldsToRows(groupEl);
         reindexRows();
         recalc();
     }
 
-    function addVariantForSameProduct() {
-        const rows = itemsList.querySelectorAll('[data-row]');
-        if (rows.length === 0) return addItem();
+    function buildGroupsFromInitialItems(items) {
+        const groupsMap = new Map();
 
-        const last = rows[rows.length - 1];
-        addItem({
-            product_id: last.querySelector('.product-select')?.value || '',
-            name: last.querySelector('.product-name')?.value || '',
-            code: last.querySelector('.product-code')?.value || '',
-            variant_id: '',
-            variant_name: '',
-            quantity: 1,
-            buy_price: 0,
-            sell_price: 0,
-            discount_type: '',
-            discount_value: 0,
+        items.forEach((item) => {
+            const key = [item.product_id || '', item.name || '', item.code || ''].join('||');
+            if (!groupsMap.has(key)) {
+                groupsMap.set(key, {
+                    product_id: item.product_id || '',
+                    name: item.name || '',
+                    code: item.code || '',
+                    rows: [],
+                });
+            }
+            groupsMap.get(key).rows.push(item);
+        });
+
+        groupsMap.forEach((group) => {
+            const groupEl = addProductGroup(group, false);
+            group.rows.forEach((rowItem) => addModelRow(groupEl, rowItem));
         });
     }
 
-    addBtn.addEventListener('click', () => addItem());
-    addSameProductBtn.addEventListener('click', addVariantForSameProduct);
+    addBtn.addEventListener('click', () => addProductGroup({}, true));
 
     itemsList.addEventListener('change', (e) => {
-        const row = e.target.closest('[data-row]');
-        if (!row) return;
+        const groupEl = e.target.closest('[data-group-id]');
+        if (!groupEl) return;
 
-        if (e.target.classList.contains('product-select')) {
-            const productId = e.target.value;
-            const product = products.find((p) => String(p.id) === String(productId));
-            const variantSelect = row.querySelector('.variant-select');
-
-            variantSelect.innerHTML = variantOptions(productId);
-            row.querySelector('.variant-id').value = '';
-
-            if (product) {
-                row.querySelector('.product-name').value = product.name || '';
-                row.querySelector('.product-code').value = product.code || '';
+        if (
+            e.target.classList.contains('group-product-select') ||
+            e.target.classList.contains('group-product-name') ||
+            e.target.classList.contains('group-product-code')
+        ) {
+            if (e.target.classList.contains('group-product-select')) {
+                const productId = e.target.value;
+                const product = products.find((p) => String(p.id) === String(productId));
+                if (product) {
+                    groupEl.querySelector('.group-product-name').value = product.name || '';
+                    groupEl.querySelector('.group-product-code').value = product.code || '';
+                }
             }
 
+            syncGroupFieldsToRows(groupEl);
             reindexRows();
+            recalc();
+            return;
         }
 
         if (e.target.classList.contains('variant-select')) {
+            const row = e.target.closest('[data-row]');
             const opt = e.target.selectedOptions[0];
             const variantId = opt?.value || '';
             row.querySelector('.variant-id').value = variantId;
 
             if (variantId) {
-                row.querySelector('.variant-name').value = opt.dataset.name || '';
+                const variantNameEl = row.querySelector('.variant-name');
+                const variantName = opt.dataset.name || '';
+
+                if (variantNameEl && variantName && !Array.from(variantNameEl.options).some((option) => option.value === variantName)) {
+                    variantNameEl.insertAdjacentHTML('beforeend', `<option value="${variantName}">${variantName}</option>`);
+                }
+
+                if (variantNameEl) {
+                    variantNameEl.value = variantName;
+                    if (typeof window.jQuery !== 'undefined') {
+                        window.jQuery(variantNameEl).trigger('change.select2');
+                    }
+                }
+
                 row.querySelector('.buy').value = opt.dataset.buy || 0;
                 row.querySelector('.sell').value = opt.dataset.sell || 0;
             }
 
-            reindexRows();
+            recalc();
         }
 
-        recalc();
+        if (e.target.classList.contains('variant-name-select')) {
+            const row = e.target.closest('[data-row]');
+            if (row) row.querySelector('.variant-id').value = '';
+            recalc();
+        }
+
+        if (e.target.classList.contains('row-discount-type')) {
+            recalc();
+        }
     });
 
     itemsList.addEventListener('input', (e) => {
@@ -382,39 +487,51 @@
             recalc();
         }
 
-        if (e.target.classList.contains('variant-name')) {
-            const row = e.target.closest('[data-row]');
-            if (row) row.querySelector('.variant-id').value = '';
-            reindexRows();
-        }
-
-        if (e.target.classList.contains('product-name')) {
-            reindexRows();
+        if (
+            e.target.classList.contains('group-product-name') ||
+            e.target.classList.contains('group-product-code')
+        ) {
+            const groupEl = e.target.closest('[data-group-id]');
+            if (groupEl) {
+                syncGroupFieldsToRows(groupEl);
+                reindexRows();
+            }
         }
     });
 
     itemsList.addEventListener('click', (e) => {
-        const row = e.target.closest('[data-row]');
-        if (!row) return;
+        const groupEl = e.target.closest('[data-group-id]');
+        if (!groupEl) return;
 
-        if (e.target.classList.contains('duplicate-variant-row')) {
-            addItem({
-                product_id: row.querySelector('.product-select')?.value || '',
-                name: row.querySelector('.product-name')?.value || '',
-                code: row.querySelector('.product-code')?.value || '',
-                variant_id: '',
+        if (e.target.classList.contains('add-model-row')) {
+            const lastRow = groupEl.querySelector('[data-row]:last-child');
+            const copied = lastRow ? {
                 variant_name: '',
                 quantity: 1,
                 buy_price: 0,
                 sell_price: 0,
                 discount_type: '',
                 discount_value: 0,
-            });
+            } : {};
+            addModelRow(groupEl, copied);
+            return;
+        }
+
+        if (e.target.classList.contains('remove-product-group')) {
+            groupEl.remove();
+            reindexRows();
+            recalc();
             return;
         }
 
         if (e.target.classList.contains('remove-row')) {
+            const row = e.target.closest('[data-row]');
             row.remove();
+
+            if (!groupEl.querySelector('[data-row]')) {
+                groupEl.remove();
+            }
+
             reindexRows();
             recalc();
         }
@@ -424,9 +541,9 @@
     invoiceDiscountValueEl.addEventListener('input', recalc);
 
     if (Array.isArray(initialItems) && initialItems.length > 0) {
-        initialItems.forEach((item) => addItem(item));
+        buildGroupsFromInitialItems(initialItems);
     } else {
-        addItem();
+        addProductGroup({}, true);
     }
 })();
 </script>
