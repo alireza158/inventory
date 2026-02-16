@@ -20,25 +20,15 @@ class PurchaseController extends Controller
         $supplierId = $request->integer('supplier_id');
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
-        $minTotalToman = $request->filled('min_total') ? (int) $request->get('min_total') : null;
-        $maxTotalToman = $request->filled('max_total') ? (int) $request->get('max_total') : null;
-
         $query = Purchase::with('supplier')
             ->withCount('items')
             ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
             ->when($dateFrom, fn ($q) => $q->whereDate('purchased_at', '>=', $dateFrom))
             ->when($dateTo, fn ($q) => $q->whereDate('purchased_at', '<=', $dateTo));
 
-        if (!is_null($minTotalToman)) {
-            $query->where('total_amount', '>=', $minTotalToman * 10);
-        }
-
-        if (!is_null($maxTotalToman)) {
-            $query->where('total_amount', '<=', $maxTotalToman * 10);
-        }
 
         $totalAllAmount = (int) Purchase::sum('total_amount');
-        $totalFilteredAmount = (int) (clone $query)->sum('total_amount');
+        $totalAllCount = (int) Purchase::count();
 
         $purchases = $query->latest('purchased_at')
             ->paginate(20)
@@ -50,7 +40,7 @@ class PurchaseController extends Controller
             'purchases',
             'suppliers',
             'totalAllAmount',
-            'totalFilteredAmount'
+            'totalAllCount'
         ));
     }
 
