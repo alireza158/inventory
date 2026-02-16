@@ -15,19 +15,28 @@ class VoucherController extends Controller
 {
     public function index(Request $request)
     {
-        $q = trim((string) $request->get('q', ''));
+        $voucherNo = trim((string) $request->get('voucher_no', ''));
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
 
-        $vouchers = WarehouseTransfer::with(['fromWarehouse', 'toWarehouse', 'user'])
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where('reference', 'like', "%{$q}%")
-                    ->orWhereHas('fromWarehouse', fn ($w) => $w->where('name', 'like', "%{$q}%"))
-                    ->orWhereHas('toWarehouse', fn ($w) => $w->where('name', 'like', "%{$q}%"));
+        $query = WarehouseTransfer::with(['fromWarehouse', 'toWarehouse', 'user'])
+            ->when($voucherNo !== '', function ($q) use ($voucherNo) {
+                $q->where(function ($inner) use ($voucherNo) {
+                    $inner->where('id', (int) $voucherNo)
+                        ->orWhere('reference', 'like', "%{$voucherNo}%");
+                });
             })
-            ->latest()
+            ->when($dateFrom, fn ($q) => $q->whereDate('transferred_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('transferred_at', '<=', $dateTo));
+
+        $totalAllAmount = (int) WarehouseTransfer::sum('total_amount');
+        $totalAllCount = (int) WarehouseTransfer::count();
+
+        $vouchers = $query->latest('transferred_at')
             ->paginate(20)
             ->withQueryString();
 
-        return view('vouchers.index', compact('vouchers'));
+        return view('vouchers.index', compact('vouchers', 'totalAllAmount', 'totalAllCount'));
     }
 
     public function create()
@@ -55,7 +64,7 @@ class VoucherController extends Controller
         $data = $this->validateTransfer($request);
 
         DB::transaction(function () use ($data) {
-            $this->createTransfer($data);
+            $this->createTransfer($data, now());
         });
 
         return redirect()->route('vouchers.index')->with('success', 'سند حواله ثبت شد.');
@@ -69,7 +78,7 @@ class VoucherController extends Controller
             $this->rollbackTransfer($voucher);
             $voucher->items()->delete();
             $voucher->delete();
-            $this->createTransfer($data);
+            $this->createTransfer($data, $voucher->transferred_at ?? now());
         });
 
         return redirect()->route('vouchers.index')->with('success', 'سند حواله با موفقیت ویرایش شد.');
@@ -90,7 +99,6 @@ class VoucherController extends Controller
         $data = $request->validate([
             'from_warehouse_id' => ['required', 'exists:warehouses,id', 'different:to_warehouse_id'],
             'to_warehouse_id' => ['required', 'exists:warehouses,id'],
-            'transferred_at' => ['required', 'date'],
             'reference' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
@@ -113,7 +121,7 @@ class VoucherController extends Controller
         return $data;
     }
 
-    private function createTransfer(array $data): WarehouseTransfer
+    private function createTransfer(array $data, $transferredAt): WarehouseTransfer
     {
         $toWarehouse = Warehouse::findOrFail($data['to_warehouse_id']);
 
@@ -122,7 +130,7 @@ class VoucherController extends Controller
             'from_warehouse_id' => $data['from_warehouse_id'],
             'to_warehouse_id' => $data['to_warehouse_id'],
             'user_id' => auth()->id(),
-            'transferred_at' => $data['transferred_at'],
+            'transferred_at' => $transferredAt,
             'total_amount' => 0,
             'note' => $data['note'] ?? null,
         ]);
@@ -183,11 +191,14 @@ class VoucherController extends Controller
     private function selectableWarehouses()
     {
         return Warehouse::query()
+            ->with('parent')
             ->where('is_active', true)
             ->where(function ($query) {
                 $query->where('type', '!=', 'personnel')
                     ->orWhereNotNull('parent_id');
             })
+            ->orderByRaw('CASE WHEN parent_id IS NULL THEN 0 ELSE 1 END')
+            ->orderBy('parent_id')
             ->orderBy('name')
             ->get();
     }

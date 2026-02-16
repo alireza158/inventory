@@ -29,13 +29,23 @@
     })->values();
 @endphp
 
+@php
+    $regularWarehouses = $warehouses->where('type', '!=', 'personnel')->values();
+    $personnelWarehousesByParent = $warehouses
+        ->where('type', 'personnel')
+        ->whereNotNull('parent_id')
+        ->groupBy(fn($warehouse) => $warehouse->parent?->name ?? 'پرسنل')
+        ->sortKeys();
+@endphp
+
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="purchase-page-wrap">
+<div class="purchase-topbar d-flex justify-content-between align-items-center mb-3">
     <h4 class="page-title mb-0">{{ $isEdit ? 'ویرایش سند حواله' : 'ثبت سند حواله' }}</h4>
-    <a class="btn btn-outline-secondary" href="{{ route('vouchers.index') }}">بازگشت</a>
+    <a class="btn btn-sm btn-outline-light" href="{{ route('vouchers.index') }}">بازگشت</a>
 </div>
 
-<div class="card">
+<div class="card purchase-form">
     <div class="card-body">
         <form method="POST" action="{{ $formAction }}">
             @csrf
@@ -44,30 +54,50 @@
             @endif
 
             <div class="row g-3">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">انبار مبدا</label>
-                    <select name="from_warehouse_id" class="form-select" required>
+                    <select name="from_warehouse_id" class="form-select" id="fromWarehouse" required>
                         <option value="">انتخاب کنید...</option>
-                        @foreach($warehouses as $warehouse)
-                            <option value="{{ $warehouse->id }}" @selected(old('from_warehouse_id', $voucher->from_warehouse_id ?? null)==$warehouse->id)>{{ $warehouse->name }}</option>
+                        @foreach($regularWarehouses as $warehouse)
+                            <option value="{{ $warehouse->id }}" @selected(old('from_warehouse_id', $voucher->from_warehouse_id ?? null)==$warehouse->id)>
+                                {{ $warehouse->name }}
+                            </option>
+                        @endforeach
+
+                        @foreach($personnelWarehousesByParent as $parentName => $personnelWarehouses)
+                            <optgroup label="پرسنل | {{ $parentName }}">
+                                @foreach($personnelWarehouses as $warehouse)
+                                    <option value="{{ $warehouse->id }}" @selected(old('from_warehouse_id', $voucher->from_warehouse_id ?? null)==$warehouse->id)>
+                                        {{ $warehouse->name }}
+                                    </option>
+                                @endforeach
+                            </optgroup>
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">انبار مقصد</label>
                     <select name="to_warehouse_id" class="form-select" id="toWarehouse" required>
                         <option value="">انتخاب کنید...</option>
-                        @foreach($warehouses as $warehouse)
-                            <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('to_warehouse_id', $voucher->to_warehouse_id ?? null)==$warehouse->id)>{{ $warehouse->name }}</option>
+                        @foreach($regularWarehouses as $warehouse)
+                            <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('to_warehouse_id', $voucher->to_warehouse_id ?? null)==$warehouse->id)>
+                                {{ $warehouse->name }}
+                            </option>
+                        @endforeach
+
+                        @foreach($personnelWarehousesByParent as $parentName => $personnelWarehouses)
+                            <optgroup label="پرسنل | {{ $parentName }}">
+                                @foreach($personnelWarehouses as $warehouse)
+                                    <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('to_warehouse_id', $voucher->to_warehouse_id ?? null)==$warehouse->id)>
+                                        {{ $warehouse->name }}
+                                    </option>
+                                @endforeach
+                            </optgroup>
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">تاریخ حواله</label>
-                    <input name="transferred_at" type="datetime-local" class="form-control" value="{{ old('transferred_at', optional($voucher->transferred_at ?? now())->format('Y-m-d\TH:i')) }}" required>
-                </div>
 
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">شماره حواله (اختیاری)</label>
                     <input name="reference" class="form-control" value="{{ old('reference', $voucher->reference ?? null) }}" placeholder="مثلاً 123">
                 </div>
@@ -110,7 +140,28 @@
 
     const tbody = document.querySelector('#itemsTable tbody');
     const addBtn = document.getElementById('addItemBtn');
+    const fromWarehouse = document.getElementById('fromWarehouse');
     const toWarehouse = document.getElementById('toWarehouse');
+
+
+    function initWarehouseSelects() {
+        if (typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.select2 !== 'function') {
+            return;
+        }
+
+        [fromWarehouse, toWarehouse].forEach((el) => {
+            if (!el) return;
+
+            const $el = window.jQuery(el);
+            if ($el.data('select2')) return;
+
+            $el.select2({
+                width: '100%',
+                dir: 'rtl',
+                placeholder: 'انتخاب انبار',
+            });
+        });
+    }
 
     function productOptions(categoryId, selectedProductId) {
         const filtered = products.filter(p => String(p.category_id) === String(categoryId || ''));
@@ -168,10 +219,13 @@
     addBtn.addEventListener('click', () => addRow());
     toWarehouse.addEventListener('change', toggleAssetCode);
 
+    initWarehouseSelects();
+
     if (initialItems.length) {
         initialItems.forEach(item => addRow(item));
     } else {
         addRow();
     }
 </script>
+</div>
 @endsection
