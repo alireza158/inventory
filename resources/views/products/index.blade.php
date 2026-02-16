@@ -18,7 +18,6 @@
                 <a class="btn btn-outline-dark" href="{{ route('movements.index') }}">گردش انبار</a>
                 <a class="btn btn-outline-secondary" href="{{ route('products.import.template') }}">دانلود نمونه</a>
                 <a class="btn btn-outline-primary" href="{{ route('products.import.show') }}">ایمپورت اکسل</a>
-                <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن محصول</a>
             </div>
         </div>
 

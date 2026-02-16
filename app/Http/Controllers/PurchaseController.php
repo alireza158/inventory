@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\ModelList;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
@@ -64,10 +65,12 @@ class PurchaseController extends Controller
     {
         $suppliers = Supplier::orderBy('name')->get();
         $products = Product::with('variants')->orderBy('name')->get();
+        $modelLists = ModelList::query()->orderBy('model_name')->pluck('model_name');
 
         return view('purchases.create', [
             'suppliers' => $suppliers,
             'products' => $products,
+            'modelLists' => $modelLists,
             'purchase' => null,
         ]);
     }
@@ -76,9 +79,10 @@ class PurchaseController extends Controller
     {
         $suppliers = Supplier::orderBy('name')->get();
         $products = Product::with('variants')->orderBy('name')->get();
+        $modelLists = ModelList::query()->orderBy('model_name')->pluck('model_name');
         $purchase->load('items');
 
-        return view('purchases.create', compact('suppliers', 'products', 'purchase'));
+        return view('purchases.create', compact('suppliers', 'products', 'modelLists', 'purchase'));
     }
 
     public function store(Request $request)

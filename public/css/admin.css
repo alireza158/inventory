@@ -532,6 +532,28 @@
 }
 
 /* آیتم‌های لیست خرید (اگر داری) */
+
+.purchase-page-wrap .purchase-tabs{
+  display:flex;
+  gap:.55rem;
+  flex-wrap:wrap;
+  margin-top:.5rem;
+}
+.purchase-page-wrap .purchase-tab-btn{
+  border:1px solid rgba(13,110,253,.25);
+  background:#fff;
+  color:var(--ink);
+  border-radius:999px;
+  padding:.35rem .8rem;
+  font-size:.8rem;
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+}
+.purchase-page-wrap .purchase-tab-btn.is-active{
+  background:linear-gradient(90deg, rgba(13,110,253,.12), rgba(0,163,255,.12));
+  border-color:rgba(13,110,253,.55);
+}
 .purchase-page-wrap .purchase-item{
   border: 1px solid rgba(13,110,253,.18);
   border-radius: 16px;
