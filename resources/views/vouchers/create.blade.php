@@ -30,12 +30,13 @@
 @endphp
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="purchase-page-wrap">
+<div class="purchase-topbar d-flex justify-content-between align-items-center mb-3">
     <h4 class="page-title mb-0">{{ $isEdit ? 'ویرایش سند حواله' : 'ثبت سند حواله' }}</h4>
-    <a class="btn btn-outline-secondary" href="{{ route('vouchers.index') }}">بازگشت</a>
+    <a class="btn btn-sm btn-outline-light" href="{{ route('vouchers.index') }}">بازگشت</a>
 </div>
 
-<div class="card">
+<div class="card purchase-form">
     <div class="card-body">
         <form method="POST" action="{{ $formAction }}">
             @csrf
@@ -44,7 +45,7 @@
             @endif
 
             <div class="row g-3">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">انبار مبدا</label>
                     <select name="from_warehouse_id" class="form-select" required>
                         <option value="">انتخاب کنید...</option>
@@ -53,7 +54,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">انبار مقصد</label>
                     <select name="to_warehouse_id" class="form-select" id="toWarehouse" required>
                         <option value="">انتخاب کنید...</option>
@@ -62,12 +63,8 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">تاریخ حواله</label>
-                    <input name="transferred_at" type="datetime-local" class="form-control" value="{{ old('transferred_at', optional($voucher->transferred_at ?? now())->format('Y-m-d\TH:i')) }}" required>
-                </div>
 
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">شماره حواله (اختیاری)</label>
                     <input name="reference" class="form-control" value="{{ old('reference', $voucher->reference ?? null) }}" placeholder="مثلاً 123">
                 </div>
@@ -174,4 +171,5 @@
         addRow();
     }
 </script>
+</div>
 @endsection
