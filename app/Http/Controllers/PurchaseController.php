@@ -55,11 +55,13 @@ class PurchaseController extends Controller
     {
         $suppliers = Supplier::orderBy('name')->get();
         $products = Product::with('variants')->orderBy('name')->get();
+        $categories = Category::orderBy('name')->get();
         $modelLists = ModelList::query()->orderBy('model_name')->pluck('model_name');
 
         return view('purchases.create', [
             'suppliers' => $suppliers,
             'products' => $products,
+            'categories' => $categories,
             'modelLists' => $modelLists,
             'purchase' => null,
         ]);
@@ -69,10 +71,11 @@ class PurchaseController extends Controller
     {
         $suppliers = Supplier::orderBy('name')->get();
         $products = Product::with('variants')->orderBy('name')->get();
+        $categories = Category::orderBy('name')->get();
         $modelLists = ModelList::query()->orderBy('model_name')->pluck('model_name');
-        $purchase->load('items');
+        $purchase->load(['items', 'items.product']);
 
-        return view('purchases.create', compact('suppliers', 'products', 'modelLists', 'purchase'));
+        return view('purchases.create', compact('suppliers', 'products', 'categories', 'modelLists', 'purchase'));
     }
 
     public function store(Request $request)
@@ -145,6 +148,7 @@ class PurchaseController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
+            'items.*.category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.code' => ['required', 'string', 'max:100'],
@@ -269,19 +273,32 @@ class PurchaseController extends Controller
         if ($product) {
             $product->update([
                 'name' => $item['name'],
+                'category_id' => $item['category_id'] ?? $product->category_id,
             ]);
 
             return $product;
         }
 
-        $defaultCategory = Category::query()->orderBy('id')->first();
+        $categoryId = $item['category_id'] ?? null;
 
-        if (!$defaultCategory) {
-            abort(422, 'برای ثبت خرید جدید، ابتدا حداقل یک دسته‌بندی کالا بسازید.');
+        if (!$categoryId) {
+            $defaultCategory = Category::query()->orderBy('id')->first();
+
+            if (!$defaultCategory) {
+                abort(422, 'برای ثبت خرید جدید، ابتدا حداقل یک دسته‌بندی کالا بسازید.');
+            }
+
+            $categoryId = $defaultCategory->id;
+        }
+
+        $category = Category::query()->whereKey($categoryId)->first();
+
+        if (!$category) {
+            abort(422, 'دسته‌بندی انتخاب‌شده برای کالا معتبر نیست.');
         }
 
         return Product::create([
-            'category_id' => $defaultCategory->id,
+            'category_id' => $category->id,
             'name' => $item['name'],
             'sku' => $item['code'],
             'code' => $item['code'],
@@ -346,7 +363,7 @@ class PurchaseController extends Controller
 
     private function rollbackPurchase(Purchase $purchase): void
     {
-        $purchase->load('items');
+        $purchase->load(['items', 'items.product']);
 
         $affectedProductIds = [];
 
