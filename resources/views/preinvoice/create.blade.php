@@ -13,11 +13,42 @@
   <title>ایجاد پیش‌فاکتور</title>
 
   <style>
-    .page-shell { max-width: 1100px; }
-    .card-soft { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.04); }
-    .section-title { font-weight: 800; }
+    body {
+      background: linear-gradient(180deg, #f6f8fc 0%, #eef2f9 100%);
+    }
+    .page-shell { max-width: 1120px; }
+    .card-soft {
+      background: #fff;
+      border: 1px solid rgba(13, 110, 253, .12);
+      border-radius: 18px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, .06);
+    }
+    .section-title { font-weight: 800; letter-spacing: -.2px; }
     .hint { color: #6c757d; font-size: .9rem; }
-    .sticky-submit { position: sticky; bottom: 10px; }
+    .topbar {
+      background: #fff;
+      border: 1px solid rgba(13,110,253,.12);
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, .05);
+    }
+    .sticky-submit {
+      position: sticky;
+      bottom: 10px;
+      z-index: 12;
+      background: rgba(246, 248, 252, .85);
+      backdrop-filter: blur(4px);
+      border-radius: 14px;
+      padding: .5rem;
+    }
+    .summary-input {
+      background-color: #f8f9fa !important;
+      border-color: #e9ecef;
+    }
+    .actions-bar .btn {
+      min-width: 152px;
+      border-radius: 10px;
+    }
   </style>
 </head>
 
@@ -136,18 +167,13 @@
           <div class="hint">می‌تونی آیتم جدید اضافه کنی یا تعداد/مدل‌ها را تغییر بدی.</div>
         </div>
 
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-            <button type="submit" class="btn btn-primary">💾 ذخیره پیش‌نویس</button>
-          </div>
-
+        <div class="d-flex gap-2 align-items-center flex-wrap actions-bar">
+          <button type="button" id="addRow" class="btn btn-outline-primary">➕ افزودن محصول</button>
+          <button type="submit" class="btn btn-primary">💾 ذخیره پیش‌نویس</button>
+        </div>
+      </div>
 
       <div id="productRows" class="p-3 p-md-4"></div>
-
-      <div class="p-3 p-md-4 border-top d-flex justify-content-center fw-semibold">
-        <button type="button" id="addRow" class="btn btn-primary" style="width:190px;height:50px;">
-          ➕ افزودن محصول
-        </button>
-      </div>
     </div>
 
     {{-- Summary --}}
@@ -157,20 +183,19 @@
       <div class="row g-3">
         <div class="col-md-4">
           <label class="form-label fw-semibold">تخفیف (تومان)</label>
-          <input type="number" name="discount_amount" id="discount" class="form-control"
-                 value="{{ old('discount_amount', 0) }}" readonly style="background-color: var(--bs-secondary-bg);">
+          <input type="number" name="discount_amount" id="discount" class="form-control summary-input"
+                 value="{{ old('discount_amount', 0) }}" readonly>
         </div>
 
         <div class="col-md-4">
           <label class="form-label fw-semibold">هزینه ارسال</label>
-          <input type="text" id="shipping_price_view" class="form-control" readonly
-                 value="0 تومان" style="background-color: var(--bs-secondary-bg);">
+          <input type="text" id="shipping_price_view" class="form-control summary-input" readonly
+                 value="0 تومان">
         </div>
 
         <div class="col-md-4">
           <label class="form-label fw-semibold">جمع کل (تومان)</label>
-          <input type="text" name="total_price" id="total_price" class="form-control fw-bold" readonly
-                 style="background-color: var(--bs-secondary-bg);">
+          <input type="text" name="total_price" id="total_price" class="form-control fw-bold summary-input" readonly>
         </div>
       </div>
 

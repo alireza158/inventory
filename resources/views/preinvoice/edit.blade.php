@@ -14,11 +14,42 @@
   <title>ویرایش پیش‌نویس</title>
 
   <style>
-    .page-shell { max-width: 1100px; }
-    .card-soft { background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,.04); }
-    .section-title { font-weight:800; }
-    .hint { color:#6c757d; font-size:.9rem; }
-    .sticky-submit { position: sticky; bottom: 10px; }
+    body {
+      background: linear-gradient(180deg, #f6f8fc 0%, #eef2f9 100%);
+    }
+    .page-shell { max-width: 1120px; }
+    .card-soft {
+      background: #fff;
+      border: 1px solid rgba(13, 110, 253, .12);
+      border-radius: 18px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, .06);
+    }
+    .section-title { font-weight: 800; letter-spacing: -.2px; }
+    .hint { color: #6c757d; font-size: .9rem; }
+    .topbar {
+      background: #fff;
+      border: 1px solid rgba(13,110,253,.12);
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, .05);
+    }
+    .sticky-submit {
+      position: sticky;
+      bottom: 10px;
+      z-index: 12;
+      background: rgba(246, 248, 252, .85);
+      backdrop-filter: blur(4px);
+      border-radius: 14px;
+      padding: .5rem;
+    }
+    .summary-input {
+      background-color: #f8f9fa !important;
+      border-color: #e9ecef;
+    }
+    .actions-bar .btn {
+      min-width: 152px;
+      border-radius: 10px;
+    }
   </style>
 
 <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -28,7 +59,7 @@
 <body class="py-4">
 <div class="container page-shell">
 
-  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="topbar mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
       <div class="h5 mb-0 fw-bold">📝 ویرایش پیش‌نویس</div>
       <div class="hint">کد: {{ $order->uuid }}</div>
@@ -136,19 +167,14 @@
           <div class="section-title mb-1">🛍️ محصولات</div>
           <div class="hint">آیتم‌ها را تغییر بده و ذخیره کن.</div>
         </div>
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-            <button type="submit" class="btn btn-primary">💾 ذخیره تغییرات</button>
-          </div>
 
+        <div class="d-flex gap-2 align-items-center flex-wrap actions-bar">
+          <button type="button" id="addRow" class="btn btn-outline-primary">➕ افزودن محصول</button>
+          <button type="submit" class="btn btn-primary">💾 ذخیره تغییرات</button>
+        </div>
       </div>
 
       <div id="productRows" class="p-3 p-md-4"></div>
-
-      <div class="p-3 p-md-4 border-top d-flex justify-content-center fw-semibold">
-        <button type="button" id="addRow" class="btn btn-primary" style="width:190px;height:50px;">
-          ➕ افزودن محصول
-        </button>
-      </div>
     </div>
 
     {{-- Summary --}}
@@ -158,22 +184,20 @@
       <div class="row g-3">
         <div class="col-md-4">
           <label class="form-label fw-semibold">تخفیف</label>
-          <input type="number" name="discount_amount" id="discount" class="form-control"
+          <input type="number" name="discount_amount" id="discount" class="form-control summary-input"
                  value="{{ old('discount_amount', $order->discount_amount) }}"
-                 readonly style="background-color: var(--bs-secondary-bg);">
+                 readonly>
         </div>
 
         <div class="col-md-4">
           <label class="form-label fw-semibold">هزینه ارسال</label>
-          <input type="text" id="shipping_price_view" class="form-control" readonly
-                 value="{{ number_format((int)$order->shipping_price) }} تومان"
-                 style="background-color: var(--bs-secondary-bg);">
+          <input type="text" id="shipping_price_view" class="form-control summary-input" readonly
+                 value="{{ number_format((int)$order->shipping_price) }} تومان">
         </div>
 
         <div class="col-md-4">
           <label class="form-label fw-semibold">جمع کل</label>
-          <input type="text" name="total_price" id="total_price" class="form-control fw-bold" readonly
-                 style="background-color: var(--bs-secondary-bg);">
+          <input type="text" name="total_price" id="total_price" class="form-control fw-bold summary-input" readonly>
         </div>
       </div>
     </div>
@@ -182,9 +206,9 @@
       <button class="btn btn-primary w-100 fs-5 py-3 shadow-sm">💾 ذخیره تغییرات</button>
     </div>
   </form>
-  <form method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}">
+  <form method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}" class="mt-3">
     @csrf
-    <button class="btn btn-success">✅ ثبت نهایی و ساخت فاکتور</button>
+    <button class="btn btn-success w-100 py-3 fw-semibold shadow-sm">✅ ثبت نهایی و ساخت فاکتور</button>
   </form>
 
 
