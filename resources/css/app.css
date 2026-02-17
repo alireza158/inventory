@@ -1,3 +1,86 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* =========================
+   Sidebar (Bootstrap List Group) - Custom UI
+========================= */
+@layer components {
+  .app-sidebar {
+    @apply bg-white border-l border-gray-200 rounded-2xl shadow-sm;
+    width: 260px;
+  }
+
+  .app-sidebar__brand {
+    @apply text-center pb-3 mb-3 border-b border-gray-100;
+  }
+
+  .app-sidebar__brand img {
+    @apply mx-auto mb-2;
+  }
+
+  .app-sidebar__title {
+    @apply font-extrabold text-gray-900;
+  }
+
+  .app-sidebar__subtitle {
+    @apply text-xs text-gray-500 mt-1;
+  }
+
+  .sidebar-group-label {
+    @apply text-[11px] text-gray-500 font-semibold tracking-wide mt-3 mb-2;
+  }
+
+  .sidebar-link {
+    @apply flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-gray-700 transition;
+  }
+
+  .sidebar-link:hover {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  .sidebar-link.active {
+    @apply bg-blue-50 text-blue-700;
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.25);
+  }
+
+  .sidebar-link .chev {
+    @apply text-gray-400 transition;
+  }
+
+  .sidebar-link[aria-expanded="true"] .chev {
+    transform: rotate(180deg);
+  }
+
+  .sidebar-submenu {
+    @apply mt-1 ms-2 ps-2 border-s border-gray-200;
+  }
+
+  .sidebar-submenu .sidebar-sublink {
+    @apply block px-3 py-2 rounded-xl text-[13px] text-gray-600 font-medium transition;
+  }
+
+  .sidebar-submenu .sidebar-sublink:hover {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  .sidebar-submenu .sidebar-sublink.active {
+    @apply bg-blue-50 text-blue-700;
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.20);
+  }
+
+  .sidebar-scroll {
+    max-height: calc(100vh - 130px);
+    overflow: auto;
+    padding-right: 6px;
+  }
+  .sidebar-scroll::-webkit-scrollbar { width: 8px; }
+  .sidebar-scroll::-webkit-scrollbar-thumb { background: #d7dde8; border-radius: 999px; }
+  .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+
+  /* Responsive */
+  @media (max-width: 991.98px){
+    .app-sidebar { width: 100%; border-radius: 16px; }
+    .sidebar-scroll { max-height: none; }
+  }
+}
