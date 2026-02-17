@@ -1,159 +1,197 @@
 @php
     $is = fn($name) => request()->routeIs($name) ? 'active' : '';
 
-    // برای active شدن گروه پیش‌فاکتور وقتی داخل هرکدوم از route هاش هستی
-    $preinvoiceOpen = request()->routeIs('preinvoice.*');
-    $productsOpen = request()->routeIs('products.*');
-    $categoriesOpen = request()->routeIs('categories.*');
-    $peopleOpen = request()->routeIs('persons.*') || request()->routeIs('customers.*') || request()->routeIs('suppliers.*') || request()->routeIs('users.*');
-    $modelListsOpen = request()->routeIs('model-lists.*');
+    // Group open states
+    $dashboardActive = request()->routeIs('dashboard');
+
+    $productsOpen = request()->routeIs('products.*')
+                || request()->routeIs('categories.*')
+                || request()->routeIs('model-lists.*');
+
+    $warehouseOpen = request()->routeIs('purchases.*')
+                || request()->routeIs('vouchers.*')
+                || request()->routeIs('warehouses.*')
+                || request()->routeIs('stocktake.*')
+                || request()->routeIs('stocktake.index');
+
+    $commerceOpen = request()->routeIs('persons.*')
+                || request()->routeIs('customers.*')
+                || request()->routeIs('suppliers.*')
+                || request()->routeIs('users.*');
+
+    $invoiceOpen = request()->routeIs('preinvoice.*')
+              || request()->routeIs('invoices.*');
+
+    $logsActive = request()->routeIs('activity-logs.*') || request()->routeIs('activity-logs.index');
 @endphp
 
 <div class="bg-white border-end p-3" style="width: 260px">
+    {{-- Brand --}}
     <div class="mb-3 text-center">
-        <img src="{{ asset('logo.png') }}" alt="{{ config('app.name') }}" class="mb-2" style="height: 56px; width: 56px; object-fit: contain;">
+        <img src="{{ asset('logo.png') }}"
+             alt="{{ config('app.name') }}"
+             class="mb-2"
+             style="height: 56px; width: 56px; object-fit: contain;">
         <div class="fw-bold">{{ config('app.name', 'سیستم انبار آریا جانبی') }}</div>
         <div class="text-muted small">مدیریت موجودی و گردش کالا</div>
     </div>
 
     <div class="list-group list-group-flush">
+
+        {{-- =======================
+            1) Dashboard
+        ======================= --}}
         <a class="list-group-item list-group-item-action {{ $is('dashboard') }}"
            href="{{ route('dashboard') }}">
             داشبورد
         </a>
 
+        {{-- =======================
+            2) Products
+        ======================= --}}
         <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $productsOpen ? 'active' : '' }}"
            data-bs-toggle="collapse"
-           href="#productsMenu"
+           href="#menuProducts"
            role="button"
            aria-expanded="{{ $productsOpen ? 'true' : 'false' }}"
-           aria-controls="productsMenu">
-            <span>کالاها</span>
+           aria-controls="menuProducts">
+            <span>محصولات</span>
             <span class="small">▾</span>
         </a>
 
-        <div class="collapse {{ $productsOpen ? 'show' : '' }}" id="productsMenu">
+        <div class="collapse {{ $productsOpen ? 'show' : '' }}" id="menuProducts">
             <div class="list-group list-group-flush ms-2 mt-1">
                 <a class="list-group-item list-group-item-action {{ $is('products.index') }}"
                    href="{{ route('products.index') }}">
-                    کلیه کالاها
+                    کالاها
+                </a>
+
+                <a class="list-group-item list-group-item-action {{ $is('categories.index') }}"
+                   href="{{ route('categories.index') }}">
+                    دسته‌بندی
+                </a>
+
+                <a class="list-group-item list-group-item-action {{ $is('model-lists.index') }}"
+                   href="{{ route('model-lists.index') }}">
+                    مدل لیست
                 </a>
             </div>
         </div>
 
-        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $categoriesOpen ? 'active' : '' }}"
+        {{-- =======================
+            3) Warehouse (Inventory)
+        ======================= --}}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $warehouseOpen ? 'active' : '' }}"
            data-bs-toggle="collapse"
-           href="#categoriesMenu"
+           href="#menuWarehouse"
            role="button"
-           aria-expanded="{{ $categoriesOpen ? 'true' : 'false' }}"
-           aria-controls="categoriesMenu">
-            <span>دسته‌بندی‌ها</span>
+           aria-expanded="{{ $warehouseOpen ? 'true' : 'false' }}"
+           aria-controls="menuWarehouse">
+            <span>انبارداری</span>
             <span class="small">▾</span>
         </a>
 
-        <div class="collapse {{ $categoriesOpen ? 'show' : '' }}" id="categoriesMenu">
+        <div class="collapse {{ $warehouseOpen ? 'show' : '' }}" id="menuWarehouse">
             <div class="list-group list-group-flush ms-2 mt-1">
-                <a class="list-group-item list-group-item-action {{ $is('categories.index') }}"
-                   href="{{ route('categories.index') }}">
-                    لیست دسته‌بندی‌ها
+                <a class="list-group-item list-group-item-action {{ request()->routeIs('purchases.*') ? 'active' : '' }}"
+                   href="{{ route('purchases.index') }}">
+                    خرید کالا
                 </a>
 
-                <a class="list-group-item list-group-item-action {{ $is('categories.create') }}"
-                   href="{{ route('categories.create') }}">
-                    ➕ افزودن دسته‌بندی
+                <a class="list-group-item list-group-item-action {{ request()->routeIs('vouchers.*') ? 'active' : '' }}"
+                   href="{{ route('vouchers.index') }}">
+                    حواله
+                </a>
+
+                <a class="list-group-item list-group-item-action {{ request()->routeIs('warehouses.*') ? 'active' : '' }}"
+                   href="{{ route('warehouses.index') }}">
+                    انبارها
+                </a>
+
+                <a class="list-group-item list-group-item-action {{ request()->routeIs('stocktake.*') || request()->routeIs('stocktake.index') ? 'active' : '' }}"
+                   href="{{ route('stocktake.index') }}">
+                    انبارگردانی
                 </a>
             </div>
         </div>
 
-
-        <a class="list-group-item list-group-item-action {{ $modelListsOpen ? 'active' : '' }}"
-           href="{{ route('model-lists.index') }}">
-            مدل لیست‌ها
+        {{-- =======================
+            4) Commerce
+        ======================= --}}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $commerceOpen ? 'active' : '' }}"
+           data-bs-toggle="collapse"
+           href="#menuCommerce"
+           role="button"
+           aria-expanded="{{ $commerceOpen ? 'true' : 'false' }}"
+           aria-controls="menuCommerce">
+            <span>بازرگانی</span>
+            <span class="small">▾</span>
         </a>
 
-        <div class="mt-2">
-            <div class="text-muted small mb-2">خرید کالا / حواله‌ها</div>
+        <div class="collapse {{ $commerceOpen ? 'show' : '' }}" id="menuCommerce">
+            <div class="list-group list-group-flush ms-2 mt-1">
+                <a class="list-group-item list-group-item-action {{ request()->routeIs('persons.*') ? 'active' : '' }}"
+                   href="{{ route('persons.index') }}">
+                    اشخاص
+                </a>
 
-            <a class="list-group-item list-group-item-action {{ $peopleOpen ? 'active' : '' }}"
-               href="{{ route('persons.index') }}">
-                اشخاص
-            </a>
-
-            <a class="list-group-item list-group-item-action {{ $is('users.*') }}"
-               href="{{ route('users.index') }}">
-                کاربران
-            </a>
-
-            <a class="list-group-item list-group-item-action {{ $is('purchases.*') }}"
-               href="{{ route('purchases.index') }}">
-                خرید کالا
-            </a>
-
-            <a class="list-group-item list-group-item-action {{ $is('vouchers.*') }}"
-               href="{{ route('vouchers.index') }}">
-                حواله‌ها
-            </a>
-
-            <a class="list-group-item list-group-item-action {{ $is('warehouses.*') }}"
-               href="{{ route('warehouses.index') }}">
-                انبارها
-            </a>
+                <a class="list-group-item list-group-item-action {{ request()->routeIs('users.*') ? 'active' : '' }}"
+                   href="{{ route('users.index') }}">
+                    کاربران
+                </a>
+            </div>
         </div>
 
-        <a class="list-group-item list-group-item-action {{ $is('stocktake.index') }}"
-           href="{{ route('stocktake.index') }}">
-            انبارگردانی
+        {{-- =======================
+            5) Invoice
+        ======================= --}}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $invoiceOpen ? 'active' : '' }}"
+           data-bs-toggle="collapse"
+           href="#menuInvoices"
+           role="button"
+           aria-expanded="{{ $invoiceOpen ? 'true' : 'false' }}"
+           aria-controls="menuInvoices">
+            <span>فاکتور</span>
+            <span class="small">▾</span>
         </a>
 
-        {{-- =========================
-             پیش‌فاکتور
-        ========================= --}}
-        <div class="mt-3">
-            <div class="text-muted small mb-2">پیش‌فاکتور</div>
+        <div class="collapse {{ $invoiceOpen ? 'show' : '' }}" id="menuInvoices">
+            <div class="list-group list-group-flush ms-2 mt-1">
 
-            <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ $preinvoiceOpen ? 'active' : '' }}"
-               data-bs-toggle="collapse"
-               href="#preinvoiceMenu"
-               role="button"
-               aria-expanded="{{ $preinvoiceOpen ? 'true' : 'false' }}"
-               aria-controls="preinvoiceMenu">
-                <span>پیش‌فاکتور</span>
-                <span class="small">▾</span>
-            </a>
+                <a class="list-group-item list-group-item-action {{ request()->routeIs('preinvoice.create') ? 'active' : '' }}"
+                   href="{{ route('preinvoice.create') }}">
+                    ثبت پیش‌فاکتور
+                </a>
 
-            <div class="collapse {{ $preinvoiceOpen ? 'show' : '' }}" id="preinvoiceMenu">
-                <div class="list-group list-group-flush ms-2 mt-1">
-                    <a class="list-group-item list-group-item-action {{ $is('preinvoice.create') }}"
-                       href="{{ route('preinvoice.create') }}">
-                        ➕ ایجاد پیش‌فاکتور
-                    </a>
-
-                    <a class="list-group-item list-group-item-action {{ $is('preinvoice.draft.index') }}"
-                       href="{{ route('preinvoice.draft.index') }}">
-                        📝 پیش‌نویس‌ها
-                    </a>
-
-                    {{-- اگر داری: لیست پیش‌فاکتورهای نهایی --}}
-                    {{-- <a class="list-group-item list-group-item-action {{ $is('preinvoice.index') }}"
+                {{-- لیست پیش‌فاکتور‌ها --}}
+                @if (Route::has('preinvoice.index'))
+                    <a class="list-group-item list-group-item-action {{ request()->routeIs('preinvoice.index') ? 'active' : '' }}"
                        href="{{ route('preinvoice.index') }}">
-                        📄 پیش‌فاکتورهای ثبت‌شده
-                    </a> --}}
-                </div>
+                        پیش‌فاکتورها
+                    </a>
+                @endif
 
+                <a class="list-group-item list-group-item-action {{ request()->routeIs('preinvoice.draft.index') ? 'active' : '' }}"
+                   href="{{ route('preinvoice.draft.index') }}">
+                    پیش‌نویس‌ها
+                </a>
 
-
+                @if (Route::has('invoices.index'))
+                    <a class="list-group-item list-group-item-action {{ request()->routeIs('invoices.*') ? 'active' : '' }}"
+                       href="{{ route('invoices.index') }}">
+                        فاکتورها
+                    </a>
+                @endif
             </div>
-         <a class="list-group-item list-group-item-action {{ $is('invoices.*') }}"
-   href="{{ route('invoices.index') }}">
-   فاکتورها
-</a>
-
-        <a class="list-group-item list-group-item-action {{ $is('activity-logs.index') }}"
-           href="{{ route('activity-logs.index') }}">
-            لاگ فعالیت‌ها
-        </a>
-
         </div>
+
+        {{-- =======================
+            Activity Logs (single)
+        ======================= --}}
+        <a class="list-group-item list-group-item-action {{ request()->routeIs('activity-logs.*') ? 'active' : '' }}"
+           href="{{ route('activity-logs.index') }}">
+            لاگ فعالیت
+        </a>
 
     </div>
 </div>
