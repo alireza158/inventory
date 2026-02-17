@@ -27,13 +27,6 @@
         </div>
 
 
-        <div class="col-md-6">
-          <label class="form-label">بارکد</label>
-          <div class="input-group">
-            <input id="barcode_input" name="barcode" class="form-control" value="{{ old('barcode') }}" placeholder="بارکد خودکار تولید می‌شود">
-            <button type="button" class="btn btn-outline-secondary" id="generateBarcodeBtn">تولید رندوم</button>
-          </div>
-        </div>
 
         <div class="col-md-6">
           <label class="form-label">دسته‌بندی</label>
@@ -212,23 +205,7 @@ function addVariantRow() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const barcodeInput = document.getElementById('barcode_input');
-  const generateBtn = document.getElementById('generateBarcodeBtn');
-
-  const randomBarcode = () => String(Math.floor(100000000000 + Math.random() * 900000000000));
-
-  const generateIfEmpty = () => {
-    if (barcodeInput && !barcodeInput.value.trim()) {
-      barcodeInput.value = randomBarcode();
-    }
-  };
-
-  generateBtn?.addEventListener('click', () => {
-    if (barcodeInput) barcodeInput.value = randomBarcode();
-  });
-
   initModelSelects(document);
-  generateIfEmpty();
 });
 
 </script>
