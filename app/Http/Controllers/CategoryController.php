@@ -9,9 +9,18 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        // بهتر: مرتب‌سازی با name
-        $categories = Category::orderBy('name')->paginate(10);
-        return view('categories.index', compact('categories'));
+        $rootCategories = Category::query()
+            ->whereNull('parent_id')
+            ->with(['children.children.children'])
+            ->orderBy('name')
+            ->get();
+
+        $categories = Category::query()
+            ->with('parent')
+            ->orderBy('name')
+            ->get();
+
+        return view('categories.index', compact('rootCategories', 'categories'));
     }
 
     public function create()

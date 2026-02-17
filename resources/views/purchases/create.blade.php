@@ -10,6 +10,7 @@
         $initialItems = $isEdit
             ? $purchase->items->map(fn ($it) => [
                 'product_id' => $it->product_id,
+                'category_id' => $it->product?->category_id,
                 'variant_id' => $it->product_variant_id,
                 'name' => $it->product_name,
                 'code' => $it->product_code,
@@ -28,6 +29,7 @@
             'id' => $p->id,
             'name' => $p->name,
             'code' => $p->code ?: $p->sku,
+            'category_id' => $p->category_id,
             'variants' => $p->variants->map(function ($v) {
                 return [
                     'id' => $v->id,
@@ -36,6 +38,13 @@
                     'sell_price' => (int) ($v->sell_price ?? 0),
                 ];
             })->values()->all(),
+        ];
+    })->values()->all();
+
+    $categoriesPayload = ($categories ?? collect())->map(function ($category) {
+        return [
+            'id' => $category->id,
+            'name' => $category->name,
         ];
     })->values()->all();
 @endphp
@@ -125,6 +134,7 @@
 <script>
 (function () {
     const products = @json($productsPayload);
+    const categories = @json($categoriesPayload);
     const modelLists = @json(($modelLists ?? collect())->values()->all());
     const initialItems = @json($initialItems);
 
@@ -155,6 +165,12 @@
         ).join('')}`;
     }
 
+    function categoryOptions(selected = '') {
+        return `<option value="">انتخاب دسته‌بندی</option>${categories.map((category) =>
+            `<option value="${category.id}" ${String(selected)===String(category.id)?'selected':''}>${category.name}</option>`
+        ).join('')}`;
+    }
+
     function modelListOptions(selected = '') {
         const normalizedSelected = String(selected || '').trim();
         const hasSelectedInList = modelLists.some((name) => String(name).trim() === normalizedSelected);
@@ -180,6 +196,7 @@
 
     function productGroupTemplate(groupId, data = {}) {
         const productId = data.product_id || '';
+        const categoryId = data.category_id || '';
         return `
         <div class="purchase-product-group" data-group-id="${groupId}">
             <div class="group-head">
@@ -194,17 +211,23 @@
             </div>
 
             <div class="row g-2 mb-2 group-product-fields">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="label">انتخاب کالا</div>
                     <select class="form-select form-select-sm group-product-select">
                         ${productOptions(productId)}
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <div class="label">دسته‌بندی کالا</div>
+                    <select class="form-select form-select-sm group-category-select" required>
+                        ${categoryOptions(categoryId)}
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <div class="label">اسم محصول (مثل گارد)</div>
                     <input class="form-control form-control-sm group-product-name" value="${data.name ?? ''}" required>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="label">کد محصول</div>
                     <input class="form-control form-control-sm group-product-code" value="${data.code ?? ''}" required>
                 </div>
@@ -224,6 +247,7 @@
         <div class="purchase-model-row" data-row>
             <div class="row g-2 align-items-end">
                 <input type="hidden" class="product-id-input" name="items[][product_id]" value="${productId}">
+                <input type="hidden" class="category-id-input" name="items[][category_id]" value="${item.category_id ?? ''}">
                 <input type="hidden" class="product-name-input" name="items[][name]" value="${item.name ?? ''}">
                 <input type="hidden" class="product-code-input" name="items[][code]" value="${item.code ?? ''}">
 
@@ -280,11 +304,13 @@
 
     function syncGroupFieldsToRows(groupEl) {
         const productId = groupEl.querySelector('.group-product-select')?.value || '';
+        const categoryId = groupEl.querySelector('.group-category-select')?.value || '';
         const name = groupEl.querySelector('.group-product-name')?.value || '';
         const code = groupEl.querySelector('.group-product-code')?.value || '';
 
         groupEl.querySelectorAll('[data-row]').forEach((row) => {
             row.querySelector('.product-id-input').value = productId;
+            row.querySelector('.category-id-input').value = categoryId;
             row.querySelector('.product-name-input').value = name;
             row.querySelector('.product-code-input').value = code;
 
@@ -326,6 +352,7 @@
 
         rows.forEach((row, idx) => {
             setName(row.querySelector('.product-id-input'), `items[${idx}][product_id]`);
+            setName(row.querySelector('.category-id-input'), `items[${idx}][category_id]`);
             setName(row.querySelector('.product-name-input'), `items[${idx}][name]`);
             setName(row.querySelector('.product-code-input'), `items[${idx}][code]`);
             setName(row.querySelector('.variant-id'), `items[${idx}][variant_id]`);
@@ -409,6 +436,7 @@
             if (!groupsMap.has(key)) {
                 groupsMap.set(key, {
                     product_id: item.product_id || '',
+                    category_id: item.category_id || '',
                     name: item.name || '',
                     code: item.code || '',
                     rows: [],
@@ -431,6 +459,7 @@
 
         if (
             e.target.classList.contains('group-product-select') ||
+            e.target.classList.contains('group-category-select') ||
             e.target.classList.contains('group-product-name') ||
             e.target.classList.contains('group-product-code')
         ) {
@@ -440,6 +469,10 @@
                 if (product) {
                     groupEl.querySelector('.group-product-name').value = product.name || '';
                     groupEl.querySelector('.group-product-code').value = product.code || '';
+                    const categorySelect = groupEl.querySelector('.group-category-select');
+                    if (categorySelect && product.category_id) {
+                        categorySelect.value = String(product.category_id);
+                    }
                 }
             }
 

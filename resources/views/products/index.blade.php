@@ -37,7 +37,6 @@
                     <button class="btn btn-outline-success">Sync از CRM</button>
                 </form>
 
-                <a class="btn btn-outline-dark" href="{{ route('movements.index') }}">گردش انبار</a>
                 <a class="btn btn-outline-secondary" href="{{ route('products.import.template') }}">دانلود نمونه</a>
             </div>
         </div>
@@ -159,7 +158,6 @@
                                     <td>{{ number_format((int)$p->price) }} تومان</td>
 
                                     <td class="text-end action-buttons">
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ route('movements.create', $p) }}">ورود/خروج</a>
                                         <a class="btn btn-sm btn-outline-secondary" href="{{ route('products.edit', $p) }}">ویرایش</a>
 
                                         <form class="d-inline" method="POST" action="{{ route('products.destroy', $p) }}" onsubmit="return confirm('حذف شود؟')">
