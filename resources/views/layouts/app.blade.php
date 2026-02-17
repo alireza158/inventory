@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'انبارداری') }}</title>
+    <title>{{ config('app.name', 'سیستم انبار آریا جانبی') }}</title>
     <script src="{{ asset('lib/jquery.min.js') }}"></script>
 
     <!-- اگر select2 داری -->
@@ -44,8 +44,9 @@
     <div class="flex-grow-1">
         {{-- Topbar --}}
         <div class="bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
-            <div class="fw-bold text-muted">
-                {{ config('app.name','انبارداری') }}
+            <div class="d-flex align-items-center gap-2 fw-bold text-muted">
+                <img src="{{ asset('logo.png') }}" alt="{{ config('app.name') }}" style="height: 34px; width: 34px; object-fit: contain;">
+                <span>{{ config('app.name','سیستم انبار آریا جانبی') }}</span>
             </div>
 
             <div class="dropdown">

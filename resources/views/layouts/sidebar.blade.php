@@ -10,8 +10,9 @@
 @endphp
 
 <div class="bg-white border-end p-3" style="width: 260px">
-    <div class="mb-3">
-        <div class="fw-bold">پنل انبار</div>
+    <div class="mb-3 text-center">
+        <img src="{{ asset('logo.png') }}" alt="{{ config('app.name') }}" class="mb-2" style="height: 56px; width: 56px; object-fit: contain;">
+        <div class="fw-bold">{{ config('app.name', 'سیستم انبار آریا جانبی') }}</div>
         <div class="text-muted small">مدیریت موجودی و گردش کالا</div>
     </div>
 
