@@ -243,8 +243,8 @@
 
                     <div class="row g-3 align-items-end">
                         <div class="col-lg-5">
-                            <label class="form-label">جستجو (نام، SKU یا بارکد)</label>
-                            <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً کابل، KB-1001 یا 123456789012">
+                            <label class="form-label">جستجو (نام یا SKU)</label>
+                            <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً کابل یا KB-1001">
                         </div>
 
                         <div class="col-lg-3">
@@ -311,7 +311,6 @@
                                     <th class="nowrap w-1">#</th>
                                     <th>نام</th>
                                     <th class="nowrap">SKU</th>
-                                    <th class="nowrap">بارکد</th>
                                     <th class="nowrap">دسته‌بندی</th>
                                     <th class="nowrap">موجودی</th>
                                     <th class="nowrap">قیمت</th>
@@ -361,9 +360,6 @@
                                             <span class="pill pill-gray">{{ $p->sku }}</span>
                                         </td>
 
-                                        <td class="nowrap">
-                                            <span class="pill">{{ $p->barcode ?: "—" }}</span>
-                                        </td>
 
                                         <td class="nowrap">
                                             {{ $p->category?->name ?: "—" }}

@@ -14,14 +14,13 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-$query = Product::query()->with(['category', 'variants']);
+        $query = Product::query()->with(['category', 'variants']);
 
         if ($request->filled('q')) {
             $q = $request->q;
             $query->where(function ($qq) use ($q) {
                 $qq->where('name', 'like', "%{$q}%")
-                   ->orWhere('sku', 'like', "%{$q}%")
-                   ->orWhere('barcode', 'like', "%{$q}%");
+                   ->orWhere('sku', 'like', "%{$q}%");
             });
         }
 
@@ -72,7 +71,6 @@ $query = Product::query()->with(['category', 'variants']);
             'category_id' => ['required', 'exists:categories,id'],
             'name'        => ['required', 'string', 'max:255'],
             'sku'         => ['required', 'string', 'max:80', 'unique:products,sku'],
-            'barcode'     => ['nullable', 'string', 'max:64', 'unique:products,barcode'],
 
             // variants (اختیاری)
             'variants'                 => ['nullable', 'array'],
@@ -87,7 +85,6 @@ $query = Product::query()->with(['category', 'variants']);
                 'category_id' => $data['category_id'],
                 'name'        => $data['name'],
                 'sku'         => $data['sku'],
-                'barcode'     => $data['barcode'] ?? $this->generateUniqueBarcode(),
 
                 // بعداً با variants پر می‌شود
                 'stock'       => 0,
@@ -134,7 +131,6 @@ $query = Product::query()->with(['category', 'variants']);
             'category_id' => ['required', 'exists:categories,id'],
             'name'        => ['required', 'string', 'max:255'],
             'sku'         => ['required', 'string', 'max:80', 'unique:products,sku,' . $product->id],
-            'barcode'     => ['nullable', 'string', 'max:64', 'unique:products,barcode,' . $product->id],
 
             // variants
             'variants'                 => ['nullable', 'array'],
@@ -153,7 +149,6 @@ $query = Product::query()->with(['category', 'variants']);
                 'category_id' => $data['category_id'],
                 'name'        => $data['name'],
                 'sku'         => $data['sku'],
-                'barcode'     => $data['barcode'] ?? $product->barcode ?? $this->generateUniqueBarcode(),
             ]);
 
             $incoming = $data['variants'] ?? [];
@@ -265,14 +260,5 @@ $query = Product::query()->with(['category', 'variants']);
         ModelList::firstOrCreate([
             'model_name' => $modelName,
         ]);
-    }
-
-    private function generateUniqueBarcode(): string
-    {
-        do {
-            $barcode = (string) random_int(100000000000, 999999999999);
-        } while (Product::where('barcode', $barcode)->exists());
-
-        return $barcode;
     }
 }
