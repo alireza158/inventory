@@ -137,12 +137,6 @@
           <div class="hint">آیتم‌ها را تغییر بده و ذخیره کن.</div>
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
-            <input type="text" id="barcodeScanner" class="form-control" style="min-width:260px" placeholder="اسکن بارکد و Enter...">
-
-            <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#barcodeModal">
-              📷 اسکن با دوربین
-            </button>
-
             <button type="submit" class="btn btn-primary">💾 ذخیره تغییرات</button>
           </div>
 
@@ -193,157 +187,8 @@
     <button class="btn btn-success">✅ ثبت نهایی و ساخت فاکتور</button>
   </form>
 
+
 </div>
-<script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
-
-
-<div class="modal fade" id="barcodeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <div class="fw-bold">📷 اسکن بارکد</div>
-          <button type="button" class="btn-close ms-0" data-bs-dismiss="modal"></button>
-        </div>
-
-        <div class="modal-body">
-          <div class="alert alert-info py-2 mb-2" style="font-size:.9rem">
-            دوربین را روی بارکد نگه دارید. بعد از هر اسکن، کالا اضافه می‌شود و اسکن ادامه پیدا می‌کند.
-          </div>
-
-          <div id="barcodeScannerView"
-               style="width:100%;min-height:320px;background:#000;border-radius:14px;overflow:hidden"></div>
-
-          <div class="d-flex gap-2 align-items-center flex-wrap mt-3">
-            <span class="badge bg-success" id="lastBarcodeBadge">آخرین بارکد: —</span>
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleTorchBtn" disabled>🔦 چراغ قوه</button>
-            <button type="button" class="btn btn-outline-danger btn-sm" id="stopScanBtn">⛔ توقف اسکن</button>
-          </div>
-
-          <div class="text-danger small mt-2 d-none" id="barcodeCamErr"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
-    (function(){
-      const modalEl = document.getElementById('barcodeModal');
-      if (!modalEl) return;
-
-      const viewEl = document.getElementById('barcodeScannerView');
-      const errEl  = document.getElementById('barcodeCamErr');
-      const lastBadge = document.getElementById('lastBarcodeBadge');
-      const stopBtn = document.getElementById('stopScanBtn');
-      const torchBtn = document.getElementById('toggleTorchBtn');
-
-      let running = false;
-      let lastCode = null;
-      let lastAt = 0;
-      let torchOn = false;
-
-      function showErr(msg){
-        if (!errEl) return;
-        errEl.textContent = msg || '';
-        errEl.classList.toggle('d-none', !msg);
-      }
-
-      function addByBarcode(code){
-        code = String(code||'').trim();
-        if (!code) return;
-
-        if (lastBadge) lastBadge.textContent = `آخرین بارکد: ${code}`;
-
-        const ok = addProductByBarcode(code);
-        if (!ok) {
-          showErr('این بارکد در لیست محصولات پیدا نشد.');
-          return;
-        }
-
-        showErr('');
-        try { navigator.vibrate && navigator.vibrate(60); } catch(e) {}
-
-        // فوکوس روی input
-        const input = document.getElementById('barcodeScanner');
-        if (input) { input.value = ''; input.focus({preventScroll:true}); }
-      }
-
-      function startScanner(){
-        if (running) return;
-        running = true;
-        showErr('');
-        if (viewEl) viewEl.innerHTML = '';
-
-        Quagga.init({
-          inputStream: {
-            type: "LiveStream",
-            target: viewEl,
-            constraints: { facingMode: "environment" }
-          },
-          locate: true,
-          decoder: {
-            readers: ["ean_reader","ean_8_reader","code_128_reader","code_39_reader","upc_reader","upc_e_reader"]
-          }
-        }, function(err){
-          if (err) {
-            console.error(err);
-            running = false;
-            showErr('دسترسی دوربین ممکن نیست. (HTTPS/Permission را چک کنید)');
-            return;
-          }
-
-          Quagga.start();
-          torchBtn.disabled = false;
-
-          Quagga.onDetected((result) => {
-            const code = result?.codeResult?.code;
-            if (!code) return;
-
-            const now = Date.now();
-            if (code === lastCode && (now - lastAt) < 1200) return; // ضد تکرار
-            lastCode = code;
-            lastAt = now;
-
-            addByBarcode(code);
-          });
-        });
-      }
-
-      function stopScanner(){
-        if (!running) return;
-        running = false;
-        try { Quagga.offDetected(); } catch(e){}
-        try { Quagga.stop(); } catch(e){}
-        torchBtn.disabled = true;
-        torchOn = false;
-      }
-
-      async function toggleTorch(){
-        try {
-          const track = Quagga?.CameraAccess?.getActiveTrack?.();
-          if (!track) return;
-          const cap = track.getCapabilities?.();
-          if (!cap || !cap.torch) {
-            showErr('چراغ قوه توسط این دستگاه/مرورگر پشتیبانی نمی‌شود.');
-            return;
-          }
-          torchOn = !torchOn;
-          await track.applyConstraints({ advanced: [{ torch: torchOn }] });
-          showErr('');
-        } catch (e) {
-          showErr('فعال‌سازی چراغ قوه ممکن نیست.');
-        }
-      }
-
-      torchBtn?.addEventListener('click', toggleTorch);
-      stopBtn?.addEventListener('click', () => {
-        stopScanner();
-        bootstrap.Modal.getInstance(modalEl)?.hide();
-      });
-
-      modalEl.addEventListener('shown.bs.modal', () => startScanner());
-      modalEl.addEventListener('hidden.bs.modal', () => stopScanner());
-    })();
-    </script>
-
 @php
   $draftItems = $order->items->map(function ($it) {
       return [
@@ -360,7 +205,6 @@
       'city_id'        => (int) ($order->city_id ?? 0),
   ];
 @endphp
-
 <script>
   const draftOrder = @json($draftOrder);
   const draftItems = @json($draftItems);
@@ -491,7 +335,7 @@ function fillProductSelect(selectEl){
   allProducts.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = `${(p.title ?? '').trim()} (${formatPrice(p.price)} تومان)${p.barcode ? ` - ${p.barcode}` : ''}`;
+    opt.textContent = `${(p.title ?? '').trim()} (${formatPrice(p.price)} تومان)`;
     selectEl.appendChild(opt);
   });
 }
@@ -524,26 +368,6 @@ function setStockUI(row, stockQty){
     badge.textContent = 'ناموجود';
   }
 }
-function addProductByBarcode(rawBarcode){
-  const barcode = String(rawBarcode || '').trim();
-  if (!barcode) return false;
-
-  const product = allProducts.find(p => String(p.barcode || '').trim() === barcode);
-  if (!product) return false;
-
-  const row = addProductRow();
-  const productSelect = row.querySelector('.product-select');
-  productSelect.value = String(product.id);
-
-  if (window.jQuery) {
-    $(productSelect).val(String(product.id)).trigger('change');
-  } else {
-    productSelect.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  return true;
-}
-
 function updateTotal(){
   const discount = Number(document.getElementById('discount')?.value || 0) || 0;
   const shipping = Number(document.getElementById('shipping_price')?.value || 0) || 0;
@@ -832,22 +656,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   document.getElementById('addRow').addEventListener('click', () => addProductRow());
-
-  const barcodeScanner = document.getElementById('barcodeScanner');
-  barcodeScanner?.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-
-    const ok = addProductByBarcode(barcodeScanner.value);
-    if (!ok) {
-      barcodeScanner.classList.add('is-invalid');
-      setTimeout(() => barcodeScanner.classList.remove('is-invalid'), 1200);
-      return;
-    }
-
-    barcodeScanner.value = '';
-    barcodeScanner.classList.remove('is-invalid');
-  });
   updateTotal();
 
   // ✅ اگر ردیفی بدون prefill ایجاد شد ولی محصول داشت، change رو صدا بزن

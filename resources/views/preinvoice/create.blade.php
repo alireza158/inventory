@@ -137,12 +137,6 @@
         </div>
 
         <div class="d-flex gap-2 align-items-center flex-wrap">
-            <input type="text" id="barcodeScanner" class="form-control" style="min-width:260px" placeholder="اسکن بارکد و Enter...">
-
-            <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#barcodeModal">
-              📷 اسکن با دوربین
-            </button>
-
             <button type="submit" class="btn btn-primary">💾 ذخیره پیش‌نویس</button>
           </div>
 
@@ -189,196 +183,6 @@
   </form>
 
 </div>
-<div class="modal fade" id="barcodeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <div class="fw-bold">📷 اسکن بارکد</div>
-          <button type="button" class="btn-close ms-0" data-bs-dismiss="modal"></button>
-        </div>
-
-        <div class="modal-body">
-          <div class="alert alert-info py-2 mb-2" style="font-size:.9rem">
-            دوربین را روی بارکد نگه دارید. بعد از هر اسکن، کالا اضافه می‌شود و اسکن ادامه پیدا می‌کند.
-          </div>
-
-          <div id="barcodeScannerView"
-               style="width:100%;min-height:320px;background:#000;border-radius:14px;overflow:hidden"></div>
-
-          <div class="d-flex gap-2 align-items-center flex-wrap mt-3">
-            <span class="badge bg-success" id="lastBarcodeBadge">آخرین بارکد: —</span>
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleTorchBtn" disabled>
-              🔦 چراغ قوه
-            </button>
-            <button type="button" class="btn btn-outline-danger btn-sm" id="stopScanBtn">
-              ⛔ توقف اسکن
-            </button>
-          </div>
-
-          <div class="text-danger small mt-2 d-none" id="barcodeCamErr"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
-  <script>
-    (function(){
-      const modalEl = document.getElementById('barcodeModal');
-      if (!modalEl) return;
-
-      const viewEl = document.getElementById('barcodeScannerView');
-      const errEl  = document.getElementById('barcodeCamErr');
-      const lastBadge = document.getElementById('lastBarcodeBadge');
-      const stopBtn = document.getElementById('stopScanBtn');
-      const torchBtn = document.getElementById('toggleTorchBtn');
-
-      let running = false;
-      let lastCode = null;
-      let lastAt = 0;
-      let torchOn = false;
-
-      function showErr(msg){
-        if (!errEl) return;
-        errEl.textContent = msg || '';
-        errEl.classList.toggle('d-none', !msg);
-      }
-
-      // ✅ اگر همان بارکد قبلاً توی ردیف‌ها هست، تعدادش +1 شود (سریع‌تر از ساخت ردیف جدید)
-      function incrementIfExistsByBarcode(barcode){
-        const code = String(barcode||'').trim();
-        if (!code) return false;
-
-        // اینجا فرض کردیم توی dropdown متنِ محصول شامل barcode هم هست
-        // اما بهتر: وقتی محصول پیدا شد، با product.id کنترل کنیم.
-        // بنابراین این تابع فعلاً ساده است و توسط addProductByBarcode پشتیبانی می‌شود.
-        return false;
-      }
-
-      function addByBarcode(code){
-        code = String(code||'').trim();
-        if (!code) return;
-
-        if (lastBadge) lastBadge.textContent = `آخرین بارکد: ${code}`;
-
-        // ✅ از منطق موجود خودت استفاده می‌کنیم
-        const ok = addProductByBarcode(code);
-
-        if (!ok) {
-          // اگر بارکد در allProducts نبود
-          showErr('این بارکد در لیست محصولات پیدا نشد.');
-          return;
-        }
-
-        showErr('');
-
-        // فوکوس روی input تا اگر با دستگاه هم زدند راحت باشد
-        const input = document.getElementById('barcodeScanner');
-        if (input) {
-          input.value = '';
-          input.focus({preventScroll:true});
-        }
-
-        // ویبره کوتاه روی موبایل (اختیاری)
-        try { navigator.vibrate && navigator.vibrate(60); } catch(e) {}
-      }
-
-      async function startScanner(){
-        if (running) return;
-        running = true;
-        showErr('');
-
-        // پاک کردن view
-        if (viewEl) viewEl.innerHTML = '';
-
-        Quagga.init({
-          inputStream: {
-            type: "LiveStream",
-            target: viewEl,
-            constraints: { facingMode: "environment" }
-          },
-          locate: true,
-          decoder: {
-            readers: [
-              "ean_reader",
-              "ean_8_reader",
-              "code_128_reader",
-              "code_39_reader",
-              "upc_reader",
-              "upc_e_reader"
-            ]
-          }
-        }, function(err){
-          if (err) {
-            console.error(err);
-            running = false;
-            showErr('دسترسی دوربین ممکن نیست. (HTTPS/Permission را چک کنید)');
-            return;
-          }
-
-          Quagga.start();
-
-          // تلاش برای فعال کردن دکمه چراغ قوه (اگر پشتیبانی شد)
-          torchBtn.disabled = false;
-
-          Quagga.onDetected((result) => {
-            const code = result?.codeResult?.code;
-            if (!code) return;
-
-            // ✅ جلوگیری از چندبار ثبت پشت‌سرهم
-            const now = Date.now();
-            if (code === lastCode && (now - lastAt) < 1200) return;
-            lastCode = code;
-            lastAt = now;
-
-            addByBarcode(code);
-          });
-        });
-      }
-
-      function stopScanner(){
-        if (!running) return;
-        running = false;
-        try { Quagga.offDetected(); } catch(e){}
-        try { Quagga.stop(); } catch(e){}
-        torchBtn.disabled = true;
-        torchOn = false;
-      }
-
-      // چراغ قوه (اگر مرورگر/دستگاه اجازه بده)
-      async function toggleTorch(){
-        try {
-          const track = Quagga?.CameraAccess?.getActiveTrack?.();
-          if (!track) return;
-
-          const cap = track.getCapabilities?.();
-          if (!cap || !cap.torch) {
-            showErr('چراغ قوه توسط این دستگاه/مرورگر پشتیبانی نمی‌شود.');
-            return;
-          }
-
-          torchOn = !torchOn;
-          await track.applyConstraints({ advanced: [{ torch: torchOn }] });
-          showErr('');
-        } catch (e) {
-          showErr('فعال‌سازی چراغ قوه ممکن نیست.');
-        }
-      }
-
-      torchBtn?.addEventListener('click', toggleTorch);
-      stopBtn?.addEventListener('click', () => {
-        stopScanner();
-        const bsModal = bootstrap.Modal.getInstance(modalEl);
-        bsModal?.hide();
-      });
-
-      // وقتی مودال باز/بسته شد
-      modalEl.addEventListener('shown.bs.modal', () => startScanner());
-      modalEl.addEventListener('hidden.bs.modal', () => stopScanner());
-
-    })();
-    </script>
-
 <script>
   const draftOrder = null;
   const draftItems = [];
@@ -606,7 +410,7 @@ function fillProductSelect(selectEl) {
   allProducts.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = `${p.title} (${formatPrice(p.price)} تومان)${p.barcode ? ` - ${p.barcode}` : ''}`;
+    opt.textContent = `${p.title} (${formatPrice(p.price)} تومان)`;
     selectEl.appendChild(opt);
   });
 }
@@ -650,25 +454,6 @@ function setStockUI(row, stockQty) {
   }
 }
 
-
-function addProductByBarcode(rawBarcode) {
-  const barcode = String(rawBarcode || '').trim();
-  if (!barcode) return false;
-
-  const product = allProducts.find(p => String(p.barcode || '').trim() === barcode);
-  if (!product) return false;
-
-  const row = addProductRow();
-  const productSelect = row.querySelector('.product-select');
-  productSelect.value = String(product.id);
-  if (window.jQuery) {
-    $(productSelect).val(String(product.id)).trigger('change');
-  } else {
-    productSelect.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  return true;
-}
 
 function updateTotal() {
   const discount = parseFloat(document.getElementById('discount')?.value || 0) || 0;
@@ -834,22 +619,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   addProductRow();
   document.getElementById('addRow').addEventListener('click', () => addProductRow());
-
-  const barcodeScanner = document.getElementById('barcodeScanner');
-  barcodeScanner?.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-
-    const ok = addProductByBarcode(barcodeScanner.value);
-    if (!ok) {
-      barcodeScanner.classList.add('is-invalid');
-      setTimeout(() => barcodeScanner.classList.remove('is-invalid'), 1200);
-      return;
-    }
-
-    barcodeScanner.value = '';
-    barcodeScanner.classList.remove('is-invalid');
-  });
 
   updateTotal();
 });
