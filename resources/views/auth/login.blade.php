@@ -1,46 +1,45 @@
 <x-guest-layout>
     <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+    <x-auth-session-status class="mb-6 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}">
+    <div class="mb-6 text-center">
+        <h1 class="text-2xl font-bold text-slate-800">ورود به حساب کاربری</h1>
+        <p class="mt-2 text-sm text-slate-500">لطفاً شماره تلفن و رمز عبور خود را وارد کنید.</p>
+    </div>
+
+    <form method="POST" action="{{ route('login') }}" class="space-y-5">
         @csrf
 
-        <!-- Email Address -->
+        <!-- Phone Number -->
         <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+            <x-input-label for="phone" :value="'شماره تلفن'" class="text-slate-700" />
+            <x-text-input id="phone" class="mt-2 block w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-indigo-400 focus:bg-white" type="tel" name="phone" :value="old('phone')" required autofocus autocomplete="username" dir="ltr" placeholder="09123456789" inputmode="numeric" />
+            <x-input-error :messages="$errors->get('phone')" class="mt-2 text-sm" />
         </div>
 
         <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
+        <div>
+            <x-input-label for="password" :value="'رمز عبور'" class="text-slate-700" />
 
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
+            <x-text-input id="password" type="password"
                             name="password"
+                            class="mt-2 block w-full rounded-xl border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-indigo-400 focus:bg-white"
                             required autocomplete="current-password" />
 
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+            <x-input-error :messages="$errors->get('password')" class="mt-2 text-sm" />
         </div>
 
         <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
+        <div class="block">
+            <label for="remember_me" class="inline-flex items-center gap-2 text-sm text-slate-600">
+                <input id="remember_me" type="checkbox" class="rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
+                <span>مرا به خاطر بسپار</span>
             </label>
         </div>
 
-        <div class="flex items-center justify-end mt-4">
-            @if (Route::has('password.request'))
-                <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('password.request') }}">
-                    {{ __('Forgot your password?') }}
-                </a>
-            @endif
-
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
+        <div class="pt-2">
+            <x-primary-button class="flex w-full items-center justify-center rounded-xl bg-indigo-600 py-3 text-sm font-bold normal-case tracking-normal hover:bg-indigo-700 focus:bg-indigo-700">
+                ورود
             </x-primary-button>
         </div>
     </form>
