@@ -309,6 +309,7 @@
                                 <tr>
                                     <th class="w-1"></th>
                                     <th class="nowrap w-1">#</th>
+                                    <th class="nowrap">کد</th>
                                     <th>نام</th>
                                     <th class="nowrap">SKU</th>
                                     <th class="nowrap">دسته‌بندی</th>
@@ -344,6 +345,8 @@
                                         </td>
 
                                         <td class="nowrap w-1">{{ $p->id }}</td>
+
+                                        <td class="nowrap"><span class="pill pill-gray">{{ $p->code ?: "—" }}</span></td>
 
                                         <td class="name-cell">
                                             <div class="title">{{ $p->name }}</div>

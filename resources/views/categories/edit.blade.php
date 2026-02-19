@@ -16,6 +16,12 @@
       </div>
 
       <div class="mb-3">
+        <label class="form-label">کد دسته‌بندی (۴ رقم)</label>
+        <input type="text" name="code" maxlength="4" class="form-control" value="{{ old('code', $category->code) }}" required>
+        @error('code') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+      </div>
+
+      <div class="mb-3">
         <label class="form-label">دسته والد (اختیاری)</label>
         <select name="parent_id" class="form-select">
           <option value="">— بدون والد (دسته اصلی) —</option>

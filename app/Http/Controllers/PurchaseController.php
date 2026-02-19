@@ -146,13 +146,9 @@ class PurchaseController extends Controller
             'invoice_discount_value' => ['nullable', 'integer', 'min:0'],
 
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'items.*.variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
-            'items.*.category_id' => ['nullable', 'integer', 'exists:categories,id'],
-            'items.*.name' => ['required', 'string', 'max:255'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.code' => ['required', 'string', 'max:100'],
-            'items.*.variant_name' => ['required', 'string', 'max:255'],
             'items.*.buy_price' => ['required', 'integer', 'min:0'],
             'items.*.sell_price' => ['required', 'integer', 'min:0'],
             'items.*.discount_type' => ['nullable', 'in:amount,percent'],
@@ -176,11 +172,20 @@ class PurchaseController extends Controller
             $itemDiscountAmount = $this->calculateDiscount($lineSubtotal, $itemDiscountType, $itemDiscountValue);
             $lineTotal = max(0, $lineSubtotal - $itemDiscountAmount);
 
-            $product = $this->resolveOrCreateProduct($item);
+            $product = Product::whereKey($item['product_id'])->lockForUpdate()->firstOrFail();
+            $variant = ProductVariant::where('product_id', $product->id)
+                ->whereKey($item['variant_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            $before = 0;
-            $after = 0;
-            $variant = $this->resolveOrCreateVariant($product, $item, $buyPrice, $sellPrice, $quantity, $before, $after);
+            $before = (int) $variant->stock;
+            $after = $before + $quantity;
+
+            $variant->update([
+                'buy_price' => $buyPrice,
+                'sell_price' => $sellPrice,
+                'stock' => $after,
+            ]);
 
             $this->recalcProductSummary($product);
 
@@ -193,7 +198,7 @@ class PurchaseController extends Controller
                 'stock_before' => $before,
                 'stock_after' => $after,
                 'reference' => 'PUR-' . $purchase->id,
-                'note' => 'ثبت/ویرایش خرید کالا - مدل: ' . $item['variant_name'],
+                'note' => 'ثبت/ویرایش خرید کالا - مدل: ' . $variant->variant_name,
             ]);
 
             WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $product->id, $quantity);
@@ -203,7 +208,7 @@ class PurchaseController extends Controller
                 'product_variant_id' => $variant->id,
                 'product_name' => $product->name,
                 'product_code' => $product->code ?: $product->sku,
-                'variant_name' => $item['variant_name'],
+                'variant_name' => $variant->variant_name,
                 'quantity' => $quantity,
                 'buy_price' => $buyPrice,
                 'sell_price' => $sellPrice,
@@ -247,118 +252,6 @@ class PurchaseController extends Controller
         }
 
         return min($discountValue, $baseAmount);
-    }
-
-    private function resolveOrCreateProduct(array $item): Product
-    {
-        $product = null;
-
-        if (!empty($item['product_id'])) {
-            $product = Product::whereKey($item['product_id'])->lockForUpdate()->first();
-        }
-
-        if (!$product && !empty($item['code'])) {
-            $product = Product::where('sku', $item['code'])
-                ->orWhere('code', $item['code'])
-                ->lockForUpdate()
-                ->first();
-        }
-
-        if (!$product && !empty($item['name'])) {
-            $product = Product::where('name', $item['name'])
-                ->lockForUpdate()
-                ->first();
-        }
-
-        if ($product) {
-            $product->update([
-                'name' => $item['name'],
-                'category_id' => $item['category_id'] ?? $product->category_id,
-            ]);
-
-            return $product;
-        }
-
-        $categoryId = $item['category_id'] ?? null;
-
-        if (!$categoryId) {
-            $defaultCategory = Category::query()->orderBy('id')->first();
-
-            if (!$defaultCategory) {
-                abort(422, 'برای ثبت خرید جدید، ابتدا حداقل یک دسته‌بندی کالا بسازید.');
-            }
-
-            $categoryId = $defaultCategory->id;
-        }
-
-        $category = Category::query()->whereKey($categoryId)->first();
-
-        if (!$category) {
-            abort(422, 'دسته‌بندی انتخاب‌شده برای کالا معتبر نیست.');
-        }
-
-        return Product::create([
-            'category_id' => $category->id,
-            'name' => $item['name'],
-            'sku' => $item['code'],
-            'code' => $item['code'],
-            'stock' => 0,
-            'reserved' => 0,
-            'unit' => 'عدد',
-            'price' => 0,
-        ]);
-    }
-
-    private function resolveOrCreateVariant(
-        Product $product,
-        array $item,
-        int $buyPrice,
-        int $sellPrice,
-        int $quantity,
-        int &$before,
-        int &$after
-    ): ProductVariant {
-        $variant = null;
-
-        if (!empty($item['variant_id'])) {
-            $variant = ProductVariant::where('product_id', $product->id)
-                ->where('id', $item['variant_id'])
-                ->lockForUpdate()
-                ->first();
-        }
-
-        if (!$variant) {
-            $variant = ProductVariant::where('product_id', $product->id)
-                ->where('variant_name', $item['variant_name'])
-                ->lockForUpdate()
-                ->first();
-        }
-
-        if ($variant) {
-            $before = (int) $variant->stock;
-            $after = $before + $quantity;
-
-            $variant->update([
-                'variant_name' => $item['variant_name'],
-                'buy_price' => $buyPrice,
-                'sell_price' => $sellPrice,
-                'stock' => $after,
-            ]);
-
-            return $variant;
-        }
-
-        $before = 0;
-        $after = $quantity;
-
-        return ProductVariant::create([
-            'product_id' => $product->id,
-            'variant_name' => $item['variant_name'],
-            'buy_price' => $buyPrice,
-            'sell_price' => $sellPrice,
-            'stock' => $after,
-            'reserved' => 0,
-        ]);
     }
 
     private function rollbackPurchase(Purchase $purchase): void

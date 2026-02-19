@@ -34,6 +34,7 @@ class CategoryController extends Controller
     {
         $data = $request->validate([
             'name'      => ['required','string','max:255','unique:categories,name'],
+            'code'      => ['required','digits:4','unique:categories,code'],
             'parent_id' => ['nullable','integer','exists:categories,id'],
         ]);
 
@@ -54,6 +55,7 @@ class CategoryController extends Controller
     {
         $data = $request->validate([
             'name'      => ['required','string','max:255','unique:categories,name,'.$category->id],
+            'code'      => ['required','digits:4','unique:categories,code,'.$category->id],
             'parent_id' => ['nullable','integer','exists:categories,id','not_in:'.$category->id],
         ]);
 
@@ -73,6 +75,7 @@ class CategoryController extends Controller
 {
     $data = $request->validate([
         'name'      => ['required', 'string', 'max:255', 'unique:categories,name'],
+        'code'      => ['nullable', 'digits:4', 'unique:categories,code'],
         'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
         // برای اینکه بعد از ساخت برگرده به صفحه محصولات و category انتخاب بمونه
         'redirect_to' => ['nullable', 'string'],
@@ -80,6 +83,7 @@ class CategoryController extends Controller
 
     $category = Category::create([
         'name' => $data['name'],
+        'code' => $data['code'] ?? str_pad((string) ((int) (Category::max('id') ?? 0) + 1001), 4, '0', STR_PAD_LEFT),
         'parent_id' => $data['parent_id'] ?? null,
     ]);
 
