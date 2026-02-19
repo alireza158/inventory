@@ -114,7 +114,7 @@
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">مقدار</label>
-                        <input type="number" min="0" class="form-control form-control-sm" id="invoiceDiscountValue" name="invoice_discount_value" value="{{ old('invoice_discount_value', $purchase->discount_value ?? 0) }}">
+                        <input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number" id="invoiceDiscountValue" name="invoice_discount_value" value="{{ old('invoice_discount_value', $purchase->discount_value ?? 0) }}">
                     </div>
                     <div class="col-md-7 text-end">
                         <div class="small text-muted">جمع کل قبل تخفیف: <span id="subtotalAmount">0</span> ریال</div>
@@ -138,6 +138,7 @@
     const modelLists = @json(($modelLists ?? collect())->values()->all());
     const initialItems = @json($initialItems);
 
+    const purchaseForm = document.getElementById('purchaseForm');
     const purchaseTabs = document.getElementById('purchaseTabs');
     const itemsList = document.getElementById('itemsList');
     const addBtn = document.getElementById('addRowBtn');
@@ -149,6 +150,37 @@
     const invoiceDiscountValueEl = document.getElementById('invoiceDiscountValue');
 
     let activeGroupId = null;
+
+    function normalizeText(value) {
+        return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    function isGuardOrGlassCategory(categoryId) {
+        const category = categories.find((c) => String(c.id) === String(categoryId || ''));
+        const name = normalizeText(category?.name);
+        return name.includes('گارد') || name.includes('گلس');
+    }
+
+    function parseNumericInput(value) {
+        const normalized = String(value || '')
+            .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
+            .replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
+            .replace(/[^\d]/g, '');
+        return Number(normalized || 0);
+    }
+
+    function formatNumericInput(value) {
+        return parseNumericInput(value).toLocaleString('en-US');
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
     function productOptions(selected = '') {
         return `<option value="">کالای جدید/بدون انتخاب</option>${products.map((p) =>
@@ -184,7 +216,18 @@
             options.unshift(`<option value="${normalizedSelected}" selected>${normalizedSelected}</option>`);
         }
 
-        return `<option value="">انتخاب/جستجوی مدل</option>${options.join('')}`;
+        return `<option value="">انتخاب مدل</option>${options.join('')}`;
+    }
+
+    function variantNameFieldTemplate(item = {}) {
+        const selectedCategoryId = item.category_id || '';
+        const selectedVariantName = String(item.variant_name || '');
+
+        if (isGuardOrGlassCategory(selectedCategoryId)) {
+            return `<select class="form-select form-select-sm variant-name variant-name-select" name="items[][variant_name]" required>${modelListOptions(selectedVariantName)}</select>`;
+        }
+
+        return `<input class="form-control form-control-sm variant-name variant-name-input" name="items[][variant_name]" list="purchaseModelListOptions" value="${escapeHtml(selectedVariantName)}" placeholder="نام مدل را وارد کنید" required>`;
     }
 
     function calculateDiscount(base, type, value) {
@@ -258,9 +301,7 @@
                         <select class="form-select form-select-sm variant-select" style="max-width:180px;">
                             ${variantOptions(productId, variantId)}
                         </select>
-                        <select class="form-select form-select-sm variant-name variant-name-select" name="items[][variant_name]" required>
-                            ${modelListOptions(item.variant_name || "")}
-                        </select>
+                        <div class="variant-name-wrap">${variantNameFieldTemplate(item)}</div>
                     </div>
                 </div>
                 <div class="col-md-1">
@@ -269,11 +310,11 @@
                 </div>
                 <div class="col-md-2">
                     <div class="label">قیمت خرید</div>
-                    <input type="number" min="0" class="form-control form-control-sm buy" name="items[][buy_price]" value="${item.buy_price ?? 0}" required>
+                    <input type="text" inputmode="numeric" class="form-control form-control-sm buy formatted-number" name="items[][buy_price]" value="${item.buy_price ?? 0}" required>
                 </div>
                 <div class="col-md-2">
                     <div class="label">قیمت فروش</div>
-                    <input type="number" min="0" class="form-control form-control-sm sell" name="items[][sell_price]" value="${item.sell_price ?? 0}" required>
+                    <input type="text" inputmode="numeric" class="form-control form-control-sm sell formatted-number" name="items[][sell_price]" value="${item.sell_price ?? 0}" required>
                 </div>
                 <div class="col-md-1">
                     <div class="label">نوع تخفیف</div>
@@ -285,7 +326,7 @@
                 </div>
                 <div class="col-md-1">
                     <div class="label">مقدار تخفیف</div>
-                    <input type="number" min="0" class="form-control form-control-sm discount-value" name="items[][discount_value]" value="${rowDiscountValue}">
+                    <input type="text" inputmode="numeric" class="form-control form-control-sm discount-value formatted-number" name="items[][discount_value]" value="${rowDiscountValue}">
                 </div>
                 <div class="col-md-1">
                     <div class="label">جمع نهایی</div>
@@ -317,6 +358,13 @@
             const variantSelect = row.querySelector('.variant-select');
             const currentVariantId = row.querySelector('.variant-id').value || '';
             variantSelect.innerHTML = variantOptions(productId, currentVariantId);
+
+            const variantNameWrap = row.querySelector('.variant-name-wrap');
+            const currentVariantName = row.querySelector('.variant-name')?.value || '';
+            if (variantNameWrap) {
+                variantNameWrap.innerHTML = variantNameFieldTemplate({ category_id: categoryId, variant_name: currentVariantName });
+                initModelSelect(variantNameWrap.querySelector('.variant-name-select'));
+            }
         });
     }
 
@@ -331,7 +379,13 @@
             width: '100%',
             dir: 'rtl',
             placeholder: 'مدل را جستجو یا انتخاب کنید',
-            tags: true,
+            tags: false,
+        });
+    }
+
+    function formatPriceInputs(scope = document) {
+        scope.querySelectorAll('.formatted-number').forEach((el) => {
+            el.value = formatNumericInput(el.value);
         });
     }
 
@@ -373,11 +427,11 @@
 
         itemsList.querySelectorAll('[data-row]').forEach((row) => {
             const qty = Number(row.querySelector('.qty')?.value || 0);
-            const buy = Number(row.querySelector('.buy')?.value || 0);
+            const buy = parseNumericInput(row.querySelector('.buy')?.value || 0);
             const lineSubtotal = qty * buy;
 
             const discountType = row.querySelector('.row-discount-type')?.value || '';
-            const discountValue = Number(row.querySelector('.discount-value')?.value || 0);
+            const discountValue = parseNumericInput(row.querySelector('.discount-value')?.value || 0);
             const rowDiscount = calculateDiscount(lineSubtotal, discountType, discountValue);
 
             const lineTotal = Math.max(0, lineSubtotal - rowDiscount);
@@ -391,7 +445,7 @@
         const invoiceDiscount = calculateDiscount(
             baseAfterRows,
             invoiceDiscountTypeEl.value,
-            Number(invoiceDiscountValueEl.value || 0)
+            parseNumericInput(invoiceDiscountValueEl.value || 0)
         );
 
         const totalDiscount = itemDiscountTotal + invoiceDiscount;
@@ -423,6 +477,7 @@
         modelsWrap.insertAdjacentHTML('beforeend', modelRowTemplate(item));
         const modelSelect = modelsWrap.querySelector('[data-row]:last-child .variant-name-select');
         initModelSelect(modelSelect);
+        formatPriceInputs(modelsWrap);
         syncGroupFieldsToRows(groupEl);
         reindexRows();
         recalc();
@@ -492,7 +547,7 @@
                 const variantNameEl = row.querySelector('.variant-name');
                 const variantName = opt.dataset.name || '';
 
-                if (variantNameEl && variantName && !Array.from(variantNameEl.options).some((option) => option.value === variantName)) {
+                if (variantNameEl && variantName && variantNameEl.tagName === 'SELECT' && !Array.from(variantNameEl.options).some((option) => option.value === variantName)) {
                     variantNameEl.insertAdjacentHTML('beforeend', `<option value="${variantName}">${variantName}</option>`);
                 }
 
@@ -503,8 +558,8 @@
                     }
                 }
 
-                row.querySelector('.buy').value = opt.dataset.buy || 0;
-                row.querySelector('.sell').value = opt.dataset.sell || 0;
+                row.querySelector('.buy').value = formatNumericInput(opt.dataset.buy || 0);
+                row.querySelector('.sell').value = formatNumericInput(opt.dataset.sell || 0);
             }
 
             recalc();
@@ -528,6 +583,11 @@
             e.target.classList.contains('sell') ||
             e.target.classList.contains('discount-value')
         ) {
+            if (e.target.classList.contains('formatted-number')) {
+                const atEnd = e.target.selectionStart === e.target.value.length;
+                e.target.value = formatNumericInput(e.target.value);
+                if (atEnd) e.target.setSelectionRange(e.target.value.length, e.target.value.length);
+            }
             recalc();
         }
 
@@ -584,11 +644,19 @@
     invoiceDiscountTypeEl.addEventListener('change', recalc);
     invoiceDiscountValueEl.addEventListener('input', recalc);
 
+    purchaseForm.addEventListener('submit', () => {
+        purchaseForm.querySelectorAll('.formatted-number').forEach((el) => {
+            el.value = parseNumericInput(el.value);
+        });
+    });
+
     if (Array.isArray(initialItems) && initialItems.length > 0) {
         buildGroupsFromInitialItems(initialItems);
     } else {
         addProductGroup({}, true);
     }
+
+    formatPriceInputs(document);
 })();
 </script>
 @endsection

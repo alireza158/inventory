@@ -16,6 +16,7 @@
         return [
             'id' => $c->id,
             'name' => $c->name,
+            'parent_id' => $c->parent_id,
         ];
     })->values();
 
@@ -112,6 +113,7 @@
                         <table class="table align-middle" id="itemsTable">
                             <thead>
                                 <tr>
+                                    <th>سردسته</th>
                                     <th>دسته‌بندی</th>
                                     <th>کالا</th>
                                     <th>تعداد</th>
@@ -170,15 +172,36 @@
             .join('');
     }
 
+    function rootCategoryOptions(selectedId = '') {
+        const roots = categories.filter((c) => !c.parent_id);
+        return `<option value="">انتخاب...</option>${roots.map((c) => `<option value="${c.id}" ${String(selectedId) === String(c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}`;
+    }
+
+    function childCategoryOptions(parentId, selectedId = '') {
+        const children = categories.filter((c) => String(c.parent_id || '') === String(parentId || ''));
+        return `<option value="">انتخاب...</option>${children.map((c) => `<option value="${c.id}" ${String(selectedId) === String(c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}`;
+    }
+
+    function resolveParentCategoryId(categoryId) {
+        const current = categories.find((c) => String(c.id) === String(categoryId || ''));
+        if (!current) return '';
+        return current.parent_id || current.id;
+    }
+
     function rowTemplate(i, item = null) {
         const selectedCategoryId = item?.category_id || '';
+        const selectedParentId = resolveParentCategoryId(selectedCategoryId);
         const selectedProductId = item?.product_id || '';
 
         return `<tr>
             <td>
+                <select class="form-select root-category-select" data-row="${i}" required>
+                    ${rootCategoryOptions(selectedParentId)}
+                </select>
+            </td>
+            <td>
                 <select name="items[${i}][category_id]" class="form-select category-select" data-row="${i}" required>
-                    <option value="">انتخاب...</option>
-                    ${categories.map(c => `<option value="${c.id}" ${String(selectedCategoryId) === String(c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}
+                    ${childCategoryOptions(selectedParentId, selectedCategoryId)}
                 </select>
             </td>
             <td>
@@ -193,6 +216,18 @@
     }
 
     function bindCategoryEvents() {
+        tbody.querySelectorAll('.root-category-select').forEach((select) => {
+            if (select.dataset.bound === '1') return;
+            select.dataset.bound = '1';
+            select.addEventListener('change', (e) => {
+                const tr = e.target.closest('tr');
+                const categorySelect = tr.querySelector('.category-select');
+                const productSelect = tr.querySelector('.product-select');
+                categorySelect.innerHTML = childCategoryOptions(e.target.value, '');
+                productSelect.innerHTML = productOptions('', null);
+            });
+        });
+
         tbody.querySelectorAll('.category-select').forEach((select) => {
             if (select.dataset.bound === '1') return;
             select.dataset.bound = '1';
