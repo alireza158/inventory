@@ -11,5 +11,6 @@ class ModelList extends Model
 
     protected $fillable = [
         'model_name',
+        'code',
     ];
 }

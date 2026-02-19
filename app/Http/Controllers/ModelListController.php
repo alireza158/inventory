@@ -22,10 +22,13 @@ class ModelListController extends Controller
     {
         $data = $request->validate([
             'model_name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'digits:4', 'unique:model_lists,code'],
         ]);
 
         ModelList::firstOrCreate([
             'model_name' => trim($data['model_name']),
+        ], [
+            'code' => $data['code'],
         ]);
 
         return back()->with('success', 'مدل با موفقیت ذخیره شد.');

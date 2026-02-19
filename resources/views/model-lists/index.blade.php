@@ -10,6 +10,8 @@
         <form method="POST" action="{{ route('model-lists.store') }}" class="row g-2">
           @csrf
           <div class="col-12">
+            <label class="form-label">کد مدل (۴ رقم)</label>
+            <input name="code" class="form-control mb-2" maxlength="4" value="{{ old('code') }}" placeholder="مثلاً 0016" required>
             <label class="form-label">مدل کامل</label>
             <input name="model_name" class="form-control" value="{{ old('model_name') }}" placeholder="مثلاً Samsung S24 Ultra 256GB" required>
             <div class="form-text">مدل را کامل وارد کنید (برند + نام + عدد/نسخه).</div>
@@ -41,12 +43,14 @@
           <table class="table table-sm align-middle">
             <thead>
               <tr>
+                <th>کد</th>
                 <th>مدل کامل</th>
               </tr>
             </thead>
             <tbody>
               @forelse($modelLists as $item)
                 <tr>
+                  <td><span class="badge bg-light text-dark">{{ $item->code ?: "—" }}</span></td>
                   <td class="fw-semibold">{{ $item->model_name }}</td>
                 </tr>
               @empty
