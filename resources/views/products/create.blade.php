@@ -5,208 +5,75 @@
   <div class="card-body">
     <h5 class="mb-3">افزودن محصول</h5>
 
-    @if($categories->count() === 0)
-      <div class="alert alert-warning">
-        هنوز دسته‌بندی ندارید. اول یک دسته‌بندی بسازید.
-        <a class="ms-2" href="{{ route('categories.create') }}">ساخت دسته‌بندی</a>
-      </div>
-    @endif
-
     <form method="POST" action="{{ route('products.store') }}">
       @csrf
-
       <div class="row g-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label class="form-label">نام محصول</label>
-          <input name="name" class="form-control" value="{{ old('name') }}" placeholder="مثلاً گارد آیفون">
+          <input name="name" class="form-control" value="{{ old('name') }}" required>
         </div>
-
-        <div class="col-md-6">
-          <label class="form-label">SKU (شناسه)</label>
-          <input name="sku" class="form-control" value="{{ old('sku') }}" placeholder="مثلاً ARIYA-6404">
-        </div>
-
-
-
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label class="form-label">دسته‌بندی</label>
-          <select name="category_id" class="form-select">
+          <select name="category_id" class="form-select" required>
             <option value="">انتخاب کنید</option>
             @foreach($categories as $cat)
-              <option value="{{ $cat->id }}" @selected(old('category_id') == $cat->id)>
-                {{ $cat->name }}
-              </option>
+              <option value="{{ $cat->id }}" @selected(old('category_id')==$cat->id)>{{ $cat->name }} ({{ $cat->code }})</option>
             @endforeach
           </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">SKU (اختیاری)</label>
+          <input name="sku" class="form-control" value="{{ old('sku') }}">
         </div>
       </div>
 
       <hr class="my-4">
-
-      <div class="d-flex align-items-center justify-content-between mb-2">
-        <h6 class="mb-0">مدل‌ها (Variant)</h6>
-        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addVariantRow()">
-          + افزودن مدل
-        </button>
+      <div class="d-flex justify-content-between mb-2">
+        <h6 class="mb-0">مدل/تنوع/طرح</h6>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addVariantRow()">+ افزودن ردیف</button>
       </div>
 
+      <table class="table table-sm" id="variantsTable">
+        <thead><tr><th>مدل لیست</th><th>عنوان طرح/رنگ</th><th>کد طرح</th><th>کد نهایی</th><th>فروش</th><th>خرید</th><th>موجودی</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
 
-      @php
-        $rawModelListItems = is_iterable($modelListOptions)
-          ? $modelListOptions
-          : (is_string($modelListOptions) ? array_filter(array_map('trim', explode(',', $modelListOptions))) : []);
-
-        $modelListItems = collect($rawModelListItems)
-          ->flatMap(function ($item) {
-            if (is_array($item) && isset($item['label'])) {
-              return [$item['label']];
-            }
-
-            if (is_object($item) && isset($item->label)) {
-              return [$item->label];
-            }
-
-            if (is_string($item)) {
-              return [$item];
-            }
-
-            if (is_iterable($item)) {
-              return collect($item)
-                ->map(function ($nestedItem) {
-                  if (is_array($nestedItem) && isset($nestedItem['label'])) {
-                    return $nestedItem['label'];
-                  }
-
-                  if (is_object($nestedItem) && isset($nestedItem->label)) {
-                    return $nestedItem->label;
-                  }
-
-                  return is_string($nestedItem) ? $nestedItem : null;
-                });
-            }
-
-            return [];
-          })
-          ->filter()
-          ->values()
-          ->all();
-      @endphp
-
-      <datalist id="modelListOptions">
-        @foreach($modelListItems as $model)
-          <option value="{{ $model }}"></option>
-        @endforeach
-      </datalist>
-
-      <div class="table-responsive">
-        <table class="table table-sm align-middle" id="variantsTable">
-          <thead>
-            <tr>
-              <th>نام مدل</th>
-              <th style="width:180px;">قیمت فروش</th>
-              <th style="width:180px;">قیمت خرید</th>
-              <th style="width:140px;">موجودی</th>
-              <th style="width:60px;"></th>
-            </tr>
-          </thead>
-          <tbody>
-            @php
-              $oldVariantsRaw = old('variants', []);
-              $oldVariants = is_array($oldVariantsRaw) ? $oldVariantsRaw : [];
-            @endphp
-            @foreach($oldVariants as $i => $v)
-              <tr>
-                <td>
-                  <select class="form-select model-select" name="variants[{{ $i }}][variant_name]" required>
-                    @if(!empty($v['variant_name']))
-                      <option value="{{ $v['variant_name'] }}" selected>{{ $v['variant_name'] }}</option>
-                    @endif
-                    @foreach($modelListItems as $model)
-                      <option value="{{ $model }}">{{ $model }}</option>
-                    @endforeach
-                  </select>
-                </td>
-                <td><input class="form-control" type="number" min="0" name="variants[{{ $i }}][sell_price]" value="{{ $v['sell_price'] ?? 0 }}"></td>
-                <td><input class="form-control" type="number" min="0" name="variants[{{ $i }}][buy_price]" value="{{ $v['buy_price'] ?? '' }}"></td>
-                <td><input class="form-control" type="number" min="0" name="variants[{{ $i }}][stock]" value="{{ $v['stock'] ?? 0 }}"></td>
-                <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">×</button></td>
-              </tr>
-            @endforeach
-          </tbody>
-        </table>
-      </div>
-
-      <div class="d-flex gap-2 mt-4">
-        <button class="btn btn-primary" @disabled($categories->count() === 0)>ثبت</button>
-        <a class="btn btn-outline-secondary" href="{{ route('products.index') }}">بازگشت</a>
-      </div>
+      <button class="btn btn-primary">ثبت</button>
     </form>
   </div>
 </div>
-
 <script>
-let variantIndex = {{ count(is_array(old('variants')) ? old('variants') : []) }};
-const modelOptions = @json(collect($modelListItems)->values());
-
-function buildModelOptionsHtml(selected = '') {
-  let html = '<option value=""></option>';
-  for (const model of modelOptions) {
-    const isSelected = model === selected ? 'selected' : '';
-    html += `<option value="${model}" ${isSelected}>${model}</option>`;
-  }
-
-  if (selected && !modelOptions.includes(selected)) {
-    html += `<option value="${selected}" selected>${selected}</option>`;
-  }
-
-  return html;
-}
-
-function initModelSelects(context = document) {
-  if (!window.jQuery || !$.fn.select2) return;
-
-  $(context).find('.model-select').each(function () {
-    if ($(this).hasClass('select2-hidden-accessible')) {
-      return;
-    }
-
-    $(this).select2({
-      width: '100%',
-      placeholder: 'جستجو یا انتخاب مدل...',
-      allowClear: true,
-      tags: true,
-      dir: 'rtl',
-      language: {
-        noResults: () => 'مدلی پیدا نشد',
-        searching: () => 'در حال جستجو...'
-      }
-    });
-  });
-}
-
-function addVariantRow() {
-  const tbody = document.querySelector('#variantsTable tbody');
-  const i = variantIndex++;
-
+const modelOptions = @json($modelListOptions);
+let idx = 0;
+function code12(cat, model, variety){ return `${cat||'0000'}${model||'0000'}${variety||'0000'}`; }
+function addVariantRow(data = {}) {
+  const tb = document.querySelector('#variantsTable tbody');
+  const i = idx++;
+  const options = modelOptions.map(m => `<option value="${m.id}" data-code="${m.code}" ${String(data.model_list_id||'')===String(m.id)?'selected':''}>${m.model_name} (${m.code||'----'})</option>`).join('');
   const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>
-      <select class="form-select model-select" name="variants[${i}][variant_name]" required>
-        ${buildModelOptionsHtml('')}
-      </select>
-    </td>
-    <td><input class="form-control" type="number" min="0" name="variants[${i}][sell_price]" value="0"></td>
-    <td><input class="form-control" type="number" min="0" name="variants[${i}][buy_price]" value=""></td>
-    <td><input class="form-control" type="number" min="0" name="variants[${i}][stock]" value="0"></td>
-    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">×</button></td>
-  `;
-  tbody.appendChild(tr);
-  initModelSelects(tr);
+  tr.innerHTML = `<td><select class="form-select model" name="variants[${i}][model_list_id]" required><option value="">انتخاب</option>${options}</select></td>
+  <td><input class="form-control vname" name="variants[${i}][variant_name]" value="${data.variant_name||''}" required></td>
+  <td><input class="form-control variety" maxlength="4" name="variants[${i}][variety_code]" value="${data.variety_code||''}" required></td>
+  <td><input class="form-control final" readonly><input type="hidden" class="variety-name" name="variants[${i}][variety_name]" value="${data.variety_name||''}"></td>
+  <td><input class="form-control" type="number" name="variants[${i}][sell_price]" value="${data.sell_price||0}" min="0" required></td>
+  <td><input class="form-control" type="number" name="variants[${i}][buy_price]" value="${data.buy_price||''}" min="0"></td>
+  <td><input class="form-control" type="number" name="variants[${i}][stock]" value="${data.stock||0}" min="0" required></td>
+  <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">×</button></td>`;
+  tb.appendChild(tr);
+  tr.addEventListener('input', ()=>refreshRow(tr));
+  tr.addEventListener('change', ()=>refreshRow(tr));
+  refreshRow(tr);
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  initModelSelects(document);
-});
-
+function refreshRow(tr){
+  const catCode = (document.querySelector('select[name="category_id"]')?.selectedOptions[0]?.textContent.match(/\((\d{4})\)/)||[])[1] || '0000';
+  const modelCode = tr.querySelector('.model')?.selectedOptions[0]?.dataset.code || '0000';
+  const varietyCode = (tr.querySelector('.variety').value||'').padStart(4,'0').slice(-4);
+  tr.querySelector('.final').value = code12(catCode, modelCode, varietyCode);
+  tr.querySelector('.variety-name').value = tr.querySelector('.vname').value;
+}
+document.querySelector('select[name="category_id"]').addEventListener('change', ()=>document.querySelectorAll('#variantsTable tbody tr').forEach(refreshRow));
+@php $oldVariants = old('variants', []); @endphp
+const oldVariants = @json($oldVariants);
+if (oldVariants.length) oldVariants.forEach(addVariantRow); else addVariantRow();
 </script>
 @endsection

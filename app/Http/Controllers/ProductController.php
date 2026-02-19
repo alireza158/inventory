@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Product;
 use App\Models\Category;
-use App\Models\ProductVariant;
 use App\Models\ModelList;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Services\CrmProductSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Services\CrmProductSyncService;
 
 class ProductController extends Controller
 {
@@ -20,7 +20,7 @@ class ProductController extends Controller
             $q = $request->q;
             $query->where(function ($qq) use ($q) {
                 $qq->where('name', 'like', "%{$q}%")
-                   ->orWhere('sku', 'like', "%{$q}%");
+                    ->orWhere('code', 'like', "%{$q}%");
             });
         }
 
@@ -33,13 +33,11 @@ class ProductController extends Controller
         }
 
         if ($request->filled('min_price')) {
-            $min = (int) preg_replace('/[^\d]/', '', $request->min_price);
-            $query->where('price', '>=', $min);
+            $query->where('price', '>=', (int) preg_replace('/[^\d]/', '', $request->min_price));
         }
 
         if ($request->filled('max_price')) {
-            $max = (int) preg_replace('/[^\d]/', '', $request->max_price);
-            $query->where('price', '<=', $max);
+            $query->where('price', '<=', (int) preg_replace('/[^\d]/', '', $request->max_price));
         }
 
         $products = $query->orderByDesc('id')->paginate(20)->withQueryString();
@@ -50,77 +48,80 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('products.index', compact('products', 'categoryTree'));
+        $categories = Category::query()->orderBy('name')->get();
+        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('model_name')->get(['id', 'model_name', 'code']);
+
+        return view('products.index', compact('products', 'categoryTree', 'categories', 'modelLists'));
     }
 
     public function create()
     {
-        $categories = Category::orderBy('name')->get();
-        $modelListOptions = ModelList::query()
-            ->orderBy('model_name')
-            ->pluck('model_name')
-            ->values()
-            ->all();
-
-        return view('products.create', compact('categories', 'modelListOptions'));
+        return redirect()->route('products.index');
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
-            'name'        => ['required', 'string', 'max:255'],
-            'sku'         => ['required', 'string', 'max:80', 'unique:products,sku'],
-
-            // variants (اختیاری)
-            'variants'                 => ['nullable', 'array'],
-            'variants.*.variant_name'  => ['required_with:variants', 'string', 'max:255'],
-            'variants.*.sell_price'    => ['required_with:variants', 'integer', 'min:0'],
-            'variants.*.buy_price'     => ['nullable', 'integer', 'min:0'],
-            'variants.*.stock'         => ['required_with:variants', 'integer', 'min:0'],
+            'name' => ['required', 'string', 'max:255'],
+            'model_list_ids' => ['required', 'array', 'min:1'],
+            'model_list_ids.*' => ['integer', 'exists:model_lists,id'],
+            'design_count' => ['required', 'integer', 'min:1', 'max:20'],
+            'buy_price' => ['nullable', 'integer', 'min:0'],
+            'sell_price' => ['nullable', 'integer', 'min:0'],
         ]);
 
         DB::transaction(function () use ($data) {
+            $category = Category::query()->findOrFail($data['category_id']);
             $product = Product::create([
-                'category_id' => $data['category_id'],
-                'name'        => $data['name'],
-                'sku'         => $data['sku'],
-
-                // بعداً با variants پر می‌شود
-                'stock'       => 0,
-                'price'       => 0,
+                'category_id' => $category->id,
+                'name' => trim($data['name']),
+                'sku' => 'AUTO-' . now()->format('YmdHis') . '-' . random_int(100, 999),
+                'code' => $this->generateProductCode($category),
+                'stock' => 0,
+                'price' => 0,
             ]);
 
-            $variants = $data['variants'] ?? [];
+            $modelLists = ModelList::query()->whereIn('id', $data['model_list_ids'])->get()->keyBy('id');
 
-            foreach ($variants as $v) {
-                ProductVariant::create([
-                    'product_id'   => $product->id,
-                    'variant_name' => $v['variant_name'],
-                    'sell_price'   => (int) $v['sell_price'],
-                    'buy_price'    => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
-                    'stock'        => (int) $v['stock'],
-                    'reserved'     => 0,
-                ]);
+            foreach ($data['model_list_ids'] as $modelListId) {
+                $model = $modelLists->get((int) $modelListId);
+                if (!$model || !$model->code) {
+                    continue;
+                }
 
-                $this->syncVariantWithModelList($v['variant_name']);
+                for ($i = 1; $i <= (int) $data['design_count']; $i++) {
+                    $varietyCode = str_pad((string) $i, 4, '0', STR_PAD_LEFT);
+                    $varietyName = 'طرح ' . $i;
+                    $variantCode = $this->generateVariantCode($category->code, $model->code, $varietyCode);
+
+                    ProductVariant::create([
+                        'product_id' => $product->id,
+                        'model_list_id' => $model->id,
+                        'variant_name' => $model->model_name . ' ' . $varietyName,
+                        'variety_name' => $varietyName,
+                        'variety_code' => $varietyCode,
+                        'variant_code' => $variantCode,
+                        'sku' => $variantCode,
+                        'sell_price' => (int) ($data['sell_price'] ?? 0),
+                        'buy_price' => isset($data['buy_price']) ? (int) $data['buy_price'] : null,
+                        'stock' => 0,
+                        'reserved' => 0,
+                    ]);
+                }
             }
 
             $this->recalcProductSummary($product);
         });
 
-        return redirect()->route('products.index')->with('success', 'محصول با موفقیت ثبت شد.');
+        return redirect()->route('products.index')->with('success', 'محصول و تنوع‌ها با موفقیت ساخته شدند.');
     }
 
     public function edit(Product $product)
     {
         $product->load('variants');
         $categories = Category::orderBy('name')->get();
-        $modelListOptions = ModelList::query()
-            ->orderBy('model_name')
-            ->pluck('model_name')
-            ->values()
-            ->all();
+        $modelListOptions = ModelList::query()->orderBy('model_name')->get(['id', 'model_name', 'code']);
 
         return view('products.edit', compact('product', 'categories', 'modelListOptions'));
     }
@@ -129,66 +130,54 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
-            'name'        => ['required', 'string', 'max:255'],
-            'sku'         => ['required', 'string', 'max:80', 'unique:products,sku,' . $product->id],
-
-            // variants
-            'variants'                 => ['nullable', 'array'],
-
-            // id برای update ردیف‌های قبلی
-            'variants.*.id'            => ['nullable', 'integer', 'exists:product_variants,id'],
-
-            'variants.*.variant_name'  => ['required_with:variants', 'string', 'max:255'],
-            'variants.*.sell_price'    => ['required_with:variants', 'integer', 'min:0'],
-            'variants.*.buy_price'     => ['nullable', 'integer', 'min:0'],
-            'variants.*.stock'         => ['required_with:variants', 'integer', 'min:0'],
+            'name' => ['required', 'string', 'max:255'],
+            'variants' => ['required', 'array', 'min:1'],
+            'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
+            'variants.*.variant_name' => ['required', 'string', 'max:255'],
+            'variants.*.model_list_id' => ['required', 'integer', 'exists:model_lists,id'],
+            'variants.*.variety_name' => ['required', 'string', 'max:255'],
+            'variants.*.variety_code' => ['required', 'digits:4'],
+            'variants.*.sell_price' => ['required', 'integer', 'min:0'],
+            'variants.*.buy_price' => ['nullable', 'integer', 'min:0'],
+            'variants.*.stock' => ['required', 'integer', 'min:0'],
         ]);
 
         DB::transaction(function () use ($data, $product) {
+            $category = Category::findOrFail($data['category_id']);
             $product->update([
-                'category_id' => $data['category_id'],
-                'name'        => $data['name'],
-                'sku'         => $data['sku'],
+                'category_id' => $category->id,
+                'name' => $data['name'],
+                'code' => $product->code ?: $this->generateProductCode($category),
             ]);
 
-            $incoming = $data['variants'] ?? [];
-
-            // ids که از فرم آمده (برای تشخیص حذف)
             $keepIds = [];
-
-            foreach ($incoming as $v) {
+            foreach ($data['variants'] as $v) {
+                $model = ModelList::findOrFail($v['model_list_id']);
                 $payload = [
                     'variant_name' => $v['variant_name'],
-                    'sell_price'   => (int) $v['sell_price'],
-                    'buy_price'    => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
-                    'stock'        => (int) $v['stock'],
+                    'model_list_id' => $model->id,
+                    'variety_name' => $v['variety_name'],
+                    'variety_code' => $v['variety_code'],
+                    'variant_code' => $this->generateVariantCode($category->code, $model->code, $v['variety_code'], $v['id'] ?? null),
+                    'sku' => $this->generateVariantCode($category->code, $model->code, $v['variety_code'], $v['id'] ?? null),
+                    'sell_price' => (int) $v['sell_price'],
+                    'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
+                    'stock' => (int) $v['stock'],
                 ];
 
-                $this->syncVariantWithModelList($v['variant_name']);
-
                 if (!empty($v['id'])) {
-                    $variant = ProductVariant::where('product_id', $product->id)
-                        ->where('id', $v['id'])
-                        ->first();
-
+                    $variant = ProductVariant::where('product_id', $product->id)->where('id', $v['id'])->first();
                     if ($variant) {
                         $variant->update($payload);
                         $keepIds[] = $variant->id;
                     }
                 } else {
-                    $variant = ProductVariant::create(array_merge($payload, [
-                        'product_id' => $product->id,
-                        'reserved'   => 0,
-                    ]));
+                    $variant = ProductVariant::create(array_merge($payload, ['product_id' => $product->id, 'reserved' => 0]));
                     $keepIds[] = $variant->id;
                 }
             }
 
-            // حذف variantهایی که دیگر در فرم نیستند
-            ProductVariant::where('product_id', $product->id)
-                ->when(count($keepIds) > 0, fn($q) => $q->whereNotIn('id', $keepIds))
-                ->delete();
-
+            ProductVariant::where('product_id', $product->id)->when(count($keepIds) > 0, fn ($q) => $q->whereNotIn('id', $keepIds))->delete();
             $this->recalcProductSummary($product);
         });
 
@@ -207,10 +196,7 @@ class ProductController extends Controller
 
         if ($request->filled('q')) {
             $q = $request->q;
-            $query->where(function ($qq) use ($q) {
-                $qq->where('name', 'like', "%{$q}%")
-                   ->orWhere('sku', 'like', "%{$q}%");
-            });
+            $query->where(fn ($qq) => $qq->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%"));
         }
 
         if ($request->filled('category_id')) {
@@ -233,32 +219,48 @@ class ProductController extends Controller
         $product->load('variants');
 
         if ($product->variants->count() === 0) {
-            $product->update([
-                'stock' => 0,
-                'price' => 0,
-            ]);
+            $product->update(['stock' => 0, 'price' => 0]);
             return;
         }
 
-        $stock = (int) $product->variants->sum('stock');
-        $minPrice = (int) $product->variants->min('sell_price');
-
         $product->update([
-            'stock' => max(0, $stock),
-            'price' => max(0, $minPrice),
+            'stock' => max(0, (int) $product->variants->sum('stock')),
+            'price' => max(0, (int) $product->variants->min('sell_price')),
         ]);
     }
 
-
-    private function syncVariantWithModelList(?string $variantName): void
+    private function generateVariantCode(string $categoryCode, string $modelCode, string $varietyCode, ?int $ignoreId = null): string
     {
-        $modelName = trim((string) $variantName);
-        if ($modelName === '') {
-            return;
+        $base = $categoryCode . $modelCode . $varietyCode;
+        $code = $base;
+        $counter = 1;
+
+        while (ProductVariant::query()
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->where('variant_code', $code)
+            ->exists()) {
+            $code = substr($base, 0, 10) . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
+            $counter++;
         }
 
-        ModelList::firstOrCreate([
-            'model_name' => $modelName,
-        ]);
+        return $code;
+    }
+
+    private function generateProductCode(Category $category): string
+    {
+        $base = $category->code ?: '0000';
+
+        $lastCode = Product::query()
+            ->where('category_id', $category->id)
+            ->where('code', 'like', $base . '%')
+            ->orderByDesc('id')
+            ->value('code');
+
+        $next = 1;
+        if ($lastCode && strlen($lastCode) >= 8) {
+            $next = ((int) substr($lastCode, -4)) + 1;
+        }
+
+        return $base . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 }
