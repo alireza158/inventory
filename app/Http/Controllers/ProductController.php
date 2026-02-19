@@ -42,11 +42,7 @@ class ProductController extends Controller
 
         $products = $query->orderByDesc('id')->paginate(20)->withQueryString();
 
-        $categoryTree = Category::query()
-            ->whereNull('parent_id')
-            ->with(['children.children.children'])
-            ->orderBy('name')
-            ->get();
+        $categoryTree = Category::query()->whereNull('parent_id')->with(['children.children.children'])->orderBy('name')->get();
 
         $categories = Category::query()->orderBy('name')->get();
         $modelLists = ModelList::query()->whereNotNull('code')->orderBy('model_name')->get(['id', 'model_name', 'code']);
@@ -193,12 +189,10 @@ class ProductController extends Controller
     public function priceList(Request $request)
     {
         $query = Product::query()->with('category');
-
         if ($request->filled('q')) {
             $q = $request->q;
             $query->where(fn ($qq) => $qq->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%"));
         }
-
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->category_id);
         }
@@ -210,14 +204,12 @@ class ProductController extends Controller
     public function syncCrm(CrmProductSyncService $service)
     {
         $res = $service->sync();
-        return redirect()->route('products.index')
-            ->with('success', "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']}");
+        return redirect()->route('products.index')->with('success', "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']}");
     }
 
     private function recalcProductSummary(Product $product): void
     {
         $product->load('variants');
-
         if ($product->variants->count() === 0) {
             $product->update(['stock' => 0, 'price' => 0]);
             return;
