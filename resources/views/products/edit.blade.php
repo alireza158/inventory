@@ -7,7 +7,6 @@
 <div class="row g-3">
 <div class="col-md-4"><label class="form-label">نام محصول</label><input name="name" class="form-control" value="{{ old('name',$product->name) }}" required></div>
 <div class="col-md-4"><label class="form-label">دسته‌بندی</label><select name="category_id" class="form-select" required><option value="">انتخاب</option>@foreach($categories as $cat)<option value="{{ $cat->id }}" @selected(old('category_id',$product->category_id)==$cat->id)>{{ $cat->name }} ({{ $cat->code }})</option>@endforeach</select></div>
-<div class="col-md-4"><label class="form-label">SKU</label><input name="sku" class="form-control" value="{{ old('sku',$product->sku) }}" required></div>
 </div><hr>
 <div class="d-flex justify-content-between mb-2"><h6>مدل/تنوع/طرح</h6><button type="button" class="btn btn-sm btn-outline-primary" onclick="addVariantRow()">+ افزودن</button></div>
 <table class="table table-sm" id="variantsTable"><thead><tr><th>مدل لیست</th><th>عنوان طرح/رنگ</th><th>کد طرح</th><th>کد نهایی</th><th>فروش</th><th>خرید</th><th>موجودی</th><th></th></tr></thead><tbody></tbody></table>

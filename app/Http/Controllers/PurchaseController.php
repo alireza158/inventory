@@ -207,7 +207,7 @@ class PurchaseController extends Controller
                 'product_id' => $product->id,
                 'product_variant_id' => $variant->id,
                 'product_name' => $product->name,
-                'product_code' => $product->code ?: $product->sku,
+                'product_code' => $product->code,
                 'variant_name' => $variant->variant_name,
                 'quantity' => $quantity,
                 'buy_price' => $buyPrice,
