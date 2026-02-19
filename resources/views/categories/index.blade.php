@@ -46,6 +46,7 @@
                             <thead>
                                 <tr>
                                     <th>#</th>
+                                    <th>کد</th>
                                     <th>نام</th>
                                     <th>والد</th>
                                     <th class="text-end">عملیات</th>
@@ -55,6 +56,7 @@
                                 @foreach($categories as $cat)
                                     <tr>
                                         <td>{{ $cat->id }}</td>
+                                        <td><span class="badge bg-light text-dark">{{ $cat->code ?: "—" }}</span></td>
                                         <td class="fw-semibold">{{ $cat->name }}</td>
                                         <td>{{ $cat->parent?->name ?: '—' }}</td>
                                         <td class="text-end">

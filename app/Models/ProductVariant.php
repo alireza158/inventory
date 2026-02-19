@@ -9,6 +9,10 @@ class ProductVariant extends Model
     protected $fillable = [
         'product_id',
         'variant_name',
+        'model_list_id',
+        'variety_name',
+        'variety_code',
+        'variant_code',
         'variety_id',
         'unique_key',
         'sku',
@@ -33,6 +37,11 @@ class ProductVariant extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function modelList()
+    {
+        return $this->belongsTo(ModelList::class);
     }
 
     public function getAvailableStockAttribute(): int

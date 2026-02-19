@@ -218,6 +218,8 @@
                         دسته‌بندی‌ها
                     </button>
 
+                    <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن محصول</a>
+
                     <form method="POST" action="{{ route('products.sync.crm') }}">
                         @csrf
                         <button class="btn btn-outline-success">Sync از CRM</button>
@@ -243,8 +245,8 @@
 
                     <div class="row g-3 align-items-end">
                         <div class="col-lg-5">
-                            <label class="form-label">جستجو (نام یا SKU)</label>
-                            <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً کابل یا KB-1001">
+                            <label class="form-label">جستجو (نام یا کد)</label>
+                            <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً گارد یا 10010001">
                         </div>
 
                         <div class="col-lg-3">
@@ -309,9 +311,9 @@
                                 <tr>
                                     <th class="w-1"></th>
                                     <th class="nowrap w-1">#</th>
+                                    <th class="nowrap">کد</th>
                                     <th>نام</th>
-                                    <th class="nowrap">SKU</th>
-                                    <th class="nowrap">دسته‌بندی</th>
+                                                                        <th class="nowrap">دسته‌بندی</th>
                                     <th class="nowrap">موجودی</th>
                                     <th class="nowrap">قیمت</th>
                                     <th class="text-end nowrap">عملیات</th>
@@ -345,6 +347,8 @@
 
                                         <td class="nowrap w-1">{{ $p->id }}</td>
 
+                                        <td class="nowrap"><span class="pill pill-gray">{{ $p->code ?: "—" }}</span></td>
+
                                         <td class="name-cell">
                                             <div class="title">{{ $p->name }}</div>
                                             <div class="meta">
@@ -356,11 +360,7 @@
                                             </div>
                                         </td>
 
-                                        <td class="nowrap">
-                                            <span class="pill pill-gray">{{ $p->sku }}</span>
-                                        </td>
-
-
+                                        
                                         <td class="nowrap">
                                             {{ $p->category?->name ?: "—" }}
                                         </td>
@@ -392,7 +392,7 @@
                                     {{-- Variants Row --}}
                                     @if($hasVariants)
                                         <tr>
-                                            <td colspan="9" class="p-0">
+                                            <td colspan="8" class="p-0">
                                                 <div class="collapse" id="{{ $collapseId }}">
                                                     <div class="variants-wrap">
                                                         <div class="variants-head">
@@ -454,7 +454,7 @@
 
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="text-center text-muted py-5">
+                                        <td colspan="8" class="text-center text-muted py-5">
                                             هیچ محصولی ثبت نشده 📦
                                         </td>
                                     </tr>

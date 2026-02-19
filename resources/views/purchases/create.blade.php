@@ -28,7 +28,7 @@
         return [
             'id' => $p->id,
             'name' => $p->name,
-            'code' => $p->code ?: $p->sku,
+            'code' => $p->code,
             'category_id' => $p->category_id,
             'variants' => $p->variants->map(function ($v) {
                 return [
