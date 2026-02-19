@@ -52,7 +52,10 @@ class ProductController extends Controller
 
     public function create()
     {
-        return redirect()->route('products.index');
+        $categories = Category::query()->orderBy('name')->get();
+        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('model_name')->get(['id', 'model_name', 'code']);
+
+        return view('products.create', compact('categories', 'modelLists'));
     }
 
     public function store(Request $request)

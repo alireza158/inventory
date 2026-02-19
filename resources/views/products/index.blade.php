@@ -218,6 +218,8 @@
                         دسته‌بندی‌ها
                     </button>
 
+                    <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن محصول</a>
+
                     <form method="POST" action="{{ route('products.sync.crm') }}">
                         @csrf
                         <button class="btn btn-outline-success">Sync از CRM</button>
