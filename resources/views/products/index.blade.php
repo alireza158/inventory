@@ -12,7 +12,7 @@
         background: linear-gradient(180deg, rgba(13,110,253,.10), rgba(13,110,253,0));
         border: 1px solid var(--soft-border);
         border-radius: var(--card-radius);
-        padding: 14px 16px;
+        padding: 12px 14px;
     }
     .page-title{
         font-weight: 800;
@@ -64,11 +64,15 @@
         font-weight: 800;
         color:#111827;
         white-space: nowrap;
+        padding: .55rem .6rem; /* جمع‌وجور */
+        font-size: 13px;
     }
 
     .table-modern td{
         border-top: 1px solid var(--soft-border);
         vertical-align: middle;
+        padding: .55rem .6rem; /* جمع‌وجور */
+        font-size: 13px;
     }
 
     .table-modern tbody tr:hover{
@@ -80,7 +84,7 @@
         align-items:center;
         gap:6px;
         border-radius: 999px;
-        padding: 4px 10px;
+        padding: 3px 9px;
         font-size: 12px;
         font-weight: 700;
         border: 1px solid var(--soft-border);
@@ -95,14 +99,13 @@
         border-radius: 12px;
         border: 1px solid var(--soft-border);
         background: #fff;
+        padding: .35rem .55rem;
     }
-    .btn-soft:hover{
-        background: #f8fafc;
-    }
+    .btn-soft:hover{ background: #f8fafc; }
 
     .toggle-variants{
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         border-radius: 12px;
         display:inline-flex;
         align-items:center;
@@ -113,18 +116,19 @@
     .toggle-variants:hover{ background:#f8fafc; }
 
     .name-cell{
-        min-width: 240px;
+        min-width: 220px;
         max-width: 420px;
     }
     .name-cell .title{
         font-weight: 800;
         color:#111827;
         line-height: 1.2;
+        font-size: 13px;
     }
     .name-cell .meta{
         font-size: 12px;
         color:#6b7280;
-        margin-top: 4px;
+        margin-top: 3px;
     }
 
     .nowrap{ white-space: nowrap; }
@@ -133,21 +137,7 @@
     .variants-wrap{
         background: var(--soft-bg);
         border-top: 1px solid var(--soft-border);
-        padding: 10px 10px 14px;
-    }
-    .variants-head{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:12px;
-        margin-bottom: 8px;
-    }
-    .variants-head .label{
-        font-weight:800;
-        color:#111827;
-        display:flex;
-        align-items:center;
-        gap:8px;
+        padding: 10px 10px 12px;
     }
 
     .variants-table{
@@ -160,9 +150,13 @@
         background:#fff;
         border-bottom:1px solid var(--soft-border) !important;
         font-weight:800;
+        padding: .5rem .55rem;
+        font-size: 12.5px;
     }
     .variants-table table td{
         border-top:1px solid var(--soft-border);
+        padding: .5rem .55rem;
+        font-size: 12.5px;
     }
 
     /* Responsive: sidebar narrower on large screens */
@@ -171,8 +165,8 @@
         .col-main{ flex: 0 0 auto; width: 76%; }
     }
     @media (min-width: 1200px){
-        .col-cat { width: 20%; }  /* کمتر از قبل */
-        .col-main{ width: 80%; }  /* فضای بیشتر برای کالاها */
+        .col-cat { width: 20%; }
+        .col-main{ width: 80%; }
     }
 </style>
 
@@ -207,9 +201,7 @@
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <h4 class="page-title">کالاها</h4>
-                    <div class="small subtle-text mt-1">
-                        مدیریت موجودی، قیمت و مدل‌ها در یک نگاه
-                    </div>
+                    <div class="small subtle-text mt-1">مدیریت موجودی، قیمت و مدل‌ها</div>
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
@@ -217,8 +209,6 @@
                     <button class="btn btn-soft d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas" aria-controls="catOffcanvas">
                         دسته‌بندی‌ها
                     </button>
-
-                    <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن محصول</a>
 
                     <form method="POST" action="{{ route('products.sync.crm') }}">
                         @csrf
@@ -230,55 +220,12 @@
             </div>
         </div>
 
-        {{-- Add Product (Inline) --}}
-        <div class="soft-card mb-3">
-            <div class="card-body">
-                <div class="fw-bold mb-2">افزودن محصول جدید</div>
-                <form method="POST" action="{{ route('products.store') }}" class="row g-3 align-items-end">
-                    @csrf
-                    <div class="col-lg-3">
-                        <label class="form-label">اسم محصول</label>
-                        <input name="name" class="form-control" value="{{ old('name') }}" required>
-                    </div>
-                    <div class="col-lg-3">
-                        <label class="form-label">گروه کالا</label>
-                        <select name="category_id" class="form-select" required>
-                            <option value="">انتخاب کنید</option>
-                            @foreach($categories as $cat)
-                                <option value="{{ $cat->id }}" @selected(old('category_id')==$cat->id)>{{ $cat->name }} ({{ $cat->code ?: '----' }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-lg-3">
-                        <label class="form-label">مدل لیست (چند انتخابی)</label>
-                        <select name="model_list_ids[]" class="form-select" multiple size="4" required>
-                            @foreach($modelLists as $model)
-                                <option value="{{ $model->id }}" @selected(collect(old('model_list_ids', []))->contains($model->id))>
-                                    {{ $model->model_name }} ({{ $model->code }})
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-lg-2">
-                        <label class="form-label">تعداد طرح</label>
-                        <input type="number" min="1" max="20" name="design_count" class="form-control" value="{{ old('design_count', 1) }}" required>
-                    </div>
-                    <div class="col-lg-1 d-grid">
-                        <button class="btn btn-primary">ساخت</button>
-                    </div>
-                    <div class="col-12 small subtle-text">
-                        به ازای هر مدل × هر طرح، یک تنوع ساخته می‌شود و کد یکتا با فرمت CCCCMMMMVVVV ثبت می‌گردد.
-                    </div>
-                </form>
-            </div>
-        </div>
-
         {{-- Filter --}}
         <div class="soft-card filter-card mb-3">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                     <div class="fw-bold">فیلترها</div>
-                    <div class="small subtle-text">برای نتیجه بهتر، چند فیلتر را ترکیب کنید</div>
+                    <div class="small subtle-text">برای نتیجه بهتر چند فیلتر را ترکیب کنید</div>
                 </div>
 
                 <form method="GET" action="{{ route('products.index') }}">
@@ -289,7 +236,7 @@
                     <div class="row g-3 align-items-end">
                         <div class="col-lg-5">
                             <label class="form-label">جستجو (نام یا کد)</label>
-                            <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً گارد یا 10010001">
+                            <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً گارد یا 10100001">
                         </div>
 
                         <div class="col-lg-3">
@@ -341,7 +288,7 @@
         {{-- Table --}}
         <div class="soft-card">
             <div class="card-body pb-0">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                     <div class="small subtle-text">
                         نمایش {{ $products->firstItem() ?? 0 }} تا {{ $products->lastItem() ?? 0 }} از {{ $products->total() ?? 0 }} مورد
                     </div>
@@ -356,7 +303,7 @@
                                     <th class="nowrap w-1">#</th>
                                     <th class="nowrap">کد</th>
                                     <th>نام</th>
-                                                                        <th class="nowrap">دسته‌بندی</th>
+                                    <th class="nowrap">دسته‌بندی</th>
                                     <th class="nowrap">موجودی</th>
                                     <th class="nowrap">قیمت</th>
                                     <th class="text-end nowrap">عملیات</th>
@@ -370,7 +317,6 @@
                                         $collapseId = "variantsRow{$p->id}";
                                     @endphp
 
-                                    {{-- Product Row --}}
                                     <tr>
                                         <td class="w-1">
                                             @if($hasVariants)
@@ -390,23 +336,18 @@
 
                                         <td class="nowrap w-1">{{ $p->id }}</td>
 
-                                        <td class="nowrap"><span class="pill pill-gray">{{ $p->code ?: "—" }}</span></td>
+                                        <td class="nowrap">
+                                            <span class="pill pill-gray">{{ $p->code ?: "—" }}</span>
+                                        </td>
 
                                         <td class="name-cell">
                                             <div class="title">{{ $p->name }}</div>
                                             <div class="meta">
-                                                @if($p->category?->name)
-                                                    <span class="subtle-text">دسته: {{ $p->category?->name }}</span>
-                                                @else
-                                                    <span class="subtle-text">بدون دسته‌بندی</span>
-                                                @endif
+                                                <span class="subtle-text">دسته: {{ $p->category?->name ?: '—' }}</span>
                                             </div>
                                         </td>
 
-                                        
-                                        <td class="nowrap">
-                                            {{ $p->category?->name ?: "—" }}
-                                        </td>
+                                        <td class="nowrap">{{ $p->category?->name ?: "—" }}</td>
 
                                         <td class="nowrap">
                                             @if((int)$p->stock === 0)
@@ -438,12 +379,12 @@
                                             <td colspan="8" class="p-0">
                                                 <div class="collapse" id="{{ $collapseId }}">
                                                     <div class="variants-wrap">
-                                                        <div class="variants-head">
-                                                            <div class="label">
-                                                                <span>مدل‌های این محصول</span>
+                                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                                            <div class="fw-bold">
+                                                                مدل‌های این محصول
                                                                 <span class="pill pill-gray">{{ $p->variants->count() }} مدل</span>
                                                             </div>
-                                                            <div class="small subtle-text">موجودی و قیمت هر مدل جداگانه ثبت شده است</div>
+                                                            <div class="small subtle-text">موجودی و قیمت هر مدل جداگانه است</div>
                                                         </div>
 
                                                         <div class="variants-table">
@@ -543,22 +484,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
-  // Collapse +/- button symbol handling (single place)
-  function initVariantToggles(root=document){
-    root.querySelectorAll('[data-bs-toggle="collapse"]').forEach(btn => {
-      const targetSel = btn.getAttribute('data-bs-target');
-      const el = document.querySelector(targetSel);
-      if (!el) return;
+  // فقط دکمه‌های مدل‌ها (نه offcanvas و نه چیزهای دیگر)
+  document.querySelectorAll('.toggle-variants').forEach(btn => {
+    const targetSel = btn.getAttribute('data-bs-target');
+    const el = document.querySelector(targetSel);
+    if (!el) return;
 
-      const symbol = btn.querySelector('.variant-symbol') || btn;
-      const setSymbol = () => symbol.textContent = el.classList.contains('show') ? '−' : '+';
-      setSymbol();
+    const symbol = btn.querySelector('.variant-symbol');
+    const setSymbol = () => symbol.textContent = el.classList.contains('show') ? '−' : '+';
+    setSymbol();
 
-      el.addEventListener('shown.bs.collapse', setSymbol);
-      el.addEventListener('hidden.bs.collapse', setSymbol);
-    });
-  }
-  initVariantToggles();
+    el.addEventListener('shown.bs.collapse', setSymbol);
+    el.addEventListener('hidden.bs.collapse', setSymbol);
+  });
 
   // Category search helper
   function bindCatSearch(inputId, treeId){
