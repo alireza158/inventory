@@ -45,7 +45,7 @@ class ProductController extends Controller
         $categoryTree = Category::query()->whereNull('parent_id')->with(['children.children.children'])->orderBy('name')->get();
 
         $categories = Category::query()->orderBy('name')->get();
-        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('model_name')->get(['id', 'model_name', 'code']);
+        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('brand')->orderBy('model_name')->get(['id', 'brand', 'model_name', 'code']);
 
         return view('products.index', compact('products', 'categoryTree', 'categories', 'modelLists'));
     }
@@ -53,7 +53,7 @@ class ProductController extends Controller
     public function create()
     {
         $categories = Category::query()->orderBy('name')->get();
-        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('model_name')->get(['id', 'model_name', 'code']);
+        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('brand')->orderBy('model_name')->get(['id', 'brand', 'model_name', 'code']);
 
         return view('products.create', compact('categories', 'modelLists'));
     }
@@ -120,7 +120,7 @@ class ProductController extends Controller
     {
         $product->load('variants');
         $categories = Category::orderBy('name')->get();
-        $modelListOptions = ModelList::query()->orderBy('model_name')->get(['id', 'model_name', 'code']);
+        $modelListOptions = ModelList::query()->orderBy('brand')->orderBy('model_name')->get(['id', 'brand', 'model_name', 'code']);
 
         return view('products.edit', compact('product', 'categories', 'modelListOptions'));
     }
@@ -226,7 +226,8 @@ class ProductController extends Controller
 
     private function generateVariantCode(string $categoryCode, string $modelCode, string $varietyCode, ?int $ignoreId = null): string
     {
-        $base = $categoryCode . $modelCode . $varietyCode;
+        $normalizedModelCode = str_pad(preg_replace('/\D/', '', (string) $modelCode), 4, '0', STR_PAD_LEFT);
+        $base = $categoryCode . $normalizedModelCode . $varietyCode;
         $code = $base;
         $counter = 1;
 

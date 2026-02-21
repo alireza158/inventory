@@ -213,6 +213,8 @@
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-success" href="{{ route('purchases.create') }}">+ خرید کالا</a>
+
                     {{-- Mobile categories button --}}
                     <button class="btn btn-soft d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas" aria-controls="catOffcanvas">
                         دسته‌بندی‌ها
@@ -254,7 +256,7 @@
                         <select name="model_list_ids[]" class="form-select" multiple size="4" required>
                             @foreach($modelLists as $model)
                                 <option value="{{ $model->id }}" @selected(collect(old('model_list_ids', []))->contains($model->id))>
-                                    {{ $model->model_name }} ({{ $model->code }})
+                                    {{ $model->brand ? ($model->brand . ' - ') : '' }}{{ $model->model_name }} ({{ $model->code }})
                                 </option>
                             @endforeach
                         </select>
