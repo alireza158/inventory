@@ -213,6 +213,8 @@
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-success" href="{{ route('purchases.create') }}">+ خرید کالا</a>
+
                     {{-- Mobile categories button --}}
                     <button class="btn btn-soft d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas" aria-controls="catOffcanvas">
                         دسته‌بندی‌ها

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
-use App\Models\ModelList;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
@@ -56,13 +55,11 @@ class PurchaseController extends Controller
         $suppliers = Supplier::orderBy('name')->get();
         $products = Product::with('variants')->orderBy('name')->get();
         $categories = Category::orderBy('name')->get();
-        $modelLists = ModelList::query()->orderBy('model_name')->pluck('model_name');
 
         return view('purchases.create', [
             'suppliers' => $suppliers,
             'products' => $products,
             'categories' => $categories,
-            'modelLists' => $modelLists,
             'purchase' => null,
         ]);
     }
@@ -72,10 +69,9 @@ class PurchaseController extends Controller
         $suppliers = Supplier::orderBy('name')->get();
         $products = Product::with('variants')->orderBy('name')->get();
         $categories = Category::orderBy('name')->get();
-        $modelLists = ModelList::query()->orderBy('model_name')->pluck('model_name');
         $purchase->load(['items', 'items.product']);
 
-        return view('purchases.create', compact('suppliers', 'products', 'categories', 'modelLists', 'purchase'));
+        return view('purchases.create', compact('suppliers', 'products', 'categories', 'purchase'));
     }
 
     public function store(Request $request)
@@ -138,7 +134,7 @@ class PurchaseController extends Controller
 
     private function validatePayload(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'note' => ['nullable', 'string', 'max:1000'],
 
@@ -154,6 +150,19 @@ class PurchaseController extends Controller
             'items.*.discount_type' => ['nullable', 'in:amount,percent'],
             'items.*.discount_value' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        foreach ($data['items'] as $index => $item) {
+            $isValidVariant = ProductVariant::query()
+                ->whereKey($item['variant_id'])
+                ->where('product_id', $item['product_id'])
+                ->exists();
+
+            if (!$isValidVariant) {
+                abort(422, 'مدل انتخاب‌شده برای ردیف ' . ($index + 1) . ' متعلق به کالای انتخابی نیست.');
+            }
+        }
+
+        return $data;
     }
 
     private function applyItems(Purchase $purchase, array $data): array
