@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChequeController;
@@ -29,32 +30,42 @@ use App\Http\Controllers\WarehouseController;
 Route::get('/', fn () => redirect()->route('dashboard'));
 
 Route::middleware('auth')->group(function () {
+
     // Dashboard + profile
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Products + stock
+    // Products + categories
     Route::resource('products', ProductController::class)->except(['show']);
     Route::resource('categories', CategoryController::class)->except(['show']);
+
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
+
     Route::get('/products/import', [ProductImportController::class, 'show'])->name('products.import.show');
     Route::post('/products/import', [ProductImportController::class, 'import'])->name('products.import');
     Route::get('/products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
+
     Route::post('/products/sync-crm', [ProductController::class, 'syncCrm'])->name('products.sync.crm');
 
-
+    // Model Lists
     Route::get('/model-lists', [ModelListController::class, 'index'])->name('model-lists.index');
     Route::post('/model-lists', [ModelListController::class, 'store'])->name('model-lists.store');
+    Route::put('/model-lists/{modelList}', [ModelListController::class, 'update'])->name('model-lists.update');
+    Route::post('/model-lists/assign-codes', [ModelListController::class, 'assignCodes'])->name('model-lists.assign-codes');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
 
+    // Quick category store
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
 
+    // Stock movements
     Route::get('/products/{product}/movements/create', [StockMovementController::class, 'create'])->name('movements.create');
     Route::post('/products/{product}/movements', [StockMovementController::class, 'store'])->name('movements.store');
     Route::get('/movements', [StockMovementReportController::class, 'index'])->name('movements.index');
 
+    // Vouchers
     Route::get('/vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
     Route::get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
     Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
@@ -62,14 +73,17 @@ Route::middleware('auth')->group(function () {
     Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
     Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
 
+    // Warehouses
     Route::get('/warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
     Route::get('/warehouses/{warehouse}/edit', [WarehouseController::class, 'edit'])->name('warehouses.edit');
     Route::put('/warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
     Route::delete('/warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
+
     Route::get('/warehouses/{warehouse}/personnel', [WarehouseController::class, 'personnelIndex'])->name('warehouses.personnel.index');
     Route::post('/warehouses/{warehouse}/personnel', [WarehouseController::class, 'personnelStore'])->name('warehouses.personnel.store');
     Route::get('/warehouses/{warehouse}/personnel/{personnel}', [WarehouseController::class, 'personnelShow'])->name('warehouses.personnel.show');
 
+    // Purchases
     Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');
     Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
     Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
@@ -78,12 +92,15 @@ Route::middleware('auth')->group(function () {
     Route::put('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
     Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
 
+    // Persons
     Route::get('/persons', [PersonController::class, 'index'])->name('persons.index');
     Route::post('/persons', [PersonController::class, 'store'])->name('persons.store');
 
+    // Suppliers
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
 
+    // Stocktake
     Route::get('/stocktake', [StocktakeController::class, 'index'])->name('stocktake.index');
 
     // Preinvoice pages

@@ -64,14 +64,14 @@
         font-weight: 800;
         color:#111827;
         white-space: nowrap;
-        padding: .55rem .6rem; /* جمع‌وجور */
+        padding: .55rem .6rem;
         font-size: 13px;
     }
 
     .table-modern td{
         border-top: 1px solid var(--soft-border);
         vertical-align: middle;
-        padding: .55rem .6rem; /* جمع‌وجور */
+        padding: .55rem .6rem;
         font-size: 13px;
     }
 
@@ -209,6 +209,9 @@
                     <button class="btn btn-soft d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas" aria-controls="catOffcanvas">
                         دسته‌بندی‌ها
                     </button>
+
+                    {{-- ✅ دکمه افزودن کالا --}}
+                    <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن کالا</a>
 
                     <form method="POST" action="{{ route('products.sync.crm') }}">
                         @csrf
@@ -484,7 +487,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
-  // فقط دکمه‌های مدل‌ها (نه offcanvas و نه چیزهای دیگر)
+  // فقط دکمه‌های مدل‌ها
   document.querySelectorAll('.toggle-variants').forEach(btn => {
     const targetSel = btn.getAttribute('data-bs-target');
     const el = document.querySelector(targetSel);
