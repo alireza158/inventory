@@ -16,28 +16,80 @@ class ModelListController extends Controller
         $q = trim((string) $request->get('q', ''));
 
         $modelLists = ModelList::query()
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where('model_name', 'like', "%{$q}%")
+                    ->orWhere('code', 'like', "%{$q}%")
+                    ->orWhere('brand', 'like', "%{$q}%");
+            })
             ->orderBy('brand')
+            ->orderByRaw('CASE WHEN code IS NULL OR code = "" THEN 1 ELSE 0 END')
+            ->orderByRaw('CAST(code AS UNSIGNED) ASC')
             ->orderBy('model_name')
-            ->paginate(100);
+            ->paginate(100)
+            ->withQueryString();
 
         $brands = array_keys(PhoneModelCatalog::brands());
 
-        return view('model-lists.index', compact('modelLists', 'brands'));
+        return view('model-lists.index', compact('modelLists', 'brands', 'q'));
     }
 
+    /**
+     * افزودن مدل جدید
+     * - code می‌تواند خالی باشد → خودکار ساخته می‌شود
+     * - code چهار رقمی و یونیک
+     */
     public function store(Request $request)
     {
         $data = $request->validate([
             'brand' => ['required', 'string', 'max:100'],
             'model_name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'digits:3', 'unique:model_lists,code'],
+            'code' => ['nullable', 'string', 'max:4'],
         ]);
 
-        ModelList::updateOrCreate([
-            'brand' => trim($data['brand']),
-            'model_name' => trim($data['model_name']),
-        ], [
-            'code' => $data['code'],
+        DB::transaction(function () use ($data) {
+
+            $brand = trim($data['brand']);
+            $modelName = trim($data['model_name']);
+
+            // اگر مدل با همین برند+نام وجود داشت، از تکرار جلوگیری کن
+            $exists = ModelList::query()
+                ->where('brand', $brand)
+                ->where('model_name', $modelName)
+                ->exists();
+
+            if ($exists) {
+                abort(422, 'این مدل قبلاً ثبت شده است.');
+            }
+
+            // کد چهار رقمی
+            $code = $this->normalizeCode4($data['code'] ?? null);
+            if ($code === null) {
+                // اگر خالی بود، خودکار بساز
+                $code = $this->nextCode4();
+            } else {
+                // اگر دستی وارد شد، نباید تکراری باشد
+                if (ModelList::query()->where('code', $code)->exists()) {
+                    abort(422, 'این کد قبلاً استفاده شده است.');
+                }
+            }
+
+            ModelList::create([
+                'brand' => $brand,
+                'model_name' => $modelName,
+                'code' => $code,
+            ]);
+        });
+
+        return redirect()->route('model-lists.index')->with('success', 'مدل با موفقیت ذخیره شد.');
+    }
+
+    /**
+     * بروزرسانی کد یک مدل
+     */
+    public function update(Request $request, ModelList $modelList): RedirectResponse
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:4'],
         ]);
 
         $code = $this->normalizeCode4($data['code']);
@@ -45,7 +97,12 @@ class ModelListController extends Controller
             return back()->withErrors(['code' => 'کد باید عددی و ۴ رقمی باشد (مثلاً 0016).']);
         }
 
-        if (ModelList::query()->where('id', '!=', $modelList->id)->where('code', $code)->exists()) {
+        $exists = ModelList::query()
+            ->where('id', '!=', $modelList->id)
+            ->where('code', $code)
+            ->exists();
+
+        if ($exists) {
             return back()->withErrors(['code' => 'این کد قبلاً برای مدل دیگری ثبت شده است.']);
         }
 
@@ -57,38 +114,28 @@ class ModelListController extends Controller
     /**
      * تولید خودکار کد برای مدل‌هایی که کد ندارند
      */
-    public function assignCodes()
+    public function assignCodes(): RedirectResponse
     {
-        $count = 0;
-        $usedCodes = ModelList::query()->whereNotNull('code')->pluck('code')->all();
+        DB::transaction(function () {
 
-        ProductVariant::query()
-            ->select('variant_name')
-            ->whereNotNull('variant_name')
-            ->where('variant_name', '<>', '')
-            ->groupBy('variant_name')
-            ->orderBy('variant_name')
-            ->chunk(500, function ($variants) use (&$count, &$usedCodes) {
-                foreach ($variants as $variant) {
-                    $modelName = trim((string) $variant->variant_name);
-                    if ($modelName === '') {
-                        continue;
-                    }
+            // رکوردهای بدون کد
+            $rows = ModelList::query()
+                ->lockForUpdate()
+                ->whereNull('code')
+                ->orWhere('code', '')
+                ->orderBy('id')
+                ->get();
 
-                    $brand = $this->detectBrand($modelName);
-                    $code = $this->nextThreeDigitCode($usedCodes);
+            if ($rows->isEmpty()) {
+                return;
+            }
 
-                    $created = ModelList::firstOrCreate([
-                        'brand' => $brand,
-                        'model_name' => $modelName,
-                    ], [
-                        'code' => $code,
-                    ]);
+            $next = $this->nextCode4();
 
-                    if ($created->wasRecentlyCreated) {
-                        $usedCodes[] = $code;
-                        $count++;
-                    }
+            foreach ($rows as $row) {
+                // اگر وسط کار تکراری شد، افزایش بده
+                while (ModelList::query()->where('code', $next)->exists()) {
+                    $next = $this->incrementCode4($next);
                 }
 
                 $row->update(['code' => $next]);
@@ -100,23 +147,39 @@ class ModelListController extends Controller
     }
 
     /**
-     * اگر هنوز از این دکمه استفاده می‌کنی:
-     * مدل‌ها را از variant_name استخراج می‌کند (قبل از "طرح X")
+     * دریافت مدل‌ها از کالاهای موجود
+     * - از variant_name استخراج می‌کند
+     * - "طرح X" را حذف می‌کند
+     * - برند را حدس می‌زند
+     * - کد ۴ رقمی خودکار می‌دهد
      */
-    public function importFromProducts()
+    public function importFromProducts(): RedirectResponse
     {
         DB::transaction(function () {
+
             $names = ProductVariant::query()
                 ->select('variant_name')
+                ->whereNotNull('variant_name')
+                ->where('variant_name', '<>', '')
                 ->distinct()
                 ->pluck('variant_name');
 
             foreach ($names as $full) {
-                $base = preg_replace('/\s*طرح\s*\d+$/u', '', (string) $full);
+                $full = trim((string) $full);
+                if ($full === '') continue;
+
+                // حذف "طرح X"
+                $base = preg_replace('/\s*طرح\s*\d+$/u', '', $full);
                 $base = trim((string) $base);
                 if ($base === '') continue;
 
-                $exists = ModelList::query()->where('model_name', $base)->exists();
+                $brand = $this->detectBrand($base);
+
+                $exists = ModelList::query()
+                    ->where('brand', $brand)
+                    ->where('model_name', $base)
+                    ->exists();
+
                 if ($exists) continue;
 
                 $code = $this->nextCode4();
@@ -125,6 +188,7 @@ class ModelListController extends Controller
                 }
 
                 ModelList::create([
+                    'brand' => $brand,
                     'model_name' => $base,
                     'code' => $code,
                 ]);
@@ -134,6 +198,43 @@ class ModelListController extends Controller
         return redirect()->route('model-lists.index')->with('success', 'مدل‌ها از کالاهای موجود دریافت و با کد خودکار ذخیره شدند.');
     }
 
+    /**
+     * ایمپورت بانک مدل‌ها از PhoneModelCatalog
+     */
+    public function importPhoneCatalog(): RedirectResponse
+    {
+        DB::transaction(function () {
+            $catalog = PhoneModelCatalog::brands();
+
+            foreach ($catalog as $brand => $models) {
+                foreach ($models as $modelName) {
+                    $normalizedName = trim((string) $modelName);
+                    if ($normalizedName === '') continue;
+
+                    $exists = ModelList::query()
+                        ->where('brand', $brand)
+                        ->where('model_name', $normalizedName)
+                        ->exists();
+
+                    if ($exists) continue;
+
+                    $code = $this->nextCode4();
+                    while (ModelList::query()->where('code', $code)->exists()) {
+                        $code = $this->incrementCode4($code);
+                    }
+
+                    ModelList::create([
+                        'brand' => $brand,
+                        'model_name' => $normalizedName,
+                        'code' => $code,
+                    ]);
+                }
+            }
+        });
+
+        return back()->with('success', 'بانک مدل‌های موبایل با موفقیت بارگذاری شد.');
+    }
+
     // ---------------- Helpers ----------------
 
     private function normalizeCode4(?string $code): ?string
@@ -141,7 +242,7 @@ class ModelListController extends Controller
         $code = trim((string) $code);
         if ($code === '') return null;
 
-        // فقط عدد
+        // فقط عدد 1 تا 4 رقم
         if (!preg_match('/^\d{1,4}$/', $code)) {
             return null;
         }
@@ -172,62 +273,12 @@ class ModelListController extends Controller
     {
         $n = (int) $code;
         $n++;
+
         if ($n > 9999) {
             abort(422, 'امکان تولید کد جدید نیست (بیش از 9999).');
         }
+
         return str_pad((string) $n, 4, '0', STR_PAD_LEFT);
-    }
-
-    public function importPhoneCatalog(): RedirectResponse
-    {
-        $catalog = PhoneModelCatalog::brands();
-        $usedCodes = ModelList::query()->whereNotNull('code')->pluck('code')->all();
-        $inserted = 0;
-
-        foreach ($catalog as $brand => $models) {
-            foreach ($models as $modelName) {
-                $normalizedName = trim((string) $modelName);
-                if ($normalizedName === '') {
-                    continue;
-                }
-
-                $exists = ModelList::query()
-                    ->where('brand', $brand)
-                    ->where('model_name', $normalizedName)
-                    ->exists();
-
-                if ($exists) {
-                    continue;
-                }
-
-                $code = $this->nextThreeDigitCode($usedCodes);
-
-                ModelList::create([
-                    'brand' => $brand,
-                    'model_name' => $normalizedName,
-                    'code' => $code,
-                ]);
-
-                $usedCodes[] = $code;
-                $inserted++;
-            }
-        }
-
-        return back()->with('success', "بانک مدل‌های موبایل با موفقیت بارگذاری شد. تعداد {$inserted} مدل جدید اضافه شد.");
-    }
-
-    private function nextThreeDigitCode(array $usedCodes): string
-    {
-        $lookup = array_flip(array_map('strval', $usedCodes));
-
-        for ($i = 1; $i <= 999; $i++) {
-            $code = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
-            if (!isset($lookup[$code])) {
-                return $code;
-            }
-        }
-
-        abort(422, 'کد سه‌رقمی خالی برای مدل لیست موجود نیست.');
     }
 
     private function detectBrand(string $modelName): string
