@@ -328,8 +328,9 @@ class ProductController extends Controller
      */
     private function normalizeCategory3(?string $code): ?string
     {
+        $normalizedCategoryCode = str_pad(preg_replace('/\D/', '', (string) $categoryCode), 4, '0', STR_PAD_LEFT);
         $normalizedModelCode = str_pad(preg_replace('/\D/', '', (string) $modelCode), 4, '0', STR_PAD_LEFT);
-        $base = $categoryCode . $normalizedModelCode . $varietyCode;
+        $base = $normalizedCategoryCode . $normalizedModelCode . $varietyCode;
         $code = $base;
 
         $counter = (int) $suffix4;
@@ -355,15 +356,17 @@ class ProductController extends Controller
      */
     private function getNextVariantSuffixInt(Product $product): int
     {
-        $product->loadMissing('variants');
+        $base = str_pad(preg_replace('/\D/', '', (string) ($category->code ?: '')), 4, '0', STR_PAD_LEFT);
 
-        $max = 0;
-        foreach ($product->variants as $v) {
-            $c = (string) ($v->variant_code ?? '');
-            if (strlen($c) >= 12 && str_starts_with($c, (string)$product->code)) {
-                $suffix = (int) substr($c, -4);
-                if ($suffix > $max) $max = $suffix;
-            }
+        $lastCode = Product::query()
+            ->where('category_id', $category->id)
+            ->where('code', 'like', $base . '%')
+            ->orderByDesc('id')
+            ->value('code');
+
+        $next = 1;
+        if ($lastCode && strlen($lastCode) >= 8) {
+            $next = ((int) substr($lastCode, -4)) + 1;
         }
 
         return $max + 1;
