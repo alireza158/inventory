@@ -15,9 +15,8 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">کد دسته‌بندی (۴ رقم)</label>
-        <input type="text" name="code" maxlength="4" class="form-control" value="{{ old('code') }}" required>
-        @error('code') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+        <label class="form-label">کد دسته‌بندی (۳ رقم - خودکار)</label>
+        <input type="text" class="form-control" value="بعد از ذخیره خودکار ساخته می‌شود" disabled>
       </div>
 
       <div class="mb-3">

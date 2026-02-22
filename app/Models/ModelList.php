@@ -10,6 +10,7 @@ class ModelList extends Model
     use HasFactory;
 
     protected $fillable = [
+        'brand',
         'model_name',
         'code',
     ];
