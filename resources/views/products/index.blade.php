@@ -225,6 +225,49 @@
             </div>
         </div>
 
+        {{-- Add Product (Inline) --}}
+        <div class="soft-card mb-3">
+            <div class="card-body">
+                <div class="fw-bold mb-2">افزودن محصول جدید</div>
+                <form method="POST" action="{{ route('products.store') }}" class="row g-3 align-items-end">
+                    @csrf
+                    <div class="col-lg-3">
+                        <label class="form-label">اسم محصول</label>
+                        <input name="name" class="form-control" value="{{ old('name') }}" required>
+                    </div>
+                    <div class="col-lg-3">
+                        <label class="form-label">گروه کالا</label>
+                        <select name="category_id" class="form-select" required>
+                            <option value="">انتخاب کنید</option>
+                            @foreach($categories as $cat)
+                                <option value="{{ $cat->id }}" @selected(old('category_id')==$cat->id)>{{ $cat->name }} ({{ $cat->code ?: '----' }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-lg-3">
+                        <label class="form-label">مدل لیست (چند انتخابی)</label>
+                        <select name="model_list_ids[]" class="form-select" multiple size="4" required>
+                            @foreach($modelLists as $model)
+                                <option value="{{ $model->id }}" @selected(collect(old('model_list_ids', []))->contains($model->id))>
+                                    {{ $model->brand ? ($model->brand . ' - ') : '' }}{{ $model->model_name }} ({{ $model->code }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-lg-2">
+                        <label class="form-label">تعداد طرح</label>
+                        <input type="number" min="1" max="20" name="design_count" class="form-control" value="{{ old('design_count', 1) }}" required>
+                    </div>
+                    <div class="col-lg-1 d-grid">
+                        <button class="btn btn-primary">ساخت</button>
+                    </div>
+                    <div class="col-12 small subtle-text">
+                        به ازای هر مدل × هر طرح، یک تنوع ساخته می‌شود و کد یکتا با فرمت CCCCMMMMVVVV ثبت می‌گردد.
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {{-- Filter --}}
         <div class="soft-card filter-card mb-3">
             <div class="card-body">

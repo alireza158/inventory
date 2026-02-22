@@ -10,20 +10,21 @@
         <form method="POST" action="{{ route('model-lists.store') }}" class="row g-2">
           @csrf
           <div class="col-12">
-            <label class="form-label">کد مدل (۴ رقم) - اختیاری</label>
-            <input name="code" class="form-control mb-2"
-                   maxlength="4"
-                   inputmode="numeric"
-                   value="{{ old('code') }}"
-                   placeholder="مثلاً 0016">
-            <div class="form-text">اگر خالی بگذارید سیستم به‌صورت خودکار کد بعدی را می‌سازد.</div>
+            <label class="form-label">برند</label>
+            <select name="brand" class="form-select mb-2" required>
+              <option value="">انتخاب برند</option>
+              @foreach(($brands ?? []) as $brand)
+                <option value="{{ $brand }}" @selected(old('brand') === $brand)>{{ $brand }}</option>
+              @endforeach
+              <option value="سایر" @selected(old('brand') === 'سایر')>سایر</option>
+            </select>
 
-            <label class="form-label mt-2">مدل کامل</label>
-            <input name="model_name" class="form-control"
-                   value="{{ old('model_name') }}"
-                   placeholder="مثلاً Samsung A16 / iPhone 14 Pro Max"
-                   required>
-            <div class="form-text">مدل را کامل وارد کنید.</div>
+            <label class="form-label">کد مدل (۳ رقم)</label>
+            <input name="code" class="form-control mb-2" maxlength="3" value="{{ old('code') }}" placeholder="مثلاً 016" required>
+
+            <label class="form-label">مدل گوشی</label>
+            <input name="model_name" class="form-control" value="{{ old('model_name') }}" placeholder="مثلاً Galaxy S24 Ultra" required>
+            <div class="form-text">کد مدل باید سه‌رقمی باشد تا برای بارکدسازی قابل استفاده باشد.</div>
           </div>
 
           <div class="col-12 d-grid">
@@ -33,24 +34,18 @@
 
         <hr>
 
-        <form method="POST" action="{{ route('model-lists.assign-codes') }}">
+        <form method="POST" action="{{ route('model-lists.import-phone-catalog') }}" class="mb-2">
           @csrf
-          <button class="btn btn-outline-primary w-100">تولید کد برای مدل‌های بدون کد</button>
+          <button class="btn btn-success w-100">بارگذاری بانک کامل مدل‌های برندها</button>
           <div class="small text-muted mt-2">
-            برای مدل‌هایی که کد ندارند، کد ۴ رقمی خودکار می‌سازد.
+            برندهای آیفون، سامسونگ، شیائومی، ریلمی، هواوی و هانر به‌صورت یک‌جا ثبت می‌شوند.
           </div>
         </form>
-
-        <hr>
 
         <form method="POST" action="{{ route('model-lists.import-from-products') }}">
           @csrf
           <button class="btn btn-outline-secondary w-100">دریافت مدل‌ها از کالاهای موجود</button>
-          <div class="small text-muted mt-2">
-            مدل‌ها از روی نام تنوع‌ها استخراج می‌شوند و همراه با کد خودکار ذخیره می‌گردند.
-          </div>
         </form>
-
       </div>
     </div>
   </div>
@@ -58,48 +53,27 @@
   <div class="col-lg-8">
     <div class="card shadow-sm">
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-          <h6 class="mb-0">لیست مدل‌ها</h6>
-
-          <form method="GET" action="{{ route('model-lists.index') }}" class="d-flex gap-2">
-            <input name="q" class="form-control form-control-sm" value="{{ $q ?? '' }}" placeholder="جستجو: مدل یا کد">
-            <button class="btn btn-sm btn-outline-secondary">جستجو</button>
-          </form>
-        </div>
+        <h6 class="mb-3">لیست مدل‌ها (تفکیک برند)</h6>
 
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead>
               <tr>
-                <th style="width:180px;">کد</th>
-                <th>مدل کامل</th>
+                <th>برند</th>
+                <th>کد ۳ رقمی</th>
+                <th>مدل گوشی</th>
               </tr>
             </thead>
             <tbody>
               @forelse($modelLists as $item)
                 <tr>
-                  <td>
-                    <form method="POST" action="{{ route('model-lists.update', $item) }}" class="d-flex gap-2 align-items-center">
-                      @csrf
-                      @method('PUT')
-                      <input name="code"
-                             class="form-control form-control-sm"
-                             maxlength="4"
-                             inputmode="numeric"
-                             value="{{ $item->code }}"
-                             placeholder="----"
-                             style="max-width:110px;">
-                      <button class="btn btn-sm btn-outline-primary">ذخیره</button>
-                    </form>
-                    @if(!$item->code)
-                      <div class="small text-danger mt-1">بدون کد</div>
-                    @endif
-                  </td>
+                  <td><span class="badge bg-info-subtle text-dark">{{ $item->brand ?: 'سایر' }}</span></td>
+                  <td><span class="badge bg-light text-dark">{{ $item->code ?: '—' }}</span></td>
                   <td class="fw-semibold">{{ $item->model_name }}</td>
                 </tr>
               @empty
                 <tr>
-                  <td colspan="2" class="text-center text-muted py-4">هنوز مدلی ثبت نشده است.</td>
+                  <td colspan="3" class="text-center text-muted py-4">هنوز مدلی ثبت نشده است.</td>
                 </tr>
               @endforelse
             </tbody>

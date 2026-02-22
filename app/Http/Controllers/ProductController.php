@@ -49,11 +49,7 @@ class ProductController extends Controller
             ->get();
 
         $categories = Category::query()->orderBy('name')->get();
-
-        $modelLists = ModelList::query()
-            ->whereNotNull('code')
-            ->orderBy('model_name')
-            ->get(['id', 'model_name', 'code']);
+        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('brand')->orderBy('model_name')->get(['id', 'brand', 'model_name', 'code']);
 
         return view('products.index', compact('products', 'categoryTree', 'categories', 'modelLists'));
     }
@@ -61,11 +57,7 @@ class ProductController extends Controller
     public function create()
     {
         $categories = Category::query()->orderBy('name')->get();
-
-        $modelLists = ModelList::query()
-            ->whereNotNull('code')
-            ->orderBy('model_name')
-            ->get(['id', 'model_name', 'code']);
+        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('brand')->orderBy('model_name')->get(['id', 'brand', 'model_name', 'code']);
 
         return view('products.create', compact('categories', 'modelLists'));
     }
@@ -172,7 +164,7 @@ class ProductController extends Controller
     {
         $product->load('variants');
         $categories = Category::orderBy('name')->get();
-        $modelListOptions = ModelList::query()->orderBy('model_name')->get(['id', 'model_name', 'code']);
+        $modelListOptions = ModelList::query()->orderBy('brand')->orderBy('model_name')->get(['id', 'brand', 'model_name', 'code']);
 
         return view('products.edit', compact('product', 'categories', 'modelListOptions'));
     }
@@ -336,54 +328,8 @@ class ProductController extends Controller
      */
     private function normalizeCategory3(?string $code): ?string
     {
-        $digits = preg_replace('/\D+/', '', (string) ($code ?? ''));
-        if ($digits === '') {
-            return null;
-        }
-        // اگر بیشتر از 3 رقم بود، 3 رقم اول را برمی‌داریم
-        $digits = substr($digits, 0, 3);
-
-        if (strlen($digits) < 3) {
-            $digits = str_pad($digits, 3, '0', STR_PAD_LEFT);
-        }
-
-        return $digits;
-    }
-
-    /**
-     * تولید کد کالا 8 رقمی: CCC + PPPPP
-     * - CCC از کد دسته‌بندی
-     * - PPPPP شماره ترتیبی کالا در همان دسته
-     */
-    private function generateProductCode8(int $categoryId, string $catCode3): string
-    {
-        // آخرین کد این دسته
-        $last = Product::query()
-            ->where('category_id', $categoryId)
-            ->whereNotNull('code')
-            ->where('code', 'like', $catCode3 . '%')
-            ->orderByDesc('code')
-            ->lockForUpdate()
-            ->first();
-
-        $lastSeq = 0;
-        if ($last && strlen((string)$last->code) >= 8) {
-            $lastSeq = (int) substr((string)$last->code, 3, 5);
-        }
-
-        $nextSeq = $lastSeq + 1;
-
-        return $catCode3 . str_pad((string)$nextSeq, 5, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * تولید کد تنوع 12 رقمی: (کد کالا 8) + (suffix 4)
-     * suffix = VVVV
-     * تضمین می‌کند variant_code یکتا باشد.
-     */
-    private function generateVariantCode12(string $productCode8, string $suffix4, ?int $ignoreId = null): string
-    {
-        $base = $productCode8 . $suffix4; // 12 digit
+        $normalizedModelCode = str_pad(preg_replace('/\D/', '', (string) $modelCode), 4, '0', STR_PAD_LEFT);
+        $base = $categoryCode . $normalizedModelCode . $varietyCode;
         $code = $base;
 
         $counter = (int) $suffix4;

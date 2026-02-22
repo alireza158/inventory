@@ -56,8 +56,8 @@
         <label class="form-label">مدل‌لیست‌های این کالا</label>
         <select name="model_list_ids[]" id="pModels" class="form-select" multiple size="10" required>
           @foreach($modelLists as $model)
-            <option value="{{ $model->id }}" data-name="{{ $model->model_name }}" @selected(collect(old('model_list_ids', []))->contains($model->id))>
-              {{ $model->model_name }} (کد: {{ $model->code }})
+            <option value="{{ $model->id }}" @selected(collect(old('model_list_ids', []))->contains($model->id))>
+              {{ $model->brand ? ($model->brand . ' - ') : '' }}{{ $model->model_name }} ({{ $model->code }})
             </option>
           @endforeach
         </select>
