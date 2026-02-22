@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/model-lists', [ModelListController::class, 'index'])->name('model-lists.index');
     Route::post('/model-lists', [ModelListController::class, 'store'])->name('model-lists.store');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
+    Route::post('/model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])->name('model-lists.import-phone-catalog');
 
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
 
