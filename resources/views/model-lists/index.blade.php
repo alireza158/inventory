@@ -26,6 +26,7 @@
             <input name="model_name" class="form-control" value="{{ old('model_name') }}" placeholder="مثلاً Galaxy S24 Ultra" required>
             <div class="form-text">کد مدل باید سه‌رقمی باشد تا برای بارکدسازی قابل استفاده باشد.</div>
           </div>
+
           <div class="col-12 d-grid">
             <button class="btn btn-primary">ذخیره مدل</button>
           </div>
