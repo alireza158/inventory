@@ -15,22 +15,18 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">کد دسته‌بندی (۴ رقم)</label>
-        <input type="text" name="code" maxlength="4" class="form-control" value="{{ old('code') }}" required>
-        @error('code') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-      </div>
-
-      <div class="mb-3">
         <label class="form-label">دسته والد (اختیاری)</label>
         <select name="parent_id" class="form-select">
           <option value="">— بدون والد (دسته اصلی) —</option>
           @foreach($parents as $p)
-            <option value="{{ $p->id }}" @selected(old('parent_id') == $p->id)>
-              {{ $p->name }}
-            </option>
+            <option value="{{ $p->id }}" @selected(old('parent_id') == $p->id)>{{ $p->name }}</option>
           @endforeach
         </select>
         @error('parent_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+      </div>
+
+      <div class="alert alert-light border small mb-3">
+        کد دسته‌بندی به صورت خودکار، <b>۲ رقمی یونیک</b> ساخته می‌شود.
       </div>
 
       <button class="btn btn-primary">ذخیره</button>

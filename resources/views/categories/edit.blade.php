@@ -16,9 +16,9 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">کد دسته‌بندی (۴ رقم)</label>
-        <input type="text" name="code" maxlength="4" class="form-control" value="{{ old('code', $category->code) }}" required>
-        @error('code') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+        <label class="form-label">کد دسته‌بندی</label>
+        <input type="text" class="form-control" value="{{ $category->code }}" disabled>
+        <div class="form-text">کد به صورت خودکار ۲ رقمی است. (در صورت نامعتبر بودن، با بروزرسانی اصلاح می‌شود)</div>
       </div>
 
       <div class="mb-3">
@@ -26,9 +26,7 @@
         <select name="parent_id" class="form-select">
           <option value="">— بدون والد (دسته اصلی) —</option>
           @foreach($parents as $p)
-            <option value="{{ $p->id }}" @selected(old('parent_id', $category->parent_id) == $p->id)>
-              {{ $p->name }}
-            </option>
+            <option value="{{ $p->id }}" @selected(old('parent_id', $category->parent_id) == $p->id)>{{ $p->name }}</option>
           @endforeach
         </select>
         @error('parent_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror

@@ -41,7 +41,7 @@ Route::middleware('auth')->group(function () {
     // Products + categories
     Route::resource('products', ProductController::class)->except(['show']);
     Route::resource('categories', CategoryController::class)->except(['show']);
-
+    Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
 
     Route::get('/products/import', [ProductImportController::class, 'show'])->name('products.import.show');
@@ -54,10 +54,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/model-lists', [ModelListController::class, 'index'])->name('model-lists.index');
     Route::post('/model-lists', [ModelListController::class, 'store'])->name('model-lists.store');
     Route::put('/model-lists/{modelList}', [ModelListController::class, 'update'])->name('model-lists.update');
+    Route::delete('/model-lists/{modelList}', [ModelListController::class, 'destroy'])->name('model-lists.destroy');
+
     Route::post('/model-lists/assign-codes', [ModelListController::class, 'assignCodes'])->name('model-lists.assign-codes');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
     Route::post('/model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])->name('model-lists.import-phone-catalog');
-
     // Quick category store
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
 
