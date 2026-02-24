@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
+<style>
+  .color-dot { width: 22px; height: 22px; border-radius: 50%; border:1px solid #d1d5db; display:inline-block; }
+</style>
+
 <div class="row g-3">
   <div class="col-lg-4">
     <div class="card shadow-sm">
@@ -14,7 +18,10 @@
             <input name="code" class="form-control mb-2" maxlength="2" value="{{ old('code') }}" required>
 
             <label class="form-label">نام رنگ</label>
-            <input name="name" class="form-control" value="{{ old('name') }}" required>
+            <input name="name" class="form-control mb-2" value="{{ old('name') }}" required>
+
+            <label class="form-label">خود رنگ</label>
+            <input type="color" name="hex_code" class="form-control form-control-color" value="{{ old('hex_code', '#9CA3AF') }}" title="انتخاب رنگ" required>
           </div>
 
           <div class="col-12 d-grid">
@@ -42,6 +49,7 @@
             <thead>
               <tr>
                 <th>کد</th>
+                <th>رنگ</th>
                 <th>نام رنگ</th>
                 <th></th>
               </tr>
@@ -49,13 +57,15 @@
             <tbody>
               @forelse($colors as $color)
                 <tr>
-                  <td style="width:100px">{{ $color->code }}</td>
+                  <td style="width:80px">{{ $color->code }}</td>
+                  <td style="width:80px"><span class="color-dot" style="background: {{ $color->hex_code }}"></span></td>
                   <td>
-                    <form method="POST" action="{{ route('colors.update', $color) }}" class="d-flex gap-2">
+                    <form method="POST" action="{{ route('colors.update', $color) }}" class="d-flex gap-2 align-items-center">
                       @csrf
                       @method('PUT')
-                      <input name="code" class="form-control" maxlength="2" value="{{ $color->code }}" style="max-width:120px" required>
+                      <input name="code" class="form-control" maxlength="2" value="{{ $color->code }}" style="max-width:80px" required>
                       <input name="name" class="form-control" value="{{ $color->name }}" required>
+                      <input type="color" name="hex_code" class="form-control form-control-color" value="{{ $color->hex_code ?? '#9CA3AF' }}" title="انتخاب رنگ" required>
                       <button class="btn btn-outline-primary btn-sm">ذخیره</button>
                     </form>
                   </td>
@@ -68,7 +78,7 @@
                   </td>
                 </tr>
               @empty
-                <tr><td colspan="3" class="text-center text-muted py-4">هنوز رنگی ثبت نشده است.</td></tr>
+                <tr><td colspan="4" class="text-center text-muted py-4">هنوز رنگی ثبت نشده است.</td></tr>
               @endforelse
             </tbody>
           </table>
