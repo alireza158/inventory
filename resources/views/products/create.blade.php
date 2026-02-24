@@ -56,7 +56,7 @@
         <label class="form-label">مدل‌لیست‌های این کالا</label>
         <select name="model_list_ids[]" id="pModels" class="form-select" multiple size="10" required>
           @foreach($modelLists as $model)
-            <option value="{{ $model->id }}" @selected(collect(old('model_list_ids', []))->contains($model->id))>
+            <option value="{{ $model->id }}" data-name="{{ $model->model_name }}" @selected(collect(old('model_list_ids', []))->contains($model->id))>
               {{ $model->brand ? ($model->brand . ' - ') : '' }}{{ $model->model_name }} ({{ $model->code }})
             </option>
           @endforeach
@@ -68,6 +68,26 @@
         <label class="form-label">تعداد طرح (برای هر مدل)</label>
         <input type="number" min="1" max="500" name="design_count" id="pDesignCount"
                class="form-control" value="{{ old('design_count', 1) }}" required>
+      </div>
+
+
+      <div class="col-md-4">
+        <div class="form-check mt-4">
+          <input class="form-check-input" type="checkbox" value="1" id="hasColors" name="has_colors" @checked(old('has_colors'))>
+          <label class="form-check-label" for="hasColors">این محصول رنگ‌بندی دارد</label>
+        </div>
+      </div>
+
+      <div class="col-md-8" id="colorsWrap" style="display:none;">
+        <label class="form-label">رنگ‌های قابل ارائه</label>
+        <select name="color_ids[]" id="pColors" class="form-select" multiple size="6">
+          @foreach($colors as $color)
+            <option value="{{ $color->id }}" data-name="{{ $color->name }}" @selected(collect(old('color_ids', []))->contains($color->id))>
+              {{ $color->name }} ({{ $color->code }})
+            </option>
+          @endforeach
+        </select>
+        <div class="form-text">اگر تیک رنگ‌بندی فعال باشد، انتخاب حداقل یک رنگ الزامی است.</div>
       </div>
 
       <div class="col-md-8">
@@ -120,6 +140,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const calcModels = document.getElementById('calcModels');
   const calcDesigns = document.getElementById('calcDesigns');
   const calcTotal = document.getElementById('calcTotal');
+  const hasColorsEl = document.getElementById('hasColors');
+  const colorsWrap = document.getElementById('colorsWrap');
+  const colorsEl = document.getElementById('pColors');
 
   const btnBuild = document.getElementById('btnBuild');
   const previewBox = document.getElementById('previewBox');
@@ -133,7 +156,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateCounts(){
     const m = modelsEl.selectedOptions.length;
     const d = parseInt(designEl.value || '0', 10);
-    const total = m * d;
+    const c = hasColorsEl.checked ? Math.max(colorsEl.selectedOptions.length, 0) : 1;
+    const total = m * d * c;
 
     calcModels.textContent = `مدل‌ها: ${m}`;
     calcDesigns.textContent = `طرح‌ها: ${d}`;
@@ -141,19 +165,30 @@ document.addEventListener('DOMContentLoaded', () => {
     return {m,d,total};
   }
 
+  function syncColorVisibility(){
+    const on = hasColorsEl.checked;
+    colorsWrap.style.display = on ? 'block' : 'none';
+    colorsEl.required = on;
+    updateCounts();
+  }
+
   modelsEl.addEventListener('change', updateCounts);
   designEl.addEventListener('input', updateCounts);
+  colorsEl.addEventListener('change', updateCounts);
+  hasColorsEl.addEventListener('change', syncColorVisibility);
+  syncColorVisibility();
   updateCounts();
 
   btnBuild.addEventListener('click', () => {
     const baseName = (nameEl.value || '').trim();
     const models = getSelectedModelNames();
     const d = parseInt(designEl.value || '0', 10);
+    const colors = hasColorsEl.checked ? Array.from(colorsEl.selectedOptions).map(o => o.dataset.name || o.textContent.trim()) : [''];
 
     const {total} = updateCounts();
 
     previewList.innerHTML = '';
-    if(!baseName || models.length === 0 || d < 1){
+    if(!baseName || models.length === 0 || d < 1 || (hasColorsEl.checked && colors.length === 0)){
       previewBox.style.display = 'block';
       previewHint.textContent = 'برای پیش‌نمایش: نام کالا + حداقل یک مدل + تعداد طرح را وارد کنید.';
       return;
@@ -167,14 +202,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let rendered = 0;
 
     models.forEach(model => {
+      colors.forEach(color => {
       for(let i=1;i<=d;i++){
         rendered++;
         if(rendered > MAX_RENDER) return;
         const row = document.createElement('div');
         row.className = 'preview-item';
-        row.innerHTML = `<div>${baseName} ${model} طرح ${i}</div><div class="preview-meta">تنوع</div>`;
+        row.innerHTML = `<div>${baseName} ${model} ${color ? ('['+color+']') : ''} طرح ${i}</div><div class="preview-meta">تنوع</div>`;
         previewList.appendChild(row);
       }
+      });
     });
 
     if(total > MAX_RENDER){
