@@ -16,12 +16,7 @@ class CategoryController extends Controller
             ->orderBy('name')
             ->get();
 
-        $categories = Category::query()
-            ->with('parent')
-            ->orderBy('name')
-            ->get();
-
-        return view('categories.index', compact('rootCategories', 'categories'));
+        return view('categories.index', compact('rootCategories'));
     }
 
     public function create()
@@ -33,12 +28,24 @@ class CategoryController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
+<<<<<<< HEAD
             'name'      => ['required','string','max:255','unique:categories,name'],
             'parent_id' => ['nullable','integer','exists:categories,id'],
         ]);
 
         DB::transaction(function () use ($data) {
             $code = $this->generateUniqueTwoDigitCode();
+=======
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name'],
+            'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
+        ]);
+
+        Category::create([
+            'name' => $data['name'],
+            'code' => $this->nextCategoryCode(),
+            'parent_id' => $data['parent_id'] ?? null,
+        ]);
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
 
             Category::create([
                 'name' => $data['name'],
@@ -59,6 +66,7 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         $data = $request->validate([
+<<<<<<< HEAD
             'name'      => ['required','string','max:255','unique:categories,name,'.$category->id],
             'parent_id' => ['nullable','integer','exists:categories,id','not_in:'.$category->id],
         ]);
@@ -68,6 +76,16 @@ class CategoryController extends Controller
             if (!$this->isTwoDigitCode($category->code)) {
                 $category->code = $this->generateUniqueTwoDigitCode($category->id);
             }
+=======
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name,' . $category->id],
+            'parent_id' => ['nullable', 'integer', 'exists:categories,id', 'not_in:' . $category->id],
+        ]);
+
+        $category->update([
+            'name' => $data['name'],
+            'parent_id' => $data['parent_id'] ?? null,
+        ]);
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
 
             $category->update([
                 'name' => $data['name'],
@@ -92,11 +110,16 @@ class CategoryController extends Controller
     public function quickStore(Request $request)
     {
         $data = $request->validate([
+<<<<<<< HEAD
             'name'      => ['required', 'string', 'max:255', 'unique:categories,name'],
+=======
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name'],
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
             'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
             'redirect_to' => ['nullable', 'string'],
         ]);
 
+<<<<<<< HEAD
         $category = null;
 
         DB::transaction(function () use (&$category, $data) {
@@ -111,10 +134,21 @@ class CategoryController extends Controller
 
         $redirectTo = $data['redirect_to'] ?? route('products.index');
 
+=======
+        $category = Category::create([
+            'name' => $data['name'],
+            'code' => $this->nextCategoryCode(),
+            'parent_id' => $data['parent_id'] ?? null,
+        ]);
+
+        $redirectTo = $data['redirect_to'] ?? route('products.index');
+
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
         return redirect($redirectTo . '?category_id=' . $category->id)
             ->with('success', 'دسته‌بندی با موفقیت ساخته شد.');
     }
 
+<<<<<<< HEAD
     /**
      * ✅ اصلاح همه کدها به 2 رقمی رندوم یونیک
      * اگر قبلاً 4 رقمی بوده یا تکراری/نامعتبر شده، با یک کلیک درست می‌شود.
@@ -199,3 +233,26 @@ class CategoryController extends Controller
         abort(422, 'کد ۲ رقمی خالی موجود نیست.');
     }
 }
+=======
+    private function nextCategoryCode(): string
+    {
+        $used = Category::query()
+            ->whereNotNull('code')
+            ->pluck('code')
+            ->map(fn ($code) => preg_replace('/\D/', '', (string) $code))
+            ->filter(fn ($code) => $code !== '')
+            ->map(fn ($code) => (int) $code)
+            ->all();
+
+        $lookup = array_flip($used);
+
+        for ($i = 1; $i <= 999; $i++) {
+            if (!isset($lookup[$i])) {
+                return str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+            }
+        }
+
+        abort(422, 'کد ۳ رقمی خالی برای دسته‌بندی وجود ندارد.');
+    }
+}
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62

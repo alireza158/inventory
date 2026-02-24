@@ -4,7 +4,8 @@
     // برای اینکه تیتر بخش وقتی داخلش هستی حالت فعال بگیره (اختیاری)
     $productsActive = request()->routeIs('products.*')
                     || request()->routeIs('categories.*')
-                    || request()->routeIs('model-lists.*');
+                    || request()->routeIs('model-lists.*')
+                    || request()->routeIs('colors.*');
 
     $warehouseActive = request()->routeIs('purchases.*')
                     || request()->routeIs('vouchers.*')
@@ -58,6 +59,11 @@
             <a class="sidebar-sublink {{ $is('model-lists.index') }}"
                href="{{ route('model-lists.index') }}">
                 مدل لیست
+            </a>
+
+            <a class="sidebar-sublink {{ $is('colors.index') }}"
+               href="{{ route('colors.index') }}">
+                رنگ‌بندی
             </a>
         </div>
 

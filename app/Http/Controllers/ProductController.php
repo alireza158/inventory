@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Color;
 use App\Models\ModelList;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -57,6 +58,7 @@ class ProductController extends Controller
     public function create()
     {
         $categories = Category::query()->orderBy('name')->get();
+<<<<<<< HEAD
 
         $modelLists = ModelList::query()
             ->whereNotNull('code')
@@ -86,6 +88,12 @@ class ProductController extends Controller
         if ($next > 9999) $next = 9999;
 
         return str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+=======
+        $modelLists = ModelList::query()->whereNotNull('code')->orderBy('brand')->orderBy('model_name')->get(['id', 'brand', 'model_name', 'code']);
+        $colors = Color::query()->orderBy('code')->get(['id', 'name', 'code']);
+
+        return view('products.create', compact('categories', 'modelLists', 'colors'));
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
     }
 
     public function store(Request $request)
@@ -93,6 +101,7 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
+<<<<<<< HEAD
 
             'use_models' => ['nullable'],
             'use_designs' => ['nullable'],
@@ -103,10 +112,19 @@ class ProductController extends Controller
 
             'design_count' => ['nullable', 'integer', 'min:1', 'max:99'],
 
+=======
+            'model_list_ids' => ['required', 'array', 'min:1'],
+            'model_list_ids.*' => ['integer', 'exists:model_lists,id'],
+            'design_count' => ['required', 'integer', 'min:1', 'max:500'],
+            'has_colors' => ['nullable', 'boolean'],
+            'color_ids' => ['nullable', 'array'],
+            'color_ids.*' => ['integer', 'exists:colors,id'],
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
             'buy_price' => ['nullable', 'integer', 'min:0'],
             'sell_price' => ['nullable', 'integer', 'min:0'],
         ]);
 
+<<<<<<< HEAD
         $useModels = $request->boolean('use_models');
         $useDesigns = $request->boolean('use_designs');
 
@@ -135,6 +153,35 @@ class ProductController extends Controller
 
             // CCPP PP (6 digits)
             $productCode6 = $cat2 . $seq4;
+=======
+        $hasColors = (bool) ($data['has_colors'] ?? false);
+        $colorIds = array_values(array_unique(array_map('intval', $data['color_ids'] ?? [])));
+
+        if ($hasColors && count($colorIds) === 0) {
+            return back()->withErrors(['color_ids' => 'حداقل یک رنگ انتخاب کنید.'])->withInput();
+        }
+
+        DB::transaction(function () use ($data, $hasColors, $colorIds) {
+            $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
+            $catCode = $this->normalizeCategory3($category->code);
+
+            if ($catCode === null) {
+                abort(422, 'برای این دسته‌بندی «کد عددی» معتبر تعریف نشده است.');
+            }
+
+            $modelIds = array_values(array_map('intval', $data['model_list_ids']));
+            $designCount = (int) $data['design_count'];
+            $colors = $hasColors
+                ? Color::query()->whereIn('id', $colorIds)->get(['id', 'name'])->keyBy('id')
+                : collect();
+
+            $totalVariants = count($modelIds) * $designCount * max(1, $colors->count());
+            if ($totalVariants > 9999) {
+                abort(422, 'تعداد کل تنوع‌ها بیش از حد مجاز است (حداکثر 9999).');
+            }
+
+            $productCode = $this->generateProductCode8($category->id, $catCode);
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
 
             $product = Product::create([
                 'category_id' => $category->id,
@@ -146,8 +193,10 @@ class ProductController extends Controller
 
                 'stock' => 0,
                 'price' => 0,
+                'has_colors' => $hasColors,
             ]);
 
+<<<<<<< HEAD
             $sellPrice = (int) ($data['sell_price'] ?? 0);
             $buyPrice = isset($data['buy_price']) ? (int) $data['buy_price'] : null;
 
@@ -203,6 +252,45 @@ class ProductController extends Controller
                         'stock' => 0,
                         'reserved' => 0,
                     ]);
+=======
+            $modelLists = ModelList::query()->whereIn('id', $modelIds)->get(['id', 'model_name'])->keyBy('id');
+            $orderedModels = collect($modelIds)->map(fn ($id) => $modelLists->get($id))->filter()->values();
+
+            $variantSeq = 0;
+            $colorLoop = $hasColors ? $colorIds : [null];
+
+            foreach ($orderedModels as $model) {
+                foreach ($colorLoop as $colorId) {
+                    $colorName = $colorId ? ($colors->get($colorId)?->name ?? null) : null;
+
+                    for ($i = 1; $i <= $designCount; $i++) {
+                        $variantSeq++;
+                        $suffix = str_pad((string) $variantSeq, 4, '0', STR_PAD_LEFT);
+                        $variantCode = $this->generateVariantCode12($productCode, $suffix);
+
+                        $varietyName = 'طرح ' . $i;
+                        if ($colorName) {
+                            $varietyName = $colorName . ' - ' . $varietyName;
+                        }
+
+                        $variantName = trim($model->model_name . ' ' . $varietyName);
+
+                        ProductVariant::create([
+                            'product_id' => $product->id,
+                            'model_list_id' => $model->id,
+                            'color_id' => $colorId,
+                            'variant_name' => $variantName,
+                            'variety_name' => $varietyName,
+                            'variety_code' => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+                            'variant_code' => $variantCode,
+                            'sku' => $variantCode,
+                            'buy_price' => $data['buy_price'] ?? null,
+                            'sell_price' => $data['sell_price'] ?? 0,
+                            'stock' => 0,
+                            'reserved' => 0,
+                        ]);
+                    }
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
                 }
             }
 
@@ -283,14 +371,17 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
-
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'variants.*.variant_name' => ['required', 'string', 'max:255'],
+<<<<<<< HEAD
             'variants.*.model_list_id' => ['nullable', 'integer', 'exists:model_lists,id'],
+=======
+            'variants.*.model_list_id' => ['required', 'integer', 'exists:model_lists,id'],
+            'variants.*.color_id' => ['nullable', 'integer', 'exists:colors,id'],
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
             'variants.*.variety_name' => ['required', 'string', 'max:255'],
             'variants.*.variety_code' => ['required', 'digits:4'],
-
             'variants.*.sell_price' => ['required', 'integer', 'min:0'],
             'variants.*.buy_price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required', 'integer', 'min:0'],
@@ -301,13 +392,20 @@ class ProductController extends Controller
 
             // نکته: کد محصول را تغییر نمی‌دهیم تا بارکدهای چاپ‌شده بهم نریزد.
             $product->update([
+<<<<<<< HEAD
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
+=======
+                'category_id' => $data['category_id'],
+                'name' => $data['name'],
+                'has_colors' => collect($data['variants'])->contains(fn ($v) => !empty($v['color_id'])),
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
             ]);
 
             $keepIds = [];
 
             foreach ($data['variants'] as $v) {
+<<<<<<< HEAD
                 $ignoreId = !empty($v['id']) ? (int) $v['id'] : null;
 
                 $modelCode3 = '000';
@@ -350,8 +448,48 @@ class ProductController extends Controller
                         'product_id' => $product->id,
                         'reserved' => 0,
                     ]));
+=======
+                if (!empty($v['id'])) {
+                    $variant = ProductVariant::where('product_id', $product->id)->where('id', $v['id'])->first();
+                    if (!$variant) {
+                        continue;
+                    }
+
+                    $variant->update([
+                        'variant_name' => $v['variant_name'],
+                        'model_list_id' => $v['model_list_id'],
+                        'color_id' => $v['color_id'] ?? null,
+                        'variety_name' => $v['variety_name'],
+                        'variety_code' => $v['variety_code'],
+                        'sell_price' => (int) $v['sell_price'],
+                        'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
+                        'stock' => (int) $v['stock'],
+                    ]);
+
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
                     $keepIds[] = $variant->id;
+                    continue;
                 }
+
+                $suffix = str_pad((string) $this->getNextVariantSuffixInt($product), 4, '0', STR_PAD_LEFT);
+                $variantCode = $this->generateVariantCode12((string) $product->code, $suffix);
+
+                $variant = ProductVariant::create([
+                    'product_id' => $product->id,
+                    'model_list_id' => $v['model_list_id'],
+                    'color_id' => $v['color_id'] ?? null,
+                    'variant_name' => $v['variant_name'],
+                    'variety_name' => $v['variety_name'],
+                    'variety_code' => $v['variety_code'],
+                    'variant_code' => $variantCode,
+                    'sku' => $variantCode,
+                    'sell_price' => (int) $v['sell_price'],
+                    'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
+                    'stock' => (int) $v['stock'],
+                    'reserved' => 0,
+                ]);
+
+                $keepIds[] = $variant->id;
             }
 
             ProductVariant::where('product_id', $product->id)
@@ -367,6 +505,7 @@ class ProductController extends Controller
     public function destroy(Product $product)
     {
         $product->delete();
+
         return redirect()->route('products.index')->with('success', 'کالا حذف شد.');
     }
 
@@ -386,12 +525,14 @@ class ProductController extends Controller
         }
 
         $products = $query->orderBy('name')->paginate(50)->withQueryString();
+
         return view('products.pricelist', compact('products'));
     }
 
     public function syncCrm(CrmProductSyncService $service)
     {
         $res = $service->sync();
+
         return redirect()->route('products.index')->with('success', "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']}");
     }
 
@@ -411,6 +552,7 @@ class ProductController extends Controller
         ]);
     }
 
+<<<<<<< HEAD
     private function normalizeCategory2(?string $code): ?string
     {
         $c = trim((string) ($code ?? ''));
@@ -458,8 +600,55 @@ class ProductController extends Controller
 
         if ($exists) {
             abort(422, "کد تنوع تکراری است: {$code} (مدل/طرح تکراری انتخاب شده).");
+=======
+    private function normalizeCategory3(?string $code): ?string
+    {
+        $digits = preg_replace('/\D/', '', (string) $code);
+        if (strlen($digits) < 3) {
+            return null;
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
         }
 
-        return $code;
+        return str_pad(substr($digits, -3), 3, '0', STR_PAD_LEFT);
+    }
+
+    private function generateProductCode8(int $categoryId, string $catCode): string
+    {
+        $lastCode = Product::query()
+            ->where('category_id', $categoryId)
+            ->where('code', 'like', $catCode . '%')
+            ->orderByDesc('id')
+            ->value('code');
+
+        $seq = 1;
+        if ($lastCode && preg_match('/^\d{8}$/', (string) $lastCode)) {
+            $seq = ((int) substr((string) $lastCode, 3)) + 1;
+        }
+
+        if ($seq > 99999) {
+            abort(422, 'امکان تولید کد یکتا برای کالا وجود ندارد.');
+        }
+
+        return $catCode . str_pad((string) $seq, 5, '0', STR_PAD_LEFT);
+    }
+
+    private function generateVariantCode12(string $productCode8, string $suffix4): string
+    {
+        return $productCode8 . str_pad(preg_replace('/\D/', '', $suffix4), 4, '0', STR_PAD_LEFT);
+    }
+<<<<<<< HEAD
+}
+=======
+
+    private function getNextVariantSuffixInt(Product $product): int
+    {
+        $max = ProductVariant::query()
+            ->where('product_id', $product->id)
+            ->pluck('variant_code')
+            ->map(fn ($code) => (int) substr((string) $code, -4))
+            ->max();
+
+        return ((int) $max) + 1;
     }
 }
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62

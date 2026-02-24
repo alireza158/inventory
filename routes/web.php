@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChequeController;
+use App\Http\Controllers\ColorController;
 use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -59,6 +60,18 @@ Route::middleware('auth')->group(function () {
     Route::post('/model-lists/assign-codes', [ModelListController::class, 'assignCodes'])->name('model-lists.assign-codes');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
     Route::post('/model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])->name('model-lists.import-phone-catalog');
+<<<<<<< HEAD
+=======
+
+
+    // Colors
+    Route::get('/colors', [ColorController::class, 'index'])->name('colors.index');
+    Route::post('/colors', [ColorController::class, 'store'])->name('colors.store');
+    Route::put('/colors/{color}', [ColorController::class, 'update'])->name('colors.update');
+    Route::delete('/colors/{color}', [ColorController::class, 'destroy'])->name('colors.destroy');
+    Route::post('/colors/seed-defaults', [ColorController::class, 'seedDefaults'])->name('colors.seed-defaults');
+
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
     // Quick category store
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
 

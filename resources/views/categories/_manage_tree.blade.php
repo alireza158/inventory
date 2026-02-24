@@ -32,8 +32,22 @@
       $indent = $level * 18;
     @endphp
 
+<<<<<<< HEAD
     <li class="mb-2" style="margin-right: {{ $indent }}px;">
       <div class="cat-item d-flex align-items-center justify-content-between gap-2">
+=======
+        <li class="mb-2" style="margin-right: {{ $indent }}px;">
+            <div class="d-flex align-items-center justify-content-between border rounded px-2 py-2 bg-white">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge text-bg-light border">{{ $cat->code ?: '—' }}</span>
+                    <span class="fw-semibold">{{ $cat->name }}</span>
+                    @if($cat->parent_id)
+                        <span class="badge text-bg-secondary">زیر‌دسته</span>
+                    @else
+                        <span class="badge text-bg-primary">دسته اصلی</span>
+                    @endif
+                </div>
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
 
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="badge bg-light text-dark cat-code">کد: {{ $cat->code ?? '--' }}</span>

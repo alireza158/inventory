@@ -44,6 +44,7 @@
 </div>
 
 <div class="card shadow-sm">
+<<<<<<< HEAD
   <div class="card-body">
     @if($rootCategories->isEmpty())
       <div class="text-center text-muted py-4">هیچ دسته‌بندی ثبت نشده.</div>
@@ -51,5 +52,15 @@
       @include('categories._manage_tree', ['nodes' => $rootCategories, 'level' => 0])
     @endif
   </div>
+=======
+    <div class="card-body">
+        @if($rootCategories->isEmpty())
+            <div class="text-center text-muted py-4">هیچ دسته‌بندی ثبت نشده.</div>
+        @else
+            <div class="small text-muted mb-3">نمایش ساده دسته‌بندی‌ها و زیر‌دسته‌ها</div>
+            @include('categories._manage_tree', ['nodes' => $rootCategories, 'level' => 0])
+        @endif
+    </div>
+>>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
 </div>
 @endsection
