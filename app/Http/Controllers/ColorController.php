@@ -10,6 +10,11 @@ class ColorController extends Controller
 {
     public function index()
     {
+        // اگر هنوز رنگی تعریف نشده باشد، ۳۲ رنگ پیش‌فرض را یک‌بار ایجاد می‌کنیم
+        if (Color::query()->count() === 0) {
+            $this->insertDefaultColors();
+        }
+
         $colors = Color::query()->orderBy('code')->paginate(100);
 
         return view('colors.index', compact('colors'));
@@ -58,7 +63,37 @@ class ColorController extends Controller
 
     public function seedDefaults(): RedirectResponse
     {
-        $defaults = [
+        $inserted = $this->insertDefaultColors();
+
+        return back()->with('success', "{$inserted} رنگ پیش‌فرض بارگذاری شد.");
+    }
+
+    private function insertDefaultColors(): int
+    {
+        $inserted = 0;
+
+        foreach ($this->defaultColors() as $idx => $row) {
+            $code = str_pad((string) ($idx + 1), 2, '0', STR_PAD_LEFT);
+
+            if (Color::query()->where('code', $code)->exists()) {
+                continue;
+            }
+
+            Color::create([
+                'name' => $row['name'],
+                'code' => $code,
+                'hex_code' => $row['hex_code'],
+            ]);
+
+            $inserted++;
+        }
+
+        return $inserted;
+    }
+
+    private function defaultColors(): array
+    {
+        return [
             ['name' => 'مشکی', 'hex_code' => '#000000'],
             ['name' => 'سفید', 'hex_code' => '#FFFFFF'],
             ['name' => 'نقره‌ای', 'hex_code' => '#C0C0C0'],
@@ -92,25 +127,5 @@ class ColorController extends Controller
             ['name' => 'طرح‌دار', 'hex_code' => '#F59E0B'],
             ['name' => 'نامشخص', 'hex_code' => '#9CA3AF'],
         ];
-
-        $inserted = 0;
-
-        foreach ($defaults as $idx => $row) {
-            $code = str_pad((string) ($idx + 1), 2, '0', STR_PAD_LEFT);
-
-            if (Color::query()->where('code', $code)->exists()) {
-                continue;
-            }
-
-            Color::create([
-                'name' => $row['name'],
-                'code' => $code,
-                'hex_code' => $row['hex_code'],
-            ]);
-
-            $inserted++;
-        }
-
-        return back()->with('success', "{$inserted} رنگ پیش‌فرض بارگذاری شد.");
     }
 }

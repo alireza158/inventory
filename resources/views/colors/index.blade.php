@@ -43,6 +43,9 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h6 class="mb-3">لیست رنگ‌ها</h6>
+        <div class="alert alert-light border py-2">
+          اگر رنگی ثبت نشده باشد، ۳۲ رنگ پیش‌فرض به‌صورت خودکار ایجاد می‌شود.
+        </div>
 
         <div class="table-responsive">
           <table class="table table-sm align-middle">
