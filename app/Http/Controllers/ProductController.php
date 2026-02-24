@@ -17,10 +17,13 @@ class ProductController extends Controller
         $query = Product::query()->with(['category', 'variants']);
 
         if ($request->filled('q')) {
-            $q = $request->q;
+            $q = trim((string) $request->q);
+
             $query->where(function ($qq) use ($q) {
                 $qq->where('name', 'like', "%{$q}%")
-                    ->orWhere('code', 'like', "%{$q}%");
+                    ->orWhere('code', 'like', "%{$q}%")
+                    ->orWhere('short_barcode', 'like', "%{$q}%") // ✅ سرچ با PPPP
+                    ->orWhere('sku', 'like', "%{$q}%");
             });
         }
 
@@ -55,7 +58,6 @@ class ProductController extends Controller
     {
         $categories = Category::query()->orderBy('name')->get();
 
-        // مدل‌لیست‌ها فقط آنهایی که کد دارند (۳ رقمی)
         $modelLists = ModelList::query()
             ->whereNotNull('code')
             ->where('code', '<>', '')
@@ -63,7 +65,27 @@ class ProductController extends Controller
             ->orderBy('model_name')
             ->get(['id', 'brand', 'model_name', 'code']);
 
-        return view('products.create', compact('categories', 'modelLists'));
+        // ✅ PPPP پیش‌نمایش
+        $previewSeq4 = $this->peekNextProductSeq4();
+
+        return view('products.create', compact('categories', 'modelLists', 'previewSeq4'));
+    }
+
+    /**
+     * PPPP پیش‌نمایش (ممکنه هنگام ثبت واقعی یکی جلوتر بیفته)
+     * نکته: هم short_barcode و هم SUBSTRING(code,3,4) را لحاظ می‌کنیم تا داده‌های قدیمی هم پوشش داده شود.
+     */
+    private function peekNextProductSeq4(): string
+    {
+        $mx = DB::table('products')
+            ->selectRaw("MAX(CAST(COALESCE(NULLIF(short_barcode,''), SUBSTRING(code, 3, 4)) AS UNSIGNED)) as mx")
+            ->value('mx');
+
+        $next = ((int) $mx) + 1;
+        if ($next < 1) $next = 1;
+        if ($next > 9999) $next = 9999;
+
+        return str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 
     public function store(Request $request)
@@ -71,46 +93,57 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
-            'variant_type' => ['required', 'in:design,model,both'],
 
-            // مدل‌لیست لازم برای model و both
+            'use_models' => ['nullable'],
+            'use_designs' => ['nullable'],
+            'model_brand_group' => ['nullable', 'string', 'max:100'],
+
             'model_list_ids' => ['nullable', 'array'],
             'model_list_ids.*' => ['integer', 'exists:model_lists,id'],
 
-            // تعداد طرح لازم برای design و both
             'design_count' => ['nullable', 'integer', 'min:1', 'max:99'],
 
             'buy_price' => ['nullable', 'integer', 'min:0'],
             'sell_price' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        $type = $data['variant_type'];
+        $useModels = $request->boolean('use_models');
+        $useDesigns = $request->boolean('use_designs');
 
-        // قوانین منطقی
-        if (($type === 'model' || $type === 'both') && empty($data['model_list_ids'])) {
-            abort(422, 'حداقل یک مدل‌لیست انتخاب کنید.');
+        if ($useModels && empty($data['model_brand_group'])) {
+            abort(422, 'برای مدل‌لیست: ابتدا گروه برند را انتخاب کنید.');
         }
-        if (($type === 'design' || $type === 'both') && empty($data['design_count'])) {
-            abort(422, 'تعداد طرح را وارد کنید.');
+        if ($useModels && empty($data['model_list_ids'])) {
+            abort(422, 'برای مدل‌لیست: حداقل یک مدل انتخاب کنید.');
+        }
+        if ($useDesigns && empty($data['design_count'])) {
+            abort(422, 'برای طرح‌بندی: تعداد طرح را وارد کنید.');
         }
 
-        DB::transaction(function () use ($data, $type) {
+        DB::transaction(function () use ($data, $useModels, $useDesigns) {
 
             $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
+
+            // CC (2 digit)
             $cat2 = $this->normalizeCategory2($category->code);
             if ($cat2 === null) {
                 abort(422, 'کد دسته‌بندی باید ۲ رقمی باشد (00 تا 99).');
             }
 
-            // PPPP = شماره ترتیبی محصول در کل سیستم (۴ رقمی)
+            // PPPP (global product sequence)  ✅
             $seq4 = $this->nextProductSeq4();
-            $productCode6 = $cat2 . $seq4; // CCPP PP (6 رقم)
+
+            // CCPP PP (6 digits)
+            $productCode6 = $cat2 . $seq4;
 
             $product = Product::create([
                 'category_id' => $category->id,
                 'name' => trim($data['name']),
                 'sku' => 'AUTO-' . now()->format('YmdHis') . '-' . random_int(100, 999),
-                'code' => $productCode6, // کد پایه محصول
+
+                'code' => $productCode6,     // کد پایه (CCPPPP)
+                'short_barcode' => $seq4,    // ✅ کد سریع 4 رقمی برای پیش‌فاکتور
+
                 'stock' => 0,
                 'price' => 0,
             ]);
@@ -118,32 +151,52 @@ class ProductController extends Controller
             $sellPrice = (int) ($data['sell_price'] ?? 0);
             $buyPrice = isset($data['buy_price']) ? (int) $data['buy_price'] : null;
 
-            // مدل‌ها
+            // مدل‌ها (حفظ ترتیب انتخاب کاربر)
             $models = collect();
-            if (!empty($data['model_list_ids'])) {
+            if ($useModels) {
                 $ids = array_values(array_map('intval', $data['model_list_ids']));
-                $models = ModelList::query()->whereIn('id', $ids)->get(['id','model_name','code'])->keyBy('id');
-                // حفظ ترتیب انتخاب کاربر
-                $models = collect($ids)->map(fn($id) => $models->get($id))->filter()->values();
+                $map = ModelList::query()->whereIn('id', $ids)->get(['id', 'model_name', 'code'])->keyBy('id');
+                $models = collect($ids)->map(fn ($id) => $map->get($id))->filter()->values();
             }
 
-            // ساخت تنوع‌ها
-            if ($type === 'design') {
+            // CASE 1: بدون مدل و بدون طرح
+            if (!$useModels && !$useDesigns) {
+                $variantCode = $this->buildVariantCode11($productCode6, '000', '00');
+
+                ProductVariant::create([
+                    'product_id' => $product->id,
+                    'model_list_id' => null,
+
+                    'variant_name' => $product->name,
+                    'variety_name' => '—',
+                    'variety_code' => '0000',
+
+                    'variant_code' => $variantCode,
+
+                    'sell_price' => $sellPrice,
+                    'buy_price' => $buyPrice,
+                    'stock' => 0,
+                    'reserved' => 0,
+                ]);
+            }
+
+            // CASE 2: فقط طرح
+            if ($useDesigns && !$useModels) {
                 $d = (int) $data['design_count'];
-                for ($i=1; $i <= $d; $i++) {
-                    $design2 = str_pad((string)$i, 2, '0', STR_PAD_LEFT);
-                    $model3 = '000';
-                    $variantCode = $this->buildVariantCode11($productCode6, $model3, $design2);
+
+                for ($i = 1; $i <= $d; $i++) {
+                    $design2 = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+                    $variantCode = $this->buildVariantCode11($productCode6, '000', $design2);
 
                     ProductVariant::create([
                         'product_id' => $product->id,
                         'model_list_id' => null,
+
                         'variant_name' => $product->name . ' طرح ' . $i,
                         'variety_name' => 'طرح ' . $i,
-                        'variety_code' => str_pad((string)$i, 4, '0', STR_PAD_LEFT),
+                        'variety_code' => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
 
                         'variant_code' => $variantCode,
-                        'sku' => $variantCode,
 
                         'sell_price' => $sellPrice,
                         'buy_price' => $buyPrice,
@@ -153,21 +206,21 @@ class ProductController extends Controller
                 }
             }
 
-            if ($type === 'model') {
+            // CASE 3: فقط مدل
+            if ($useModels && !$useDesigns) {
                 foreach ($models as $m) {
                     $model3 = $this->normalizeModel3($m->code);
-                    $design2 = '00';
-                    $variantCode = $this->buildVariantCode11($productCode6, $model3, $design2);
+                    $variantCode = $this->buildVariantCode11($productCode6, $model3, '00');
 
                     ProductVariant::create([
                         'product_id' => $product->id,
                         'model_list_id' => $m->id,
+
                         'variant_name' => $product->name . ' ' . $m->model_name,
                         'variety_name' => '—',
                         'variety_code' => '0000',
 
                         'variant_code' => $variantCode,
-                        'sku' => $variantCode,
 
                         'sell_price' => $sellPrice,
                         'buy_price' => $buyPrice,
@@ -177,23 +230,26 @@ class ProductController extends Controller
                 }
             }
 
-            if ($type === 'both') {
+            // CASE 4: مدل + طرح
+            if ($useModels && $useDesigns) {
                 $d = (int) $data['design_count'];
+
                 foreach ($models as $m) {
                     $model3 = $this->normalizeModel3($m->code);
-                    for ($i=1; $i <= $d; $i++) {
-                        $design2 = str_pad((string)$i, 2, '0', STR_PAD_LEFT);
+
+                    for ($i = 1; $i <= $d; $i++) {
+                        $design2 = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                         $variantCode = $this->buildVariantCode11($productCode6, $model3, $design2);
 
                         ProductVariant::create([
                             'product_id' => $product->id,
                             'model_list_id' => $m->id,
+
                             'variant_name' => $product->name . ' ' . $m->model_name . ' طرح ' . $i,
                             'variety_name' => 'طرح ' . $i,
-                            'variety_code' => str_pad((string)$i, 4, '0', STR_PAD_LEFT),
+                            'variety_code' => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
 
                             'variant_code' => $variantCode,
-                            'sku' => $variantCode,
 
                             'sell_price' => $sellPrice,
                             'buy_price' => $buyPrice,
@@ -214,7 +270,10 @@ class ProductController extends Controller
     {
         $product->load('variants');
         $categories = Category::orderBy('name')->get();
-        $modelListOptions = ModelList::query()->orderBy('brand')->orderBy('model_name')->get(['id', 'brand', 'model_name', 'code']);
+        $modelListOptions = ModelList::query()
+            ->orderBy('brand')
+            ->orderBy('model_name')
+            ->get(['id', 'brand', 'model_name', 'code']);
 
         return view('products.edit', compact('product', 'categories', 'modelListOptions'));
     }
@@ -240,14 +299,17 @@ class ProductController extends Controller
         DB::transaction(function () use ($data, $product) {
             $product = Product::query()->lockForUpdate()->findOrFail($product->id);
 
+            // نکته: کد محصول را تغییر نمی‌دهیم تا بارکدهای چاپ‌شده بهم نریزد.
             $product->update([
-                'category_id' => (int)$data['category_id'],
+                'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
             ]);
 
             $keepIds = [];
 
             foreach ($data['variants'] as $v) {
+                $ignoreId = !empty($v['id']) ? (int) $v['id'] : null;
+
                 $modelCode3 = '000';
                 $modelListId = $v['model_list_id'] ?? null;
 
@@ -256,10 +318,11 @@ class ProductController extends Controller
                     $modelCode3 = $this->normalizeModel3($model->code);
                 }
 
-                $design2 = substr((string)$v['variety_code'], -2);
+                // DD از variety_code آخرین 2 رقم
+                $design2 = substr((string) $v['variety_code'], -2);
                 if (!preg_match('/^\d{2}$/', $design2)) $design2 = '00';
 
-                $variantCode = $this->buildVariantCode11($product->code, $modelCode3, $design2);
+                $variantCode = $this->buildVariantCode11($product->code, $modelCode3, $design2, $ignoreId);
 
                 $payload = [
                     'variant_name' => $v['variant_name'],
@@ -267,14 +330,17 @@ class ProductController extends Controller
                     'variety_name' => $v['variety_name'],
                     'variety_code' => $v['variety_code'],
                     'variant_code' => $variantCode,
-                    'sku' => $variantCode,
-                    'sell_price' => (int)$v['sell_price'],
-                    'buy_price' => isset($v['buy_price']) ? (int)$v['buy_price'] : null,
-                    'stock' => (int)$v['stock'],
+
+                    'sell_price' => (int) $v['sell_price'],
+                    'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
+                    'stock' => (int) $v['stock'],
                 ];
 
                 if (!empty($v['id'])) {
-                    $variant = ProductVariant::where('product_id', $product->id)->where('id', $v['id'])->first();
+                    $variant = ProductVariant::where('product_id', $product->id)
+                        ->where('id', $v['id'])
+                        ->first();
+
                     if ($variant) {
                         $variant->update($payload);
                         $keepIds[] = $variant->id;
@@ -289,7 +355,7 @@ class ProductController extends Controller
             }
 
             ProductVariant::where('product_id', $product->id)
-                ->when(count($keepIds) > 0, fn($q) => $q->whereNotIn('id', $keepIds))
+                ->when(count($keepIds) > 0, fn ($q) => $q->whereNotIn('id', $keepIds))
                 ->delete();
 
             $this->recalcProductSummary($product);
@@ -307,11 +373,17 @@ class ProductController extends Controller
     public function priceList(Request $request)
     {
         $query = Product::query()->with('category');
+
         if ($request->filled('q')) {
-            $q = $request->q;
-            $query->where(fn($qq) => $qq->where('name','like',"%{$q}%")->orWhere('code','like',"%{$q}%"));
+            $q = trim((string) $request->q);
+            $query->where(fn ($qq) => $qq->where('name', 'like', "%{$q}%")
+                ->orWhere('code', 'like', "%{$q}%")
+                ->orWhere('short_barcode', 'like', "%{$q}%"));
         }
-        if ($request->filled('category_id')) $query->where('category_id', $request->category_id);
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
 
         $products = $query->orderBy('name')->paginate(50)->withQueryString();
         return view('products.pricelist', compact('products'));
@@ -334,14 +406,14 @@ class ProductController extends Controller
         }
 
         $product->update([
-            'stock' => max(0, (int)$product->variants->sum('stock')),
-            'price' => max(0, (int)$product->variants->min('sell_price')),
+            'stock' => max(0, (int) $product->variants->sum('stock')),
+            'price' => max(0, (int) $product->variants->min('sell_price')),
         ]);
     }
 
     private function normalizeCategory2(?string $code): ?string
     {
-        $c = trim((string)($code ?? ''));
+        $c = trim((string) ($code ?? ''));
         if ($c === '') return null;
         if (!preg_match('/^\d{2}$/', $c)) return null;
         return $c;
@@ -349,32 +421,42 @@ class ProductController extends Controller
 
     private function normalizeModel3(?string $code): string
     {
-        $c = preg_replace('/\D+/', '', (string)($code ?? ''));
+        $c = preg_replace('/\D+/', '', (string) ($code ?? ''));
         $c = substr($c, 0, 3);
         return str_pad($c, 3, '0', STR_PAD_LEFT);
     }
 
+    /**
+     * تولید PPPP واقعی (قفل داخل تراکنش)
+     * نکته: هم short_barcode و هم SUBSTRING(code,3,4) را لحاظ می‌کنیم تا داده‌های قدیمی هم پوشش داده شود.
+     */
     private function nextProductSeq4(): string
     {
         $mx = DB::table('products')
             ->lockForUpdate()
-            ->selectRaw("MAX(CAST(SUBSTRING(code, 3, 4) AS UNSIGNED)) as mx")
+            ->selectRaw("MAX(CAST(COALESCE(NULLIF(short_barcode,''), SUBSTRING(code, 3, 4)) AS UNSIGNED)) as mx")
             ->value('mx');
 
-        $next = ((int)$mx) + 1;
+        $next = ((int) $mx) + 1;
         if ($next > 9999) abort(422, 'حداکثر 9999 کالا پشتیبانی می‌شود (PPPP چهار رقمی است).');
 
-        return str_pad((string)$next, 4, '0', STR_PAD_LEFT);
+        return str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 
-    private function buildVariantCode11(string $productCode6, string $model3, string $design2): string
+    /**
+     * ساخت کد 11 رقمی: CCPPPPMMMDD
+     * - اگر ignoreId داده شود، در چک تکراری بودن، همان رکورد نادیده گرفته می‌شود.
+     */
+    private function buildVariantCode11(string $productCode6, string $model3, string $design2, ?int $ignoreId = null): string
     {
-        // CCPP PP + MMM + DD
         $code = $productCode6 . $model3 . $design2;
 
-        // اگر variant_code یونیک در DB است، این چک خیلی کمک می‌کند:
-        if (ProductVariant::where('variant_code', $code)->exists()) {
-            // این یعنی دو تنوع با مدل/طرح تکراری ساخته شده
+        $exists = ProductVariant::query()
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->where('variant_code', $code)
+            ->exists();
+
+        if ($exists) {
             abort(422, "کد تنوع تکراری است: {$code} (مدل/طرح تکراری انتخاب شده).");
         }
 

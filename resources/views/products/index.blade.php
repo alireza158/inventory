@@ -6,6 +6,8 @@
         --soft-bg:#f6f8fb;
         --soft-border:#e8edf3;
         --card-radius:16px;
+        --grid:#e6ebf2;
+        --grid2:#f4f7fb;
     }
 
     .page-head{
@@ -14,27 +16,18 @@
         border-radius: var(--card-radius);
         padding: 12px 14px;
     }
-    .page-title{
-        font-weight: 800;
-        letter-spacing: -.3px;
-        margin: 0;
-    }
+    .page-title{font-weight: 800;letter-spacing: -.3px;margin:0;}
     .subtle-text{ color:#6b7280; }
 
     .soft-card{
         border: 1px solid var(--soft-border);
         border-radius: var(--card-radius);
         box-shadow: 0 10px 30px rgba(16,24,40,.06);
+        background:#fff;
     }
 
-    .sticky-panel{
-        position: sticky;
-        top: 90px;
-    }
-
-    .cat-card .form-control{
-        border-radius: 12px;
-    }
+    .sticky-panel{ position: sticky; top: 90px; }
+    .cat-card .form-control{ border-radius: 12px; }
 
     .cat-tree-wrap{
         max-height: calc(100vh - 240px);
@@ -45,39 +38,15 @@
     .cat-tree-wrap::-webkit-scrollbar-thumb{ background: #d8dee8; border-radius: 99px; }
 
     .filter-card .form-control,
-    .filter-card .form-select{
+    .filter-card .form-select{ border-radius: 12px; }
+
+    .btn-soft{
         border-radius: 12px;
-    }
-
-    .table-shell{
-        border-radius: var(--card-radius);
-        overflow: hidden;
         border: 1px solid var(--soft-border);
-    }
-
-    .table-modern thead th{
-        position: sticky;
-        top: 0;
-        z-index: 3;
         background: #fff;
-        border-bottom: 1px solid var(--soft-border) !important;
-        font-weight: 800;
-        color:#111827;
-        white-space: nowrap;
-        padding: .55rem .6rem;
-        font-size: 13px;
+        padding: .35rem .55rem;
     }
-
-    .table-modern td{
-        border-top: 1px solid var(--soft-border);
-        vertical-align: middle;
-        padding: .55rem .6rem;
-        font-size: 13px;
-    }
-
-    .table-modern tbody tr:hover{
-        background: #fbfdff;
-    }
+    .btn-soft:hover{ background:#f8fafc; }
 
     .pill{
         display:inline-flex;
@@ -95,71 +64,63 @@
     .pill-danger{ background: rgba(220,53,69,.08); border-color: rgba(220,53,69,.25); color:#b42318; }
     .pill-success{ background: rgba(25,135,84,.10); border-color: rgba(25,135,84,.25); color:#146c43; }
 
-    .btn-soft{
-        border-radius: 12px;
-        border: 1px solid var(--soft-border);
-        background: #fff;
-        padding: .35rem .55rem;
+    .mono{
+        font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+        letter-spacing: .5px;
     }
-    .btn-soft:hover{ background: #f8fafc; }
+
+    /* اکسل/شیت */
+    .sheet-wrap{
+        border: 1px solid var(--grid);
+        border-radius: var(--card-radius);
+        overflow: hidden;
+        background:#fff;
+    }
+    .sheet{
+        margin:0;
+        border-collapse: separate;
+        border-spacing: 0;
+        width:100%;
+    }
+    .sheet thead th{
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: #fff;
+        font-weight: 800;
+        color:#111827;
+        padding: .55rem .6rem;
+        font-size: 13px;
+        border-bottom: 1px solid var(--grid);
+        border-left: 1px solid var(--grid);
+        white-space: nowrap;
+    }
+    .sheet thead th:first-child{ border-right: 1px solid var(--grid); }
+    .sheet td{
+        padding: .55rem .6rem;
+        font-size: 13px;
+        border-bottom: 1px solid var(--grid2);
+        border-left: 1px solid var(--grid);
+        vertical-align: middle;
+        background:#fff;
+    }
+    .sheet td:first-child{ border-right: 1px solid var(--grid); }
+    .sheet tbody tr:hover td{ background:#fbfdff; }
 
     .toggle-variants{
-        width: 32px;
-        height: 32px;
-        border-radius: 12px;
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
         display:inline-flex;
         align-items:center;
         justify-content:center;
         border:1px solid var(--soft-border);
         background:#fff;
+        font-weight:900;
     }
     .toggle-variants:hover{ background:#f8fafc; }
 
-    .name-cell{
-        min-width: 220px;
-        max-width: 420px;
-    }
-    .name-cell .title{
-        font-weight: 800;
-        color:#111827;
-        line-height: 1.2;
-        font-size: 13px;
-    }
-    .name-cell .meta{
-        font-size: 12px;
-        color:#6b7280;
-        margin-top: 3px;
-    }
-
-    .nowrap{ white-space: nowrap; }
-    .w-1{ width:1%; }
-
-    .variants-wrap{
-        background: var(--soft-bg);
-        border-top: 1px solid var(--soft-border);
-        padding: 10px 10px 12px;
-    }
-
-    .variants-table{
-        background:#fff;
-        border:1px solid var(--soft-border);
-        border-radius: 14px;
-        overflow:hidden;
-    }
-    .variants-table table thead th{
-        background:#fff;
-        border-bottom:1px solid var(--soft-border) !important;
-        font-weight:800;
-        padding: .5rem .55rem;
-        font-size: 12.5px;
-    }
-    .variants-table table td{
-        border-top:1px solid var(--soft-border);
-        padding: .5rem .55rem;
-        font-size: 12.5px;
-    }
-
-    /* Responsive: sidebar narrower on large screens */
+    /* Responsive columns */
     @media (min-width: 992px){
         .col-cat { flex: 0 0 auto; width: 24%; }
         .col-main{ flex: 0 0 auto; width: 76%; }
@@ -196,6 +157,7 @@
 
     {{-- Main --}}
     <div class="col-main">
+
         {{-- Header --}}
         <div class="page-head mb-3">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -207,12 +169,10 @@
                 <div class="d-flex gap-2 flex-wrap">
                     <a class="btn btn-success" href="{{ route('purchases.create') }}">+ خرید کالا</a>
 
-                    {{-- Mobile categories button --}}
-                    <button class="btn btn-soft d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas" aria-controls="catOffcanvas">
+                    <button class="btn btn-soft d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas">
                         دسته‌بندی‌ها
                     </button>
 
-                    {{-- ✅ دکمه افزودن کالا --}}
                     <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن کالا</a>
 
                     <form method="POST" action="{{ route('products.sync.crm') }}">
@@ -224,6 +184,7 @@
                 </div>
             </div>
         </div>
+
         {{-- Filter --}}
         <div class="soft-card filter-card mb-3">
             <div class="card-body">
@@ -239,8 +200,8 @@
 
                     <div class="row g-3 align-items-end">
                         <div class="col-lg-5">
-                            <label class="form-label">جستجو (نام یا کد)</label>
-                            <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً گارد یا 10100001">
+                            <label class="form-label">جستجو (نام / کد ۴ رقمی / کد محصول)</label>
+                            <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً 0490 یا گارد یونیک">
                         </div>
 
                         <div class="col-lg-3">
@@ -268,27 +229,6 @@
             </div>
         </div>
 
-        {{-- Active Filters Bar --}}
-        @php
-            $hasFilters = request('q') || request('stock_status') || request('min_price') || request('max_price') || request('category_id');
-        @endphp
-
-        @if($hasFilters)
-            <div class="soft-card mb-3" style="background:#fff;">
-                <div class="card-body py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="d-flex flex-wrap gap-2 align-items-center">
-                        <div class="small subtle-text">فیلتر فعال:</div>
-                        @if(request('q')) <span class="pill pill-gray">جستجو: {{ request('q') }}</span> @endif
-                        @if(request('category_id')) <span class="pill pill-gray">دسته انتخاب شده</span> @endif
-                        @if(request('stock_status')==='out') <span class="pill pill-danger">ناموجود</span> @endif
-                        @if(request('min_price')) <span class="pill pill-gray">از: {{ request('min_price') }}</span> @endif
-                        @if(request('max_price')) <span class="pill pill-gray">تا: {{ request('max_price') }}</span> @endif
-                    </div>
-                    <a class="btn btn-sm btn-soft" href="{{ route('products.index') }}">حذف فیلترها</a>
-                </div>
-            </div>
-        @endif
-
         {{-- Table --}}
         <div class="soft-card">
             <div class="card-body pb-0">
@@ -298,18 +238,17 @@
                     </div>
                 </div>
 
-                <div class="table-shell">
+                <div class="sheet-wrap">
                     <div class="table-responsive">
-                        <table class="table table-modern mb-0">
+                        <table class="sheet">
                             <thead>
                                 <tr>
                                     <th class="w-1"></th>
-                                    <th class="nowrap w-1">#</th>
-                                    <th class="nowrap">کد</th>
-                                    <th>نام</th>
-                                    <th class="nowrap">دسته‌بندی</th>
+                                    <th class="nowrap">کد ۴ رقمی</th>
+                                    <th class="nowrap">بارکد ۱۱ رقمی</th>
+                                    <th>اسم کالا</th>
                                     <th class="nowrap">موجودی</th>
-                                    <th class="nowrap">قیمت</th>
+                                    <th class="nowrap">قیمت فروش</th>
                                     <th class="text-end nowrap">عملیات</th>
                                 </tr>
                             </thead>
@@ -319,6 +258,19 @@
                                     @php
                                         $hasVariants = $p->variants && $p->variants->count() > 0;
                                         $collapseId = "variantsRow{$p->id}";
+
+                                        // کد ۴ رقمی PPPP
+                                        $short = $p->short_barcode;
+                                        if (!$short && $p->code && strlen($p->code) >= 6) {
+                                            $short = substr($p->code, 2, 4); // CCPPPP -> PPPP
+                                        }
+
+                                        // نمایش نمونه بارکد 11 رقمی از اولین تنوع (به عنوان نمونه)
+                                        $sampleBarcode = null;
+                                        if ($hasVariants) {
+                                            $firstVar = $p->variants->sortBy('variant_code')->first();
+                                            $sampleBarcode = $firstVar?->variant_code;
+                                        }
                                     @endphp
 
                                     <tr>
@@ -330,7 +282,7 @@
                                                         data-bs-target="#{{ $collapseId }}"
                                                         aria-expanded="false"
                                                         aria-controls="{{ $collapseId }}"
-                                                        title="نمایش مدل‌ها">
+                                                        title="نمایش تنوع‌ها">
                                                     <span class="variant-symbol">+</span>
                                                 </button>
                                             @else
@@ -338,20 +290,25 @@
                                             @endif
                                         </td>
 
-                                        <td class="nowrap w-1">{{ $p->id }}</td>
-
-                                        <td class="nowrap">
-                                            <span class="pill pill-gray">{{ $p->code ?: "—" }}</span>
+                                        <td class="nowrap mono">
+                                            <span class="pill pill-gray">{{ $short ?: '—' }}</span>
                                         </td>
 
-                                        <td class="name-cell">
-                                            <div class="title">{{ $p->name }}</div>
-                                            <div class="meta">
-                                                <span class="subtle-text">دسته: {{ $p->category?->name ?: '—' }}</span>
-                                            </div>
+                                        <td class="nowrap mono">
+                                            @if($sampleBarcode)
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <span class="pill pill-gray">{{ $sampleBarcode }}</span>
+                                                    <span class="pill pill-gray">{{ $p->variants->count() }} تنوع</span>
+                                                </div>
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
                                         </td>
 
-                                        <td class="nowrap">{{ $p->category?->name ?: "—" }}</td>
+                                        <td>
+                                            <div class="fw-bold">{{ $p->name }}</div>
+                                            <div class="small subtle-text">دسته: {{ $p->category?->name ?: '—' }}</div>
+                                        </td>
 
                                         <td class="nowrap">
                                             @if((int)$p->stock === 0)
@@ -377,61 +334,45 @@
                                         </td>
                                     </tr>
 
-                                    {{-- Variants Row --}}
+                                    {{-- Variants Row (اختیاری) --}}
                                     @if($hasVariants)
                                         <tr>
-                                            <td colspan="8" class="p-0">
+                                            <td colspan="7" class="p-0">
                                                 <div class="collapse" id="{{ $collapseId }}">
                                                     <div class="variants-wrap">
-                                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                                                            <div class="fw-bold">
-                                                                مدل‌های این محصول
-                                                                <span class="pill pill-gray">{{ $p->variants->count() }} مدل</span>
-                                                            </div>
-                                                            <div class="small subtle-text">موجودی و قیمت هر مدل جداگانه است</div>
+                                                        <div class="small subtle-text mb-2">
+                                                            تنوع‌ها (برای انبار/اسکن): بارکد ۱۱ رقمی هر تنوع
                                                         </div>
 
-                                                        <div class="variants-table">
-                                                            <div class="table-responsive">
-                                                                <table class="table table-sm mb-0">
-                                                                    <thead>
+                                                        <div class="table-responsive">
+                                                            <table class="table table-sm mb-0">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>نام تنوع</th>
+                                                                        <th class="nowrap">بارکد ۱۱</th>
+                                                                        <th class="nowrap">موجودی</th>
+                                                                        <th class="nowrap">فروش</th>
+                                                                        <th class="nowrap">خرید</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    @foreach($p->variants->sortBy('variant_code') as $v)
                                                                         <tr>
-                                                                            <th class="nowrap">#</th>
-                                                                            <th>نام مدل</th>
-                                                                            <th class="nowrap">موجودی</th>
-                                                                            <th class="nowrap">قیمت فروش</th>
-                                                                            <th class="nowrap">قیمت خرید</th>
+                                                                            <td class="fw-bold">{{ $v->variant_name }}</td>
+                                                                            <td class="mono">{{ $v->variant_code }}</td>
+                                                                            <td>
+                                                                                @if((int)$v->stock === 0)
+                                                                                    <span class="pill pill-danger">0</span>
+                                                                                @else
+                                                                                    <span class="pill pill-success">{{ $v->stock }}</span>
+                                                                                @endif
+                                                                            </td>
+                                                                            <td>{{ number_format((int)$v->sell_price) }} تومان</td>
+                                                                            <td>{{ $v->buy_price !== null ? number_format((int)$v->buy_price).' تومان' : '—' }}</td>
                                                                         </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        @foreach($p->variants as $i => $v)
-                                                                            <tr>
-                                                                                <td class="nowrap">{{ $i + 1 }}</td>
-                                                                                <td class="fw-bold">{{ $v->variant_name }}</td>
-                                                                                <td class="nowrap">
-                                                                                    @if((int)$v->stock === 0)
-                                                                                        <span class="pill pill-danger">0</span>
-                                                                                    @else
-                                                                                        <span class="pill pill-success">{{ $v->stock }}</span>
-                                                                                    @endif
-                                                                                </td>
-                                                                                <td class="nowrap">
-                                                                                    <span class="fw-bold">{{ number_format((int)$v->sell_price) }}</span>
-                                                                                    <span class="subtle-text">تومان</span>
-                                                                                </td>
-                                                                                <td class="nowrap">
-                                                                                    @if($v->buy_price !== null)
-                                                                                        <span class="fw-bold">{{ number_format((int)$v->buy_price) }}</span>
-                                                                                        <span class="subtle-text">تومان</span>
-                                                                                    @else
-                                                                                        <span class="subtle-text">—</span>
-                                                                                    @endif
-                                                                                </td>
-                                                                            </tr>
-                                                                        @endforeach
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
+                                                                    @endforeach
+                                                                </tbody>
+                                                            </table>
                                                         </div>
 
                                                     </div>
@@ -442,9 +383,7 @@
 
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted py-5">
-                                            هیچ محصولی ثبت نشده 📦
-                                        </td>
+                                        <td colspan="7" class="text-center text-muted py-5">هیچ کالایی ثبت نشده 📦</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -488,7 +427,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
-  // فقط دکمه‌های مدل‌ها
+  // +/- toggle
   document.querySelectorAll('.toggle-variants').forEach(btn => {
     const targetSel = btn.getAttribute('data-bs-target');
     const el = document.querySelector(targetSel);
