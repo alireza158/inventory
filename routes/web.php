@@ -43,6 +43,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('products', ProductController::class)->except(['show']);
     Route::resource('categories', CategoryController::class)->except(['show']);
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
+
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
 
     Route::get('/products/import', [ProductImportController::class, 'show'])->name('products.import.show');
@@ -60,9 +61,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/model-lists/assign-codes', [ModelListController::class, 'assignCodes'])->name('model-lists.assign-codes');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
     Route::post('/model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])->name('model-lists.import-phone-catalog');
-<<<<<<< HEAD
-=======
-
 
     // Colors
     Route::get('/colors', [ColorController::class, 'index'])->name('colors.index');
@@ -71,7 +69,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/colors/{color}', [ColorController::class, 'destroy'])->name('colors.destroy');
     Route::post('/colors/seed-defaults', [ColorController::class, 'seedDefaults'])->name('colors.seed-defaults');
 
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
     // Quick category store
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
 
@@ -126,7 +123,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->name('preinvoice.draft.update');
     Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->name('preinvoice.draft.finalize');
 
-    // Preinvoice APIs (used by JS)
+    // Preinvoice APIs
     Route::prefix('preinvoice/api')->group(function () {
         Route::get('/products', [PreinvoiceApiController::class, 'products']);
         Route::get('/products/{product}', [PreinvoiceApiController::class, 'product']);
@@ -162,4 +159,4 @@ Route::middleware('auth')->group(function () {
     Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
