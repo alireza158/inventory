@@ -111,6 +111,8 @@ class ProductController extends Controller
             'model_list_ids.*' => ['integer', 'exists:model_lists,id'],
 
             'design_count' => ['nullable', 'integer', 'min:1', 'max:99'],
+            'design_notes' => ['nullable', 'array'],
+            'design_notes.*' => ['nullable', 'string', 'max:120'],
 
 =======
             'model_list_ids' => ['required', 'array', 'min:1'],
@@ -138,7 +140,11 @@ class ProductController extends Controller
             abort(422, 'برای طرح‌بندی: تعداد طرح را وارد کنید.');
         }
 
-        DB::transaction(function () use ($data, $useModels, $useDesigns) {
+        $designNotes = collect($data['design_notes'] ?? [])
+            ->map(fn ($note) => trim((string) $note))
+            ->values();
+
+        DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes) {
 
             $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
 
@@ -236,13 +242,15 @@ class ProductController extends Controller
                 for ($i = 1; $i <= $d; $i++) {
                     $design2 = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                     $variantCode = $this->buildVariantCode11($productCode6, '000', $design2);
+                    $designNote = (string) ($designNotes->get($i - 1) ?? '');
+                    $designTitle = $designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i);
 
                     ProductVariant::create([
                         'product_id' => $product->id,
                         'model_list_id' => null,
 
-                        'variant_name' => $product->name . ' طرح ' . $i,
-                        'variety_name' => 'طرح ' . $i,
+                        'variant_name' => $product->name . ' ' . $designTitle,
+                        'variety_name' => $designTitle,
                         'variety_code' => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
 
                         'variant_code' => $variantCode,
@@ -328,13 +336,15 @@ class ProductController extends Controller
                     for ($i = 1; $i <= $d; $i++) {
                         $design2 = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                         $variantCode = $this->buildVariantCode11($productCode6, $model3, $design2);
+                        $designNote = (string) ($designNotes->get($i - 1) ?? '');
+                        $designTitle = $designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i);
 
                         ProductVariant::create([
                             'product_id' => $product->id,
                             'model_list_id' => $m->id,
 
-                            'variant_name' => $product->name . ' ' . $m->model_name . ' طرح ' . $i,
-                            'variety_name' => 'طرح ' . $i,
+                            'variant_name' => $product->name . ' ' . $m->model_name . ' ' . $designTitle,
+                            'variety_name' => $designTitle,
                             'variety_code' => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
 
                             'variant_code' => $variantCode,

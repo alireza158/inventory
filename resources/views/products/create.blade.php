@@ -194,6 +194,8 @@
         <input type="number" min="1" max="99" name="design_count" id="pDesignCount"
                class="form-control" value="{{ old('design_count', 1) }}">
         <div class="form-text">حداکثر 99 چون DD دو رقمی است.</div>
+
+        <div class="mt-2" id="designNotesWrap"></div>
       </div>
 
 
@@ -280,6 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const nameEl = document.getElementById('pName');
   const catEl = document.getElementById('pCategory');
   const designEl = document.getElementById('pDesignCount');
+  const designNotesWrap = document.getElementById('designNotesWrap');
 
   const calcModels = document.getElementById('calcModels');
   const calcDesigns = document.getElementById('calcDesigns');
@@ -367,6 +370,58 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+
+
+  const oldDesignNotes = @json(array_values(old('design_notes', [])));
+
+  function getDesignNote(index){
+    const input = document.querySelector(`[name="design_notes[]"][data-design-index="${index}"]`);
+    return (input?.value || '').trim();
+  }
+
+  function getDesignTitle(index){
+    const note = getDesignNote(index);
+    return note ? `طرح ${index} (${note})` : `طرح ${index}`;
+  }
+
+  function renderDesignNotesInputs(){
+    if(!designNotesWrap) return;
+
+    const count = useDesigns.checked ? Math.max(parseInt(designEl.value || '0', 10), 0) : 0;
+    designNotesWrap.innerHTML = '';
+
+    if(count < 1){
+      return;
+    }
+
+    const title = document.createElement('div');
+    title.className = 'form-text mb-1';
+    title.textContent = 'توضیح هر طرح را وارد کنید تا در نام تنوع ثبت شود (اختیاری).';
+    designNotesWrap.appendChild(title);
+
+    for(let i=1; i<=count; i++){
+      const wrap = document.createElement('div');
+      wrap.className = 'input-group input-group-sm mt-1';
+
+      const span = document.createElement('span');
+      span.className = 'input-group-text';
+      span.textContent = `طرح ${i}`;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'form-control';
+      input.name = 'design_notes[]';
+      input.dataset.designIndex = String(i);
+      input.placeholder = 'مثلاً مشکی سالیوان';
+      input.maxLength = 120;
+      input.value = oldDesignNotes[i - 1] || '';
+
+      wrap.appendChild(span);
+      wrap.appendChild(input);
+      designNotesWrap.appendChild(wrap);
+    }
+  }
+
   function updateCounts(){
 <<<<<<< HEAD
     const m = useModels.checked ? selectedModels().length : 0;
@@ -396,6 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
     modelsSection.classList.toggle('hidden', !useModels.checked);
     designSection.classList.toggle('hidden', !useDesigns.checked);
     filterModels();
+    renderDesignNotesInputs();
     updateCounts();
   }
 
@@ -412,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   modelsEl.addEventListener('change', updateCounts);
-  designEl.addEventListener('input', updateCounts);
+  designEl.addEventListener('input', () => { renderDesignNotesInputs(); updateCounts(); });
   colorsEl.addEventListener('change', updateCounts);
   hasColorsEl.addEventListener('change', syncColorVisibility);
   syncColorVisibility();
@@ -455,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // label
     let label = baseName;
     if(useModels && model) label += ` ${model.name}`;
-    if(useDesigns && designNo > 0) label += ` طرح ${designNo}`;
+    if(useDesigns && designNo > 0) label += ` ${getDesignTitle(designNo)}`;
 
     return {label, barcode};
   }
@@ -551,11 +607,12 @@ document.addEventListener('DOMContentLoaded', () => {
   useDesigns.addEventListener('change', toggleSections);
   brandGroup.addEventListener('change', () => { filterModels(); updateCounts(); });
   modelSearch.addEventListener('input', filterModels);
-  designEl.addEventListener('input', updateCounts);
+  designEl.addEventListener('input', () => { renderDesignNotesInputs(); updateCounts(); });
   modelChecks.forEach(ch => ch.addEventListener('change', updateCounts));
   catEl.addEventListener('change', updateCounts);
 
   toggleSections();
+  renderDesignNotesInputs();
 
   // Build Preview
   btnBuild.addEventListener('click', () => {
