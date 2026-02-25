@@ -10,6 +10,7 @@ class ProductVariant extends Model
         'product_id',
         'variant_name',
         'model_list_id',
+        'color_id',
         'variety_name',
         'variety_code',
         'variant_code',
@@ -42,6 +43,11 @@ class ProductVariant extends Model
     public function modelList()
     {
         return $this->belongsTo(ModelList::class);
+    }
+
+    public function color()
+    {
+        return $this->belongsTo(Color::class);
     }
 
     public function getAvailableStockAttribute(): int
