@@ -99,7 +99,6 @@ class ProductController extends Controller
             'model_list_ids'   => ['nullable', 'array'],
             'model_list_ids.*' => ['integer', 'exists:model_lists,id'],
 
-            // چون DD دو رقمی است، طرح‌ها تا 99 منطقی است
             'design_count'      => ['nullable', 'integer', 'min:1', 'max:99'],
             'design_notes'      => ['nullable', 'array'],
             'design_notes.*'    => ['nullable', 'string', 'max:120'],
@@ -129,16 +128,16 @@ class ProductController extends Controller
 
             $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
 
-            // CC (2 digit)
+            // CC
             $cat2 = $this->normalizeCategory2($category->code);
             if ($cat2 === null) {
                 abort(422, 'کد دسته‌بندی باید ۲ رقمی باشد (00 تا 99).');
             }
 
-            // PPPP (global)
+            // PPPP واقعی
             $seq4 = $this->nextProductSeq4();
 
-            // base product code (CCPPPP) => 6 digits
+            // CCPPpp => 6 digit
             $productCode6 = $cat2 . $seq4;
 
             $product = Product::create([
@@ -158,7 +157,11 @@ class ProductController extends Controller
             $models = collect();
             if ($useModels) {
                 $ids = array_values(array_map('intval', $data['model_list_ids']));
-                $map = ModelList::query()->whereIn('id', $ids)->get(['id', 'model_name', 'code'])->keyBy('id');
+                $map = ModelList::query()
+                    ->whereIn('id', $ids)
+                    ->get(['id', 'model_name', 'code'])
+                    ->keyBy('id');
+
                 $models = collect($ids)->map(fn ($id) => $map->get($id))->filter()->values();
             }
 
@@ -266,7 +269,9 @@ class ProductController extends Controller
     public function edit(Product $product)
     {
         $product->load('variants');
+
         $categories = Category::orderBy('name')->get();
+
         $modelListOptions = ModelList::query()
             ->orderBy('brand')
             ->orderBy('model_name')
@@ -295,7 +300,6 @@ class ProductController extends Controller
         DB::transaction(function () use ($data, $product) {
             $product = Product::query()->lockForUpdate()->findOrFail($product->id);
 
-            // کد محصول ثابت می‌ماند
             $product->update([
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
@@ -314,7 +318,6 @@ class ProductController extends Controller
                     $modelCode3 = $this->normalizeModel3($model->code);
                 }
 
-                // DD = آخرین 2 رقم variety_code
                 $design2 = substr((string) $v['variety_code'], -2);
                 if (!preg_match('/^\d{2}$/', $design2)) $design2 = '00';
 

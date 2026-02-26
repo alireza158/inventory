@@ -8,6 +8,7 @@ use App\Models\ProductVariant;
 use App\Models\Purchase;
 use App\Models\StockMovement;
 use App\Models\Supplier;
+use App\Models\Warehouse;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,12 +20,12 @@ class PurchaseController extends Controller
         $supplierId = $request->integer('supplier_id');
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
+
         $query = Purchase::with('supplier')
             ->withCount('items')
             ->when($supplierId, fn ($q) => $q->where('supplier_id', $supplierId))
             ->when($dateFrom, fn ($q) => $q->whereDate('purchased_at', '>=', $dateFrom))
             ->when($dateTo, fn ($q) => $q->whereDate('purchased_at', '<=', $dateTo));
-
 
         $totalAllAmount = (int) Purchase::sum('total_amount');
         $totalAllCount = (int) Purchase::count();
@@ -46,32 +47,137 @@ class PurchaseController extends Controller
     public function show(Purchase $purchase)
     {
         $purchase->load(['supplier', 'items.variant', 'items.product']);
-
         return view('purchases.show', compact('purchase'));
     }
 
     public function create()
     {
-        $suppliers = Supplier::orderBy('name')->get();
-        $products = Product::with('variants')->orderBy('name')->get();
-        $categories = Category::orderBy('name')->get();
+        $suppliers = Supplier::orderBy('name')->get(['id', 'name', 'phone']);
+        $warehouses = Warehouse::orderBy('name')->get(['id', 'name']);
+
+        $categories = Category::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'parent_id']);
+
+        $products = Product::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'category_id', 'code']);
+
+        $variants = ProductVariant::query()
+            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
+            ->select([
+                'product_variants.id',
+                'product_variants.product_id',
+                'product_variants.model_list_id',
+                'product_variants.variant_code',
+                'product_variants.variant_name',
+                'product_variants.variety_name',
+                'product_variants.variety_code',
+                'product_variants.sell_price',
+                'product_variants.buy_price',
+                'product_variants.stock',
+                'product_variants.reserved',
+                'model_lists.model_name as model_name',
+                'model_lists.code as model_code',
+            ])
+            ->get()
+            ->map(function ($v) {
+                $design2 = substr((string) $v->variant_code, -2);
+                if (!preg_match('/^\d{2}$/', $design2)) $design2 = '00';
+
+                return [
+                    'id' => (int) $v->id,
+                    'product_id' => (int) $v->product_id,
+                    'model_list_id' => $v->model_list_id ? (int) $v->model_list_id : 0,
+                    'variant_code' => (string) $v->variant_code,
+                    'variant_name' => (string) ($v->variant_name ?? ''),
+                    'variety_name' => (string) ($v->variety_name ?? ''),
+                    'variety_code' => (string) ($v->variety_code ?? ''),
+                    'design2' => $design2,
+                    'design_title' => (string) ($v->variety_name ?? ''),
+                    'sell_price' => (int) ($v->sell_price ?? 0),
+                    'buy_price' => is_null($v->buy_price) ? null : (int) $v->buy_price,
+                    'stock' => (int) ($v->stock ?? 0),
+                    'reserved' => (int) ($v->reserved ?? 0),
+                    'model_name' => (string) ($v->model_name ?? ''),
+                    'model_code' => (string) ($v->model_code ?? ''),
+                ];
+            });
 
         return view('purchases.create', [
             'suppliers' => $suppliers,
-            'products' => $products,
+            'warehouses' => $warehouses,
             'categories' => $categories,
+            'products' => $products,
+            'variants' => $variants,
             'purchase' => null,
         ]);
     }
 
     public function edit(Purchase $purchase)
     {
-        $suppliers = Supplier::orderBy('name')->get();
-        $products = Product::with('variants')->orderBy('name')->get();
-        $categories = Category::orderBy('name')->get();
-        $purchase->load(['items', 'items.product']);
+        $purchase->load(['items', 'items.product', 'items.variant']);
 
-        return view('purchases.create', compact('suppliers', 'products', 'categories', 'purchase'));
+        $suppliers = Supplier::orderBy('name')->get(['id', 'name', 'phone']);
+        $warehouses = Warehouse::orderBy('name')->get(['id', 'name']);
+
+        $categories = Category::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'parent_id']);
+
+        $products = Product::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'category_id', 'code']);
+
+        $variants = ProductVariant::query()
+            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
+            ->select([
+                'product_variants.id',
+                'product_variants.product_id',
+                'product_variants.model_list_id',
+                'product_variants.variant_code',
+                'product_variants.variant_name',
+                'product_variants.variety_name',
+                'product_variants.variety_code',
+                'product_variants.sell_price',
+                'product_variants.buy_price',
+                'product_variants.stock',
+                'product_variants.reserved',
+                'model_lists.model_name as model_name',
+                'model_lists.code as model_code',
+            ])
+            ->get()
+            ->map(function ($v) {
+                $design2 = substr((string) $v->variant_code, -2);
+                if (!preg_match('/^\d{2}$/', $design2)) $design2 = '00';
+
+                return [
+                    'id' => (int) $v->id,
+                    'product_id' => (int) $v->product_id,
+                    'model_list_id' => $v->model_list_id ? (int) $v->model_list_id : 0,
+                    'variant_code' => (string) $v->variant_code,
+                    'variant_name' => (string) ($v->variant_name ?? ''),
+                    'variety_name' => (string) ($v->variety_name ?? ''),
+                    'variety_code' => (string) ($v->variety_code ?? ''),
+                    'design2' => $design2,
+                    'design_title' => (string) ($v->variety_name ?? ''),
+                    'sell_price' => (int) ($v->sell_price ?? 0),
+                    'buy_price' => is_null($v->buy_price) ? null : (int) $v->buy_price,
+                    'stock' => (int) ($v->stock ?? 0),
+                    'reserved' => (int) ($v->reserved ?? 0),
+                    'model_name' => (string) ($v->model_name ?? ''),
+                    'model_code' => (string) ($v->model_code ?? ''),
+                ];
+            });
+
+        return view('purchases.create', [
+            'suppliers' => $suppliers,
+            'warehouses' => $warehouses,
+            'categories' => $categories,
+            'products' => $products,
+            'variants' => $variants,
+            'purchase' => $purchase,
+        ]);
     }
 
     public function store(Request $request)
@@ -79,8 +185,10 @@ class PurchaseController extends Controller
         $data = $this->validatePayload($request);
 
         DB::transaction(function () use ($data) {
+
             $purchase = Purchase::create([
                 'supplier_id' => $data['supplier_id'],
+                'warehouse_id' => $data['warehouse_id'],
                 'user_id' => auth()->id(),
                 'purchased_at' => now(),
                 'note' => $data['note'] ?? null,
@@ -91,8 +199,7 @@ class PurchaseController extends Controller
                 'total_amount' => 0,
             ]);
 
-            $summary = $this->applyItems($purchase, $data);
-
+            $summary = $this->applyItems($purchase, $data, (int) $data['warehouse_id']);
             $purchase->update($summary);
         });
 
@@ -104,18 +211,19 @@ class PurchaseController extends Controller
         $data = $this->validatePayload($request);
 
         DB::transaction(function () use ($purchase, $data) {
+
             $this->rollbackPurchase($purchase);
 
             $purchase->update([
                 'supplier_id' => $data['supplier_id'],
+                'warehouse_id' => $data['warehouse_id'],
                 'note' => $data['note'] ?? null,
                 'user_id' => auth()->id(),
                 'discount_type' => $data['invoice_discount_type'] ?? null,
                 'discount_value' => (int) ($data['invoice_discount_value'] ?? 0),
             ]);
 
-            $summary = $this->applyItems($purchase, $data);
-
+            $summary = $this->applyItems($purchase, $data, (int) $data['warehouse_id']);
             $purchase->update($summary);
         });
 
@@ -134,22 +242,56 @@ class PurchaseController extends Controller
 
     private function validatePayload(Request $request): array
     {
+        $invoiceDiscountType = $request->input('invoice_discount_type', $request->input('discount_type'));
+        $invoiceDiscountValue = $request->input('invoice_discount_value', $request->input('discount_value'));
+        $note = $request->input('note', $request->input('notes'));
+
+        $request->merge([
+            'invoice_discount_type' => $invoiceDiscountType,
+            'invoice_discount_value' => $invoiceDiscountValue,
+            'note' => $note,
+        ]);
+
         $data = $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
+            'warehouse_id' => ['required', 'exists:warehouses,id'],
             'note' => ['nullable', 'string', 'max:1000'],
 
-            'invoice_discount_type' => ['nullable', 'in:amount,percent'],
+            'invoice_discount_type' => ['nullable', 'in:amount,percent,none'],
             'invoice_discount_value' => ['nullable', 'integer', 'min:0'],
 
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.buy_price' => ['required', 'integer', 'min:0'],
-            'items.*.sell_price' => ['required', 'integer', 'min:0'],
+
+            'items.*.qty' => ['nullable', 'integer', 'min:1'],
+            'items.*.quantity' => ['nullable', 'integer', 'min:1'],
+
+            'items.*.buy_price' => ['required'],
+            'items.*.sell_price' => ['required'],
+
             'items.*.discount_type' => ['nullable', 'in:amount,percent'],
             'items.*.discount_value' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        // ✅ اینجا فقط پرانتز اصلاح شد
+        $data['items'] = array_values(array_map(function ($item) {
+            $qty = (int) ($item['quantity'] ?? $item['qty'] ?? 0);
+
+            $buy = (int) preg_replace('/[^\d]/', '', (string) ($item['buy_price'] ?? 0));
+            $sell = (int) preg_replace('/[^\d]/', '', (string) ($item['sell_price'] ?? 0));
+
+            $item['quantity'] = max(1, $qty);
+            $item['buy_price'] = max(0, $buy);
+            $item['sell_price'] = max(0, $sell);
+
+            return $item;
+        }, $data['items'])); // ✅ درست: فقط دو تا )
+
+        if (($data['invoice_discount_type'] ?? null) === 'none') {
+            $data['invoice_discount_type'] = null;
+            $data['invoice_discount_value'] = 0;
+        }
 
         foreach ($data['items'] as $index => $item) {
             $isValidVariant = ProductVariant::query()
@@ -165,7 +307,7 @@ class PurchaseController extends Controller
         return $data;
     }
 
-    private function applyItems(Purchase $purchase, array $data): array
+    private function applyItems(Purchase $purchase, array $data, int $warehouseId): array
     {
         $subtotalAmount = 0;
         $itemsDiscountTotal = 0;
@@ -174,6 +316,7 @@ class PurchaseController extends Controller
             $quantity = (int) $item['quantity'];
             $buyPrice = (int) $item['buy_price'];
             $sellPrice = (int) $item['sell_price'];
+
             $lineSubtotal = $quantity * $buyPrice;
 
             $itemDiscountType = $item['discount_type'] ?? null;
@@ -182,6 +325,7 @@ class PurchaseController extends Controller
             $lineTotal = max(0, $lineSubtotal - $itemDiscountAmount);
 
             $product = Product::whereKey($item['product_id'])->lockForUpdate()->firstOrFail();
+
             $variant = ProductVariant::where('product_id', $product->id)
                 ->whereKey($item['variant_id'])
                 ->lockForUpdate()
@@ -210,7 +354,7 @@ class PurchaseController extends Controller
                 'note' => 'ثبت/ویرایش خرید کالا - مدل: ' . $variant->variant_name,
             ]);
 
-            WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $product->id, $quantity);
+            WarehouseStockService::change($warehouseId, $product->id, $quantity);
 
             $purchase->items()->create([
                 'product_id' => $product->id,
@@ -233,8 +377,10 @@ class PurchaseController extends Controller
         }
 
         $baseAfterItemDiscount = max(0, $subtotalAmount - $itemsDiscountTotal);
+
         $invoiceDiscountType = $data['invoice_discount_type'] ?? null;
         $invoiceDiscountValue = (int) ($data['invoice_discount_value'] ?? 0);
+
         $invoiceDiscountAmount = $this->calculateDiscount($baseAfterItemDiscount, $invoiceDiscountType, $invoiceDiscountValue);
 
         $totalDiscount = $itemsDiscountTotal + $invoiceDiscountAmount;
@@ -251,9 +397,7 @@ class PurchaseController extends Controller
 
     private function calculateDiscount(int $baseAmount, ?string $discountType, int $discountValue): int
     {
-        if ($baseAmount <= 0 || !$discountType || $discountValue <= 0) {
-            return 0;
-        }
+        if ($baseAmount <= 0 || !$discountType || $discountValue <= 0) return 0;
 
         if ($discountType === 'percent') {
             $value = min($discountValue, 100);
@@ -267,30 +411,29 @@ class PurchaseController extends Controller
     {
         $purchase->load(['items', 'items.product']);
 
+        $warehouseId = (int) ($purchase->warehouse_id ?? 0);
+        if ($warehouseId <= 0) $warehouseId = (int) WarehouseStockService::centralWarehouseId();
+
         $affectedProductIds = [];
 
         foreach ($purchase->items as $item) {
-            if (!$item->product_variant_id) {
-                continue;
-            }
+            if (!$item->product_variant_id) continue;
 
             $variant = ProductVariant::whereKey($item->product_variant_id)
                 ->lockForUpdate()
                 ->first();
 
-            if (!$variant) {
-                continue;
-            }
+            if (!$variant) continue;
 
             if ((int) $variant->stock < (int) $item->quantity) {
-                abort(422, 'امکان ویرایش این سند وجود ندارد؛ موجودی فعلی یکی از مدل‌ها کمتر از مقدار خرید قبلی است.');
+                abort(422, 'امکان ویرایش/حذف این سند وجود ندارد؛ موجودی فعلی یکی از مدل‌ها کمتر از مقدار خرید قبلی است.');
             }
 
             $variant->update([
                 'stock' => (int) $variant->stock - (int) $item->quantity,
             ]);
 
-            WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $variant->product_id, -((int) $item->quantity));
+            WarehouseStockService::change($warehouseId, (int) $variant->product_id, -((int) $item->quantity));
 
             $affectedProductIds[] = $variant->product_id;
         }
@@ -303,9 +446,7 @@ class PurchaseController extends Controller
 
         foreach (array_unique($affectedProductIds) as $productId) {
             $product = Product::find($productId);
-            if ($product) {
-                $this->recalcProductSummary($product);
-            }
+            if ($product) $this->recalcProductSummary($product);
         }
     }
 
@@ -314,10 +455,7 @@ class PurchaseController extends Controller
         $product->load('variants');
 
         if ($product->variants->count() === 0) {
-            $product->update([
-                'stock' => 0,
-                'price' => 0,
-            ]);
+            $product->update(['stock' => 0, 'price' => 0]);
             return;
         }
 
