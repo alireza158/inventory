@@ -142,11 +142,10 @@
     const invoiceDiscountTypeEl = document.getElementById('invoiceDiscountType');
     const invoiceDiscountValueEl = document.getElementById('invoiceDiscountValue');
 
-
     function parseNumericInput(value) {
         const normalized = String(value || '')
-            .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
-            .replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
+            .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+            .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
             .replace(/[^\d]/g, '');
         return Number(normalized || 0);
     }
@@ -155,20 +154,11 @@
         return parseNumericInput(value).toLocaleString('en-US');
     }
 
-
-    function productOptions(selected = '') {
-        return `<option value="">انتخاب کالا</option>${products.map((p) =>
-            `<option value="${p.id}" ${String(selected)===String(p.id)?'selected':''}>${p.name} (${p.code || '-'})</option>`
-        ).join('')}`;
-    }
-
-    function variantOptions(productId, selected = '') {
-        const product = products.find((p) => String(p.id) === String(productId));
-        if (!product) return '<option value="">ابتدا کالا را انتخاب کنید</option>';
-
-        return `<option value="">انتخاب مدل</option>${product.variants.map((v) =>
-            `<option value="${v.id}" data-name="${v.name}" data-buy="${v.buy_price}" data-sell="${v.sell_price}" ${String(selected)===String(v.id)?'selected':''}>${v.name}</option>`
-        ).join('')}`;
+    function calculateDiscount(base, type, value) {
+        const v = Number(value || 0);
+        if (!type || v <= 0 || base <= 0) return 0;
+        if (type === 'percent') return Math.floor(base * Math.min(v, 100) / 100);
+        return Math.min(v, base);
     }
 
     function categoryOptions(selected = '') {
@@ -177,18 +167,53 @@
         ).join('')}`;
     }
 
+    function productOptionsByCategory(categoryId, selected = '') {
+        if (!categoryId) return '<option value="">ابتدا دسته‌بندی را انتخاب کنید</option>';
+        const filtered = products.filter((p) => String(p.category_id) === String(categoryId));
+        if (filtered.length === 0) return '<option value="">کالایی در این دسته‌بندی نیست</option>';
 
+        return `<option value="">انتخاب کالا</option>${filtered.map((p) =>
+            `<option value="${p.id}" ${String(selected)===String(p.id)?'selected':''}>${p.name} (${p.code || '-'})</option>`
+        ).join('')}`;
+    }
 
-    function calculateDiscount(base, type, value) {
-        const v = Number(value || 0);
-        if (!type || v <= 0 || base <= 0) return 0;
-        if (type === 'percent') return Math.floor(base * Math.min(v, 100) / 100);
-        return Math.min(v, base);
+    function extractModelGroup(name) {
+        const cleaned = String(name || '').trim();
+        if (!cleaned) return 'سایر';
+
+        const byDash = cleaned.split(' - ');
+        if (byDash.length > 1) return byDash[0].trim() || 'سایر';
+
+        const m = cleaned.match(/^(.*?)\s+طرح\s+\d+/u);
+        if (m && m[1]) return m[1].trim();
+
+        return 'عمومی';
+    }
+
+    function groupedVariants(productId) {
+        const product = products.find((p) => String(p.id) === String(productId));
+        if (!product) return [];
+
+        const map = new Map();
+        product.variants.forEach((v) => {
+            const key = extractModelGroup(v.name);
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(v);
+        });
+
+        return Array.from(map.entries()).map(([label, variants]) => ({ label, variants }));
+    }
+
+    function findVariant(productId, variantId) {
+        const product = products.find((p) => String(p.id) === String(productId));
+        if (!product) return null;
+        return product.variants.find((v) => String(v.id) === String(variantId)) || null;
     }
 
     function productGroupTemplate(groupId, data = {}) {
-        const productId = data.product_id || '';
         const categoryId = data.category_id || '';
+        const productId = data.product_id || '';
+
         return `
         <div class="purchase-product-group" data-group-id="${groupId}">
             <div class="group-head">
@@ -197,22 +222,21 @@
                     <span class="group-title-text">محصول 1</span>
                 </div>
                 <div class="group-actions d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary add-model-row">+ افزودن مدل لیست</button>
                     <button type="button" class="btn btn-sm btn-outline-danger remove-product-group">حذف محصول</button>
                 </div>
             </div>
 
             <div class="row g-2 mb-2 group-product-fields">
                 <div class="col-md-4">
-                    <div class="label">انتخاب کالا</div>
-                    <select class="form-select form-select-sm group-product-select" required>
-                        ${productOptions(productId)}
+                    <div class="label">۱) دسته‌بندی</div>
+                    <select class="form-select form-select-sm group-category-select" required>
+                        ${categoryOptions(categoryId)}
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <div class="label">دسته‌بندی کالا</div>
-                    <select class="form-select form-select-sm group-category-select" required disabled>
-                        ${categoryOptions(categoryId)}
+                    <div class="label">۲) کالا (از همان دسته‌بندی)</div>
+                    <select class="form-select form-select-sm group-product-select" required>
+                        ${productOptionsByCategory(categoryId, productId)}
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -221,32 +245,32 @@
                 </div>
             </div>
 
+            <div class="border rounded p-2 mb-2 bg-light-subtle variant-picker" data-variant-picker>
+                <div class="small fw-semibold mb-2">۳) انتخاب مدل لیست و طرح (تب‌به‌تب)</div>
+                <ul class="nav nav-tabs nav-tabs-sm mb-2" data-variant-tabs></ul>
+                <div data-variant-tab-content class="small text-muted">ابتدا دسته‌بندی و کالا را انتخاب کنید.</div>
+            </div>
+
             <div class="group-models" data-models></div>
         </div>`;
     }
 
     function modelRowTemplate(item = {}) {
-        const productId = item.product_id || '';
-        const variantId = item.variant_id || '';
         const rowDiscountType = item.discount_type || '';
         const rowDiscountValue = item.discount_value || 0;
 
         return `
         <div class="purchase-model-row" data-row>
             <div class="row g-2 align-items-end">
-                <input type="hidden" class="product-id-input" name="items[][product_id]" value="${productId}">
-                <input type="hidden" class="category-id-input" name="items[][category_id]" value="${item.category_id ?? ''}">
-                <input type="hidden" class="product-name-input" name="items[][name]" value="${item.name ?? ''}">
-                <input type="hidden" class="product-code-input" name="items[][code]" value="${item.code ?? ''}">
+                <input type="hidden" class="product-id-input" name="items[][product_id]" value="${item.product_id || ''}">
+                <input type="hidden" class="category-id-input" name="items[][category_id]" value="${item.category_id || ''}">
+                <input type="hidden" class="product-name-input" name="items[][name]" value="${item.name || ''}">
+                <input type="hidden" class="product-code-input" name="items[][code]" value="${item.code || ''}">
 
                 <div class="col-md-3">
-                    <div class="label">مدل لیست</div>
-                    <input type="hidden" class="variant-id" name="items[][variant_id]" value="${variantId}">
-                    <div>
-                        <select class="form-select form-select-sm variant-select" required>
-                            ${variantOptions(productId, variantId)}
-                        </select>
-                    </div>
+                    <div class="label">مدل / طرح</div>
+                    <input type="hidden" class="variant-id" name="items[][variant_id]" value="${item.variant_id || ''}">
+                    <input type="text" class="form-control form-control-sm variant-name-display" value="${item.variant_name || ''}" readonly>
                 </div>
                 <div class="col-md-1">
                     <div class="label">تعداد</div>
@@ -276,7 +300,7 @@
                     <div class="label">جمع نهایی</div>
                     <div class="line-total">0</div>
                 </div>
-                <div class="col-md-1 text-end">
+                <div class="col-md-2 text-end">
                     <button type="button" class="btn btn-sm btn-outline-danger remove-row">حذف</button>
                 </div>
             </div>
@@ -287,11 +311,26 @@
         if (el && el.getAttribute('name')) el.setAttribute('name', newName);
     }
 
+    function setRowVariant(row, productId, variantId, explicitName = '') {
+        const variant = findVariant(productId, variantId);
+        row.querySelector('.variant-id').value = variantId || '';
+        row.querySelector('.variant-name-display').value = explicitName || variant?.name || '';
+
+        if (variant) {
+            row.querySelector('.buy').value = formatNumericInput(variant.buy_price || 0);
+            row.querySelector('.sell').value = formatNumericInput(variant.sell_price || 0);
+        }
+    }
+
     function syncGroupFieldsToRows(groupEl) {
         const productId = groupEl.querySelector('.group-product-select')?.value || '';
         const categoryId = groupEl.querySelector('.group-category-select')?.value || '';
-        const name = products.find((p) => String(p.id) === String(productId))?.name || '';
-        const code = groupEl.querySelector('.group-product-code')?.value || '';
+        const product = products.find((p) => String(p.id) === String(productId));
+        const name = product?.name || '';
+        const code = product?.code || '';
+
+        const codeEl = groupEl.querySelector('.group-product-code');
+        if (codeEl) codeEl.value = code;
 
         groupEl.querySelectorAll('[data-row]').forEach((row) => {
             row.querySelector('.product-id-input').value = productId;
@@ -299,13 +338,55 @@
             row.querySelector('.product-name-input').value = name;
             row.querySelector('.product-code-input').value = code;
 
-            const variantSelect = row.querySelector('.variant-select');
-            const currentVariantId = row.querySelector('.variant-id').value || '';
-            variantSelect.innerHTML = variantOptions(productId, currentVariantId);
-
+            const variantId = row.querySelector('.variant-id').value || '';
+            if (variantId) {
+                const found = findVariant(productId, variantId);
+                if (!found) {
+                    row.querySelector('.variant-id').value = '';
+                    row.querySelector('.variant-name-display').value = '';
+                }
+            }
         });
     }
 
+    function renderVariantTabs(groupEl, activeLabel = '') {
+        const productId = groupEl.querySelector('.group-product-select')?.value || '';
+        const tabsEl = groupEl.querySelector('[data-variant-tabs]');
+        const contentEl = groupEl.querySelector('[data-variant-tab-content]');
+
+        if (!productId) {
+            tabsEl.innerHTML = '';
+            contentEl.innerHTML = 'ابتدا دسته‌بندی و کالا را انتخاب کنید.';
+            return;
+        }
+
+        const groups = groupedVariants(productId);
+        if (groups.length === 0) {
+            tabsEl.innerHTML = '';
+            contentEl.innerHTML = 'برای این کالا مدل/طرحی ثبت نشده است.';
+            return;
+        }
+
+        const current = groups.find((g) => g.label === activeLabel)?.label || groups[0].label;
+
+        tabsEl.innerHTML = groups.map((g) => {
+            const active = g.label === current;
+            return `<li class="nav-item"><button type="button" class="nav-link ${active?'active':''} variant-tab-btn" data-tab-label="${g.label}">${g.label} <span class="badge text-bg-light ms-1">${g.variants.length}</span></button></li>`;
+        }).join('');
+
+        const target = groups.find((g) => g.label === current) || groups[0];
+        contentEl.innerHTML = `
+            <div class="d-flex flex-wrap gap-2">
+                ${target.variants.map((v) => `
+                    <button type="button" class="btn btn-sm btn-outline-primary add-variant-btn"
+                        data-variant-id="${v.id}" data-variant-name="${v.name}" data-buy="${v.buy_price}" data-sell="${v.sell_price}">
+                        ${v.name}
+                    </button>
+                `).join('')}
+            </div>
+            <div class="small text-muted mt-2">روی هر مورد بزن تا به ردیف‌های خرید اضافه شود.</div>
+        `;
+    }
 
     function formatPriceInputs(scope = document) {
         scope.querySelectorAll('.formatted-number').forEach((el) => {
@@ -340,7 +421,6 @@
             setName(row.querySelector('.row-discount-type'), `items[${idx}][discount_type]`);
             setName(row.querySelector('.discount-value'), `items[${idx}][discount_value]`);
         });
-
     }
 
     function recalc() {
@@ -378,16 +458,17 @@
         totalEl.textContent = total.toLocaleString('fa-IR');
     }
 
-    function addProductGroup(data = {}, withInitialModel = true) {
+    function addProductGroup(data = {}, withInitialRows = true) {
         const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         itemsList.insertAdjacentHTML('beforeend', productGroupTemplate(groupId, data));
         const groupEl = itemsList.querySelector(`[data-group-id="${groupId}"]`);
 
-        if (withInitialModel) {
+        if (withInitialRows && data.variant_id) {
             addModelRow(groupEl, data);
         }
 
         syncGroupFieldsToRows(groupEl);
+        renderVariantTabs(groupEl);
         reindexRows();
         recalc();
         return groupEl;
@@ -395,9 +476,35 @@
 
     function addModelRow(groupEl, item = {}) {
         if (!groupEl) return;
+
+        const productId = groupEl.querySelector('.group-product-select')?.value || item.product_id || '';
+        const categoryId = groupEl.querySelector('.group-category-select')?.value || item.category_id || '';
+        if (!productId || !item.variant_id) return;
+
+        const product = products.find((p) => String(p.id) === String(productId));
         const modelsWrap = groupEl.querySelector('[data-models]');
-        modelsWrap.insertAdjacentHTML('beforeend', modelRowTemplate(item));
-        formatPriceInputs(modelsWrap);
+
+        const rowData = {
+            ...item,
+            product_id: productId,
+            category_id: categoryId,
+            name: product?.name || item.name || '',
+            code: product?.code || item.code || '',
+        };
+
+        modelsWrap.insertAdjacentHTML('beforeend', modelRowTemplate(rowData));
+        const row = modelsWrap.querySelector('[data-row]:last-child');
+
+        setRowVariant(row, productId, item.variant_id, item.variant_name || '');
+
+        if (item.buy_price !== undefined && item.buy_price !== null) {
+            row.querySelector('.buy').value = formatNumericInput(item.buy_price);
+        }
+        if (item.sell_price !== undefined && item.sell_price !== null) {
+            row.querySelector('.sell').value = formatNumericInput(item.sell_price);
+        }
+
+        formatPriceInputs(row);
         syncGroupFieldsToRows(groupEl);
         reindexRows();
         recalc();
@@ -407,7 +514,7 @@
         const groupsMap = new Map();
 
         items.forEach((item) => {
-            const key = [item.product_id || '', item.name || '', item.code || ''].join('||');
+            const key = [item.product_id || '', item.category_id || ''].join('||');
             if (!groupsMap.has(key)) {
                 groupsMap.set(key, {
                     product_id: item.product_id || '',
@@ -422,59 +529,39 @@
 
         groupsMap.forEach((group) => {
             const groupEl = addProductGroup(group, false);
-            group.rows.forEach((rowItem) => addModelRow(groupEl, rowItem));
+            group.rows.forEach((rowItem) => {
+                addModelRow(groupEl, rowItem);
+            });
         });
     }
 
-    addBtn.addEventListener('click', () => addProductGroup({}, true));
+    addBtn.addEventListener('click', () => addProductGroup({}, false));
 
     itemsList.addEventListener('change', (e) => {
         const groupEl = e.target.closest('[data-group-id]');
         if (!groupEl) return;
 
-        if (
-            e.target.classList.contains('group-product-select') ||
-            e.target.classList.contains('group-category-select') ||
-            e.target.classList.contains('group-product-code')
-        ) {
-            if (e.target.classList.contains('group-product-select')) {
-                const productId = e.target.value;
-                const product = products.find((p) => String(p.id) === String(productId));
-                if (product) {
-                    groupEl.querySelector('.group-product-code').value = product.code || '';
-                    const categorySelect = groupEl.querySelector('.group-category-select');
-                    if (categorySelect && product.category_id) {
-                        categorySelect.value = String(product.category_id);
-                    }
-                } else {
-                    groupEl.querySelector('.group-product-code').value = '';
-                    const categorySelect = groupEl.querySelector('.group-category-select');
-                    if (categorySelect) {
-                        categorySelect.value = '';
-                    }
-                }
-            }
-
+        if (e.target.classList.contains('group-category-select')) {
+            const categoryId = e.target.value || '';
+            const productSelect = groupEl.querySelector('.group-product-select');
+            productSelect.innerHTML = productOptionsByCategory(categoryId, '');
+            groupEl.querySelector('.group-product-code').value = '';
+            groupEl.querySelector('[data-models]').innerHTML = '';
             syncGroupFieldsToRows(groupEl);
+            renderVariantTabs(groupEl);
             reindexRows();
             recalc();
             return;
         }
 
-        if (e.target.classList.contains('variant-select')) {
-            const row = e.target.closest('[data-row]');
-            const opt = e.target.selectedOptions[0];
-            const variantId = opt?.value || '';
-            row.querySelector('.variant-id').value = variantId;
-
-            if (variantId) {
-                row.querySelector('.buy').value = formatNumericInput(opt.dataset.buy || 0);
-                row.querySelector('.sell').value = formatNumericInput(opt.dataset.sell || 0);
-            }
-
+        if (e.target.classList.contains('group-product-select')) {
+            groupEl.querySelector('[data-models]').innerHTML = '';
+            syncGroupFieldsToRows(groupEl);
+            renderVariantTabs(groupEl);
+            reindexRows();
             recalc();
+            return;
         }
-
 
         if (e.target.classList.contains('row-discount-type')) {
             recalc();
@@ -495,34 +582,36 @@
             }
             recalc();
         }
-
-        if (e.target.classList.contains('group-product-code')) {
-            const groupEl = e.target.closest('[data-group-id]');
-            if (groupEl) {
-                syncGroupFieldsToRows(groupEl);
-                reindexRows();
-            }
-        }
     });
 
     itemsList.addEventListener('click', (e) => {
         const groupEl = e.target.closest('[data-group-id]');
-        if (!groupEl) return;
 
-        if (e.target.classList.contains('add-model-row')) {
-            const lastRow = groupEl.querySelector('[data-row]:last-child');
-            const copied = lastRow ? {
+        if (e.target.classList.contains('variant-tab-btn')) {
+            if (!groupEl) return;
+            renderVariantTabs(groupEl, e.target.dataset.tabLabel || '');
+            return;
+        }
+
+        if (e.target.classList.contains('add-variant-btn')) {
+            if (!groupEl) return;
+            const variantId = e.target.dataset.variantId || '';
+            if (!variantId) return;
+
+            addModelRow(groupEl, {
+                variant_id: variantId,
+                variant_name: e.target.dataset.variantName || '',
                 quantity: 1,
-                buy_price: 0,
-                sell_price: 0,
+                buy_price: parseNumericInput(e.target.dataset.buy || 0),
+                sell_price: parseNumericInput(e.target.dataset.sell || 0),
                 discount_type: '',
                 discount_value: 0,
-            } : {};
-            addModelRow(groupEl, copied);
+            });
             return;
         }
 
         if (e.target.classList.contains('remove-product-group')) {
+            if (!groupEl) return;
             groupEl.remove();
             reindexRows();
             recalc();
@@ -530,12 +619,9 @@
         }
 
         if (e.target.classList.contains('remove-row')) {
+            if (!groupEl) return;
             const row = e.target.closest('[data-row]');
             row.remove();
-
-            if (!groupEl.querySelector('[data-row]')) {
-                groupEl.remove();
-            }
 
             reindexRows();
             recalc();
@@ -554,7 +640,7 @@
     if (Array.isArray(initialItems) && initialItems.length > 0) {
         buildGroupsFromInitialItems(initialItems);
     } else {
-        addProductGroup({}, true);
+        addProductGroup({}, false);
     }
 
     formatPriceInputs(document);
