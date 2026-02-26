@@ -2,39 +2,143 @@
 
 @section('content')
 <style>
-  .preview-box{border:1px solid #e8edf3;border-radius:14px;background:#fff;}
+  :root{
+    --brd:#e8edf3;
+    --muted:#6b7280;
+    --soft:#f8fafc;
+    --soft2:#f3f6fb;
+    --primary:#2563eb;
+  }
+
+  .preview-box{border:1px solid var(--brd);border-radius:14px;background:#fff;}
   .preview-item{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-top:1px solid #eef2f7;font-size:13px;}
   .preview-item:first-child{border-top:0;}
-  .preview-meta{color:#6b7280;font-size:12px;}
+  .preview-meta{color:var(--muted);font-size:12px;}
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;letter-spacing:1px;}
-  .soft-hint{background:#f8fafc;border:1px solid #e8edf3;border-radius:12px;padding:10px;}
+  .soft-hint{background:var(--soft);border:1px solid var(--brd);border-radius:12px;padding:10px;}
   .hidden{display:none!important;}
 
-  /* dropdown مدل لیست: جمع‌وجورتر */
-  .dropdown-menu.model-menu{
-    max-height: 300px;
-    overflow: auto;
-    border-radius: 14px;
-    padding: 10px;
+  /* ===== مدل لیست ردیفی ===== */
+  .model-panel{
+    border:1px solid var(--brd);
+    border-radius:16px;
+    background:#fff;
+    overflow:hidden;
   }
-  .model-item{
+  .model-panel-head{
+    padding:10px 12px;
+    background:linear-gradient(0deg, #fff, var(--soft2));
+    border-bottom:1px solid var(--brd);
     display:flex;
     align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .model-panel-title{
+    font-weight:700;
+    font-size:13px;
+  }
+  .model-panel-actions{
+    display:flex;
     gap:8px;
-    padding:6px 8px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .model-panel-actions .btn{
+    padding:6px 10px;
     border-radius:10px;
-    font-size: 12.5px;
-    line-height: 1.35;
+    font-size:12px;
   }
-  .model-item:hover{ background:#f8fafc; }
-  .model-item .form-check-input{
-    margin: 0;
-    flex: 0 0 auto;
+  .model-hint{
+    font-size:12px;
+    color:var(--muted);
   }
-  .model-item .form-check-label{
-    margin: 0;
-    flex: 1 1 auto;
-    cursor: pointer;
+
+  .model-list{
+    max-height:360px;
+    overflow:auto;
+  }
+
+  .model-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+    border-top:1px solid #eef2f7;
+    cursor:pointer;
+    user-select:none;
+  }
+  .model-row:first-child{border-top:0;}
+  .model-row:hover{background:var(--soft);}
+  .model-row.is-checked{background:#eef6ff;}
+  .model-row .form-check-input{
+    margin:0;
+    flex:0 0 auto;
+  }
+  .model-row-main{
+    flex:1 1 auto;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .model-row-name{
+    font-size:13px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .model-row-sub{
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:2px 8px;
+    border:1px solid var(--brd);
+    border-radius:999px;
+    background:#fff;
+    font-size:12px;
+    color:#111827;
+  }
+  .pill .mono{font-size:11px;color:#334155;}
+  .pill-btn{
+    border:0;
+    background:transparent;
+    color:#64748b;
+    font-size:14px;
+    line-height:1;
+    padding:0 2px;
+    cursor:pointer;
+  }
+  .pill-btn:hover{color:#0f172a;}
+
+  .selected-chips{
+    padding:10px 12px;
+    border-top:1px solid var(--brd);
+    background:#fff;
+  }
+  .selected-chips-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .selected-chips-title span{
+    font-size:12px;
+    color:var(--muted);
+  }
+  .chips-wrap{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
   }
 
   /* پیش‌نمایش: بدون اسکرول داخلی */
@@ -45,7 +149,6 @@
 </style>
 
 @php
-  // ✅ PPPP پیش‌نمایش از کنترلر میاد (ممکنه لحظه ثبت تغییر کنه)
   $previewSeq4 = $previewSeq4 ?? '0000';
 @endphp
 
@@ -104,7 +207,7 @@
         </div>
       </div>
 
-      {{-- بخش مدل‌لیست --}}
+      {{-- بخش مدل‌لیست (ردیفی) --}}
       <div class="col-12 hidden" id="modelsSection">
         <div class="row g-3">
 
@@ -118,7 +221,7 @@
               <option value="Huawei/Honor" @selected(old('model_brand_group')==='Huawei/Honor')>هواوی و هانر</option>
               <option value="سایر" @selected(old('model_brand_group')==='سایر')>سایر</option>
             </select>
-            <div class="form-text">اول گروه را انتخاب کن.</div>
+            <div class="form-text">اگر گروه را انتخاب نکنی، فقط انتخاب‌شده‌ها نمایش داده می‌شوند.</div>
           </div>
 
           <div class="col-md-8">
@@ -127,27 +230,25 @@
           </div>
 
           <div class="col-12">
-            <label class="form-label">مدل‌لیست‌های این کالا</label>
+            <div class="model-panel">
+              <div class="model-panel-head">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <div class="model-panel-title">مدل‌لیست‌های این کالا</div>
+                  <span class="badge text-bg-primary" id="modelsSelectedBadge">0</span>
+                  <span class="model-hint" id="modelsHint">ابتدا گروه برند را انتخاب کنید.</span>
+                </div>
 
-            {{-- کشویی واقعی + چند انتخابی با checkbox --}}
-            <div class="dropdown w-100">
-              <button
-                class="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center"
-                type="button"
-                id="modelsDropdownBtn"
-                data-bs-toggle="dropdown"
-                data-bs-auto-close="outside"
-                aria-expanded="false">
-                <span>انتخاب مدل‌لیست‌ها</span>
-                <span class="badge text-bg-primary" id="modelsSelectedBadge">0</span>
-              </button>
+                <div class="model-panel-actions">
+                  <button type="button" class="btn btn-outline-secondary" id="btnOnlySelected">فقط انتخاب‌شده‌ها</button>
+                  <button type="button" class="btn btn-outline-primary" id="btnSelectAllVisible">انتخاب همهٔ مواردِ قابل‌مشاهده</button>
+                  <button type="button" class="btn btn-outline-danger" id="btnClearAll">پاک کردن انتخاب‌ها</button>
+                </div>
+              </div>
 
-              <div class="dropdown-menu w-100 model-menu" aria-labelledby="modelsDropdownBtn">
-                <div class="small text-muted mb-2" id="modelsDropdownHint">ابتدا گروه برند را انتخاب کنید.</div>
-
+              <div class="model-list" id="modelList">
                 @foreach($modelLists as $model)
                   <div
-                    class="model-item"
+                    class="model-row model-item"
                     data-brand="{{ $model->brand }}"
                     data-code="{{ $model->code }}"
                     data-name="{{ $model->model_name }}"
@@ -161,16 +262,32 @@
                       id="ml{{ $model->id }}"
                       {{ collect(old('model_list_ids', []))->contains($model->id) ? 'checked' : '' }}
                     >
-                    <label class="form-check-label" for="ml{{ $model->id }}">
-                      {{ $model->brand ? ($model->brand.' - ') : '' }}{{ $model->model_name }}
-                      <span class="text-muted">({{ $model->code }})</span>
-                    </label>
+
+                    <div class="model-row-main">
+                      <div class="model-row-name">
+                        {{ $model->brand ? ($model->brand.' - ') : '' }}{{ $model->model_name }}
+                      </div>
+                      <div class="model-row-sub">
+                        <span class="pill">کد: <span class="mono">{{ $model->code }}</span></span>
+                        @if($model->brand)
+                          <span class="pill">برند: {{ $model->brand }}</span>
+                        @endif
+                      </div>
+                    </div>
                   </div>
                 @endforeach
               </div>
+
+              <div class="selected-chips">
+                <div class="selected-chips-title">
+                  <span>مدل‌های انتخاب‌شده (برای حذف روی × بزن)</span>
+                  <span id="selectedCountText">0 مورد</span>
+                </div>
+                <div class="chips-wrap" id="selectedChips"></div>
+              </div>
             </div>
 
-            <div class="form-text">می‌توانید چند مدل (مثلاً 10 تا) را تیک بزنید.</div>
+            <div class="form-text">برای سرعت: روی ردیف کلیک کن تا تیک بخورد/برداشته شود.</div>
           </div>
 
         </div>
@@ -185,7 +302,6 @@
 
         <div class="mt-2" id="designNotesWrap"></div>
       </div>
-
 
       <div class="col-md-8">
         <label class="form-label">خلاصه</label>
@@ -234,7 +350,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const PREVIEW_PPPP = @json($previewSeq4); // 4 digits from controller
+  const PREVIEW_PPPP = @json($previewSeq4);
 
   const useModels = document.getElementById('useModels');
   const useDesigns = document.getElementById('useDesigns');
@@ -246,7 +362,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const modelSearch = document.getElementById('modelSearch');
 
   const modelsSelectedBadge = document.getElementById('modelsSelectedBadge');
-  const modelsDropdownHint = document.getElementById('modelsDropdownHint');
+  const modelsHint = document.getElementById('modelsHint');
+
+  const btnOnlySelected = document.getElementById('btnOnlySelected');
+  const btnSelectAllVisible = document.getElementById('btnSelectAllVisible');
+  const btnClearAll = document.getElementById('btnClearAll');
+
+  const selectedChips = document.getElementById('selectedChips');
+  const selectedCountText = document.getElementById('selectedCountText');
 
   const nameEl = document.getElementById('pName');
   const catEl = document.getElementById('pCategory');
@@ -272,12 +395,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // pagination state
   const PER_PAGE = 25;
   let currentPage = 1;
-  let lastBuildState = null; // {baseName, cat2, pppp, models[], d, total, useModels, useDesigns}
+  let lastBuildState = null;
+
+  // مدل‌لیست state
+  let onlySelected = false;
 
   function getCat2(){
     const opt = catEl.selectedOptions[0];
     const code = (opt?.dataset?.code || '').trim();
-    // اگر دسته‌بندی کد نداشت یا غلط بود
     if(!/^\d{2}$/.test(code)) return '00';
     return code;
   }
@@ -308,35 +433,93 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateSelectedBadge(){
-    modelsSelectedBadge.textContent = String(selectedModels().length);
+    const count = selectedModels().length;
+    modelsSelectedBadge.textContent = String(count);
+    selectedCountText.textContent = `${count} مورد`;
+  }
+
+  function paintCheckedRows(){
+    modelItems.forEach(item => {
+      const ch = item.querySelector('.model-check');
+      item.classList.toggle('is-checked', !!ch?.checked);
+    });
+  }
+
+  function renderSelectedChips(){
+    const models = selectedModels();
+    selectedChips.innerHTML = '';
+
+    if(models.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'text-muted small';
+      empty.textContent = 'چیزی انتخاب نشده.';
+      selectedChips.appendChild(empty);
+      return;
+    }
+
+    models.forEach(m => {
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.innerHTML = `
+        <span>${m.name}</span>
+        <span class="mono">${m.code}</span>
+        <button type="button" class="pill-btn" aria-label="remove">×</button>
+      `;
+      pill.querySelector('button').addEventListener('click', (e) => {
+        e.preventDefault();
+        const ch = document.querySelector(\`.model-check[value="\${m.id}"]\`);
+        if(ch){
+          ch.checked = false;
+          ch.dispatchEvent(new Event('change', {bubbles:true}));
+        }
+      });
+      selectedChips.appendChild(pill);
+    });
   }
 
   function filterModels(){
     if(!useModels.checked) return;
 
-    const group = brandGroup.value;
+    const group = (brandGroup.value || '').trim();
     const q = (modelSearch.value || '').trim().toLowerCase();
 
     let visible = 0;
+    let matched = 0;
 
     modelItems.forEach(item => {
-      const okBrand = group ? brandMatch(group, item.dataset.brand) : false;
       const txt = (item.dataset.text || '').toLowerCase();
+      const ch = item.querySelector('.model-check');
+      const isChecked = !!ch?.checked;
+
+      // اگر گروه انتخاب نشده، فقط انتخاب‌شده‌ها را نشان بده
+      let okBrand = group ? brandMatch(group, item.dataset.brand) : isChecked;
+
       const okSearch = q ? txt.includes(q) : true;
 
-      const show = okBrand && okSearch;
+      const okOnlySelected = onlySelected ? isChecked : true;
+
+      const show = okBrand && okSearch && okOnlySelected;
+
       item.style.display = show ? '' : 'none';
       if(show) visible++;
+
+      // صرفاً برای متن راهنما: تعداد گزینه‌های match (بدون onlySelected)
+      const showForMatchCount = okBrand && okSearch;
+      if(showForMatchCount) matched++;
     });
 
+    // hint
     if(!group){
-      modelsDropdownHint.textContent = 'ابتدا گروه برند را انتخاب کنید.';
+      modelsHint.textContent = selectedModels().length
+        ? 'گروه انتخاب نشده؛ فقط مدل‌های تیک‌خورده نمایش داده می‌شوند.'
+        : 'ابتدا گروه برند را انتخاب کنید.';
     } else {
-      modelsDropdownHint.textContent = visible ? `نمایش ${visible} مدل` : 'مدلی پیدا نشد.';
+      if(matched === 0) modelsHint.textContent = 'مدلی با این فیلتر پیدا نشد.';
+      else modelsHint.textContent = onlySelected
+        ? `نمایش ${visible} مورد از انتخاب‌شده‌ها`
+        : `نمایش ${visible} مدل`;
     }
   }
-
-
 
   const oldDesignNotes = @json(array_values(old('design_notes', [])));
 
@@ -356,9 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const count = useDesigns.checked ? Math.max(parseInt(designEl.value || '0', 10), 0) : 0;
     designNotesWrap.innerHTML = '';
 
-    if(count < 1){
-      return;
-    }
+    if(count < 1) return;
 
     const title = document.createElement('div');
     title.className = 'form-text mb-1';
@@ -402,6 +583,8 @@ document.addEventListener('DOMContentLoaded', () => {
     calcTotal.textContent = `کل تنوع: ${total}`;
 
     updateSelectedBadge();
+    paintCheckedRows();
+    renderSelectedChips();
     return {m,d,total};
   }
 
@@ -413,12 +596,11 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCounts();
   }
 
-  // code builder: CCPP PPM MMDD => CCPP PP + MMM + DD
+  // code builder
   function code11(cat2, pppp, model3, design2){
     return `${cat2}${pppp}${model3}${design2}`;
   }
 
-  // generate item by index (without building full list)
   function getItemByIndex(state, idx){
     const {baseName, models, d, useModels, useDesigns, cat2, pppp} = state;
 
@@ -445,7 +627,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const design2 = useDesigns ? String(designNo).padStart(2,'0') : '00';
     const barcode = code11(cat2, pppp, model3, design2);
 
-    // label
     let label = baseName;
     if(useModels && model) label += ` ${model.name}`;
     if(useDesigns && designNo > 0) label += ` ${getDesignTitle(designNo)}`;
@@ -457,10 +638,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalPages = Math.max(1, Math.ceil(totalItems / PER_PAGE));
     currentPage = Math.min(Math.max(1, page), totalPages);
 
-    // info
     pageInfo.textContent = `صفحه ${currentPage} از ${totalPages} — نمایش ${PER_PAGE} مورد در هر صفحه`;
 
-    // build buttons
     pagination.innerHTML = '';
 
     const makeLi = (label, disabled, active, onClick) => {
@@ -481,7 +660,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     pagination.appendChild(makeLi('قبلی', currentPage === 1, false, () => renderPage(currentPage - 1)));
 
-    // limited range
     const windowSize = 5;
     let start = Math.max(1, currentPage - Math.floor(windowSize/2));
     let end = Math.min(totalPages, start + windowSize - 1);
@@ -538,19 +716,83 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPagination(total, p);
   }
 
-  // Events
+  // ===== Events =====
   useModels.addEventListener('change', toggleSections);
   useDesigns.addEventListener('change', toggleSections);
+
   brandGroup.addEventListener('change', () => { filterModels(); updateCounts(); });
   modelSearch.addEventListener('input', filterModels);
+
   designEl.addEventListener('input', () => { renderDesignNotesInputs(); updateCounts(); });
-  modelChecks.forEach(ch => ch.addEventListener('change', updateCounts));
+
   catEl.addEventListener('change', updateCounts);
+
+  // کلیک روی ردیف = تیک/آن‌تیک
+  modelItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      // اگر مستقیم روی checkbox کلیک شد، خودش مدیریت می‌کنه
+      if(e.target && (e.target.classList.contains('model-check'))) return;
+
+      const ch = item.querySelector('.model-check');
+      if(!ch) return;
+
+      ch.checked = !ch.checked;
+      ch.dispatchEvent(new Event('change', {bubbles:true}));
+    });
+  });
+
+  modelChecks.forEach(ch => ch.addEventListener('change', () => {
+    filterModels();
+    updateCounts();
+  }));
+
+  btnOnlySelected.addEventListener('click', () => {
+    onlySelected = !onlySelected;
+    btnOnlySelected.classList.toggle('btn-outline-secondary', !onlySelected);
+    btnOnlySelected.classList.toggle('btn-secondary', onlySelected);
+    btnOnlySelected.textContent = onlySelected ? 'نمایش همه' : 'فقط انتخاب‌شده‌ها';
+    filterModels();
+  });
+
+  btnSelectAllVisible.addEventListener('click', () => {
+    if(!useModels.checked) return;
+
+    let changed = 0;
+    modelItems.forEach(item => {
+      if(item.style.display === 'none') return;
+      const ch = item.querySelector('.model-check');
+      if(ch && !ch.checked){
+        ch.checked = true;
+        changed++;
+      }
+    });
+
+    if(changed){
+      updateCounts();
+      filterModels();
+    }
+  });
+
+  btnClearAll.addEventListener('click', () => {
+    let changed = 0;
+    modelChecks.forEach(ch => {
+      if(ch.checked){
+        ch.checked = false;
+        changed++;
+      }
+    });
+    if(changed){
+      updateCounts();
+      filterModels();
+    }
+  });
 
   toggleSections();
   renderDesignNotesInputs();
+  updateCounts();
+  filterModels();
 
-  // Build Preview
+  // ===== Build Preview =====
   btnBuild.addEventListener('click', () => {
     const baseName = (nameEl.value || '').trim();
     const {m,d,total} = updateCounts();
@@ -560,7 +802,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     previewBox.style.display = 'block';
 
-    // validations
     if(!baseName){
       previewHint.textContent = 'نام کالا را وارد کنید.';
       previewList.innerHTML = '';
@@ -569,12 +810,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if(useModels.checked){
-      if(!brandGroup.value){
-        previewHint.textContent = 'برای مدل‌لیست: ابتدا گروه برند را انتخاب کنید.';
-        previewList.innerHTML = '';
-        previewPager.style.display = 'none';
-        return;
-      }
       if(m < 1){
         previewHint.textContent = 'برای مدل‌لیست: حداقل یک مدل انتخاب کنید.';
         previewList.innerHTML = '';
@@ -590,7 +825,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // store state for pagination render
     lastBuildState = {
       baseName,
       cat2,
@@ -603,8 +837,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     previewHint.textContent = `کل تنوع: ${total} — نمایش کد/بارکد هر تنوع (PPPP پیش‌نمایش: ${pppp})`;
-
-    // render first page
     renderPage(1);
   });
 });
