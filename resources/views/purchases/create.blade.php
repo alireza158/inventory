@@ -15,6 +15,7 @@
                 'name' => $it->product_name,
                 'code' => $it->product_code,
                 'variant_name' => $it->variant_name,
+                'variant_code' => $it->variant?->variant_code,
                 'quantity' => $it->quantity,
                 'buy_price' => $it->buy_price,
                 'sell_price' => $it->sell_price,
@@ -34,6 +35,7 @@
                 return [
                     'id' => $v->id,
                     'name' => $v->variant_name,
+                    'code' => $v->variant_code,
                     'buy_price' => (int) ($v->buy_price ?? 0),
                     'sell_price' => (int) ($v->sell_price ?? 0),
                 ];
@@ -67,7 +69,7 @@
                 @endif
 
                 <div class="row g-2 mb-2">
-                    <div class="col-md-6">
+                    <div class="col-md-5">
                         <label class="form-label">تامین‌کننده</label>
                         <div class="d-flex gap-2">
                             <select class="form-select form-select-sm" name="supplier_id" required>
@@ -81,7 +83,18 @@
                             <a href="{{ route('persons.index') }}" class="btn btn-sm btn-outline-dark">مدیریت اشخاص</a>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-3">
+                        <label class="form-label">انبار مقصد خرید</label>
+                        <select class="form-select form-select-sm" name="warehouse_id" required>
+                            <option value="">انتخاب انبار...</option>
+                            @foreach($warehouses as $warehouse)
+                                <option value="{{ $warehouse->id }}" @selected(old('warehouse_id', $purchase->warehouse_id ?? null)==$warehouse->id)>
+                                    {{ $warehouse->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
                         <label class="form-label">توضیحات (اختیاری)</label>
                         <input class="form-control form-control-sm" name="note" value="{{ old('note', $purchase->note ?? '') }}">
                     </div>
@@ -289,6 +302,7 @@
                     <div class="label">مدل / طرح</div>
                     <input type="hidden" class="variant-id" name="items[][variant_id]" value="${item.variant_id || ''}">
                     <input type="text" class="form-control form-control-sm variant-name-display" value="${item.variant_name || ''}" readonly>
+                    <div class="small text-muted mt-1 variant-code-tooltip" title="کد ۱۱ رقمی تنوع">کد ۱۱ رقمی: ${item.variant_code || '—'}</div>
                 </div>
                 <div class="col-md-1">
                     <div class="label">تعداد</div>
@@ -333,6 +347,12 @@
         const variant = findVariant(productId, variantId);
         row.querySelector('.variant-id').value = variantId || '';
         row.querySelector('.variant-name-display').value = explicitName || variant?.name || '';
+        const codeEl = row.querySelector('.variant-code-tooltip');
+        if (codeEl) {
+            const code = variant?.code || '';
+            codeEl.textContent = `کد ۱۱ رقمی: ${code || '—'}`;
+            codeEl.setAttribute('title', code ? `کد ۱۱ رقمی: ${code}` : 'کد ۱۱ رقمی ثبت نشده');
+        }
 
         if (variant) {
             row.querySelector('.buy').value = formatNumericInput(variant.buy_price || 0);
@@ -552,6 +572,11 @@
         const row = modelsWrap.querySelector('[data-row]:last-child');
 
         setRowVariant(row, productId, item.variant_id, item.variant_name || '');
+        const codeEl = row.querySelector('.variant-code-tooltip');
+        if (codeEl && item.variant_code) {
+            codeEl.textContent = `کد ۱۱ رقمی: ${item.variant_code}`;
+            codeEl.setAttribute('title', `کد ۱۱ رقمی: ${item.variant_code}`);
+        }
 
         if (item.buy_price !== undefined && item.buy_price !== null) {
             row.querySelector('.buy').value = formatNumericInput(item.buy_price);
@@ -671,6 +696,7 @@
             addModelRow(groupEl, {
                 variant_id: variant.id,
                 variant_name: variant.name,
+                variant_code: variant.code || '',
                 quantity: 1,
                 buy_price: parseNumericInput(variant.buy_price || 0),
                 sell_price: parseNumericInput(variant.sell_price || 0),
