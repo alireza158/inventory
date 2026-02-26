@@ -246,9 +246,27 @@
             </div>
 
             <div class="border rounded p-2 mb-2 bg-light-subtle variant-picker" data-variant-picker>
-                <div class="small fw-semibold mb-2">۳) انتخاب مدل لیست و طرح (تب‌به‌تب)</div>
-                <ul class="nav nav-tabs nav-tabs-sm mb-2" data-variant-tabs></ul>
-                <div data-variant-tab-content class="small text-muted">ابتدا دسته‌بندی و کالا را انتخاب کنید.</div>
+                <div class="small fw-semibold mb-2">۳) انتخاب مدل لیست و طرح (ردیفی)</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <div class="label">مدل لیست</div>
+                        <select class="form-select form-select-sm model-select" data-model-select>
+                            <option value="">ابتدا دسته‌بندی و کالا را انتخاب کنید</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="label">طرح‌بندی</div>
+                        <select class="form-select form-select-sm design-select" data-design-select disabled>
+                            <option value="">ابتدا مدل لیست را انتخاب کنید</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-sm btn-outline-primary add-selected-variant-btn" data-add-selected-variant disabled>
+                            افزودن
+                        </button>
+                    </div>
+                </div>
+                <div class="small text-muted mt-2" data-variant-picker-help>ابتدا دسته‌بندی و کالا را انتخاب کنید.</div>
             </div>
 
             <div class="group-models" data-models></div>
@@ -349,43 +367,81 @@
         });
     }
 
-    function renderVariantTabs(groupEl, activeLabel = '') {
+    function designLabelForVariant(modelLabel, variantName) {
+        const full = String(variantName || '').trim();
+        const model = String(modelLabel || '').trim();
+        if (!full) return 'نامشخص';
+        if (!model) return full;
+
+        if (full === model) return '— بدون طرح —';
+
+        const escaped = model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const matcher = new RegExp(`^${escaped}\\s*[-–—]?\\s*`, 'u');
+        const trimmed = full.replace(matcher, '').trim();
+
+        return trimmed || full;
+    }
+
+    function modelOptionsHtml(groups, selected = '') {
+        if (!groups.length) return '<option value="">برای این کالا مدل/طرحی ثبت نشده است</option>';
+
+        return `<option value="">انتخاب مدل لیست</option>${groups.map((g) =>
+            `<option value="${g.label}" ${g.label===selected?'selected':''}>${g.label}</option>`
+        ).join('')}`;
+    }
+
+    function designOptionsHtml(variants, modelLabel, selected = '') {
+        if (!variants.length) return '<option value="">طرحی برای این مدل ثبت نشده است</option>';
+
+        return `<option value="">انتخاب طرح‌بندی</option>${variants.map((v) => {
+            const title = designLabelForVariant(modelLabel, v.name);
+            return `<option value="${v.id}" ${String(v.id)===String(selected)?'selected':''}>${title}</option>`;
+        }).join('')}`;
+    }
+
+    function renderVariantPicker(groupEl, selectedModel = '', selectedVariantId = '') {
         const productId = groupEl.querySelector('.group-product-select')?.value || '';
-        const tabsEl = groupEl.querySelector('[data-variant-tabs]');
-        const contentEl = groupEl.querySelector('[data-variant-tab-content]');
+        const modelSelect = groupEl.querySelector('[data-model-select]');
+        const designSelect = groupEl.querySelector('[data-design-select]');
+        const helpEl = groupEl.querySelector('[data-variant-picker-help]');
+        const addBtnEl = groupEl.querySelector('[data-add-selected-variant]');
 
         if (!productId) {
-            tabsEl.innerHTML = '';
-            contentEl.innerHTML = 'ابتدا دسته‌بندی و کالا را انتخاب کنید.';
+            modelSelect.innerHTML = '<option value="">ابتدا دسته‌بندی و کالا را انتخاب کنید</option>';
+            designSelect.innerHTML = '<option value="">ابتدا مدل لیست را انتخاب کنید</option>';
+            designSelect.disabled = true;
+            addBtnEl.disabled = true;
+            helpEl.textContent = 'ابتدا دسته‌بندی و کالا را انتخاب کنید.';
             return;
         }
 
         const groups = groupedVariants(productId);
         if (groups.length === 0) {
-            tabsEl.innerHTML = '';
-            contentEl.innerHTML = 'برای این کالا مدل/طرحی ثبت نشده است.';
+            modelSelect.innerHTML = '<option value="">برای این کالا مدل/طرحی ثبت نشده است</option>';
+            designSelect.innerHTML = '<option value="">طرحی برای انتخاب وجود ندارد</option>';
+            designSelect.disabled = true;
+            addBtnEl.disabled = true;
+            helpEl.textContent = 'برای این کالا مدل/طرحی ثبت نشده است.';
             return;
         }
 
-        const current = groups.find((g) => g.label === activeLabel)?.label || groups[0].label;
+        const currentModel = groups.find((g) => g.label === selectedModel)?.label || selectedModel;
+        modelSelect.innerHTML = modelOptionsHtml(groups, currentModel);
 
-        tabsEl.innerHTML = groups.map((g) => {
-            const active = g.label === current;
-            return `<li class="nav-item"><button type="button" class="nav-link ${active?'active':''} variant-tab-btn" data-tab-label="${g.label}">${g.label} <span class="badge text-bg-light ms-1">${g.variants.length}</span></button></li>`;
-        }).join('');
+        const targetGroup = groups.find((g) => g.label === currentModel);
+        if (!targetGroup) {
+            designSelect.innerHTML = '<option value="">ابتدا مدل لیست را انتخاب کنید</option>';
+            designSelect.disabled = true;
+            addBtnEl.disabled = true;
+            helpEl.textContent = 'مدل لیست را انتخاب کنید تا طرح‌بندی‌های همان مدل نمایش داده شود.';
+            return;
+        }
 
-        const target = groups.find((g) => g.label === current) || groups[0];
-        contentEl.innerHTML = `
-            <div class="d-flex flex-wrap gap-2">
-                ${target.variants.map((v) => `
-                    <button type="button" class="btn btn-sm btn-outline-primary add-variant-btn"
-                        data-variant-id="${v.id}" data-variant-name="${v.name}" data-buy="${v.buy_price}" data-sell="${v.sell_price}">
-                        ${v.name}
-                    </button>
-                `).join('')}
-            </div>
-            <div class="small text-muted mt-2">روی هر مورد بزن تا به ردیف‌های خرید اضافه شود.</div>
-        `;
+        designSelect.innerHTML = designOptionsHtml(targetGroup.variants, targetGroup.label, selectedVariantId);
+        designSelect.disabled = false;
+        const hasSelectedVariant = !!(designSelect.value || selectedVariantId);
+        addBtnEl.disabled = !hasSelectedVariant;
+        helpEl.textContent = 'طرح‌بندی موردنظر را انتخاب کنید و روی «افزودن» بزنید تا ردیف خرید اضافه شود.';
     }
 
     function formatPriceInputs(scope = document) {
@@ -468,7 +524,7 @@
         }
 
         syncGroupFieldsToRows(groupEl);
-        renderVariantTabs(groupEl);
+        renderVariantPicker(groupEl);
         reindexRows();
         recalc();
         return groupEl;
@@ -548,7 +604,7 @@
             groupEl.querySelector('.group-product-code').value = '';
             groupEl.querySelector('[data-models]').innerHTML = '';
             syncGroupFieldsToRows(groupEl);
-            renderVariantTabs(groupEl);
+            renderVariantPicker(groupEl);
             reindexRows();
             recalc();
             return;
@@ -557,9 +613,20 @@
         if (e.target.classList.contains('group-product-select')) {
             groupEl.querySelector('[data-models]').innerHTML = '';
             syncGroupFieldsToRows(groupEl);
-            renderVariantTabs(groupEl);
+            renderVariantPicker(groupEl);
             reindexRows();
             recalc();
+            return;
+        }
+
+        if (e.target.classList.contains('model-select')) {
+            renderVariantPicker(groupEl, e.target.value || '', '');
+            return;
+        }
+
+        if (e.target.classList.contains('design-select')) {
+            const addSelectedBtn = groupEl.querySelector('[data-add-selected-variant]');
+            if (addSelectedBtn) addSelectedBtn.disabled = !e.target.value;
             return;
         }
 
@@ -587,26 +654,31 @@
     itemsList.addEventListener('click', (e) => {
         const groupEl = e.target.closest('[data-group-id]');
 
-        if (e.target.classList.contains('variant-tab-btn')) {
+        if (e.target.classList.contains('add-selected-variant-btn')) {
             if (!groupEl) return;
-            renderVariantTabs(groupEl, e.target.dataset.tabLabel || '');
-            return;
-        }
 
-        if (e.target.classList.contains('add-variant-btn')) {
-            if (!groupEl) return;
-            const variantId = e.target.dataset.variantId || '';
-            if (!variantId) return;
+            const modelSelect = groupEl.querySelector('[data-model-select]');
+            const designSelect = groupEl.querySelector('[data-design-select]');
+            const selectedModel = modelSelect?.value || '';
+            const variantId = designSelect?.value || '';
+            const productId = groupEl.querySelector('.group-product-select')?.value || '';
+            if (!selectedModel || !variantId || !productId) return;
+
+            const selectedGroup = groupedVariants(productId).find((g) => g.label === selectedModel);
+            const variant = selectedGroup?.variants.find((v) => String(v.id) === String(variantId));
+            if (!variant) return;
 
             addModelRow(groupEl, {
-                variant_id: variantId,
-                variant_name: e.target.dataset.variantName || '',
+                variant_id: variant.id,
+                variant_name: variant.name,
                 quantity: 1,
-                buy_price: parseNumericInput(e.target.dataset.buy || 0),
-                sell_price: parseNumericInput(e.target.dataset.sell || 0),
+                buy_price: parseNumericInput(variant.buy_price || 0),
+                sell_price: parseNumericInput(variant.sell_price || 0),
                 discount_type: '',
                 discount_value: 0,
             });
+
+            renderVariantPicker(groupEl, selectedModel, '');
             return;
         }
 
