@@ -15,14 +15,6 @@
       </div>
 
       <div class="mb-3">
-<<<<<<< HEAD
-=======
-        <label class="form-label">کد دسته‌بندی (۳ رقم - خودکار)</label>
-        <input type="text" class="form-control" value="بعد از ذخیره خودکار ساخته می‌شود" disabled>
-      </div>
-
-      <div class="mb-3">
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
         <label class="form-label">دسته والد (اختیاری)</label>
         <select name="parent_id" class="form-select">
           <option value="">— بدون والد (دسته اصلی) —</option>

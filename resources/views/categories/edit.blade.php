@@ -16,14 +16,9 @@
       </div>
 
       <div class="mb-3">
-<<<<<<< HEAD
         <label class="form-label">کد دسته‌بندی</label>
-        <input type="text" class="form-control" value="{{ $category->code }}" disabled>
-        <div class="form-text">کد به صورت خودکار ۲ رقمی است. (در صورت نامعتبر بودن، با بروزرسانی اصلاح می‌شود)</div>
-=======
-        <label class="form-label">کد دسته‌بندی (۳ رقم - خودکار)</label>
         <input type="text" class="form-control" value="{{ $category->code ?: '—' }}" readonly>
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
+        <div class="form-text">کد به صورت خودکار ۲ رقمی و یکتا نگهداری می‌شود.</div>
       </div>
 
       <div class="mb-3">
