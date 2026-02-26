@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\ModelList;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Supplier;
+use App\Models\Warehouse;
 use App\Services\CrmProductSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,9 +67,12 @@ class ProductController extends Controller
             ->orderBy('model_name')
             ->get(['id', 'brand', 'model_name', 'code']);
 
+        $suppliers = Supplier::query()->orderBy('name')->get(['id', 'name', 'phone']);
+        $warehouses = Warehouse::query()->orderBy('name')->get(['id', 'name']);
+
         $previewSeq4 = $this->peekNextProductSeq4();
 
-        return view('products.create', compact('categories', 'modelLists', 'previewSeq4'));
+        return view('products.create', compact('categories', 'modelLists', 'previewSeq4', 'suppliers', 'warehouses'));
     }
 
     /**

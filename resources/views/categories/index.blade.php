@@ -29,7 +29,6 @@
   <div class="d-flex gap-2 flex-wrap">
     <a class="btn btn-primary" href="{{ route('categories.create') }}">+ افزودن دسته‌بندی</a>
 
-    {{-- ✅ اصلاح کدها --}}
     <form method="POST" action="{{ route('categories.fixCodes') }}" onsubmit="return confirm('کد همه دسته‌ها ۲ رقمی یونیک شود؟');">
       @csrf
       <button class="btn btn-outline-secondary">اصلاح کدها (۲ رقمی)</button>
@@ -44,23 +43,13 @@
 </div>
 
 <div class="card shadow-sm">
-<<<<<<< HEAD
   <div class="card-body">
     @if($rootCategories->isEmpty())
       <div class="text-center text-muted py-4">هیچ دسته‌بندی ثبت نشده.</div>
     @else
+      <div class="small text-muted mb-3">نمایش ساده دسته‌بندی‌ها و زیر‌دسته‌ها</div>
       @include('categories._manage_tree', ['nodes' => $rootCategories, 'level' => 0])
     @endif
   </div>
-=======
-    <div class="card-body">
-        @if($rootCategories->isEmpty())
-            <div class="text-center text-muted py-4">هیچ دسته‌بندی ثبت نشده.</div>
-        @else
-            <div class="small text-muted mb-3">نمایش ساده دسته‌بندی‌ها و زیر‌دسته‌ها</div>
-            @include('categories._manage_tree', ['nodes' => $rootCategories, 'level' => 0])
-        @endif
-    </div>
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
 </div>
 @endsection
