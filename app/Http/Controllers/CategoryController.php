@@ -28,24 +28,12 @@ class CategoryController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-<<<<<<< HEAD
-            'name'      => ['required','string','max:255','unique:categories,name'],
-            'parent_id' => ['nullable','integer','exists:categories,id'],
-        ]);
-
-        DB::transaction(function () use ($data) {
-            $code = $this->generateUniqueTwoDigitCode();
-=======
             'name' => ['required', 'string', 'max:255', 'unique:categories,name'],
             'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
         ]);
 
-        Category::create([
-            'name' => $data['name'],
-            'code' => $this->nextCategoryCode(),
-            'parent_id' => $data['parent_id'] ?? null,
-        ]);
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
+        DB::transaction(function () use ($data) {
+            $code = $this->generateUniqueTwoDigitCode();
 
             Category::create([
                 'name' => $data['name'],
@@ -66,26 +54,14 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         $data = $request->validate([
-<<<<<<< HEAD
-            'name'      => ['required','string','max:255','unique:categories,name,'.$category->id],
-            'parent_id' => ['nullable','integer','exists:categories,id','not_in:'.$category->id],
-        ]);
-
-        DB::transaction(function () use ($data, $category) {
-            // اگر کد قبلی 2 رقمی نبود، خودکار اصلاحش کن
-            if (!$this->isTwoDigitCode($category->code)) {
-                $category->code = $this->generateUniqueTwoDigitCode($category->id);
-            }
-=======
             'name' => ['required', 'string', 'max:255', 'unique:categories,name,' . $category->id],
             'parent_id' => ['nullable', 'integer', 'exists:categories,id', 'not_in:' . $category->id],
         ]);
 
-        $category->update([
-            'name' => $data['name'],
-            'parent_id' => $data['parent_id'] ?? null,
-        ]);
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
+        DB::transaction(function () use ($data, $category) {
+            if (!$this->isTwoDigitCode($category->code)) {
+                $category->code = $this->generateUniqueTwoDigitCode($category->id);
+            }
 
             $category->update([
                 'name' => $data['name'],
@@ -103,23 +79,14 @@ class CategoryController extends Controller
         return redirect()->route('categories.index')->with('success', 'دسته‌بندی حذف شد.');
     }
 
-    /**
-     * ساخت سریع دسته‌بندی (برای جاهایی مثل محصولات)
-     * کد همیشه خودکار 2 رقمی است.
-     */
     public function quickStore(Request $request)
     {
         $data = $request->validate([
-<<<<<<< HEAD
-            'name'      => ['required', 'string', 'max:255', 'unique:categories,name'],
-=======
             'name' => ['required', 'string', 'max:255', 'unique:categories,name'],
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
             'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
             'redirect_to' => ['nullable', 'string'],
         ]);
 
-<<<<<<< HEAD
         $category = null;
 
         DB::transaction(function () use (&$category, $data) {
@@ -134,25 +101,10 @@ class CategoryController extends Controller
 
         $redirectTo = $data['redirect_to'] ?? route('products.index');
 
-=======
-        $category = Category::create([
-            'name' => $data['name'],
-            'code' => $this->nextCategoryCode(),
-            'parent_id' => $data['parent_id'] ?? null,
-        ]);
-
-        $redirectTo = $data['redirect_to'] ?? route('products.index');
-
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
         return redirect($redirectTo . '?category_id=' . $category->id)
             ->with('success', 'دسته‌بندی با موفقیت ساخته شد.');
     }
 
-<<<<<<< HEAD
-    /**
-     * ✅ اصلاح همه کدها به 2 رقمی رندوم یونیک
-     * اگر قبلاً 4 رقمی بوده یا تکراری/نامعتبر شده، با یک کلیک درست می‌شود.
-     */
     public function fixCodes()
     {
         DB::transaction(function () {
@@ -162,13 +114,11 @@ class CategoryController extends Controller
             }
 
             $categories = Category::query()->lockForUpdate()->orderBy('id')->get();
-
             $used = [];
 
             foreach ($categories as $cat) {
                 $newCode = $this->generateUniqueTwoDigitCode($cat->id, $used);
                 $used[$newCode] = true;
-
                 $cat->update(['code' => $newCode]);
             }
         });
@@ -176,24 +126,18 @@ class CategoryController extends Controller
         return redirect()->route('categories.index')->with('success', 'کدهای دسته‌بندی‌ها به ۲ رقمی یونیک اصلاح شدند.');
     }
 
-    // ----------------- Helpers -----------------
-
     private function isTwoDigitCode(?string $code): bool
     {
-        $code = trim((string)($code ?? ''));
+        $code = trim((string) ($code ?? ''));
         return (bool) preg_match('/^\d{2}$/', $code);
     }
 
-    /**
-     * تولید کد 2 رقمی رندوم و یونیک
-     * - اگر $usedSet داده بشه، داخل همان عملیات هم یونیک می‌ماند (برای fixCodes)
-     */
     private function generateUniqueTwoDigitCode(?int $ignoreId = null, ?array $usedSet = null): string
     {
         $existing = Category::query()
-            ->when($ignoreId, fn($q) => $q->where('id', '!=', $ignoreId))
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
             ->pluck('code')
-            ->map(fn($c) => trim((string)$c))
+            ->map(fn ($c) => trim((string) $c))
             ->filter()
             ->all();
 
@@ -206,7 +150,9 @@ class CategoryController extends Controller
 
         if (is_array($usedSet)) {
             foreach ($usedSet as $k => $v) {
-                if ($v === true) $used[$k] = true;
+                if ($v === true) {
+                    $used[$k] = true;
+                }
             }
         }
 
@@ -216,15 +162,14 @@ class CategoryController extends Controller
 
         for ($try = 0; $try < 300; $try++) {
             $n = random_int(0, 99);
-            $code = str_pad((string)$n, 2, '0', STR_PAD_LEFT);
+            $code = str_pad((string) $n, 2, '0', STR_PAD_LEFT);
             if (!isset($used[$code])) {
                 return $code;
             }
         }
 
-        // fallback اگر خیلی بدشانس بودیم: جستجوی خطی
         for ($i = 0; $i <= 99; $i++) {
-            $code = str_pad((string)$i, 2, '0', STR_PAD_LEFT);
+            $code = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
             if (!isset($used[$code])) {
                 return $code;
             }
@@ -233,26 +178,3 @@ class CategoryController extends Controller
         abort(422, 'کد ۲ رقمی خالی موجود نیست.');
     }
 }
-=======
-    private function nextCategoryCode(): string
-    {
-        $used = Category::query()
-            ->whereNotNull('code')
-            ->pluck('code')
-            ->map(fn ($code) => preg_replace('/\D/', '', (string) $code))
-            ->filter(fn ($code) => $code !== '')
-            ->map(fn ($code) => (int) $code)
-            ->all();
-
-        $lookup = array_flip($used);
-
-        for ($i = 1; $i <= 999; $i++) {
-            if (!isset($lookup[$i])) {
-                return str_pad((string) $i, 3, '0', STR_PAD_LEFT);
-            }
-        }
-
-        abort(422, 'کد ۳ رقمی خالی برای دسته‌بندی وجود ندارد.');
-    }
-}
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62

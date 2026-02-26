@@ -417,7 +417,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function code11(cat2, pppp, model3, design2){
     return `${cat2}${pppp}${model3}${design2}`;
   }
->>>>>>> main
 
   // generate item by index (without building full list)
   function getItemByIndex(state, idx){
