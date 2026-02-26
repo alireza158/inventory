@@ -184,13 +184,6 @@
                 </div>
             </div>
         </div>
-
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 1d3ec7e100dbe0795727bcfd57ebd1eb3115ca62
-        {{-- Filter --}}
         <div class="soft-card filter-card mb-3">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -467,4 +460,4 @@ document.addEventListener('DOMContentLoaded', function () {
   bindCatSearch('catSearchMobile', 'catTreeMobile');
 });
 </script>
-@endsection
+@endsection 
