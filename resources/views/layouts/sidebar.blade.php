@@ -1,45 +1,19 @@
 @php
-    $is = fn($name) => request()->routeIs($name) ? 'active' : '';
+    $currentRouteName = request()->route()?->getName() ?? '';
 
-    $productsActive = request()->routeIs('products.*')
-                    || request()->routeIs('categories.*')
-                    || request()->routeIs('model-lists.*');
+    $isRoute = static fn(string ...$patterns): bool => Str::is($patterns, $currentRouteName);
+    $is = static fn(string ...$patterns): string => $isRoute(...$patterns) ? 'active' : '';
 
-    $warehouseActive = request()->routeIs('purchases.*')
-                    || request()->routeIs('vouchers.*')
-                    || request()->routeIs('warehouses.*')
-                    || request()->routeIs('stocktake.*')
-                    || request()->routeIs('stocktake.index');
+    $productsActive = $isRoute('products.*', 'categories.*', 'model-lists.*');
 
-    $commerceActive  = request()->routeIs('persons.*')
-                    || request()->routeIs('customers.*')
-                    || request()->routeIs('suppliers.*')
-                    || request()->routeIs('users.*');
+    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'warehouses.*', 'stocktake.*', 'stocktake.index');
 
-    $invoiceActive   = request()->routeIs('preinvoice.*')
-                    || request()->routeIs('invoices.*');
+    $commerceActive  = $isRoute('persons.*', 'customers.*', 'suppliers.*', 'users.*');
+
+    $invoiceActive   = $isRoute('preinvoice.*', 'invoices.*');
 @endphp
 
 <style>
-  /* ===== Mobile Toggle Button ===== */
-  .sidebar-toggle-btn{
-    position: fixed;
-    top: 12px;
-    left: 12px;            /* طبق خواسته: باز شدن از سمت چپ */
-    z-index: 1200;
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    border: 1px solid rgba(13,110,253,.18);
-    background: rgba(255,255,255,.92);
-    backdrop-filter: blur(6px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 10px 24px rgba(15,23,42,.08);
-  }
-  .sidebar-toggle-btn:active{ transform: translateY(1px); }
-  .sidebar-toggle-btn svg{ width: 22px; height: 22px; }
 
   /* ===== Backdrop ===== */
   .sidebar-backdrop{
@@ -55,25 +29,24 @@
   /* ===== Sidebar base ===== */
   .app-sidebar{
     width: 280px;
+    flex: 0 0 280px;
   }
 
   /* ===== Mobile Offcanvas Behavior ===== */
   @media (max-width: 991.98px){
-    .sidebar-toggle-btn{ display: inline-flex; }
-
     .app-sidebar{
       position: fixed;
       top: 0;
-      left: 0;
+      right: 0;
       height: 100dvh;
       max-height: 100dvh;
       z-index: 1210;
       background: #fff;
       box-shadow: 0 16px 40px rgba(15,23,42,.22);
-      transform: translateX(-110%);
+      transform: translateX(110%);
       transition: transform .24s ease;
-      border-top-right-radius: 18px;
-      border-bottom-right-radius: 18px;
+      border-top-left-radius: 18px;
+      border-bottom-left-radius: 18px;
       overflow: hidden;
     }
 
@@ -130,10 +103,6 @@
     touch-action: none;
   }
 </style>
-  <svg viewBox="0 0 24 24" fill="none">
-    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>
-</button>
 
 {{-- بک‌دراپ --}}
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -179,38 +148,38 @@
         {{-- Warehouse --}}
         <div class="sidebar-section-title {{ $warehouseActive ? 'is-active' : '' }}">انبارداری</div>
         <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ request()->routeIs('purchases.*') ? 'active' : '' }}" href="{{ route('purchases.index') }}">خرید کالا</a>
-            <a class="sidebar-sublink {{ request()->routeIs('vouchers.*') ? 'active' : '' }}" href="{{ route('vouchers.index') }}">حواله</a>
-            <a class="sidebar-sublink {{ request()->routeIs('warehouses.*') ? 'active' : '' }}" href="{{ route('warehouses.index') }}">انبارها</a>
-            <a class="sidebar-sublink {{ request()->routeIs('stocktake.*') || request()->routeIs('stocktake.index') ? 'active' : '' }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
+            <a class="sidebar-sublink {{ $is('purchases.*') }}" href="{{ route('purchases.index') }}">خرید کالا</a>
+            <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله</a>
+            <a class="sidebar-sublink {{ $is('warehouses.*') }}" href="{{ route('warehouses.index') }}">انبارها</a>
+            <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
         </div>
 
         {{-- Commerce --}}
         <div class="sidebar-section-title {{ $commerceActive ? 'is-active' : '' }}">بازرگانی</div>
         <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ request()->routeIs('persons.*') ? 'active' : '' }}" href="{{ route('persons.index') }}">اشخاص</a>
-            <a class="sidebar-sublink {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}">کاربران</a>
+            <a class="sidebar-sublink {{ $is('persons.*') }}" href="{{ route('persons.index') }}">اشخاص</a>
+            <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران</a>
         </div>
 
         {{-- Invoice --}}
         <div class="sidebar-section-title {{ $invoiceActive ? 'is-active' : '' }}">فاکتور</div>
         <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ request()->routeIs('preinvoice.create') ? 'active' : '' }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
+            <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
 
             @if (Route::has('preinvoice.index'))
-                <a class="sidebar-sublink {{ request()->routeIs('preinvoice.index') ? 'active' : '' }}" href="{{ route('preinvoice.index') }}">پیش‌فاکتورها</a>
+                <a class="sidebar-sublink {{ $is('preinvoice.index') }}" href="{{ route('preinvoice.index') }}">پیش‌فاکتورها</a>
             @endif
 
-            <a class="sidebar-sublink {{ request()->routeIs('preinvoice.draft.index') ? 'active' : '' }}" href="{{ route('preinvoice.draft.index') }}">پیش‌نویس‌ها</a>
+            <a class="sidebar-sublink {{ $is('preinvoice.draft.index') }}" href="{{ route('preinvoice.draft.index') }}">پیش‌نویس‌ها</a>
 
             @if (Route::has('invoices.index'))
-                <a class="sidebar-sublink {{ request()->routeIs('invoices.*') ? 'active' : '' }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+                <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
             @endif
         </div>
 
         {{-- Other --}}
         <div class="sidebar-group-label">سایر</div>
-        <a class="sidebar-link {{ request()->routeIs('activity-logs.*') ? 'active' : '' }}" href="{{ route('activity-logs.index') }}">
+        <a class="sidebar-link {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">
             <span class="title">لاگ فعالیت</span>
         </a>
 
