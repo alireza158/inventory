@@ -32,7 +32,31 @@
       font-family: "Vazirmatn", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif !important;
     }
   </style>
+<style>
+  /* Topbar روی موبایل ثابت/چسبنده */
+  .app-topbar{
+    position: sticky;
+    top: 0;
+    z-index: 1180;
+    background: rgba(255,255,255,.96) !important;
+    backdrop-filter: blur(6px);
+  }
+  @media (min-width: 992px){
+    .app-topbar{ position: static; }
+  }
 
+  .app-menu-btn{
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 18px rgba(15,23,42,.06);
+  }
+  .app-menu-btn svg{ width: 22px; height: 22px; }
+</style>
 <body class="bg-light">
 <div class="d-flex" style="min-height: 100vh">
 
@@ -42,28 +66,38 @@
     {{-- Main --}}
     <div class="flex-grow-1">
         {{-- Topbar --}}
-        <div class="bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2 fw-bold text-muted">
-                <img src="{{ asset('logo.png') }}" alt="{{ config('app.name') }}" style="height: 34px; width: 34px; object-fit: contain;">
-                <span>{{ config('app.name','سیستم انبار آریا جانبی') }}</span>
-            </div>
+<div class="app-topbar bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2 fw-bold text-muted">
 
-            <div class="dropdown">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                    {{ auth()->user()->name ?? 'کاربر' }}
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><span class="dropdown-item-text text-muted small">{{ auth()->user()->email ?? '' }}</span></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button class="dropdown-item text-danger">خروج</button>
-                        </form>
-                    </li>
-                </ul>
-            </div>
-        </div>
+        {{-- Mobile Menu Button (فقط موبایل) --}}
+        <button type="button" class="btn btn-sm btn-outline-secondary d-lg-none app-menu-btn"
+                id="sidebarToggleBtn" aria-label="باز کردن منو">
+            <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </button>
+
+        <img src="{{ asset('logo.png') }}" alt="{{ config('app.name') }}"
+             style="height: 34px; width: 34px; object-fit: contain;">
+        <span class="text-truncate">{{ config('app.name','سیستم انبار آریا جانبی') }}</span>
+    </div>
+
+    <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+            {{ auth()->user()->name ?? 'کاربر' }}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><span class="dropdown-item-text text-muted small">{{ auth()->user()->email ?? '' }}</span></li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button class="dropdown-item text-danger">خروج</button>
+                </form>
+            </li>
+        </ul>
+    </div>
+</div>
 
         <main class="container py-4">
             @if(session('success'))
