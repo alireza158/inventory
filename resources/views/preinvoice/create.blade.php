@@ -139,8 +139,13 @@
 
       <div class="row g-3">
         <div class="col-12">
-          <label class="form-label fw-semibold">انتخاب مشتری (اختیاری)</label>
-          <select id="customer_select" class="form-select"></select>
+          <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <label class="form-label fw-semibold mb-0">انتخاب مشتری (اختیاری)</label>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#quickCustomerModal">
+              ➕ ساخت مشتری جدید
+            </button>
+          </div>
+          <select id="customer_select" class="form-select mt-2"></select>
           <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', '') }}">
           <div class="hint mt-2" id="customer_balance_hint"></div>
         </div>
@@ -249,6 +254,50 @@
     </div>
   </form>
 
+</div>
+
+<div class="modal fade" id="quickCustomerModal" tabindex="-1" aria-labelledby="quickCustomerModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <form class="modal-content" id="quickCustomerForm">
+      <div class="modal-header">
+        <h5 class="modal-title" id="quickCustomerModalLabel">➕ افزودن مشتری جدید</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger d-none" id="quickCustomerErrors"></div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">نام مشتری *</label>
+            <input type="text" class="form-control" name="customer_name" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">شماره موبایل *</label>
+            <input type="text" class="form-control" name="mobile" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">استان</label>
+            <select class="form-select" name="province_id" id="quick_customer_province_id">
+              <option value=""></option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">شهر</label>
+            <select class="form-select" name="city_id" id="quick_customer_city_id" disabled>
+              <option value=""></option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">آدرس</label>
+            <textarea class="form-control" rows="2" name="address"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">انصراف</button>
+        <button type="submit" class="btn btn-primary" id="quickCustomerSubmitBtn">ثبت مشتری</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -404,6 +453,142 @@ function initCustomerSelect() {
   });
 }
 
+function upsertCustomerOption(customer) {
+  const customerSelect = document.getElementById('customer_select');
+  if (!customerSelect || !window.jQuery) return;
+
+  const title = (((customer.first_name || '').trim() + ' ' + (customer.last_name || '').trim()).trim()) || '—';
+  const text = title + ' - ' + (customer.mobile || '');
+
+  const exists = Array.from(customerSelect.options).some(function (opt) {
+    return Number(opt.value) === Number(customer.id);
+  });
+
+  if (!exists) {
+    const newOption = new Option(text, customer.id, false, false);
+    customerSelect.add(newOption);
+  }
+
+  $(customerSelect).val(String(customer.id)).trigger('change');
+  $(customerSelect).trigger({
+    type: 'select2:select',
+    params: {
+      data: {
+        id: customer.id,
+        text: text
+      }
+    }
+  });
+}
+
+function initQuickCustomerModal() {
+  const form = document.getElementById('quickCustomerForm');
+  const modalEl = document.getElementById('quickCustomerModal');
+  const provinceSelect = document.getElementById('quick_customer_province_id');
+  const citySelect = document.getElementById('quick_customer_city_id');
+  const errorsBox = document.getElementById('quickCustomerErrors');
+  const submitBtn = document.getElementById('quickCustomerSubmitBtn');
+  if (!form || !modalEl || !provinceSelect || !citySelect) return;
+
+  const modalInstance = new bootstrap.Modal(modalEl);
+
+  function resetErrors() {
+    errorsBox.classList.add('d-none');
+    errorsBox.innerHTML = '';
+  }
+
+  function showErrors(messages) {
+    errorsBox.classList.remove('d-none');
+    errorsBox.innerHTML = '<ul class="mb-0">' + messages.map(function (msg) {
+      return '<li>' + msg + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function setCityOptions(provinceId) {
+    const province = areaProvinces.find(function (item) {
+      return Number(item.id) === Number(provinceId);
+    });
+    const cities = province && province.cities ? province.cities : [];
+
+    citySelect.innerHTML = '<option value=""></option>';
+    cities.forEach(function (city) {
+      const option = document.createElement('option');
+      option.value = city.id;
+      option.textContent = city.name || '';
+      citySelect.appendChild(option);
+    });
+    setSelectDisabled(citySelect, cities.length === 0);
+  }
+
+  provinceSelect.addEventListener('change', function () {
+    setCityOptions(this.value || '');
+  });
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    resetErrors();
+    submitBtn.disabled = true;
+
+    const formData = new FormData(form);
+    const payload = {
+      customer_name: formData.get('customer_name') || '',
+      mobile: formData.get('mobile') || '',
+      province_id: formData.get('province_id') || null,
+      city_id: formData.get('city_id') || null,
+      address: formData.get('address') || ''
+    };
+
+    try {
+      const res = await fetch(API.customers, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        const messages = json && json.errors ? Object.values(json.errors).flat() : ['خطا در ثبت مشتری.'];
+        showErrors(messages);
+        return;
+      }
+
+      const customer = json && json.data ? json.data.customer : null;
+      if (!customer) {
+        showErrors(['پاسخ سرور نامعتبر است.']);
+        return;
+      }
+
+      upsertCustomerOption(customer);
+      form.reset();
+      citySelect.innerHTML = '<option value=""></option>';
+      setSelectDisabled(citySelect, true);
+      modalInstance.hide();
+    } catch (error) {
+      showErrors(['ارتباط با سرور برقرار نشد.']);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  modalEl.addEventListener('shown.bs.modal', function () {
+    resetErrors();
+    provinceSelect.innerHTML = '<option value=""></option>';
+    areaProvinces.forEach(function (province) {
+      const option = document.createElement('option');
+      option.value = province.id;
+      option.textContent = province.name || '';
+      provinceSelect.appendChild(option);
+    });
+    setCityOptions('');
+    initLocationSelect2(provinceSelect, 'انتخاب استان...');
+    initLocationSelect2(citySelect, 'انتخاب شهر...');
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const shippingSelect = document.getElementById('shipping_id');
   const provinceSelect = document.getElementById('province_id');
@@ -418,6 +603,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   fillShippingSelect();
 
   initCustomerSelect();
+  initQuickCustomerModal();
 
   provinceSelect.addEventListener('change', () => {
     fillCitiesByProvinceId(provinceSelect.value);
