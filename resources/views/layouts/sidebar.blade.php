@@ -14,25 +14,6 @@
 @endphp
 
 <style>
-  /* ===== Mobile Toggle Button ===== */
-  .sidebar-toggle-btn{
-    position: fixed;
-    top: 12px;
-    left: 12px;            /* طبق خواسته: باز شدن از سمت چپ */
-    z-index: 1200;
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    border: 1px solid rgba(13,110,253,.18);
-    background: rgba(255,255,255,.92);
-    backdrop-filter: blur(6px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 10px 24px rgba(15,23,42,.08);
-  }
-  .sidebar-toggle-btn:active{ transform: translateY(1px); }
-  .sidebar-toggle-btn svg{ width: 22px; height: 22px; }
 
   /* ===== Backdrop ===== */
   .sidebar-backdrop{
@@ -48,25 +29,24 @@
   /* ===== Sidebar base ===== */
   .app-sidebar{
     width: 280px;
+    flex: 0 0 280px;
   }
 
   /* ===== Mobile Offcanvas Behavior ===== */
   @media (max-width: 991.98px){
-    .sidebar-toggle-btn{ display: inline-flex; }
-
     .app-sidebar{
       position: fixed;
       top: 0;
-      left: 0;
+      right: 0;
       height: 100dvh;
       max-height: 100dvh;
       z-index: 1210;
       background: #fff;
       box-shadow: 0 16px 40px rgba(15,23,42,.22);
-      transform: translateX(-110%);
+      transform: translateX(110%);
       transition: transform .24s ease;
-      border-top-right-radius: 18px;
-      border-bottom-right-radius: 18px;
+      border-top-left-radius: 18px;
+      border-bottom-left-radius: 18px;
       overflow: hidden;
     }
 
@@ -123,10 +103,6 @@
     touch-action: none;
   }
 </style>
-  <svg viewBox="0 0 24 24" fill="none">
-    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>
-</button>
 
 {{-- بک‌دراپ --}}
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
