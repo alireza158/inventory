@@ -11,6 +11,7 @@
     $commerceActive  = $isRoute('persons.*', 'customers.*', 'suppliers.*', 'users.*');
 
     $invoiceActive   = $isRoute('preinvoice.*', 'invoices.*', 'shipping-methods.*');
+    $commissionActive = $isRoute('commissions.*');
 @endphp
 
 <style>
@@ -176,6 +177,15 @@
             @if (Route::has('invoices.index'))
                 <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
             @endif
+        </div>
+
+
+        {{-- Commissions --}}
+        <div class="sidebar-section-title {{ $commissionActive ? 'is-active' : '' }}">پورسانت</div>
+        <div class="sidebar-submenu">
+            <a class="sidebar-sublink {{ $is('commissions.periods.*') }}" href="{{ route('commissions.periods.index') }}">دوره‌ها</a>
+            <a class="sidebar-sublink {{ $is('commissions.targets.*') }}" href="{{ route('commissions.targets.index') }}">تارگت‌ها</a>
+            <a class="sidebar-sublink {{ $is('commissions.reports.*') }}" href="{{ route('commissions.reports.index') }}">گزارش</a>
         </div>
 
         {{-- Other --}}
