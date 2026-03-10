@@ -39,4 +39,9 @@ class PreinvoiceOrder extends Model
     {
         return $this->hasMany(PreinvoiceOrderItem::class);
     }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

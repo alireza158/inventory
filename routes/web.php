@@ -7,6 +7,9 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CommissionReportController;
+use App\Http\Controllers\CommissionTargetController;
+use App\Http\Controllers\CommissionPeriodController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceNoteController;
@@ -146,6 +149,22 @@ Route::middleware('auth')->group(function () {
         Route::post('/{uuid}/payments', [InvoicePaymentController::class, 'store'])->name('invoices.payments.store');
         Route::post('/{uuid}/notes', [InvoiceNoteController::class, 'store'])->name('invoices.notes.store');
         Route::post('/payments/{payment}/cheque', [ChequeController::class, 'store'])->name('cheques.store');
+    });
+
+
+    // Commissions
+    Route::prefix('commissions')->name('commissions.')->group(function () {
+        Route::get('/periods', [CommissionPeriodController::class, 'index'])->name('periods.index');
+        Route::post('/periods', [CommissionPeriodController::class, 'store'])->name('periods.store');
+        Route::put('/periods/{period}', [CommissionPeriodController::class, 'update'])->name('periods.update');
+        Route::post('/periods/{period}/close', [CommissionPeriodController::class, 'close'])->name('periods.close');
+
+        Route::get('/targets', [CommissionTargetController::class, 'index'])->name('targets.index');
+        Route::post('/targets', [CommissionTargetController::class, 'store'])->name('targets.store');
+        Route::put('/targets/{target}', [CommissionTargetController::class, 'update'])->name('targets.update');
+
+        Route::post('/reports/{period}/calculate', [CommissionReportController::class, 'calculate'])->name('reports.calculate');
+        Route::get('/reports', [CommissionReportController::class, 'index'])->name('reports.index');
     });
 
     // Activity logs
