@@ -2,27 +2,27 @@
 
 namespace App\Http\Requests\Commission;
 
+use Illuminate\Validation\Rule;
+
 class UpdateCommissionTargetRequest extends StoreCommissionTargetRequest
 {
-    public function withValidator($validator): void
+    public function rules(): array
     {
-        $validator->after(function ($validator): void {
-            if (!$this->filled('commission_period_id') || !$this->filled('user_id') || !$this->filled('category_id')) {
-                return;
-            }
+        $rules = parent::rules();
 
-            $targetId = $this->route('target')?->id;
+        $target = $this->route('target');
 
-            $exists = \App\Models\CommissionTarget::query()
-                ->where('commission_period_id', $this->integer('commission_period_id'))
-                ->where('user_id', $this->integer('user_id'))
-                ->where('category_id', $this->integer('category_id'))
-                ->where('id', '!=', $targetId)
-                ->exists();
+        $rules['category_id'] = [
+            'required',
+            'exists:categories,id',
+            Rule::unique('commission_targets')
+                ->ignore($target?->id)
+                ->where(fn ($query) => $query
+                    ->where('commission_period_id', $this->integer('commission_period_id'))
+                    ->where('user_id', $this->integer('user_id'))
+                ),
+        ];
 
-            if ($exists) {
-                $validator->errors()->add('category_id', 'رکورد مشابه برای این دوره/کاربر/دسته‌بندی وجود دارد.');
-            }
-        });
+        return $rules;
     }
 }

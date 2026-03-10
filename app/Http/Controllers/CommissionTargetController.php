@@ -27,7 +27,14 @@ class CommissionTargetController extends Controller
 
     public function store(StoreCommissionTargetRequest $request)
     {
-        CommissionTarget::query()->create($request->validated());
+        CommissionTarget::query()->updateOrCreate(
+            [
+                'commission_period_id' => $request->integer('commission_period_id'),
+                'user_id' => $request->integer('user_id'),
+                'category_id' => $request->integer('category_id'),
+            ],
+            $request->validated()
+        );
 
         return back()->with('success', 'تارگت پورسانت ذخیره شد.');
     }
