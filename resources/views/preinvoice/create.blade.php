@@ -305,17 +305,17 @@
     products:  "{{ url('/preinvoice/api/products') }}",
     product:   "{{ url('/preinvoice/api/products') }}", // /{id}
     area:      "{{ url('/preinvoice/api/area') }}",
-    shippings: "{{ url('/preinvoice/api/shippings') }}",
     customers: "{{ url('/preinvoice/api/customers') }}",
     customer:  "{{ url('/preinvoice/api/customers') }}", // /{id}
   };
 
   var INIT_ROWS = @json($initRows);
+  const INITIAL_SHIPPINGS = @json($shippingMethods);
 </script>
 
 {{-- مشتری/آدرس/ارسال (همون منطق خودت، بدون template literal) --}}
 <script>
-let shippings = [];
+let shippings = INITIAL_SHIPPINGS || [];
 let areaProvinces = [];
 
 function initLocationSelect2(selectEl, placeholder) {
@@ -366,11 +366,6 @@ function fillCitiesByProvinceId(provinceId) {
   fillCities(province && province.cities ? province.cities : []);
 }
 
-async function loadShippings() {
-  const res = await fetch(API.shippings, { headers: { 'Accept': 'application/json' } });
-  const data = await res.json();
-  shippings = (data && data.data && data.data.shippings && data.data.shippings.data) ? data.data.shippings.data : [];
-}
 function fillShippingSelect() {
   const shippingSelect = document.getElementById('shipping_id');
   shippingSelect.innerHTML = '<option value="">انتخاب روش ارسال...</option>';
@@ -599,7 +594,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadArea();
   fillProvincesSelect(areaProvinces);
 
-  await loadShippings();
   fillShippingSelect();
 
   initCustomerSelect();

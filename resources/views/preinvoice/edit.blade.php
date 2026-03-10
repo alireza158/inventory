@@ -235,14 +235,12 @@
 
   const initialProvinceId = {{ (int) old('province_id', $order->province_id) }};
   const initialCityId = {{ (int) old('city_id', $order->city_id ?? 0) }};
+  const INITIAL_SHIPPINGS = @json($shippingMethods);
 
   const API = {
     products:  "{{ url('/preinvoice/api/products') }}",
     product:   "{{ url('/preinvoice/api/products') }}", // /{id}
     area:      "{{ url('/preinvoice/api/area') }}",
-    shippings: "{{ url('/preinvoice/api/shippings') }}",
-
-
   };
   API.customers = "{{ url('/preinvoice/api/customers') }}";
 </script>
@@ -292,7 +290,7 @@ function setSelectDisabled(selectEl, disabled){
 /* =========================
    Location + Shipping
 ========================= */
-let shippings = [];
+let shippings = INITIAL_SHIPPINGS || [];
 let areaProvinces = [];
 
 async function loadArea(){
@@ -326,11 +324,6 @@ function fillCities(cities){
 function fillCitiesByProvinceId(provinceId){
   const p = areaProvinces.find(x => Number(x.id) === Number(provinceId));
   fillCities(p?.cities ?? []);
-}
-async function loadShippings(){
-  const res = await fetch(API.shippings, { headers: { 'Accept': 'application/json' } });
-  const data = await res.json();
-  shippings = data?.data?.shippings?.data ?? [];
 }
 function fillShippingSelect(){
   const el = document.getElementById('shipping_id');
@@ -640,7 +633,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // shippings
-  await loadShippings();
   fillShippingSelect();
 
   const currentSid = safeInt(draftOrder.shipping_id, 0);

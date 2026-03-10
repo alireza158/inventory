@@ -9,11 +9,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\ShippingMethod;
 class PreinvoiceController extends Controller
 {
     public function create()
     {
-        return view('preinvoice.create');
+        $shippingMethods = ShippingMethod::query()->select(['id', 'name', 'price'])->orderBy('name')->get();
+
+        return view('preinvoice.create', compact('shippingMethods'));
     }
 
     public function draftIndex()
@@ -51,7 +54,7 @@ class PreinvoiceController extends Controller
                 'city_id'     => $this->orderCityId($validated, $customer),
 
                 'shipping_id'      => (int) $validated['shipping_id'],
-                'shipping_price'   => (int) $validated['shipping_price'],
+                'shipping_price'   => (int) $this->resolveShippingPrice((int) $validated['shipping_id']),
                 'discount_amount'  => (int) ($validated['discount_amount'] ?? 0),
                 'total_price'      => (int) $validated['total_price'],
             ]);
@@ -66,7 +69,9 @@ class PreinvoiceController extends Controller
     public function editDraft(string $uuid)
     {
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
-        return view('preinvoice.edit', compact('order'));
+        $shippingMethods = ShippingMethod::query()->select(['id', 'name', 'price'])->orderBy('name')->get();
+
+        return view('preinvoice.edit', compact('order', 'shippingMethods'));
     }
 
     public function updateDraft(string $uuid, Request $request)
@@ -93,7 +98,7 @@ class PreinvoiceController extends Controller
                 'city_id'     => $this->orderCityId($validated, $customer),
 
                 'shipping_id'     => (int) $validated['shipping_id'],
-                'shipping_price'  => (int) $validated['shipping_price'],
+                'shipping_price'  => (int) $this->resolveShippingPrice((int) $validated['shipping_id']),
                 'discount_amount' => (int) ($validated['discount_amount'] ?? 0),
                 'total_price'     => (int) $validated['total_price'],
             ]);
@@ -123,8 +128,8 @@ class PreinvoiceController extends Controller
             'province_id' => 'required|integer',
             'city_id'     => 'nullable|integer',
 
-            'shipping_id'    => 'required|integer',
-            'shipping_price' => 'required|integer|min:0',
+            'shipping_id'    => 'required|integer|exists:shipping_methods,id',
+            'shipping_price' => 'nullable|integer|min:0',
 
             'discount_amount' => 'nullable|integer|min:0',
             'total_price'     => 'required|integer|min:0',
@@ -182,6 +187,12 @@ class PreinvoiceController extends Controller
         // city_id می‌تواند null باشد
         if ($customer && !empty($customer->city_id)) return (int)$customer->city_id;
         return !empty($validated['city_id']) ? (int)$validated['city_id'] : null;
+    }
+
+
+    private function resolveShippingPrice(int $shippingId): int
+    {
+        return (int) ShippingMethod::query()->whereKey($shippingId)->value('price');
     }
 
     /* =========================
