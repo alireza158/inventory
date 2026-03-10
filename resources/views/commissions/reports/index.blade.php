@@ -24,7 +24,7 @@
                 <tbody>
                     @foreach($results as $row)
                     <tr class="border-t">
-                        <td>{{ $row->user->name }}</td><td>{{ $row->category->name }}</td>
+                        <td>{{ $row->user?->name ?? '-' }}</td><td>{{ $row->category?->name ?? '-' }}</td>
                         <td>{{ number_format($row->target_amount) }}</td><td>{{ number_format($row->sold_amount) }}</td>
                         <td>{{ $row->achievement_percent }}</td><td>{{ $row->commission_type }}</td>
                         <td>{{ $row->commission_value }}</td><td>{{ number_format($row->commission_amount) }}</td>

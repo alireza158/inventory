@@ -25,4 +25,23 @@ class StoreCommissionTargetRequest extends FormRequest
             'min_percent_to_activate' => ['required', 'numeric', 'min:0'],
         ];
     }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            if (!$this->filled('commission_period_id') || !$this->filled('user_id') || !$this->filled('category_id')) {
+                return;
+            }
+
+            $exists = \App\Models\CommissionTarget::query()
+                ->where('commission_period_id', $this->integer('commission_period_id'))
+                ->where('user_id', $this->integer('user_id'))
+                ->where('category_id', $this->integer('category_id'))
+                ->exists();
+
+            if ($exists) {
+                $validator->errors()->add('category_id', 'برای این کاربر و دسته‌بندی در دوره انتخابی قبلاً تارگت ثبت شده است.');
+            }
+        });
+    }
 }
