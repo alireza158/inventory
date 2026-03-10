@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ShippingMethod;
 use Illuminate\Http\Request;
 
 class PreinvoiceApiController extends Controller
@@ -112,14 +113,21 @@ class PreinvoiceApiController extends Controller
 
     public function shippings()
     {
+        $items = ShippingMethod::query()
+            ->select(['id', 'name', 'price'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($item) => [
+                'id' => (int) $item->id,
+                'name' => $item->name,
+                'price' => (int) $item->price,
+            ])
+            ->values();
+
         return response()->json([
             'data' => [
                 'shippings' => [
-                    'data' => [
-                        ['id' => 1, 'name' => 'ارسال فوری', 'price' => 50000],
-                        ['id' => 2, 'name' => 'پیک', 'price' => 30000],
-                        ['id' => 3, 'name' => 'مراجعه حضوری', 'price' => 0],
-                    ],
+                    'data' => $items,
                 ],
             ],
         ]);

@@ -23,6 +23,7 @@ use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\StockMovementReportController;
 use App\Http\Controllers\StocktakeController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\ShippingMethodController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
@@ -60,6 +61,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/model-lists/assign-codes', [ModelListController::class, 'assignCodes'])->name('model-lists.assign-codes');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
     Route::post('/model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])->name('model-lists.import-phone-catalog');
+
+    // Shipping methods
+    Route::get('/shipping-methods', [ShippingMethodController::class, 'index'])->name('shipping-methods.index');
+    Route::post('/shipping-methods', [ShippingMethodController::class, 'store'])->name('shipping-methods.store');
+    Route::put('/shipping-methods/{shippingMethod}', [ShippingMethodController::class, 'update'])->name('shipping-methods.update');
+    Route::delete('/shipping-methods/{shippingMethod}', [ShippingMethodController::class, 'destroy'])->name('shipping-methods.destroy');
 
     // Quick category store
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
@@ -120,8 +127,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/products', [PreinvoiceApiController::class, 'products']);
         Route::get('/products/{product}', [PreinvoiceApiController::class, 'product']);
         Route::get('/area', [PreinvoiceApiController::class, 'area']);
-        Route::get('/shippings', [PreinvoiceApiController::class, 'shippings']);
-
         Route::get('/customers', [CustomerApiController::class, 'search'])->name('api.customers.search');
         Route::post('/customers', [CustomerApiController::class, 'store'])->name('api.customers.store');
         Route::get('/customers/{customer}', [CustomerApiController::class, 'show'])->name('api.customers.show');

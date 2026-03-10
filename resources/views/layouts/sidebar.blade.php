@@ -10,7 +10,7 @@
 
     $commerceActive  = $isRoute('persons.*', 'customers.*', 'suppliers.*', 'users.*');
 
-    $invoiceActive   = $isRoute('preinvoice.*', 'invoices.*');
+    $invoiceActive   = $isRoute('preinvoice.*', 'invoices.*', 'shipping-methods.*');
 @endphp
 
 <style>
@@ -171,6 +171,7 @@
             @endif
 
             <a class="sidebar-sublink {{ $is('preinvoice.draft.index') }}" href="{{ route('preinvoice.draft.index') }}">پیش‌نویس‌ها</a>
+            <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال</a>
 
             @if (Route::has('invoices.index'))
                 <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
