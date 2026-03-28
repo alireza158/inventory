@@ -1,6 +1,19 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    $currentSort = $sort ?? 'id';
+    $currentDir = $dir ?? 'desc';
+    $toFa = fn ($value) => strtr((string) $value, ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹']);
+    $sortLink = function (string $key) use ($currentSort, $currentDir) {
+        $nextDir = ($currentSort === $key && $currentDir === 'asc') ? 'desc' : 'asc';
+        return route('products.index', array_merge(request()->query(), ['sort' => $key, 'dir' => $nextDir, 'page' => null]));
+    };
+    $sortArrow = function (string $key) use ($currentSort, $currentDir) {
+        if ($currentSort !== $key) return '↕';
+        return $currentDir === 'asc' ? '↑' : '↓';
+    };
+@endphp
 <style>
     :root{
         --soft-bg:#f6f8fb;
@@ -63,6 +76,46 @@
     .pill-gray{ background:#f8fafc; }
     .pill-danger{ background: rgba(220,53,69,.08); border-color: rgba(220,53,69,.25); color:#b42318; }
     .pill-success{ background: rgba(25,135,84,.10); border-color: rgba(25,135,84,.25); color:#146c43; }
+
+    .product-name-wrap{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:8px;
+    }
+    .status-dot{
+        width:10px;
+        height:10px;
+        border-radius:50%;
+        flex:0 0 10px;
+        margin-top:4px;
+        box-shadow:0 0 0 2px rgba(255,255,255,.9);
+    }
+    .status-dot.active{ background:#22c55e; }
+    .status-dot.inactive{ background:#ef4444; }
+    .sortable-link{
+        color: inherit;
+        text-decoration: none;
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+    }
+    .sortable-link:hover{ color:#0d6efd; }
+    .sort-arrow{
+        font-size:11px;
+        color:#6b7280;
+    }
+    .bulk-toolbar{
+        border:1px solid var(--soft-border);
+        border-radius:14px;
+        padding:10px 12px;
+        background:#f8fafc;
+    }
+    .buy-price-muted{ color:#9ca3af; }
+    .price-inline{
+        white-space: nowrap;
+        font-weight: 700;
+    }
 
     .mono{
         font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
@@ -174,18 +227,24 @@
                     </button>
 
                     <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن کالا</a>
-
-                    <form method="POST" action="{{ route('products.sync.crm') }}">
-                        @csrf
-                        <button class="btn btn-outline-success">Sync از CRM</button>
-                    </form>
-
-                    <a class="btn btn-outline-secondary" href="{{ route('products.import.template') }}">دانلود نمونه</a>
                 </div>
             </div>
         </div>
+        <div id="productsAjaxArea">
         <div class="soft-card filter-card mb-3">
             <div class="card-body">
+                <div class="bulk-toolbar mb-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="fw-bold">عملیات روی کالا</div>
+                        <div class="small subtle-text">ابتدا یک کالا را انتخاب کنید، سپس عملیات را اجرا کنید.</div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <button class="btn btn-primary btn-sm" type="button" id="bulkEditBtn">ویرایش</button>
+                        <button class="btn btn-outline-danger btn-sm" type="button" id="bulkDeleteBtn">حذف</button>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" id="bulkStockBtn">موجودی انبار به تفکیک</button>
+                    </div>
+                </div>
+
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                     <div class="fw-bold">فیلترها</div>
                     <div class="small subtle-text">برای نتیجه بهتر چند فیلتر را ترکیب کنید</div>
@@ -250,14 +309,28 @@
                         <table class="sheet">
                             <thead>
                                 <tr>
+                                    <th class="w-1 text-center">
+                                        <input type="checkbox" class="form-check-input" id="selectAllProducts" title="انتخاب همه">
+                                    </th>
                                     <th class="w-1"></th>
-                                    <th class="nowrap">کد ۴ رقمی</th>
-                                    <th class="nowrap">بارکد ۱۱ رقمی</th>
-                                    <th>اسم کالا</th>
-                                    <th class="nowrap">وضعیت فروش</th>
-                                    <th class="nowrap">موجودی</th>
-                                    <th class="nowrap">قیمت فروش</th>
-                                    <th class="text-end nowrap">عملیات</th>
+                                    <th class="nowrap">
+                                        <a href="{{ $sortLink('short_barcode') }}" class="sortable-link">کد کالا <span class="sort-arrow">{{ $sortArrow('short_barcode') }}</span></a>
+                                    </th>
+                                    <th class="nowrap">
+                                        <a href="{{ $sortLink('barcode') }}" class="sortable-link">بارکد کالا <span class="sort-arrow">{{ $sortArrow('barcode') }}</span></a>
+                                    </th>
+                                    <th>
+                                        <a href="{{ $sortLink('name') }}" class="sortable-link">اسم کالا <span class="sort-arrow">{{ $sortArrow('name') }}</span></a>
+                                    </th>
+                                    <th class="nowrap">
+                                        <a href="{{ $sortLink('stock') }}" class="sortable-link">موجودی <span class="sort-arrow">{{ $sortArrow('stock') }}</span></a>
+                                    </th>
+                                    <th class="nowrap">
+                                        <a href="{{ $sortLink('variants_buy_price_min') }}" class="sortable-link">قیمت خرید <span class="sort-arrow">{{ $sortArrow('variants_buy_price_min') }}</span></a>
+                                    </th>
+                                    <th class="nowrap">
+                                        <a href="{{ $sortLink('price') }}" class="sortable-link">قیمت فروش <span class="sort-arrow">{{ $sortArrow('price') }}</span></a>
+                                    </th>
                                 </tr>
                             </thead>
 
@@ -282,6 +355,16 @@
                                     @endphp
 
                                     <tr>
+                                        <td class="text-center">
+                                            <input type="checkbox"
+                                                   class="form-check-input product-checkbox"
+                                                   value="{{ $p->id }}"
+                                                   data-edit-url="{{ route('products.edit', $p) }}"
+                                                   data-delete-url="{{ route('products.destroy', $p) }}"
+                                                   data-product-name="{{ $p->name }}"
+                                                   data-stock-breakdown='@json($p->warehouseStocks->map(fn($ws) => ["warehouse" => $ws->warehouse?->name, "qty" => (int) $ws->quantity])->values())'>
+                                        </td>
+
                                         <td class="w-1">
                                             @if($hasVariants)
                                                 <button class="toggle-variants"
@@ -304,26 +387,18 @@
 
                                         <td class="nowrap mono">
                                             @if($sampleBarcode)
-                                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                    <span class="pill pill-gray">{{ $sampleBarcode }}</span>
-                                                    <span class="pill pill-gray">{{ $p->variants->count() }} تنوع</span>
-                                                </div>
+                                                <span class="pill pill-gray">{{ $sampleBarcode }}</span>
                                             @else
-                                                <span class="text-muted">—</span>
+                                                <span class="pill pill-gray">{{ $p->barcode ?: '—' }}</span>
                                             @endif
                                         </td>
 
                                         <td>
-                                            <div class="fw-bold">{{ $p->name }}</div>
-                                            <div class="small subtle-text">دسته: {{ $p->category?->name ?: '—' }}</div>
-                                        </td>
-
-                                        <td class="nowrap">
-                                            @if($p->is_sellable ?? true)
-                                                <span class="pill pill-success">قابل فروش</span>
-                                            @else
-                                                <span class="pill pill-danger">غیرقابل فروش</span>
-                                            @endif
+                                            <div class="product-name-wrap">
+                                                <div class="fw-bold">{{ $p->name }}</div>
+                                                <span class="status-dot {{ ($p->is_sellable ?? true) ? 'active' : 'inactive' }}"
+                                                      title="{{ ($p->is_sellable ?? true) ? 'فعال' : 'غیرفعال' }}"></span>
+                                            </div>
                                         </td>
 
                                         <td class="nowrap">
@@ -335,18 +410,16 @@
                                         </td>
 
                                         <td class="nowrap">
-                                            <span class="fw-bold">{{ number_format((int)$p->price) }}</span>
-                                            <span class="subtle-text">تومان</span>
+                                            @php $buyPrice = $p->variants_min_buy_price; @endphp
+                                            @if(!is_null($buyPrice))
+                                                <span class="price-inline">{{ $toFa(number_format((int)$buyPrice).' تومان') }}</span>
+                                            @else
+                                                <span class="buy-price-muted">—</span>
+                                            @endif
                                         </td>
 
-                                        <td class="text-end nowrap">
-                                            <a class="btn btn-sm btn-soft" href="{{ route('products.edit', $p) }}">ویرایش</a>
-
-                                            <form class="d-inline" method="POST" action="{{ route('products.destroy', $p) }}" onsubmit="return confirm('حذف شود؟')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger" style="border-radius:12px;">حذف</button>
-                                            </form>
+                                        <td class="nowrap">
+                                            <span class="price-inline">{{ $toFa(number_format((int)$p->price).' تومان') }}</span>
                                         </td>
                                     </tr>
 
@@ -412,6 +485,7 @@
                 </div>
             </div>
         </div>
+        </div>
 
     </div>
 </div>
@@ -440,24 +514,44 @@
     </div>
 </div>
 
+<form id="bulkDeleteForm" method="POST" class="d-none">
+    @csrf
+    @method('DELETE')
+</form>
+
+<div class="modal fade" id="stockBreakdownModal" tabindex="-1" aria-labelledby="stockBreakdownLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stockBreakdownLabel">موجودی کالا به تفکیک انبار</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body">
+                <div id="stockBreakdownProductName" class="fw-bold mb-2"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>انبار</th>
+                                <th class="text-end">تعداد</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockBreakdownBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  const modalEl = document.getElementById('stockBreakdownModal');
+  const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+  const stockNameEl = document.getElementById('stockBreakdownProductName');
+  const stockBodyEl = document.getElementById('stockBreakdownBody');
+  const deleteForm = document.getElementById('bulkDeleteForm');
 
-  // +/- toggle
-  document.querySelectorAll('.toggle-variants').forEach(btn => {
-    const targetSel = btn.getAttribute('data-bs-target');
-    const el = document.querySelector(targetSel);
-    if (!el) return;
-
-    const symbol = btn.querySelector('.variant-symbol');
-    const setSymbol = () => symbol.textContent = el.classList.contains('show') ? '−' : '+';
-    setSymbol();
-
-    el.addEventListener('shown.bs.collapse', setSymbol);
-    el.addEventListener('hidden.bs.collapse', setSymbol);
-  });
-
-  // Category search helper
   function bindCatSearch(inputId, treeId){
     const input = document.getElementById(inputId);
     const tree = document.getElementById(treeId);
@@ -474,8 +568,136 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  async function loadProducts(url, pushState = true) {
+    const area = document.getElementById('productsAjaxArea');
+    if (!area) return;
+    area.style.opacity = '0.55';
+
+    try {
+      const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const incomingArea = doc.getElementById('productsAjaxArea');
+      if (!incomingArea) {
+        window.location.href = url;
+        return;
+      }
+
+      area.innerHTML = incomingArea.innerHTML;
+      if (pushState) history.pushState({}, '', url);
+      initAjaxBindings();
+    } catch (e) {
+      window.location.href = url;
+    } finally {
+      area.style.opacity = '1';
+    }
+  }
+
+  function getSelectedProducts(){
+    return Array.from(document.querySelectorAll('.product-checkbox')).filter(ch => ch.checked);
+  }
+
+  function getSingleSelected(){
+    const selected = getSelectedProducts();
+    if (selected.length !== 1){
+      alert('برای این عملیات باید دقیقا یک کالا انتخاب شود.');
+      return null;
+    }
+    return selected[0];
+  }
+
+  function initAjaxBindings(){
+    document.querySelectorAll('.toggle-variants').forEach(btn => {
+      const targetSel = btn.getAttribute('data-bs-target');
+      const el = document.querySelector(targetSel);
+      if (!el) return;
+      const symbol = btn.querySelector('.variant-symbol');
+      const setSymbol = () => symbol.textContent = el.classList.contains('show') ? '−' : '+';
+      setSymbol();
+      el.addEventListener('shown.bs.collapse', setSymbol);
+      el.addEventListener('hidden.bs.collapse', setSymbol);
+    });
+
+    const selectAll = document.getElementById('selectAllProducts');
+    const productCheckboxes = Array.from(document.querySelectorAll('.product-checkbox'));
+    selectAll?.addEventListener('change', function () {
+      productCheckboxes.forEach(ch => ch.checked = this.checked);
+    });
+
+    const form = document.querySelector('#productsAjaxArea form[method="GET"]');
+    form?.addEventListener('submit', function(e){
+      e.preventDefault();
+      const params = new URLSearchParams(new FormData(this));
+      loadProducts(`${this.action}?${params.toString()}`);
+    });
+
+    document.querySelectorAll('#productsAjaxArea a.sortable-link, #productsAjaxArea .pagination a, #catTree a, #catTreeMobile a').forEach(link => {
+      if (link.dataset.ajaxBound === '1') return;
+      link.dataset.ajaxBound = '1';
+      link.addEventListener('click', function(e){
+        if (!this.href || !this.href.includes('/products')) return;
+        e.preventDefault();
+        loadProducts(this.href);
+      });
+    });
+
+    const clearBtn = document.querySelector('#productsAjaxArea a.btn-outline-secondary[href*="products"]');
+    if (clearBtn && clearBtn.dataset.ajaxBound !== '1') {
+      clearBtn.dataset.ajaxBound = '1';
+      clearBtn.addEventListener('click', function(e){
+        e.preventDefault();
+        loadProducts(this.href);
+      });
+    }
+
+    document.getElementById('bulkEditBtn')?.addEventListener('click', function () {
+      const selected = getSingleSelected();
+      if (!selected) return;
+      window.location.href = selected.dataset.editUrl;
+    });
+
+    document.getElementById('bulkDeleteBtn')?.addEventListener('click', function () {
+      const selected = getSingleSelected();
+      if (!selected) return;
+      if (!confirm(`کالای «${selected.dataset.productName}» حذف شود؟`)) return;
+      deleteForm.setAttribute('action', selected.dataset.deleteUrl);
+      deleteForm.submit();
+    });
+
+    document.getElementById('bulkStockBtn')?.addEventListener('click', function () {
+      const selected = getSingleSelected();
+      if (!selected || !modal || !stockBodyEl || !stockNameEl) return;
+
+      stockNameEl.textContent = selected.dataset.productName;
+      stockBodyEl.innerHTML = '';
+
+      let breakdown = [];
+      try {
+        breakdown = JSON.parse(selected.dataset.stockBreakdown || '[]');
+      } catch (e) {
+        breakdown = [];
+      }
+
+      if (!breakdown.length){
+        stockBodyEl.innerHTML = '<tr><td colspan="2" class="text-center text-muted">برای این کالا در انبارها موجودی ثبت نشده است.</td></tr>';
+      } else {
+        breakdown.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${item.warehouse ?? '—'}</td><td class="text-end">${item.qty ?? 0}</td>`;
+          stockBodyEl.appendChild(tr);
+        });
+      }
+      modal.show();
+    });
+  }
+
   bindCatSearch('catSearch', 'catTree');
   bindCatSearch('catSearchMobile', 'catTreeMobile');
+  initAjaxBindings();
+
+  window.addEventListener('popstate', function () {
+    loadProducts(window.location.href, false);
+  });
 });
 </script>
 @endsection 

@@ -1,6 +1,13 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+  $warehouses = $warehouses ?? collect();
+  $suppliers = $suppliers ?? collect();
+  $products = $products ?? collect();
+  $variants = $variants ?? collect();
+  $categories = $categories ?? collect();
+@endphp
 <style>
   :root{
     --brd:#e8edf3;
