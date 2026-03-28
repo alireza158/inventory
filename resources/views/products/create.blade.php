@@ -1,6 +1,14 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+  $warehouses = collect($warehouses ?? []);
+  $suppliers  = collect($suppliers ?? []);
+  $categories = collect($categories ?? []);
+  $products   = collect($products ?? []);
+  $variants   = collect($variants ?? []);
+@endphp
+
 <style>
   :root{
     --brd:#e8edf3;
@@ -71,6 +79,16 @@
       <a class="btn btn-outline-secondary" href="{{ route('purchases.index') }}">بازگشت</a>
     </div>
 
+    @if($warehouses->isEmpty() || $suppliers->isEmpty() || $categories->isEmpty())
+      <div class="alert alert-warning">
+        بعضی از اطلاعات اولیه فرم از کنترلر به ویو ارسال نشده یا خالی است.
+        <br>
+        انبارها: <b>{{ $warehouses->count() }}</b> |
+        تامین‌کننده‌ها: <b>{{ $suppliers->count() }}</b> |
+        دسته‌بندی‌ها: <b>{{ $categories->count() }}</b>
+      </div>
+    @endif
+
     <form method="POST" action="{{ route('purchases.store') }}" id="purchaseForm" class="row g-3">
       @csrf
 
@@ -90,9 +108,11 @@
                 <label class="form-label">انبار مقصد</label>
                 <select name="warehouse_id" id="warehouseId" class="form-select" required>
                   <option value="">انتخاب کنید...</option>
-                  @foreach($warehouses as $w)
+                  @forelse($warehouses as $w)
                     <option value="{{ $w->id }}" @selected(old('warehouse_id') == $w->id)>{{ $w->name }}</option>
-                  @endforeach
+                  @empty
+                    <option value="" disabled>انباری تعریف نشده</option>
+                  @endforelse
                 </select>
                 <div class="form-text">موجودی این خرید به این انبار اضافه می‌شود.</div>
               </div>
@@ -101,11 +121,13 @@
                 <label class="form-label">تامین‌کننده</label>
                 <select name="supplier_id" id="supplierId" class="form-select" required>
                   <option value="">انتخاب کنید...</option>
-                  @foreach($suppliers as $s)
+                  @forelse($suppliers as $s)
                     <option value="{{ $s->id }}" @selected(old('supplier_id') == $s->id)>
                       {{ $s->name }} @if(!empty($s->phone)) ({{ $s->phone }}) @endif
                     </option>
-                  @endforeach
+                  @empty
+                    <option value="" disabled>تامین‌کننده‌ای تعریف نشده</option>
+                  @endforelse
                 </select>
               </div>
 
@@ -259,32 +281,37 @@
 document.addEventListener('DOMContentLoaded', function(){
 
   // ===== داده‌ها از کنترلر =====
-  var CATEGORIES = @json($categories);
-  var PRODUCTS   = @json($products);
-  var VARIANTS   = @json($variants);
+  var CATEGORIES = @json($categories->values());
+  var PRODUCTS   = @json($products->values());
+  var VARIANTS   = @json($variants->values());
 
   // ===== helpers =====
   function onlyDigits(s){
     return String(s || '').replace(/\D+/g,'');
   }
+
   function padLeft(s, len, ch){
     s = String(s || '');
     ch = ch || '0';
     while(s.length < len) s = ch + s;
     return s;
   }
+
   function normalizeModel3(code){
     var d = onlyDigits(code).substring(0,3);
     return padLeft(d, 3, '0');
   }
+
   function normalizeDesign2(d2){
     d2 = onlyDigits(d2).substring(0,2);
     return padLeft(d2, 2, '0');
   }
+
   function moneyToInt(val){
     var d = onlyDigits(val);
     return d ? parseInt(d,10) : 0;
   }
+
   function fmt(x){
     x = parseInt(x || 0, 10);
     return String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -312,7 +339,6 @@ document.addEventListener('DOMContentLoaded', function(){
       P_META[pid] = { models: [], modelsMap:{}, designsByModel:{} };
     }
 
-    // مدل
     if(!P_META[pid].modelsMap[mid]){
       var modelName = mid === 0 ? '— بدون مدل —' : (v.model_name ? v.model_name : ('مدل ' + mid));
       var modelCode3 = mid === 0 ? '000' : normalizeModel3(v.model_code);
@@ -320,16 +346,17 @@ document.addEventListener('DOMContentLoaded', function(){
       P_META[pid].models.push(P_META[pid].modelsMap[mid]);
     }
 
-    // طرح
     if(!P_META[pid].designsByModel[mid]) P_META[pid].designsByModel[mid] = [];
-    var title = design2 === '00' ? '— بدون طرح —' : (v.design_title ? v.design_title : (v.variety_name ? v.variety_name : ('طرح ' + design2)));
+    var title = design2 === '00'
+      ? '— بدون طرح —'
+      : (v.design_title ? v.design_title : (v.variety_name ? v.variety_name : ('طرح ' + design2)));
+
     var arr = P_META[pid].designsByModel[mid];
     if(arr.findIndex(function(x){ return x.design2 === design2; }) === -1){
       arr.push({design2: design2, title: title});
     }
   });
 
-  // مرتب‌سازی مدل‌ها/طرح‌ها
   Object.keys(P_META).forEach(function(pid){
     P_META[pid].models.sort(function(a,b){ return a.id - b.id; });
     Object.keys(P_META[pid].designsByModel).forEach(function(mid){
@@ -382,13 +409,16 @@ document.addEventListener('DOMContentLoaded', function(){
   function buildModelOptions(pid){
     var meta = P_META[pid];
     var html = '<option value="">انتخاب مدل...</option>';
+
     if(!meta || !meta.models.length){
       html += '<option value="0">— بدون مدل —</option>';
       return html;
     }
+
     meta.models.forEach(function(m){
       html += '<option value="' + m.id + '">' + m.name + '</option>';
     });
+
     return html;
   }
 
@@ -406,17 +436,19 @@ document.addEventListener('DOMContentLoaded', function(){
     arr.forEach(function(d){
       html += '<option value="' + d.design2 + '">' + d.title + '</option>';
     });
+
     return html;
   }
 
   function reindexRows(){
     var cards = Array.prototype.slice.call(itemsWrap.querySelectorAll('.item-card'));
+
     cards.forEach(function(card, idx){
       card.dataset.index = String(idx);
+
       var no = card.querySelector('.rowNo');
       if(no) no.textContent = String(idx + 1);
 
-      // name ها را ری‌مپ کن
       var inputs = card.querySelectorAll('[name]');
       inputs.forEach(function(el){
         var n = el.getAttribute('name');
@@ -428,6 +460,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function addRow(prefill){
     prefill = prefill || {};
+
     var html = rowTpl.innerHTML;
     html = html.replace(/__i__/g, String(itemsWrap.querySelectorAll('.item-card').length));
     html = html.replace('__cat_options__', catOptionsHtml());
@@ -439,19 +472,21 @@ document.addEventListener('DOMContentLoaded', function(){
 
     wireRow(card);
 
-    // prefill (برای کلیک روی طرح‌ها)
     if(prefill.category_id){
       card.querySelector('[data-role="catSel"]').value = String(prefill.category_id);
       onCatChange(card);
     }
+
     if(prefill.product_id){
       card.querySelector('[data-role="prodSel"]').value = String(prefill.product_id);
       onProductChange(card);
     }
+
     if(prefill.model_list_id !== undefined){
       card.querySelector('[data-role="modelSel"]').value = String(prefill.model_list_id);
       onModelChange(card);
     }
+
     if(prefill.design2){
       card.querySelector('[data-role="designSel"]').value = String(prefill.design2);
       onDesignChange(card);
@@ -470,10 +505,23 @@ document.addEventListener('DOMContentLoaded', function(){
   function setCodeState(card, code, ok){
     var chip = card.querySelector('[data-role="codeChip"]');
     var txt = card.querySelector('[data-role="codeText"]');
+
     txt.textContent = code || '—';
     chip.classList.remove('ok');
     chip.classList.remove('bad');
     chip.classList.add(ok ? 'ok' : 'bad');
+  }
+
+  function clearVariantFields(card){
+    var variantId = card.querySelector('[data-role="variantId"]');
+    var variantCode = card.querySelector('[data-role="variantCode"]');
+    var design2Hidden = card.querySelector('[data-role="design2Hidden"]');
+    var stockText = card.querySelector('[data-role="stockText"]');
+
+    variantId.value = '';
+    variantCode.value = '';
+    design2Hidden.value = '';
+    stockText.textContent = '—';
   }
 
   function setVariant(card, v){
@@ -483,10 +531,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var stockText = card.querySelector('[data-role="stockText"]');
 
     if(!v){
-      variantId.value = '';
-      variantCode.value = '';
-      design2Hidden.value = '';
-      stockText.textContent = '—';
+      clearVariantFields(card);
       setCodeState(card, '—', false);
       return;
     }
@@ -502,13 +547,13 @@ document.addEventListener('DOMContentLoaded', function(){
 
     setCodeState(card, String(v.variant_code || ''), true);
 
-    // قیمت پیش‌فرض (اگر خالی بود)
     var buy = card.querySelector('[data-role="buyPrice"]');
     var sell = card.querySelector('[data-role="sellPrice"]');
 
     if(buy && (!buy.value || moneyToInt(buy.value) === 0) && v.buy_price !== null && v.buy_price !== undefined){
       buy.value = String(v.buy_price);
     }
+
     if(sell && (!sell.value || moneyToInt(sell.value) === 0) && v.sell_price !== null && v.sell_price !== undefined){
       sell.value = String(v.sell_price);
     }
@@ -522,6 +567,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var prodCode = card.querySelector('[data-role="prodCode"]');
 
     var catId = catSel.value;
+
     prodSel.disabled = !catId;
     prodSel.innerHTML = catId ? buildProductOptions(productsByCat(catId)) : '<option value="">ابتدا دسته‌بندی</option>';
 
@@ -595,6 +641,8 @@ document.addEventListener('DOMContentLoaded', function(){
     var prodSel = card.querySelector('[data-role="prodSel"]');
     var modelSel = card.querySelector('[data-role="modelSel"]');
     var designSel = card.querySelector('[data-role="designSel"]');
+    var stockText = card.querySelector('[data-role="stockText"]');
+    var design2Hidden = card.querySelector('[data-role="design2Hidden"]');
 
     var pid = prodSel.value ? parseInt(prodSel.value,10) : 0;
     var mid = modelSel.value === '' ? null : parseInt(modelSel.value,10);
@@ -608,22 +656,25 @@ document.addEventListener('DOMContentLoaded', function(){
     var key = pid + '|' + mid + '|' + d2;
     var v = V_MAP[key] || null;
 
-    // اگر variant موجود نبود، کد را هم نشان بده ولی با حالت اخطار
     if(!v){
-      // ساخت کد ۱۱ رقمی از product.code + model3 + design2
       var p = productById(pid);
       var p6 = p && p.code ? String(p.code) : '000000';
-      var model3 = (mid === 0) ? '000' : (P_META[pid] && P_META[pid].modelsMap[mid] ? P_META[pid].modelsMap[mid].code3 : '000');
+      var model3 = (mid === 0)
+        ? '000'
+        : (P_META[pid] && P_META[pid].modelsMap[mid] ? P_META[pid].modelsMap[mid].code3 : '000');
+
       var code11 = '' + p6 + model3 + d2;
 
+      clearVariantFields(card);
+      design2Hidden.value = d2;
+      stockText.textContent = '—';
       setCodeState(card, code11, false);
-      setVariant(card, null);
+      calcRow(card);
+      calcAll();
       return;
     }
 
-    // برای اینکه تو JS راحت باشه:
     v.design2 = d2;
-
     setVariant(card, v);
     calcRow(card);
     calcAll();
@@ -648,7 +699,6 @@ document.addEventListener('DOMContentLoaded', function(){
       pill.className = 'design-pill';
       pill.textContent = d.title + ' (' + d.design2 + ')';
       pill.addEventListener('click', function(){
-        // ردیف جدید با همان category/product/model و طرح انتخابی
         var catSel = card.querySelector('[data-role="catSel"]');
         addRow({
           category_id: catSel.value,
@@ -676,7 +726,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     var qty = card.querySelector('[data-role="qty"]');
     var buy = card.querySelector('[data-role="buyPrice"]');
-
+    var sell = card.querySelector('[data-role="sellPrice"]');
     var btnRemove = card.querySelector('[data-role="removeRow"]');
 
     catSel.addEventListener('change', function(){ onCatChange(card); calcAll(); });
@@ -686,8 +736,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
     qty.addEventListener('input', function(){ calcRow(card); calcAll(); });
     buy.addEventListener('input', function(){ calcRow(card); calcAll(); });
-
-    var sell = card.querySelector('[data-role="sellPrice"]');
     sell.addEventListener('input', function(){ calcAll(); });
 
     btnRemove.addEventListener('click', function(){ removeRow(card); });
@@ -704,11 +752,11 @@ document.addEventListener('DOMContentLoaded', function(){
   function calcAll(){
     var cards = Array.prototype.slice.call(itemsWrap.querySelectorAll('.item-card'));
     var total = 0;
+
     cards.forEach(function(c){
       total += calcRow(c);
     });
 
-    // تخفیف
     var dtype = discountType.value;
     var dval = parseInt(discountValue.value || '0', 10);
     if(dval < 0) dval = 0;
@@ -728,7 +776,6 @@ document.addEventListener('DOMContentLoaded', function(){
     sumPayable.textContent = fmt(payable);
   }
 
-  // ===== دکمه‌ها =====
   btnAddRow.addEventListener('click', function(){ addRow(); });
 
   btnClearRows.addEventListener('click', function(){
@@ -740,13 +787,12 @@ document.addEventListener('DOMContentLoaded', function(){
   discountType.addEventListener('change', calcAll);
   discountValue.addEventListener('input', calcAll);
 
-  // ===== شروع =====
   addRow();
   calcAll();
 
-  // ===== جلوگیری از ثبت با کد نامعتبر =====
   document.getElementById('purchaseForm').addEventListener('submit', function(e){
     var cards = Array.prototype.slice.call(itemsWrap.querySelectorAll('.item-card'));
+
     if(cards.length === 0){
       e.preventDefault();
       alert('حداقل یک ردیف خرید اضافه کن.');
@@ -756,6 +802,7 @@ document.addEventListener('DOMContentLoaded', function(){
     for(var i=0;i<cards.length;i++){
       var vId = cards[i].querySelector('[data-role="variantId"]').value;
       var code = cards[i].querySelector('[data-role="codeText"]').textContent;
+
       if(!vId){
         e.preventDefault();
         alert('ردیف ' + (i+1) + ' تنوع معتبر ندارد. (کد/مدل/طرح باید دقیقاً مطابق تنوع‌های ساخته‌شده باشد) \nکد فعلی: ' + code);

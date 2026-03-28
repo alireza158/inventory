@@ -200,10 +200,6 @@
                 <div class="cat-tree-wrap" id="catTree">
                     @include('categories._tree', ['nodes' => $categoryTree])
                 </div>
-
-                <div class="small subtle-text mt-3">
-                    افزودن دسته‌بندی از منوی «دسته‌بندی‌ها» در سایدبار انجام می‌شود.
-                </div>
             </div>
         </div>
     </div>
@@ -216,7 +212,6 @@
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <h4 class="page-title">کالاها</h4>
-                    <div class="small subtle-text mt-1">مدیریت موجودی، قیمت و مدل‌ها</div>
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
@@ -247,7 +242,6 @@
 
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                     <div class="fw-bold">فیلترها</div>
-                    <div class="small subtle-text">برای نتیجه بهتر چند فیلتر را ترکیب کنید</div>
                 </div>
 
                 <form method="GET" action="{{ route('products.index') }}">
