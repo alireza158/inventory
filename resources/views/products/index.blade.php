@@ -402,10 +402,12 @@
                                         </td>
 
                                         <td class="nowrap">
-                                            @if((int)$p->stock === 0)
-                                                <span class="pill pill-danger">0</span>
+                                            @php $buyPrice = $p->variants_min_buy_price; @endphp
+                                            @if(!is_null($buyPrice))
+                                                <span class="fw-bold">{{ number_format((int)$buyPrice) }}</span>
+                                                <span class="subtle-text">تومان</span>
                                             @else
-                                                <span class="pill pill-success">{{ $p->stock }}</span>
+                                                <span class="buy-price-muted">—</span>
                                             @endif
                                         </td>
 
@@ -426,7 +428,7 @@
                                     {{-- Variants Row (اختیاری) --}}
                                     @if($hasVariants)
                                         <tr>
-                                            <td colspan="8" class="p-0">
+                                            <td colspan="9" class="p-0">
                                                 <div class="collapse" id="{{ $collapseId }}">
                                                     <div class="variants-wrap">
                                                         <div class="small subtle-text mb-2">
@@ -472,7 +474,7 @@
 
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted py-5">هیچ کالایی ثبت نشده 📦</td>
+                                        <td colspan="9" class="text-center text-muted py-5">هیچ کالایی ثبت نشده 📦</td>
                                     </tr>
                                 @endforelse
                             </tbody>
