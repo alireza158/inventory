@@ -64,6 +64,23 @@
     .pill-danger{ background: rgba(220,53,69,.08); border-color: rgba(220,53,69,.25); color:#b42318; }
     .pill-success{ background: rgba(25,135,84,.10); border-color: rgba(25,135,84,.25); color:#146c43; }
 
+    .product-name-wrap{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:8px;
+    }
+    .status-dot{
+        width:10px;
+        height:10px;
+        border-radius:50%;
+        flex:0 0 10px;
+        margin-top:4px;
+        box-shadow:0 0 0 2px rgba(255,255,255,.9);
+    }
+    .status-dot.active{ background:#22c55e; }
+    .status-dot.inactive{ background:#ef4444; }
+
     .mono{
         font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
         letter-spacing: .5px;
@@ -254,7 +271,6 @@
                                     <th class="nowrap">کد ۴ رقمی</th>
                                     <th class="nowrap">بارکد ۱۱ رقمی</th>
                                     <th>اسم کالا</th>
-                                    <th class="nowrap">وضعیت فروش</th>
                                     <th class="nowrap">موجودی</th>
                                     <th class="nowrap">قیمت فروش</th>
                                     <th class="text-end nowrap">عملیات</th>
@@ -314,16 +330,12 @@
                                         </td>
 
                                         <td>
-                                            <div class="fw-bold">{{ $p->name }}</div>
+                                            <div class="product-name-wrap">
+                                                <div class="fw-bold">{{ $p->name }}</div>
+                                                <span class="status-dot {{ ($p->is_sellable ?? true) ? 'active' : 'inactive' }}"
+                                                      title="{{ ($p->is_sellable ?? true) ? 'فعال' : 'غیرفعال' }}"></span>
+                                            </div>
                                             <div class="small subtle-text">دسته: {{ $p->category?->name ?: '—' }}</div>
-                                        </td>
-
-                                        <td class="nowrap">
-                                            @if($p->is_sellable ?? true)
-                                                <span class="pill pill-success">قابل فروش</span>
-                                            @else
-                                                <span class="pill pill-danger">غیرقابل فروش</span>
-                                            @endif
                                         </td>
 
                                         <td class="nowrap">
@@ -353,7 +365,7 @@
                                     {{-- Variants Row (اختیاری) --}}
                                     @if($hasVariants)
                                         <tr>
-                                            <td colspan="8" class="p-0">
+                                            <td colspan="7" class="p-0">
                                                 <div class="collapse" id="{{ $collapseId }}">
                                                     <div class="variants-wrap">
                                                         <div class="small subtle-text mb-2">
@@ -399,7 +411,7 @@
 
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted py-5">هیچ کالایی ثبت نشده 📦</td>
+                                        <td colspan="7" class="text-center text-muted py-5">هیچ کالایی ثبت نشده 📦</td>
                                     </tr>
                                 @endforelse
                             </tbody>
