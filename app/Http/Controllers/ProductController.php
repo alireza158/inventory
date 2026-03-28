@@ -43,6 +43,12 @@ class ProductController extends Controller
             $query->where('price', '<=', (int) preg_replace('/[^\d]/', '', $request->max_price));
         }
 
+        if ($request->sellable_status === 'sellable') {
+            $query->where('is_sellable', true);
+        } elseif ($request->sellable_status === 'unsellable') {
+            $query->where('is_sellable', false);
+        }
+
         $products = $query->orderByDesc('id')->paginate(20)->withQueryString();
 
         $categoryTree = Category::query()
@@ -105,6 +111,7 @@ class ProductController extends Controller
 
             'buy_price'  => ['nullable', 'integer', 'min:0'],
             'sell_price' => ['nullable', 'integer', 'min:0'],
+            'is_sellable' => ['nullable', 'boolean'],
         ]);
 
         $useModels  = $request->boolean('use_models');
@@ -124,7 +131,9 @@ class ProductController extends Controller
             ->map(fn ($note) => trim((string) $note))
             ->values();
 
-        DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes) {
+        $isSellable = $request->boolean('is_sellable', true);
+
+        DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes, $isSellable) {
 
             $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
 
@@ -148,6 +157,7 @@ class ProductController extends Controller
                 'short_barcode' => $seq4,
                 'stock'         => 0,
                 'price'         => 0,
+                'is_sellable'   => $isSellable,
             ]);
 
             $sellPrice = (int) ($data['sell_price'] ?? 0);
@@ -285,6 +295,7 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name'        => ['required', 'string', 'max:255'],
+            'is_sellable' => ['nullable', 'boolean'],
 
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
@@ -297,12 +308,15 @@ class ProductController extends Controller
             'variants.*.stock' => ['required', 'integer', 'min:0'],
         ]);
 
-        DB::transaction(function () use ($data, $product) {
+        $isSellable = $request->boolean('is_sellable', true);
+
+        DB::transaction(function () use ($data, $product, $isSellable) {
             $product = Product::query()->lockForUpdate()->findOrFail($product->id);
 
             $product->update([
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
+                'is_sellable' => $isSellable,
             ]);
 
             $keepIds = [];

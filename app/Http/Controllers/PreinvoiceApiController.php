@@ -15,6 +15,7 @@ class PreinvoiceApiController extends Controller
 
         $items = Product::query()
             ->select(['id', 'name', 'sku', 'short_barcode', 'code', 'price', 'stock'])
+            ->where('is_sellable', true)
             ->when($q !== '', function ($query) use ($q, $qDigits) {
 
                 // ✅ اگر عدد وارد شد و طولش <= 4 یعنی PPPP
@@ -69,6 +70,8 @@ class PreinvoiceApiController extends Controller
 
     public function product(Product $product)
     {
+        abort_unless((bool) $product->is_sellable, 404);
+
         $product->load(['variants' => fn ($q) => $q->orderBy('variant_name')]);
 
         $payload = [

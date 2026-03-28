@@ -40,6 +40,7 @@ class Product extends Model
         // اگر ستونش هست و نمی‌خوای حذف کنی:
         'models',
         'has_colors',
+        'is_sellable',
     ];
 
     protected $casts = [
@@ -54,6 +55,7 @@ class Product extends Model
 
         'models'     => 'array',
         'has_colors' => 'boolean',
+        'is_sellable' => 'boolean',
         'synced_at'  => 'datetime',
     ];
 
