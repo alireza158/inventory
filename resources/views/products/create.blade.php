@@ -2,6 +2,7 @@
 
 @section('content')
 @php
+<<<<<<< HEAD
   $warehouses = collect($warehouses ?? []);
   $suppliers  = collect($suppliers ?? []);
   $categories = collect($categories ?? []);
@@ -9,6 +10,14 @@
   $variants   = collect($variants ?? []);
 @endphp
 
+=======
+  $warehouses = $warehouses ?? collect();
+  $suppliers = $suppliers ?? collect();
+  $products = $products ?? collect();
+  $variants = $variants ?? collect();
+  $categories = $categories ?? collect();
+@endphp
+>>>>>>> 5e08e73677189bfb082cd0322b64b4a29b77cc60
 <style>
   :root{
     --brd:#e8edf3;

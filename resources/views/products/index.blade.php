@@ -398,8 +398,7 @@
                                         <td class="nowrap">
                                             @php $buyPrice = $p->variants_min_buy_price; @endphp
                                             @if(!is_null($buyPrice))
-                                                <span class="fw-bold">{{ number_format((int)$buyPrice) }}</span>
-                                                <span class="subtle-text">تومان</span>
+                                                <span class="price-inline">{{ $toFa(number_format((int)$buyPrice).' تومان') }}</span>
                                             @else
                                                 <span class="buy-price-muted">—</span>
                                             @endif
