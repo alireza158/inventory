@@ -210,7 +210,16 @@
                             </select>
                         </div>
 
-                        <div class="col-lg-4">
+                        <div class="col-lg-2">
+                            <label class="form-label">وضعیت فروش</label>
+                            <select name="sellable_status" class="form-select">
+                                <option value="" @selected(request('sellable_status')==='' || is_null(request('sellable_status')))>همه</option>
+                                <option value="sellable" @selected(request('sellable_status')==='sellable')>قابل فروش</option>
+                                <option value="unsellable" @selected(request('sellable_status')==='unsellable')>غیرقابل فروش</option>
+                            </select>
+                        </div>
+
+                        <div class="col-lg-2">
                             <label class="form-label">بازه قیمت (تومان)</label>
                             <div class="input-group">
                                 <input name="min_price" class="form-control money" value="{{ request('min_price') }}" placeholder="از">
@@ -245,6 +254,7 @@
                                     <th class="nowrap">کد ۴ رقمی</th>
                                     <th class="nowrap">بارکد ۱۱ رقمی</th>
                                     <th>اسم کالا</th>
+                                    <th class="nowrap">وضعیت فروش</th>
                                     <th class="nowrap">موجودی</th>
                                     <th class="nowrap">قیمت فروش</th>
                                     <th class="text-end nowrap">عملیات</th>
@@ -309,6 +319,14 @@
                                         </td>
 
                                         <td class="nowrap">
+                                            @if($p->is_sellable ?? true)
+                                                <span class="pill pill-success">قابل فروش</span>
+                                            @else
+                                                <span class="pill pill-danger">غیرقابل فروش</span>
+                                            @endif
+                                        </td>
+
+                                        <td class="nowrap">
                                             @if((int)$p->stock === 0)
                                                 <span class="pill pill-danger">0</span>
                                             @else
@@ -335,7 +353,7 @@
                                     {{-- Variants Row (اختیاری) --}}
                                     @if($hasVariants)
                                         <tr>
-                                            <td colspan="7" class="p-0">
+                                            <td colspan="8" class="p-0">
                                                 <div class="collapse" id="{{ $collapseId }}">
                                                     <div class="variants-wrap">
                                                         <div class="small subtle-text mb-2">
@@ -381,7 +399,7 @@
 
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-5">هیچ کالایی ثبت نشده 📦</td>
+                                        <td colspan="8" class="text-center text-muted py-5">هیچ کالایی ثبت نشده 📦</td>
                                     </tr>
                                 @endforelse
                             </tbody>

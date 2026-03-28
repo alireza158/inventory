@@ -135,7 +135,7 @@ class PreinvoiceController extends Controller
             'total_price'     => 'required|integer|min:0',
 
             'products' => 'required|array|min:1',
-            'products.*.id' => 'required|integer',
+            'products.*.id' => 'required|integer|exists:products,id,is_sellable,1',
             'products.*.variety_id' => 'required|integer', // 0 هم قابل قبول است (بدون مدل)
             'products.*.quantity' => 'required|integer|min:1',
             'products.*.price' => 'nullable|integer|min:0',
