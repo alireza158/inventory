@@ -69,6 +69,11 @@ class Product extends Model
         return $this->hasMany(ProductVariant::class);
     }
 
+    public function warehouseStocks()
+    {
+        return $this->hasMany(WarehouseStock::class);
+    }
+
     public function getAvailableStockAttribute(): int
     {
         return max(0, ($this->stock ?? 0) - ($this->reserved ?? 0));
