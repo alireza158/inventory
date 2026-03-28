@@ -14,7 +14,13 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query()->with(['category', 'variants']);
+        $query = Product::query()
+            ->with([
+                'category',
+                'variants',
+                'warehouseStocks.warehouse',
+            ])
+            ->withMin('variants', 'buy_price');
 
         if ($request->filled('q')) {
             $q = trim((string) $request->q);
@@ -49,7 +55,26 @@ class ProductController extends Controller
             $query->where('is_sellable', false);
         }
 
-        $products = $query->orderByDesc('id')->paginate(20)->withQueryString();
+        $sort = (string) $request->get('sort', 'id');
+        $dir  = strtolower((string) $request->get('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        $allowedSorts = [
+            'short_barcode'     => 'short_barcode',
+            'barcode'           => 'barcode',
+            'name'              => 'name',
+            'stock'             => 'stock',
+            'variants_buy_price_min' => 'variants_min_buy_price',
+            'price'             => 'price',
+            'id'                => 'id',
+        ];
+
+        $sortColumn = $allowedSorts[$sort] ?? 'id';
+
+        $products = $query
+            ->orderBy($sortColumn, $dir)
+            ->orderByDesc('id')
+            ->paginate(20)
+            ->withQueryString();
 
         $categoryTree = Category::query()
             ->whereNull('parent_id')
@@ -57,7 +82,7 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('products.index', compact('products', 'categoryTree'));
+        return view('products.index', compact('products', 'categoryTree', 'sort', 'dir'));
     }
 
     public function create()
