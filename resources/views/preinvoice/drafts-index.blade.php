@@ -7,7 +7,7 @@
 @section('content')
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0">🧾 پیش‌نویس‌های پیش‌فاکتور</h4>
+    <h4 class="mb-0">💰 صف تایید مالی پیش‌فاکتورها</h4>
     <a href="{{ route('preinvoice.create') }}" class="btn btn-primary">➕ ایجاد پیش‌فاکتور</a>
   </div>
 
@@ -39,7 +39,13 @@
               <td>{{ number_format((int)$o->total_price) }}</td>
               <td>{{ $o->created_at ? Jalalian::fromDateTime($o->created_at)->format('Y/m/d H:i') : '—' }}</td>
               <td>
-                <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش</a>
+                <div class="d-flex gap-1 justify-content-end">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش</a>
+                  <form method="POST" action="{{ route('preinvoice.draft.finalize', $o->uuid) }}">
+                    @csrf
+                    <button class="btn btn-sm btn-success" onclick="return confirm('بعد از تایید مالی، این پیش‌فاکتور به فاکتور/حواله انبار تبدیل می‌شود. ادامه می‌دهید؟')">تایید مالی</button>
+                  </form>
+                </div>
               </td>
             </tr>
           @empty

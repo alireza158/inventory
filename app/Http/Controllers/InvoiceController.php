@@ -46,7 +46,7 @@ class InvoiceController extends Controller
         $invoice = Invoice::where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
-            'status' => 'required|in:processing,shipped,delivered,canceled',
+            'status' => 'required|in:warehouse_pending,warehouse_collecting,warehouse_checking,warehouse_packing,warehouse_sent,canceled',
         ]);
 
         $invoice->update([

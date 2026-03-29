@@ -170,7 +170,7 @@
                 <a class="sidebar-sublink {{ $is('preinvoice.index') }}" href="{{ route('preinvoice.index') }}">پیش‌فاکتورها</a>
             @endif
 
-            <a class="sidebar-sublink {{ $is('preinvoice.draft.index') }}" href="{{ route('preinvoice.draft.index') }}">پیش‌نویس‌ها</a>
+            <a class="sidebar-sublink {{ $is('preinvoice.draft.index') }}" href="{{ route('preinvoice.draft.index') }}">صف تایید مالی</a>
             <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال</a>
 
             @if (Route::has('invoices.index'))

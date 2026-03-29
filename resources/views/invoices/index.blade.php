@@ -5,9 +5,11 @@
   use Morilog\Jalali\Jalalian;
 
   $statusFa = fn($s) => match($s){
-    'processing' => 'در حال پردازش',
-    'shipped' => 'ارسال شده',
-    'delivered' => 'تحویل شده',
+    'warehouse_pending' => 'در انتظار تایید انبار',
+    'warehouse_collecting' => 'در حال جمع‌آوری',
+    'warehouse_checking' => 'چک کردن بار',
+    'warehouse_packing' => 'بسته‌بندی بار',
+    'warehouse_sent' => 'ارسال شد',
     'canceled' => 'کنسل شده',
     default => $s,
   };

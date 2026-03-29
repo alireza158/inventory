@@ -103,10 +103,10 @@
 
   <div class="topbar mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
     <div>
-      <div class="h5 mb-0 fw-bold">🧾 ایجاد پیش‌فاکتور (Draft)</div>
+      <div class="h5 mb-0 fw-bold">🧾 ثبت پیش‌فاکتور</div>
       <div class="hint">محصول را یکبار انتخاب کن، زیرش هر تعداد مدل/طرح و تعداد اضافه کن.</div>
     </div>
-    <a class="btn btn-outline-secondary" href="{{ route('preinvoice.draft.index') }}">📂 لیست پیش‌نویس‌ها</a>
+    <a class="btn btn-outline-secondary" href="{{ route('preinvoice.draft.index') }}">📂 صف تایید مالی</a>
   </div>
 
   @if(session('success'))
@@ -250,7 +250,7 @@
     </div>
 
     <div class="sticky-submit">
-      <button class="btn btn-primary w-100 fs-5 py-3 shadow-sm">💾 ذخیره پیش‌نویس</button>
+      <button class="btn btn-primary w-100 fs-5 py-3 shadow-sm">✅ ثبت و ارسال برای تایید مالی</button>
     </div>
   </form>
 
