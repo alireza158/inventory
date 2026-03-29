@@ -116,6 +116,29 @@
         white-space: nowrap;
         font-weight: 700;
     }
+    .variant-operation-select{
+        min-width: 240px;
+        border-radius: 10px;
+    }
+    .btn-stock-breakdown{
+        border: 0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+        color: #fff;
+        box-shadow: 0 8px 18px rgba(37,99,235,.25);
+        transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+    }
+    .btn-stock-breakdown:hover{
+        color:#fff;
+        transform: translateY(-1px);
+        box-shadow: 0 12px 22px rgba(37,99,235,.32);
+    }
+    .btn-stock-breakdown:focus{ color:#fff; }
+    .btn-stock-breakdown:disabled{
+        opacity: .65;
+        box-shadow: none;
+        transform: none;
+    }
 
     .mono{
         font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
@@ -236,8 +259,12 @@
                     <div class="d-flex flex-wrap gap-2 mt-2">
                         <button class="btn btn-primary btn-sm" type="button" id="bulkEditBtn">ویرایش</button>
                         <button class="btn btn-outline-danger btn-sm" type="button" id="bulkDeleteBtn">حذف</button>
-                        <button class="btn btn-outline-secondary btn-sm" type="button" id="bulkStockBtn">موجودی انبار به تفکیک</button>
+                        <select id="bulkVariantSelect" class="form-select form-select-sm variant-operation-select" disabled>
+                            <option value="">انتخاب تنوع محصول...</option>
+                        </select>
+                        <button class="btn btn-sm btn-stock-breakdown" type="button" id="bulkStockBtn">📦 موجودی انبار به تفکیک</button>
                     </div>
+                    <div class="small subtle-text mt-2" id="variantHelpText">برای انتخاب تنوع، ابتدا فقط یک کالا را تیک بزنید.</div>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -356,6 +383,7 @@
                                                    data-edit-url="{{ route('products.edit', $p) }}"
                                                    data-delete-url="{{ route('products.destroy', $p) }}"
                                                    data-product-name="{{ $p->name }}"
+                                                   data-variants='@json($p->variants->sortBy("variant_code")->values()->map(fn($v) => ["id" => (int)$v->id, "name" => $v->variant_name, "stock" => (int)$v->stock]))'
                                                    data-stock-breakdown='@json($p->warehouseStocks->map(fn($ws) => ["warehouse" => $ws->warehouse?->name, "qty" => (int) $ws->quantity])->values())'>
                                         </td>
 
@@ -546,6 +574,17 @@ document.addEventListener('DOMContentLoaded', function () {
   const stockNameEl = document.getElementById('stockBreakdownProductName');
   const stockBodyEl = document.getElementById('stockBreakdownBody');
   const deleteForm = document.getElementById('bulkDeleteForm');
+  const variantSelectEl = document.getElementById('bulkVariantSelect');
+  const variantHelpTextEl = document.getElementById('variantHelpText');
+
+  function parseJsonDataset(raw, fallback = []){
+    if (!raw) return fallback;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return fallback;
+    }
+  }
 
   function bindCatSearch(inputId, treeId){
     const input = document.getElementById(inputId);
@@ -601,6 +640,44 @@ document.addEventListener('DOMContentLoaded', function () {
     return selected[0];
   }
 
+  function updateVariantSelectState(){
+    if (!variantSelectEl) return;
+    const selected = getSelectedProducts();
+
+    if (selected.length !== 1){
+      variantSelectEl.innerHTML = '<option value="">انتخاب تنوع محصول...</option>';
+      variantSelectEl.disabled = true;
+      if (variantHelpTextEl){
+        variantHelpTextEl.textContent = 'برای انتخاب تنوع، ابتدا فقط یک کالا را تیک بزنید.';
+      }
+      return;
+    }
+
+    const variants = parseJsonDataset(selected[0].dataset.variants, []);
+    variantSelectEl.disabled = false;
+    variantSelectEl.innerHTML = '<option value="">انتخاب تنوع محصول...</option>';
+
+    if (!variants.length){
+      variantSelectEl.innerHTML = '<option value="">این کالا تنوعی ندارد</option>';
+      variantSelectEl.disabled = true;
+      if (variantHelpTextEl){
+        variantHelpTextEl.textContent = 'این کالا تنوع ثبت‌شده‌ای ندارد و عملیات روی کل کالا انجام می‌شود.';
+      }
+      return;
+    }
+
+    variants.forEach(variant => {
+      const option = document.createElement('option');
+      option.value = String(variant.id);
+      option.textContent = `${variant.name ?? 'تنوع'} (موجودی کل: ${variant.stock ?? 0})`;
+      variantSelectEl.appendChild(option);
+    });
+
+    if (variantHelpTextEl){
+        variantHelpTextEl.textContent = 'برای نمایش موجودی انبار به تفکیک، تنوع محصول را انتخاب کنید.';
+    }
+  }
+
   function initAjaxBindings(){
     document.querySelectorAll('.toggle-variants').forEach(btn => {
       const targetSel = btn.getAttribute('data-bs-target');
@@ -617,7 +694,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const productCheckboxes = Array.from(document.querySelectorAll('.product-checkbox'));
     selectAll?.addEventListener('change', function () {
       productCheckboxes.forEach(ch => ch.checked = this.checked);
+      updateVariantSelectState();
     });
+    productCheckboxes.forEach(ch => ch.addEventListener('change', updateVariantSelectState));
 
     const form = document.querySelector('#productsAjaxArea form[method="GET"]');
     form?.addEventListener('submit', function(e){
@@ -663,27 +742,58 @@ document.addEventListener('DOMContentLoaded', function () {
       const selected = getSingleSelected();
       if (!selected || !modal || !stockBodyEl || !stockNameEl) return;
 
-      stockNameEl.textContent = selected.dataset.productName;
-      stockBodyEl.innerHTML = '';
-
-      let breakdown = [];
-      try {
-        breakdown = JSON.parse(selected.dataset.stockBreakdown || '[]');
-      } catch (e) {
-        breakdown = [];
+      const variants = parseJsonDataset(selected.dataset.variants, []);
+      const selectedVariantId = variantSelectEl?.value ? Number(variantSelectEl.value) : null;
+      const selectedVariant = selectedVariantId ? variants.find(v => Number(v.id) === selectedVariantId) : null;
+      if (variants.length && !selectedVariant){
+        alert('ابتدا تنوع محصول را انتخاب کنید.');
+        variantSelectEl?.focus();
+        return;
       }
 
-      if (!breakdown.length){
+      stockNameEl.textContent = selectedVariant
+        ? `${selected.dataset.productName} — ${selectedVariant.name ?? 'تنوع انتخابی'}`
+        : selected.dataset.productName;
+      stockBodyEl.innerHTML = '';
+
+      const breakdown = parseJsonDataset(selected.dataset.stockBreakdown, []);
+      const variantTotal = Number(selectedVariant?.stock ?? 0);
+      let limitedBreakdown = breakdown;
+      if (selectedVariant){
+        let remaining = variantTotal;
+        limitedBreakdown = breakdown
+          .filter(item => Number(item.qty ?? 0) > 0)
+          .map(item => {
+            if (remaining <= 0) return null;
+            const qty = Math.min(Number(item.qty ?? 0), remaining);
+            remaining -= qty;
+            return {
+              warehouse: item.warehouse,
+              qty,
+            };
+          })
+          .filter(Boolean);
+      }
+
+      if (!limitedBreakdown.length){
         stockBodyEl.innerHTML = '<tr><td colspan="2" class="text-center text-muted">برای این کالا در انبارها موجودی ثبت نشده است.</td></tr>';
       } else {
-        breakdown.forEach(item => {
+        limitedBreakdown.forEach(item => {
           const tr = document.createElement('tr');
           tr.innerHTML = `<td>${item.warehouse ?? '—'}</td><td class="text-end">${item.qty ?? 0}</td>`;
           stockBodyEl.appendChild(tr);
         });
+
+        if (selectedVariant){
+          const hintRow = document.createElement('tr');
+          hintRow.innerHTML = `<td colspan="2" class="small text-muted pt-2">جمع موجودی تنوع «${selectedVariant.name ?? 'انتخابی'}»: ${selectedVariant.stock ?? 0}</td>`;
+          stockBodyEl.appendChild(hintRow);
+        }
       }
       modal.show();
     });
+
+    updateVariantSelectState();
   }
 
   bindCatSearch('catSearch', 'catTree');
