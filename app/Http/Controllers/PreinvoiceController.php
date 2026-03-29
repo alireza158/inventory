@@ -22,7 +22,7 @@ class PreinvoiceController extends Controller
     public function draftIndex()
     {
         $orders = PreinvoiceOrder::query()
-            ->where('status', 'draft')
+            ->where('status', 'submitted_finance')
             ->orderByDesc('id')
             ->paginate(20);
 
@@ -40,7 +40,7 @@ class PreinvoiceController extends Controller
             $order = PreinvoiceOrder::create([
                 'uuid'        => (string) Str::uuid(),
                 'created_by'  => auth()->id(),
-                'status'      => 'draft',
+                'status'      => 'submitted_finance',
 
                 // ✅ اتصال مشتری
                 'customer_id' => $customer?->id,
@@ -63,7 +63,7 @@ class PreinvoiceController extends Controller
         });
 
         return redirect()->route('preinvoice.draft.index')
-            ->with('success', '✅ پیش‌نویس ذخیره شد.');
+            ->with('success', '✅ پیش‌فاکتور ثبت و برای تایید مالی ارسال شد.');
     }
 
     public function editDraft(string $uuid)
@@ -77,7 +77,7 @@ class PreinvoiceController extends Controller
     public function updateDraft(string $uuid, Request $request)
     {
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
-        abort_if($order->status !== 'draft', 403);
+        abort_if($order->status !== 'submitted_finance', 403);
 
         $validated = $this->validateDraftPayload($request);
 
@@ -108,7 +108,7 @@ class PreinvoiceController extends Controller
             $this->syncItems($order, $validated['products']);
         });
 
-        return back()->with('success', '✅ پیش‌نویس بروزرسانی شد.');
+        return back()->with('success', '✅ پیش‌فاکتور بروزرسانی شد.');
     }
 
     /* =========================
@@ -212,7 +212,7 @@ class PreinvoiceController extends Controller
     public function finalize(string $uuid)
     {
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
-        abort_if($order->status !== 'draft', 403);
+        abort_if($order->status !== 'submitted_finance', 403);
 
         $invoice = DB::transaction(function () use ($order) {
 
@@ -239,7 +239,7 @@ class PreinvoiceController extends Controller
                 'discount_amount' => (int)$order->discount_amount,
                 'subtotal' => (int)$subtotal,
                 'total' => (int)$total,
-                'status' => 'processing',
+                'status' => 'warehouse_pending',
             ]);
 
             foreach ($order->items as $it) {
@@ -253,12 +253,12 @@ class PreinvoiceController extends Controller
                 ]);
             }
 
-            $order->update(['status' => 'final']); // یا هر چیزی که دوست داری
+            $order->update(['status' => 'finance_approved']);
 
             return $invoice;
         });
 
         return redirect()->route('invoices.show', $invoice->uuid)
-            ->with('success', '✅ پیش‌فاکتور ثبت نهایی شد و به فاکتور تبدیل شد.');
+            ->with('success', '✅ تایید مالی انجام شد و پیش‌فاکتور به فاکتور/حواله انبار تبدیل شد.');
     }
 }

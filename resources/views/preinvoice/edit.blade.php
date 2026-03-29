@@ -11,7 +11,7 @@
   <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ asset('lib/select2.min.js') }}"></script>
 
-  <title>ویرایش پیش‌نویس</title>
+  <title>ویرایش پیش‌فاکتور ارجاع‌شده به مالی</title>
 
   <style>
     body {
@@ -61,10 +61,10 @@
 
   <div class="topbar mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
-      <div class="h5 mb-0 fw-bold">📝 ویرایش پیش‌نویس</div>
+      <div class="h5 mb-0 fw-bold">📝 ویرایش پیش‌فاکتور (در صف مالی)</div>
       <div class="hint">کد: {{ $order->uuid }}</div>
     </div>
-    <a class="btn btn-outline-secondary" href="{{ route('preinvoice.draft.index') }}">📂 لیست پیش‌نویس‌ها</a>
+    <a class="btn btn-outline-secondary" href="{{ route('preinvoice.draft.index') }}">📂 صف تایید مالی</a>
   </div>
 
   @if(session('success'))
@@ -208,7 +208,7 @@
   </form>
   <form method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}" class="mt-3">
     @csrf
-    <button class="btn btn-success w-100 py-3 fw-semibold shadow-sm">✅ ثبت نهایی و ساخت فاکتور</button>
+    <button class="btn btn-success w-100 py-3 fw-semibold shadow-sm">✅ تایید مالی و تبدیل به فاکتور/حواله</button>
   </form>
 
 
