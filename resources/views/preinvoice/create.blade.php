@@ -9,10 +9,10 @@
     if (!$initRows && $order) {
         $initRows = $order->items->map(function ($it) {
             return [
-                'id'        => (int) $it->product_id,
-                'variety_id'=> (int) $it->variant_id,
-                'quantity'  => (int) $it->quantity,
-                'price'     => (int) $it->price,
+                'id'         => (int) $it->product_id,
+                'variety_id' => (int) $it->variant_id,
+                'quantity'   => (int) $it->quantity,
+                'price'      => (int) $it->price,
             ];
         })->values();
     }
@@ -26,132 +26,227 @@
 <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
 
 <style>
-    body { background: linear-gradient(180deg, #f6f8fc 0%, #eef2f9 100%); }
-    .page-shell { max-width: 1160px; }
+    body {
+        background: linear-gradient(180deg, #f6f8fc 0%, #eef2f9 100%);
+        font-size: 14px;
+    }
+    .page-shell { max-width: 1140px; }
+
     .card-soft {
         background: #fff;
-        border: 1px solid rgba(13, 110, 253, .12);
-        border-radius: 18px;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, .06);
+        border: 1px solid rgba(13, 110, 253, .10);
+        border-radius: 16px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, .05);
     }
-    .section-title { font-weight: 800; letter-spacing: -.2px; }
-    .hint { color: #6c757d; font-size: .9rem; }
+
+    .section-title {
+        font-weight: 800;
+        letter-spacing: -.2px;
+        font-size: 1rem;
+    }
+
+    .hint {
+        color: #6c757d;
+        font-size: .83rem;
+    }
+
     .topbar {
         background: #fff;
-        border: 1px solid rgba(13,110,253,.12);
-        border-radius: 16px;
-        padding: 1rem 1.25rem;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, .05);
+        border: 1px solid rgba(13,110,253,.10);
+        border-radius: 14px;
+        padding: .9rem 1rem;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, .05);
     }
+
     .sticky-submit {
         position: sticky;
         bottom: 10px;
         z-index: 12;
-        background: rgba(246, 248, 252, .88);
+        background: rgba(246, 248, 252, .90);
         backdrop-filter: blur(5px);
-        border-radius: 14px;
-        padding: .5rem;
-    }
-    .summary-input { background-color: #f8f9fa !important; border-color: #e9ecef; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; letter-spacing: 1px; }
-    .fs-7 { font-size: .85rem; }
-
-    .customer-card {
-        border: 1px dashed rgba(13,110,253,.25);
-        border-radius: 16px;
-        background: rgba(13,110,253,.03);
-        padding: 14px;
-    }
-
-    .product-block {
-        background: #fff;
-        border: 2px solid #e2e8f0;
-        border-radius: 16px;
-        overflow: hidden;
-        transition: all .2s ease;
-        box-shadow: 0 8px 18px rgba(15,23,42,.04);
-    }
-    .product-block:hover { border-color: #cbd5e1; }
-    .product-header {
-        padding: 14px 16px;
-        background: linear-gradient(0deg, #fff, #f6f8ff);
-        border-bottom: 1px solid #e2e8f0;
-    }
-    .product-body {
-        padding: 14px 16px;
-        background: #fff;
-    }
-    .product-summary {
-        display: none;
-        padding: 14px 16px;
-        background: #f8fafc;
-    }
-    .product-block.is-collapsed .product-body { display: none; }
-    .product-block.is-collapsed .product-summary {
-        display: block;
-        border-top: 1px solid #e2e8f0;
-    }
-
-    .varieties-wrapper {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 12px;
-    }
-    .variety-row {
-        background: #fff;
-        border: 1px solid #e2e8f0;
         border-radius: 12px;
-        transition: all .2s;
-        padding: 10px;
+        padding: .45rem;
     }
-    .variety-row:hover {
-        border-color: #94a3b8;
-        box-shadow: 0 2px 4px rgba(0,0,0,.02);
+
+    .summary-input {
+        background-color: #f8f9fa !important;
+        border-color: #e9ecef;
+    }
+
+    .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        letter-spacing: 1px;
+    }
+
+    .fs-7 { font-size: .82rem; }
+
+    .compact-label {
+        font-size: .82rem;
+        font-weight: 700;
+        margin-bottom: .32rem;
+    }
+
+    .customer-box {
+        border: 1px dashed rgba(13,110,253,.22);
+        background: rgba(13,110,253,.03);
+        border-radius: 12px;
+        padding: 10px 12px;
     }
 
     .chip {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 5px 10px;
+        padding: 4px 10px;
         border-radius: 999px;
         border: 1px solid #e2e8f0;
         background: #fff;
-        font-size: .85rem;
+        font-size: .8rem;
+        white-space: nowrap;
+    }
+
+    .product-block {
+        background: #fff;
+        border: 1px solid #dbe3ef;
+        border-radius: 14px;
+        overflow: hidden;
+        transition: all .2s ease;
+        margin-bottom: 12px;
+    }
+
+    .product-header {
+        padding: 10px 12px;
+        background: linear-gradient(0deg, #fff, #f7f9ff);
+        border-bottom: 1px solid #e8edf5;
+    }
+
+    .product-body {
+        padding: 10px 12px;
+    }
+
+    .product-summary {
+        display: none;
+        padding: 10px 12px;
+        background: #fafcff;
+    }
+
+    .product-block.is-collapsed .product-body {
+        display: none;
+    }
+
+    .product-block.is-collapsed .product-summary {
+        display: block;
+    }
+
+    .varieties-wrapper {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px;
+    }
+
+    .variety-row {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 8px;
+    }
+
+    .variety-row + .variety-row {
+        margin-top: 8px;
+    }
+
+    .row-tools {
+        border-top: 1px dashed #d9e2ef;
+        margin-top: 10px;
+        padding-top: 10px;
+    }
+
+    .icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        border: 1px solid #dbe3ef;
+        background: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+        transition: all .15s ease;
+    }
+
+    .icon-btn:hover {
+        background: #f8fafc;
+        transform: translateY(-1px);
+    }
+
+    .icon-btn.ok {
+        color: #15803d;
+        border-color: #cce9d5;
+    }
+
+    .icon-btn.danger {
+        color: #dc2626;
+        border-color: #f5c9c9;
+    }
+
+    .icon-btn.muted {
+        color: #334155;
     }
 
     .block-subtotal-box {
-        border: 1px dashed rgba(13,110,253,.25);
+        border: 1px dashed rgba(13,110,253,.18);
         background: rgba(13,110,253,.03);
-        border-radius: 14px;
-        padding: 10px 12px;
+        border-radius: 10px;
+        padding: 8px 10px;
+    }
+
+    .summary-line {
+        font-size: .88rem;
+    }
+
+    .select2-container .select2-selection--single {
+        height: 38px !important;
+        padding-top: 4px;
+        border-color: #dee2e6 !important;
+        border-radius: .5rem !important;
+    }
+
+    .select2-container .select2-selection--single .select2-selection__rendered {
+        line-height: 28px !important;
+        padding-right: 12px !important;
+    }
+
+    .select2-container .select2-selection--single .select2-selection__arrow {
+        height: 36px !important;
     }
 </style>
 
-<div class="container page-shell py-4">
+<div class="container page-shell py-3">
 
-    <div class="topbar mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="topbar mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
             <div class="h5 mb-0 fw-bold">🧾 ثبت پیش‌فاکتور</div>
-            <div class="hint">مشتری را از لیست اشخاص انتخاب کن، بعد محصولات و تنوع‌های هر محصول را ثبت کن.</div>
+            <div class="hint">نسخه جمع‌وجور برای ثبت خریدهای سنگین</div>
         </div>
-        <a class="btn btn-outline-secondary" href="{{ route('preinvoice.draft.index') }}">📂 صف تایید مالی</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ route('preinvoice.draft.index') }}">صف تایید مالی</a>
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm rounded-4 fw-bold">✅ {{ session('success') }}</div>
+        <div class="alert alert-success border-0 shadow-sm rounded-4 fw-bold py-2">✅ {{ session('success') }}</div>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 fw-bold" style="white-space: pre-wrap">
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 fw-bold py-2" style="white-space: pre-wrap">
             {!! session('error') !!}
         </div>
     @endif
 
     @if ($errors->any())
-        <div class="alert alert-danger border-0 shadow-sm rounded-4">
-            <div class="fw-bold mb-2">⚠️ خطا:</div>
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 py-2">
+            <div class="fw-bold mb-1">⚠️ خطا:</div>
             <ul class="mb-0">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -164,134 +259,122 @@
         @csrf
 
         {{-- Customer --}}
-        <div class="card-soft p-3 p-md-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div class="card-soft p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                 <div>
-                    <div class="section-title">👤 اطلاعات مشتری</div>
-                    <div class="hint">انتخاب مشتری از لیست اشخاص با جستجو بر اساس نام و شماره موبایل</div>
+                    <div class="section-title">👤 مشتری</div>
+                    <div class="hint">جستجو با نام یا شماره موبایل، مستقیم داخل فرم</div>
                 </div>
-
-                <div class="d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#customerPickerModal">
-                        🔎 انتخاب از لیست اشخاص
-                    </button>
-                    <a href="{{ $customersPageUrl }}" class="btn btn-outline-success">
-                        ➕ افزودن مشتری جدید
-                    </a>
-                </div>
+                <a href="{{ $customersPageUrl }}" class="btn btn-sm btn-outline-success">➕ افزودن مشتری</a>
             </div>
 
-            <div class="customer-card mb-3">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div>
+            <div class="row g-2">
+                <div class="col-lg-6">
+                    <label class="compact-label">جستجو و انتخاب مشتری</label>
+                    <select id="customer_search_select" class="form-select"></select>
+                    <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', '') }}">
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="customer-box h-100 d-flex flex-column justify-content-center">
                         <div class="fw-bold" id="selectedCustomerTitle">هنوز مشتری انتخاب نشده است</div>
                         <div class="hint mt-1" id="customer_balance_hint"></div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-danger" id="clearCustomerBtn">حذف انتخاب مشتری</button>
                 </div>
-            </div>
 
-            <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', '') }}">
-
-            <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold">نام مشتری</label>
-                    <input type="text" name="customer_name" id="customer_name" class="form-control"
+                    <label class="compact-label">نام مشتری</label>
+                    <input type="text" name="customer_name" id="customer_name" class="form-control form-control-sm"
                            value="{{ old('customer_name') }}" required>
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold">شماره موبایل</label>
-                    <input type="text" name="customer_mobile" id="customer_mobile" class="form-control"
+                    <label class="compact-label">شماره موبایل</label>
+                    <input type="text" name="customer_mobile" id="customer_mobile" class="form-control form-control-sm"
                            value="{{ old('customer_mobile') }}" required>
                 </div>
             </div>
         </div>
 
         {{-- Shipping --}}
-        <div class="card-soft p-3 p-md-4 mb-4">
-            <div class="section-title">🚚 ارسال و مقصد</div>
+        <div class="card-soft p-3 mb-3">
+            <div class="section-title mb-2">🚚 ارسال و مقصد</div>
 
-            <div class="row g-3 align-items-end mt-1">
+            <div class="row g-2 align-items-end">
                 <div class="col-lg-6">
-                    <label class="form-label fw-semibold">شیوه ارسال</label>
-                    <select id="shipping_id" name="shipping_id" class="form-select" required>
+                    <label class="compact-label">شیوه ارسال</label>
+                    <select id="shipping_id" name="shipping_id" class="form-select form-select-sm" required>
                         <option value="">انتخاب روش ارسال...</option>
                     </select>
-
-                    <div class="hint mt-2" id="shipping_label">هزینه ارسال</div>
+                    <div class="hint mt-1" id="shipping_label">هزینه ارسال</div>
                     <input type="hidden" id="shipping_price" name="shipping_price" value="{{ old('shipping_price', 0) }}">
                 </div>
 
                 <div class="col-lg-6">
-                    <div class="p-3 rounded-4" style="background: rgba(13,110,253,.05); border:1px dashed rgba(13,110,253,.3)">
-                        <div class="fw-bold">📦 وضعیت</div>
-                        <div class="hint mt-2" id="shipping_mode_hint">با تغییر روش ارسال، جمع کل و فیلدهای مقصد دوباره تنظیم می‌شود.</div>
+                    <div class="customer-box">
+                        <div class="fw-bold fs-7">وضعیت</div>
+                        <div class="hint mt-1" id="shipping_mode_hint">با تغییر روش ارسال، جمع کل دوباره محاسبه می‌شود.</div>
                     </div>
                 </div>
             </div>
 
-            <div id="locationWrapper" class="row g-3 mt-2">
+            <div id="locationWrapper" class="row g-2 mt-1">
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold">استان</label>
-                    <select id="province_id" name="province_id" class="form-select">
+                    <label class="compact-label">استان</label>
+                    <select id="province_id" name="province_id" class="form-select form-select-sm">
                         <option value=""></option>
                     </select>
                 </div>
+
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold">شهر</label>
-                    <select id="city_id" name="city_id" class="form-select">
+                    <label class="compact-label">شهر</label>
+                    <select id="city_id" name="city_id" class="form-select form-select-sm">
                         <option value=""></option>
                     </select>
                 </div>
             </div>
 
-            <div id="addressWrapper" class="mt-3">
-                <label class="form-label fw-semibold">آدرس</label>
-                <textarea id="customer_address" name="customer_address" class="form-control" rows="3">{{ old('customer_address') }}</textarea>
+            <div id="addressWrapper" class="mt-2">
+                <label class="compact-label">آدرس</label>
+                <textarea id="customer_address" name="customer_address" class="form-control form-control-sm" rows="2">{{ old('customer_address') }}</textarea>
             </div>
         </div>
 
         {{-- Products --}}
-        <div class="card-soft mb-4">
-            <div class="p-3 p-md-4 border-bottom">
+        <div class="card-soft mb-3">
+            <div class="p-3 border-bottom">
                 <div class="section-title mb-1">🛍️ محصولات</div>
-                <div class="hint">
-                    اول محصول را با نام یا کد ۴ رقمی پیدا کن، بعد تنوع‌های همان محصول را یکی‌یکی با تعداد جدا ثبت کن.
-                    بعد از تکمیل هر محصول، آن را ببند تا خلاصه‌اش نمایش داده شود.
-                </div>
+                <div class="hint">برای هر محصول، تنوع‌ها را ثبت کن و بعد با ✓ آن را ببند تا لیست خلاصه شود.</div>
             </div>
 
-            <div class="p-3 p-md-4">
+            <div class="p-3">
                 <div id="productBlocksContainer"></div>
 
-                <div class="mt-3">
-                    <button type="button" id="addProductBlockBtn" class="btn btn-outline-primary w-100 py-3">
-                        ➕ افزودن محصول
-                    </button>
-                </div>
+                <button type="button" id="addProductBlockBtn" class="btn btn-outline-primary btn-sm w-100 py-2">
+                    ➕ افزودن محصول
+                </button>
             </div>
         </div>
 
         {{-- Summary --}}
-        <div class="card-soft p-3 p-md-4 mb-4">
-            <div class="section-title">💳 جمع‌بندی</div>
+        <div class="card-soft p-3 mb-3">
+            <div class="section-title mb-2">💳 جمع‌بندی</div>
 
-            <div class="row g-3 mt-1">
+            <div class="row g-2">
                 <div class="col-md-4">
-                    <label class="form-label fw-semibold">تخفیف (تومان)</label>
-                    <input type="number" name="discount_amount" id="discount" class="form-control summary-input"
+                    <label class="compact-label">تخفیف (تومان)</label>
+                    <input type="number" name="discount_amount" id="discount" class="form-control form-control-sm summary-input"
                            value="{{ old('discount_amount', 0) }}">
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label fw-semibold">هزینه ارسال</label>
-                    <input type="text" id="shipping_price_view" class="form-control summary-input" readonly value="0 تومان">
+                    <label class="compact-label">هزینه ارسال</label>
+                    <input type="text" id="shipping_price_view" class="form-control form-control-sm summary-input" readonly value="0 تومان">
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label fw-semibold">جمع کل (تومان)</label>
-                    <input type="text" name="total_price" id="total_price" class="form-control fw-bold summary-input" readonly>
+                    <label class="compact-label">جمع کل (تومان)</label>
+                    <input type="text" name="total_price" id="total_price" class="form-control form-control-sm fw-bold summary-input" readonly>
                 </div>
             </div>
 
@@ -299,35 +382,9 @@
         </div>
 
         <div class="sticky-submit">
-            <button class="btn btn-primary w-100 fs-5 py-3 shadow-sm">✅ ثبت پیش‌فاکتور</button>
+            <button class="btn btn-primary w-100 py-2 shadow-sm">✅ ثبت پیش‌فاکتور</button>
         </div>
     </form>
-</div>
-
-{{-- modal انتخاب مشتری --}}
-<div class="modal fade" id="customerPickerModal" tabindex="-1" aria-labelledby="customerPickerModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="customerPickerModalLabel">انتخاب مشتری از لیست اشخاص</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-
-            <div class="modal-body">
-                <label class="form-label fw-semibold">جستجو با نام یا شماره موبایل</label>
-                <select id="customer_picker_select" class="form-select"></select>
-
-                <div class="hint mt-3">
-                    نام مشتری یا شماره موبایل را تایپ کن، مشتری را انتخاب کن، سپس دکمه «ثبت انتخاب مشتری» را بزن.
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">بستن</button>
-                <button type="button" class="btn btn-primary" id="applyCustomerBtn">ثبت انتخاب مشتری</button>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -382,16 +439,19 @@ function isInPersonShipping(ship) {
 function initLocationSelect2(selectEl, placeholder) {
     if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
     const $el = $(selectEl);
+
     if ($el.hasClass('select2-hidden-accessible')) {
         $el.off('select2:select select2:clear');
         $el.select2('destroy');
     }
+
     $el.select2({
         width: '100%',
         dir: 'rtl',
         placeholder: placeholder,
         allowClear: true
     });
+
     $el.on('select2:select select2:clear', function () {
         this.dispatchEvent(new Event('change', { bubbles: true }));
     });
@@ -443,6 +503,7 @@ function fillCitiesByProvinceId(provinceId) {
     const province = areaProvinces.find(function (p) {
         return Number(p.id) === Number(provinceId);
     });
+
     fillCities(province && province.cities ? province.cities : []);
 }
 
@@ -480,7 +541,7 @@ function toggleShippingFields() {
         addressWrapper.style.display = '';
         provinceEl.required = true;
         addressEl.required = true;
-        hintEl.textContent = 'با تغییر روش ارسال، جمع کل و فیلدهای مقصد دوباره تنظیم می‌شود.';
+        hintEl.textContent = 'با تغییر روش ارسال، جمع کل دوباره محاسبه می‌شود.';
     }
 }
 
@@ -531,71 +592,70 @@ function applyCustomerToForm(c) {
         'مانده حساب: ' + Number(c.balance || 0).toLocaleString('fa-IR') + ' تومان';
 }
 
-function clearCustomerSelection() {
-    document.getElementById('customer_id').value = '';
-    document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
-    document.getElementById('customer_balance_hint').textContent = '';
-}
+function preloadCustomerOption(selectEl, customer) {
+    if (!selectEl || !customer || !window.jQuery) return;
 
-function initCustomerPickerModal() {
-    const modalEl = document.getElementById('customerPickerModal');
-    const pickerEl = document.getElementById('customer_picker_select');
-    const applyBtn = document.getElementById('applyCustomerBtn');
-    const modalInstance = new bootstrap.Modal(modalEl);
+    const text = customerFullName(customer) + (customer.mobile ? ' - ' + customer.mobile : '');
+    const exists = Array.from(selectEl.options).some(function (opt) {
+        return Number(opt.value) === Number(customer.id);
+    });
 
-    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
-        $(pickerEl).select2({
-            width: '100%',
-            dir: 'rtl',
-            dropdownParent: $('#customerPickerModal'),
-            placeholder: 'نام یا شماره موبایل مشتری...',
-            allowClear: true,
-            minimumInputLength: 1,
-            ajax: {
-                url: API.customers,
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                    return { q: params.term || '' };
-                },
-                processResults: function (resp) {
-                    const items = (resp && resp.data && resp.data.customers) ? resp.data.customers : [];
-                    return {
-                        results: items.map(function (c) {
-                            const full = customerFullName(c) || '—';
-                            return {
-                                id: c.id,
-                                text: full + ' - ' + (c.mobile || '')
-                            };
-                        })
-                    };
-                }
-            }
-        });
+    if (!exists) {
+        const option = new Option(text, customer.id, true, true);
+        selectEl.add(option);
     }
 
-    applyBtn.addEventListener('click', async function () {
-        const cid = pickerEl.value || '';
-        if (!cid) {
-            alert('اول یک مشتری را انتخاب کن.');
-            return;
+    $(selectEl).val(String(customer.id)).trigger('change');
+}
+
+function initInlineCustomerSearch() {
+    const selectEl = document.getElementById('customer_search_select');
+
+    if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
+
+    $(selectEl).select2({
+        width: '100%',
+        dir: 'rtl',
+        placeholder: 'جستجو با نام یا شماره موبایل...',
+        allowClear: true,
+        minimumInputLength: 1,
+        ajax: {
+            url: API.customers,
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return { q: params.term || '' };
+            },
+            processResults: function (resp) {
+                const items = (resp && resp.data && resp.data.customers) ? resp.data.customers : [];
+                return {
+                    results: items.map(function (c) {
+                        return {
+                            id: c.id,
+                            text: customerFullName(c) + ' - ' + (c.mobile || '')
+                        };
+                    })
+                };
+            }
         }
+    });
+
+    $(selectEl).on('select2:select', async function (e) {
+        const customerId = e && e.params && e.params.data ? e.params.data.id : null;
+        if (!customerId) return;
 
         try {
-            const res = await fetch(API.customer + '/' + cid, { headers: { 'Accept': 'application/json' } });
+            const res = await fetch(API.customer + '/' + customerId, { headers: { 'Accept': 'application/json' } });
             const json = await res.json();
             const customer = json && json.data ? json.data.customer : null;
+            if (customer) applyCustomerToForm(customer);
+        } catch (error) {}
+    });
 
-            if (!customer) {
-                alert('اطلاعات مشتری پیدا نشد.');
-                return;
-            }
-
-            applyCustomerToForm(customer);
-            modalInstance.hide();
-        } catch (e) {
-            alert('دریافت اطلاعات مشتری انجام نشد.');
-        }
+    $(selectEl).on('select2:clear', function () {
+        document.getElementById('customer_id').value = '';
+        document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
+        document.getElementById('customer_balance_hint').textContent = '';
     });
 }
 
@@ -607,8 +667,10 @@ async function loadOldCustomer() {
         const res = await fetch(API.customer + '/' + cid, { headers: { 'Accept': 'application/json' } });
         const json = await res.json();
         const customer = json && json.data ? json.data.customer : null;
+
         if (customer) {
             applyCustomerToForm(customer);
+            preloadCustomerOption(document.getElementById('customer_search_select'), customer);
         }
     } catch (e) {}
 }
@@ -719,8 +781,8 @@ function updateBlockSummary(block) {
     const rows = block.querySelectorAll('.variety-row');
 
     rows.forEach(function (row) {
-        const price = parseFloat(row.querySelector('.price-raw')?.value || 0) || 0;
-        const quantity = parseInt(row.querySelector('.quantity-input')?.value || 0, 10) || 0;
+        const price = parseFloat(row.querySelector('.price-raw') ? row.querySelector('.price-raw').value : 0) || 0;
+        const quantity = parseInt(row.querySelector('.quantity-input') ? row.querySelector('.quantity-input').value : 0, 10) || 0;
         subtotal += price * quantity;
     });
 
@@ -732,8 +794,8 @@ function updateBlockSummary(block) {
 }
 
 function updateTotal() {
-    const discount = parseFloat(document.getElementById('discount')?.value || 0) || 0;
-    const shipping = parseFloat(document.getElementById('shipping_price')?.value || 0) || 0;
+    const discount = parseFloat(document.getElementById('discount') ? document.getElementById('discount').value : 0) || 0;
+    const shipping = parseFloat(document.getElementById('shipping_price') ? document.getElementById('shipping_price').value : 0) || 0;
 
     let total = 0;
 
@@ -742,8 +804,8 @@ function updateTotal() {
     });
 
     document.querySelectorAll('.variety-row').forEach(function (row) {
-        const price = parseFloat(row.querySelector('.price-raw')?.value || 0) || 0;
-        const quantity = parseInt(row.querySelector('.quantity-input')?.value || 0, 10) || 0;
+        const price = parseFloat(row.querySelector('.price-raw') ? row.querySelector('.price-raw').value : 0) || 0;
+        const quantity = parseInt(row.querySelector('.quantity-input') ? row.querySelector('.quantity-input').value : 0, 10) || 0;
         total += price * quantity;
     });
 
@@ -824,59 +886,58 @@ function addProductBlock(prefill) {
     const blockIndex = container.children.length + 1;
 
     const block = createEl(
-        '<div class="product-block mb-4">' +
+        '<div class="product-block">' +
             '<div class="product-header">' +
                 '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">' +
                     '<div>' +
                         '<div class="fw-bold text-primary">محصول #' + blockIndex + '</div>' +
-                        '<div class="hint">اول محصول را انتخاب کن، بعد تنوع‌های آن را وارد کن.</div>' +
+                        '<div class="hint">محصول را انتخاب کن و تنوع‌ها را وارد کن</div>' +
                     '</div>' +
                     '<div class="d-flex gap-2 flex-wrap">' +
-                        '<button type="button" class="btn btn-outline-success btn-sm close-block-btn">✔️ تکمیل این محصول</button>' +
-                        '<button type="button" class="btn btn-outline-danger btn-sm remove-block-btn">🗑️ حذف محصول</button>' +
+                        '<span class="chip"><span class="text-muted">نام:</span><span class="fw-bold product-name-label">—</span></span>' +
+                        '<span class="chip"><span class="text-muted">کد:</span><span class="fw-bold product-code-label">—</span></span>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
 
             '<div class="product-body">' +
-                '<div class="row g-3 mb-3">' +
-                    '<div class="col-lg-8">' +
-                        '<label class="form-label fw-semibold">انتخاب کالا</label>' +
-                        '<select class="form-select product-select" required></select>' +
-                    '</div>' +
-                    '<div class="col-lg-4">' +
-                        '<label class="form-label fw-semibold">اطلاعات سریع</label>' +
-                        '<div class="d-flex gap-2 flex-wrap">' +
-                            '<span class="chip"><span class="text-muted">نام:</span><span class="fw-bold product-name-label">—</span></span>' +
-                            '<span class="chip"><span class="text-muted">کد:</span><span class="fw-bold product-code-label">—</span></span>' +
-                        '</div>' +
-                    '</div>' +
+                '<div class="mb-2">' +
+                    '<label class="compact-label">انتخاب کالا</label>' +
+                    '<select class="form-select form-select-sm product-select" required></select>' +
                 '</div>' +
 
                 '<div class="varieties-wrapper">' +
-                    '<div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 flex-wrap gap-2">' +
-                        '<div class="fw-semibold text-secondary">تنوع‌های این محصول</div>' +
-                        '<button type="button" class="btn btn-primary btn-sm add-variety-btn">➕ افزودن تنوع</button>' +
+                    '<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">' +
+                        '<div class="fw-semibold fs-7 text-secondary">تنوع‌های این محصول</div>' +
+                        '<button type="button" class="btn btn-outline-primary btn-sm add-variety-btn">➕ افزودن تنوع</button>' +
                     '</div>' +
-                    '<div class="varieties-list-container d-flex flex-column gap-2"></div>' +
 
-                    '<div class="block-subtotal-box mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">' +
-                        '<div class="fw-bold">جمع این محصول</div>' +
-                        '<div class="fw-bold block-subtotal">0 تومان</div>' +
+                    '<div class="varieties-list-container"></div>' +
+
+                    '<div class="row-tools d-flex justify-content-between align-items-center flex-wrap gap-2">' +
+                        '<div class="block-subtotal-box d-flex justify-content-between align-items-center gap-3">' +
+                            '<span class="fw-bold fs-7">جمع این محصول</span>' +
+                            '<span class="fw-bold block-subtotal">0 تومان</span>' +
+                        '</div>' +
+                        '<div class="d-flex align-items-center gap-2">' +
+                            '<button type="button" class="icon-btn ok collapse-block-btn" title="تکمیل محصول">✓</button>' +
+                            '<button type="button" class="icon-btn danger remove-block-btn" title="حذف محصول">✕</button>' +
+                        '</div>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
 
             '<div class="product-summary">' +
                 '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">' +
-                    '<div>' +
-                        '<div class="fw-bold summary-title">—</div>' +
-                        '<div class="hint mt-1"><span class="summary-rows">0 تنوع</span></div>' +
+                    '<div class="summary-line">' +
+                        '<span class="fw-bold summary-title">—</span>' +
+                        '<span class="text-muted mx-2">|</span>' +
+                        '<span class="summary-rows text-muted">0 تنوع</span>' +
                     '</div>' +
-                    '<div class="d-flex gap-2 align-items-center flex-wrap">' +
+                    '<div class="d-flex align-items-center gap-2 flex-wrap">' +
                         '<span class="chip"><span class="text-muted">جمع:</span><span class="fw-bold summary-subtotal">0 تومان</span></span>' +
-                        '<button type="button" class="btn btn-outline-primary btn-sm edit-block-btn">✏️ ویرایش</button>' +
-                        '<button type="button" class="btn btn-outline-danger btn-sm remove-block-btn">🗑️ حذف</button>' +
+                        '<button type="button" class="icon-btn muted edit-block-btn" title="باز کردن محصول">✎</button>' +
+                        '<button type="button" class="icon-btn danger remove-block-btn" title="حذف محصول">✕</button>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
@@ -888,18 +949,14 @@ function addProductBlock(prefill) {
     const productSelect = block.querySelector('.product-select');
     initProductSelect2(productSelect);
 
-    function attachRemoveButtons() {
-        block.querySelectorAll('.remove-block-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                block.remove();
-                updateTotal();
-            });
+    block.querySelectorAll('.remove-block-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            block.remove();
+            updateTotal();
         });
-    }
+    });
 
-    attachRemoveButtons();
-
-    block.querySelector('.close-block-btn').addEventListener('click', function () {
+    block.querySelector('.collapse-block-btn').addEventListener('click', function () {
         collapseBlock(block);
     });
 
@@ -977,19 +1034,19 @@ async function addVarietyRow(block, productId, prefillRow) {
             '<input type="hidden" name="products[' + idx + '][id]" class="hidden-product-id" value="' + String(productId) + '">' +
 
             '<div class="col-md-5">' +
-                '<label class="form-label fs-7">تنوع / مدل / طرح</label>' +
+                '<label class="compact-label">تنوع / مدل / طرح</label>' +
                 '<select name="products[' + idx + '][variety_id]" class="form-select form-select-sm variety-select" required>' +
                     '<option value="">در حال بارگذاری...</option>' +
                 '</select>' +
             '</div>' +
 
             '<div class="col-md-2">' +
-                '<label class="form-label fs-7">تعداد</label>' +
+                '<label class="compact-label">تعداد</label>' +
                 '<input type="number" name="products[' + idx + '][quantity]" class="form-control form-control-sm quantity-input" min="1" value="1" required>' +
             '</div>' +
 
             '<div class="col-md-4">' +
-                '<label class="form-label fs-7">قیمت واحد</label>' +
+                '<label class="compact-label">قیمت واحد</label>' +
                 '<input type="text" class="form-control form-control-sm price-view" readonly>' +
                 '<input type="hidden" name="products[' + idx + '][price]" class="price-raw" value="0">' +
                 '<div class="mt-1 d-flex gap-2 flex-wrap align-items-center">' +
@@ -999,7 +1056,7 @@ async function addVarietyRow(block, productId, prefillRow) {
             '</div>' +
 
             '<div class="col-md-1 text-center">' +
-                '<button type="button" class="btn btn-outline-danger btn-sm w-100 remove-variety-btn" title="حذف این تنوع">❌</button>' +
+                '<button type="button" class="icon-btn danger remove-variety-btn mt-4 mt-md-0" title="حذف تنوع">✕</button>' +
             '</div>' +
         '</div>'
     );
@@ -1014,7 +1071,7 @@ async function addVarietyRow(block, productId, prefillRow) {
 
     row.querySelector('.remove-variety-btn').addEventListener('click', function () {
         if (list.children.length <= 1) {
-            alert('حداقل یک تنوع باید برای این محصول وجود داشته باشد. اگر لازم نیست، کل محصول را حذف کن.');
+            alert('حداقل یک تنوع باید برای این محصول وجود داشته باشد.');
             return;
         }
         row.remove();
@@ -1210,12 +1267,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     fillShippingSelect();
-    initCustomerPickerModal();
+    initInlineCustomerSearch();
     await loadOldCustomer();
-
-    document.getElementById('clearCustomerBtn').addEventListener('click', function () {
-        clearCustomerSelection();
-    });
 
     provinceSelect.addEventListener('change', function () {
         fillCitiesByProvinceId(provinceSelect.value);
@@ -1246,8 +1299,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (oldShippingId) {
         shippingSelect.value = String(oldShippingId);
     }
-    shippingSelect.dispatchEvent(new Event('change'));
 
+    shippingSelect.dispatchEvent(new Event('change'));
     updateTotal();
 });
 </script>
