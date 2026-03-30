@@ -30,7 +30,9 @@ class PreinvoiceController extends Controller
             ->orderByDesc('id')
             ->paginate(20);
 
-        return view('preinvoice.drafts-index', compact('orders'));
+        $canFinanceApprove = $this->canHandleFinanceActions();
+
+        return view('preinvoice.drafts-index', compact('orders', 'canFinanceApprove'));
     }
 
     public function saveDraft(Request $request)
@@ -75,7 +77,9 @@ class PreinvoiceController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('preinvoice.edit', compact('order', 'shippingMethods'));
+        $canFinanceApprove = $this->canHandleFinanceActions();
+
+        return view('preinvoice.edit', compact('order', 'shippingMethods', 'canFinanceApprove'));
     }
 
     public function updateDraft(string $uuid, Request $request)
@@ -255,8 +259,17 @@ class PreinvoiceController extends Controller
         }
     }
 
+
+    private function canHandleFinanceActions(): bool
+    {
+        $user = auth()->user();
+
+        return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
+    }
+
     public function finalize(string $uuid)
     {
+        abort_unless($this->canHandleFinanceActions(), 403);
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== 'submitted_finance', 403);
 

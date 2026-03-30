@@ -6,8 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class WarehouseTransfer extends Model
 {
+
+    public const TYPE_BETWEEN_WAREHOUSES = 'between_warehouses';
+    public const TYPE_ORGANIZATION_EXPENSE = 'organization_expense';
+    public const TYPE_PERSONNEL_ASSET = 'personnel_asset';
+
+    public static function typeOptions(): array
+    {
+        return [
+            self::TYPE_BETWEEN_WAREHOUSES => 'حواله بین انبار',
+            self::TYPE_ORGANIZATION_EXPENSE => 'حواله هزینه سازمانی',
+            self::TYPE_PERSONNEL_ASSET => 'حواله اموال پرسنل',
+        ];
+    }
+
     protected $fillable = [
         'reference',
+        'voucher_type',
         'from_warehouse_id',
         'to_warehouse_id',
         'user_id',

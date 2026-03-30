@@ -206,10 +206,12 @@
       <button class="btn btn-primary w-100 fs-5 py-3 shadow-sm">💾 ذخیره تغییرات</button>
     </div>
   </form>
+  @if($canFinanceApprove)
   <form method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}" class="mt-3">
     @csrf
     <button class="btn btn-success w-100 py-3 fw-semibold shadow-sm">✅ تایید مالی و تبدیل به فاکتور/حواله</button>
   </form>
+  @endif
 
 
 </div>

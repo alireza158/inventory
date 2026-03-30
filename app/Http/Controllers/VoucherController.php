@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
@@ -18,6 +19,7 @@ class VoucherController extends Controller
         $voucherNo = trim((string) $request->get('voucher_no', ''));
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
+        $voucherType = (string) $request->get('voucher_type', 'all');
 
         $query = WarehouseTransfer::with(['fromWarehouse', 'toWarehouse', 'user'])
             ->when($voucherNo !== '', function ($q) use ($voucherNo) {
@@ -26,17 +28,39 @@ class VoucherController extends Controller
                         ->orWhere('reference', 'like', "%{$voucherNo}%");
                 });
             })
+            ->when($voucherType !== 'all' && $voucherType !== 'sale', fn ($q) => $q->where('voucher_type', $voucherType))
             ->when($dateFrom, fn ($q) => $q->whereDate('transferred_at', '>=', $dateFrom))
             ->when($dateTo, fn ($q) => $q->whereDate('transferred_at', '<=', $dateTo));
+
+        $salesInvoices = Invoice::query()
+            ->with(['items.product'])
+            ->when($voucherNo !== '', function ($q) use ($voucherNo) {
+                $q->where(function ($inner) use ($voucherNo) {
+                    $inner->where('uuid', 'like', "%{$voucherNo}%")
+                        ->orWhere('customer_name', 'like', "%{$voucherNo}%")
+                        ->orWhere('customer_mobile', 'like', "%{$voucherNo}%");
+                });
+            })
+            ->when($dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
+            ->orderByDesc('id')
+            ->paginate(20, ['*'], 'sales_page')
+            ->withQueryString();
 
         $totalAllAmount = (int) WarehouseTransfer::sum('total_amount');
         $totalAllCount = (int) WarehouseTransfer::count();
 
         $vouchers = $query->latest('transferred_at')
-            ->paginate(20)
+            ->paginate(20, ['*'], 'vouchers_page')
             ->withQueryString();
 
-        return view('vouchers.index', compact('vouchers', 'totalAllAmount', 'totalAllCount'));
+        return view('vouchers.index', compact(
+            'vouchers',
+            'salesInvoices',
+            'totalAllAmount',
+            'totalAllCount',
+            'voucherType'
+        ));
     }
 
     public function create()
@@ -97,6 +121,7 @@ class VoucherController extends Controller
     private function validateTransfer(Request $request): array
     {
         $data = $request->validate([
+            'voucher_type' => ['required', 'in:' . implode(',', array_keys(WarehouseTransfer::typeOptions()))],
             'from_warehouse_id' => ['required', 'exists:warehouses,id', 'different:to_warehouse_id'],
             'to_warehouse_id' => ['required', 'exists:warehouses,id'],
             'reference' => ['nullable', 'string', 'max:100'],
@@ -114,7 +139,7 @@ class VoucherController extends Controller
                 ->exists();
 
             if (!$belongsToCategory) {
-                abort(422, "ردیف " . ($index + 1) . ": کالا در دسته‌بندی انتخابی نیست.");
+                abort(422, 'ردیف ' . ($index + 1) . ': کالا در دسته‌بندی انتخابی نیست.');
             }
         }
 
@@ -127,6 +152,7 @@ class VoucherController extends Controller
 
         $transfer = WarehouseTransfer::create([
             'reference' => $data['reference'] ?? null,
+            'voucher_type' => $data['voucher_type'],
             'from_warehouse_id' => $data['from_warehouse_id'],
             'to_warehouse_id' => $data['to_warehouse_id'],
             'user_id' => auth()->id(),

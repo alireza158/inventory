@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+
 class ChequeController extends Controller
 {
     public function store(\App\Models\InvoicePayment $payment, Request $request)
     {
+        abort_unless($this->canHandleFinanceActions(), 403);
         abort_if($payment->method !== 'cheque', 403);
 
         $data = $request->validate([
@@ -30,6 +32,13 @@ class ChequeController extends Controller
             'status' => $data['status'] ?? 'pending',
         ]);
 
-        return back()->with('success','✅ چک ثبت شد.');
+        return back()->with('success', '✅ چک ثبت شد.');
+    }
+
+    private function canHandleFinanceActions(): bool
+    {
+        $user = auth()->user();
+
+        return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
     }
 }
