@@ -25,7 +25,7 @@
 <div class="purchase-page-wrap">
 <div class="purchase-topbar d-flex justify-content-between align-items-center mb-3">
     <h4 class="page-title mb-0">{{ $isEdit ? 'ویرایش سند حواله' : 'ثبت سند حواله' }}</h4>
-    <a class="btn btn-sm btn-outline-light" href="{{ route('vouchers.index') }}">بازگشت</a>
+    <a class="btn btn-sm btn-outline-light" href="{{ $sectionSlug ? route('vouchers.section.index', $sectionSlug) : route('vouchers.index') }}">بازگشت</a>
 </div>
 
 <div class="card purchase-form">
@@ -37,9 +37,12 @@
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label">نوع حواله</label>
-                    <select name="voucher_type" class="form-select" id="voucherType" required>
+                    @if($fixedVoucherType)
+                        <input type="hidden" name="voucher_type" value="{{ $fixedVoucherType }}">
+                    @endif
+                    <select name="voucher_type" class="form-select" id="voucherType" required @disabled($fixedVoucherType)>
                         @foreach($voucherTypes as $typeKey => $typeLabel)
-                            <option value="{{ $typeKey }}" @selected(old('voucher_type', $voucher->voucher_type ?? 'between_warehouses') === $typeKey)>{{ $typeLabel }}</option>
+                            <option value="{{ $typeKey }}" @selected(old('voucher_type', $fixedVoucherType ?? $voucher->voucher_type ?? 'between_warehouses') === $typeKey)>{{ $typeLabel }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -85,15 +88,6 @@
                 <div class="col-md-4" id="beneficiaryWrap">
                     <label class="form-label">نام تحویل‌گیرنده / ذی‌نفع</label>
                     <input name="beneficiary_name" class="form-control" value="{{ old('beneficiary_name', $voucher->beneficiary_name ?? null) }}" placeholder="برای پرسنل / شوروم">
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">نوع حواله</label>
-                    <select name="voucher_type" class="form-select" required>
-                        @foreach($voucherTypes as $typeKey => $typeLabel)
-                            <option value="{{ $typeKey }}" @selected(old('voucher_type', $voucher->voucher_type ?? 'between_warehouses') === $typeKey)>{{ $typeLabel }}</option>
-                        @endforeach
-                    </select>
                 </div>
 
                 <div class="col-md-4">

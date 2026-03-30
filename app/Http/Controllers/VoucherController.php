@@ -15,6 +15,74 @@ use Illuminate\Support\Facades\DB;
 
 class VoucherController extends Controller
 {
+
+    private function sectionTypeMap(): array
+    {
+        return [
+            'return-from-sale' => WarehouseTransfer::TYPE_CUSTOMER_RETURN,
+            'scrap' => WarehouseTransfer::TYPE_SCRAP,
+            'personnel' => WarehouseTransfer::TYPE_PERSONNEL_ASSET,
+            'transfer' => WarehouseTransfer::TYPE_BETWEEN_WAREHOUSES,
+        ];
+    }
+
+    private function resolveSectionType(string $type): string
+    {
+        $map = $this->sectionTypeMap();
+        abort_unless(isset($map[$type]), 404);
+
+        return $map[$type];
+    }
+
+    public function hub()
+    {
+        return view('vouchers.hub');
+    }
+
+    public function sectionIndex(string $type)
+    {
+        $voucherType = $this->resolveSectionType($type);
+
+        $vouchers = WarehouseTransfer::query()
+            ->with(['fromWarehouse', 'toWarehouse', 'user', 'relatedInvoice'])
+            ->where('voucher_type', $voucherType)
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('vouchers.section', compact('vouchers', 'type', 'voucherType'));
+    }
+
+    public function sectionCreate(string $type)
+    {
+        $fixedVoucherType = $this->resolveSectionType($type);
+        return $this->createWithType($fixedVoucherType, $type);
+    }
+
+    public function sectionStore(string $type, Request $request)
+    {
+        $fixedVoucherType = $this->resolveSectionType($type);
+        $request->merge(['voucher_type' => $fixedVoucherType]);
+
+        return $this->store($request);
+    }
+
+    public function outputs(Request $request)
+    {
+        $q = trim((string) $request->get('q', ''));
+
+        $outputs = StockMovement::query()
+            ->with(['product', 'user'])
+            ->where('type', 'out')
+            ->when($q !== '', function ($query) use ($q) {
+                $query->whereHas('product', fn($p) => $p->where('name', 'like', "%{$q}%"));
+            })
+            ->latest('id')
+            ->paginate(30)
+            ->withQueryString();
+
+        return view('vouchers.outputs', compact('outputs', 'q'));
+    }
     public function index(Request $request)
     {
         $voucherNo = trim((string) $request->get('voucher_no', ''));
@@ -60,6 +128,11 @@ class VoucherController extends Controller
 
     public function create()
     {
+        return $this->createWithType();
+    }
+
+    private function createWithType(?string $fixedVoucherType = null, ?string $sectionSlug = null)
+    {
         $categories = Category::orderBy('name')->get();
         $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
         $warehouses = $this->selectableWarehouses();
@@ -67,7 +140,7 @@ class VoucherController extends Controller
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
         $voucher = null;
 
-        return view('vouchers.create', compact('categories', 'products', 'warehouses', 'voucher', 'invoices', 'centralWarehouseId'));
+        return view('vouchers.create', compact('categories', 'products', 'warehouses', 'voucher', 'invoices', 'centralWarehouseId', 'fixedVoucherType', 'sectionSlug'));
     }
 
     public function edit(WarehouseTransfer $voucher)
@@ -79,7 +152,10 @@ class VoucherController extends Controller
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
         $voucher->load('items.product', 'relatedInvoice');
 
-        return view('vouchers.create', compact('voucher', 'categories', 'products', 'warehouses', 'invoices', 'centralWarehouseId'));
+                $fixedVoucherType = null;
+        $sectionSlug = null;
+
+        return view('vouchers.create', compact('voucher', 'categories', 'products', 'warehouses', 'invoices', 'centralWarehouseId', 'fixedVoucherType', 'sectionSlug'));
     }
 
     public function invoiceProducts(string $uuid)
@@ -191,6 +267,10 @@ class VoucherController extends Controller
 
             if (!$belongsToCategory) {
                 abort(422, 'ردیف ' . ($index + 1) . ': کالا در دسته‌بندی انتخابی نیست.');
+            }
+
+            if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && !in_array((int) $item['product_id'], $invoiceProductIds, true)) {
+                abort(422, 'ردیف ' . ($index + 1) . ': کالا باید از اقلام همان فاکتور مشتری انتخاب شود.');
             }
 
             if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && !in_array((int) $item['product_id'], $invoiceProductIds, true)) {
