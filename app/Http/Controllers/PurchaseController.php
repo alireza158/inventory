@@ -304,6 +304,15 @@ class PurchaseController extends Controller
             }
         }
 
+        $seenVariants = [];
+        foreach ($data['items'] as $index => $item) {
+            $key = ((int) $item['product_id']) . ':' . ((int) $item['variant_id']);
+            if (isset($seenVariants[$key])) {
+                abort(422, 'مدل/طرح تکراری در ردیف ' . ($index + 1) . ' مجاز نیست. هر مدل برای هر کالا فقط یک بار قابل ثبت است.');
+            }
+            $seenVariants[$key] = true;
+        }
+
         return $data;
     }
 

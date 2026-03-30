@@ -562,6 +562,16 @@
         const categoryId = groupEl.querySelector('.group-category-select')?.value || item.category_id || '';
         if (!productId || !item.variant_id) return;
 
+        const duplicateRow = Array.from(groupEl.querySelectorAll('[data-row]')).find((row) => {
+            const rowProductId = row.querySelector('.product-id-input')?.value || '';
+            const rowVariantId = row.querySelector('.variant-id')?.value || '';
+            return String(rowProductId) === String(productId) && String(rowVariantId) === String(item.variant_id);
+        });
+        if (duplicateRow) {
+            alert('این مدل/طرح قبلاً برای این کالا اضافه شده است.');
+            return;
+        }
+
         const product = products.find((p) => String(p.id) === String(productId));
         const modelsWrap = groupEl.querySelector('[data-models]');
 
