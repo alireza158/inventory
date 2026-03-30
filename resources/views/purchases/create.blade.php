@@ -67,9 +67,10 @@
                 @if($isEdit)
                     @method('PUT')
                 @endif
+                <input type="hidden" name="warehouse_id" value="{{ old('warehouse_id', $purchase->warehouse_id ?? '') }}">
 
                 <div class="row g-2 mb-2">
-                    <div class="col-md-5">
+                    <div class="col-md-4">
                         <label class="form-label">تامین‌کننده</label>
                         <div class="d-flex gap-2">
                             <select class="form-select form-select-sm" name="supplier_id" required>
@@ -84,20 +85,24 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">انبار مقصد خرید</label>
-                        <select class="form-select form-select-sm" name="warehouse_id" required>
-                            <option value="">انتخاب انبار...</option>
-                            @foreach($warehouses as $warehouse)
-                                <option value="{{ $warehouse->id }}" @selected(old('warehouse_id', $purchase->warehouse_id ?? null)==$warehouse->id)>
-                                    {{ $warehouse->name }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <label class="form-label">انبار مقصد</label>
+                        <input class="form-control form-control-sm" value="انبار مرکزی" readonly>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-{{ $isEdit ? '2' : '5' }}">
                         <label class="form-label">توضیحات (اختیاری)</label>
                         <input class="form-control form-control-sm" name="note" value="{{ old('note', $purchase->note ?? '') }}">
                     </div>
+                    @if($isEdit)
+                        <div class="col-md-3">
+                            <label class="form-label">تاریخ خرید</label>
+                            <input
+                                type="datetime-local"
+                                class="form-control form-control-sm"
+                                name="purchased_at"
+                                value="{{ old('purchased_at', optional($purchase->purchased_at)->format('Y-m-d\\TH:i')) }}"
+                            >
+                        </div>
+                    @endif
                 </div>
 
 
