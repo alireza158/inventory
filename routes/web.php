@@ -81,6 +81,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
     Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
     Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
+    Route::get('/vouchers/invoice/{uuid}/products', [VoucherController::class, 'invoiceProducts'])->name('vouchers.invoice.products');
     Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
     Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
 
