@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
 use App\Models\Product;
@@ -55,16 +56,82 @@ class VoucherController extends Controller
 
     public function sectionCreate(string $type)
     {
+        if ($type === 'return-from-sale') {
+            return $this->returnCreate();
+        }
+
         $fixedVoucherType = $this->resolveSectionType($type);
         return $this->createWithType($fixedVoucherType, $type);
     }
 
     public function sectionStore(string $type, Request $request)
     {
+        if ($type === 'return-from-sale') {
+            return $this->returnStore($request);
+        }
+
         $fixedVoucherType = $this->resolveSectionType($type);
         $request->merge(['voucher_type' => $fixedVoucherType]);
 
         return $this->store($request);
+    }
+
+    public function customerInvoices(Customer $customer)
+    {
+        $invoices = Invoice::query()
+            ->where('customer_id', $customer->id)
+            ->latest('id')
+            ->get(['uuid', 'customer_name', 'created_at']);
+
+        return response()->json($invoices);
+    }
+
+    public function returnCreate()
+    {
+        $customers = Customer::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'mobile']);
+        $warehouses = $this->selectableWarehouses()->where('type', '!=', 'personnel')->values();
+
+        return view('vouchers.return-create', compact('customers', 'warehouses'));
+    }
+
+    public function returnStore(Request $request)
+    {
+        $data = $request->validate([
+            'customer_id' => ['required', 'exists:customers,id'],
+            'related_invoice_uuid' => ['required', 'exists:invoices,uuid'],
+            'to_warehouse_id' => ['required', 'exists:warehouses,id'],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'note' => ['nullable', 'string', 'max:255'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $invoice = Invoice::query()->with('items')->where('uuid', $data['related_invoice_uuid'])->firstOrFail();
+        if ((int) $invoice->customer_id !== (int) $data['customer_id']) {
+            abort(422, 'فاکتور انتخابی متعلق به مشتری انتخاب‌شده نیست.');
+        }
+
+        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+        $payload = [
+            'voucher_type' => WarehouseTransfer::TYPE_CUSTOMER_RETURN,
+            'from_warehouse_id' => $centralWarehouseId,
+            'to_warehouse_id' => (int) $data['to_warehouse_id'],
+            'related_invoice_uuid' => $data['related_invoice_uuid'],
+            'reference' => $data['reference'] ?? null,
+            'note' => $data['note'] ?? null,
+            'items' => array_map(fn($it) => [
+                'category_id' => (int) Product::query()->whereKey((int) $it['product_id'])->value('category_id'),
+                'product_id' => (int) $it['product_id'],
+                'quantity' => (int) $it['quantity'],
+            ], $data['items']),
+        ];
+
+        DB::transaction(function () use ($payload) {
+            $this->createTransfer($payload, now());
+        });
+
+        return redirect()->route('vouchers.section.index', 'return-from-sale')->with('success', 'برگشت از فروش ثبت شد.');
     }
 
     public function outputs(Request $request)
@@ -276,6 +343,10 @@ class VoucherController extends Controller
             if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && !in_array((int) $item['product_id'], $invoiceProductIds, true)) {
                 abort(422, 'ردیف ' . ($index + 1) . ': کالا باید از اقلام همان فاکتور مشتری انتخاب شود.');
             }
+
+            if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && !in_array((int) $item['product_id'], $invoiceProductIds, true)) {
+                abort(422, 'ردیف ' . ($index + 1) . ': کالا باید از اقلام همان فاکتور مشتری انتخاب شود.');
+            }
         }
 
         if (($data['voucher_type'] ?? null) === WarehouseTransfer::TYPE_CUSTOMER_RETURN && empty($data['related_invoice_uuid'])) {
@@ -314,9 +385,14 @@ class VoucherController extends Controller
         foreach ($data['items'] as $item) {
             $product = Product::findOrFail($item['product_id']);
             $qty = (int) $item['quantity'];
+            $invoiceItemPrice = null;
+            if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $relatedInvoice) {
+                $invoiceItemPrice = (int) ($relatedInvoice->items()->where('product_id', $product->id)->value('price') ?? 0);
+            }
+
             $unitPrice = in_array($voucherType, [WarehouseTransfer::TYPE_SCRAP, WarehouseTransfer::TYPE_SHOWROOM], true)
                 ? 0
-                : (int) ($product->price ?? 0);
+                : ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN ? (int) $invoiceItemPrice : (int) ($product->price ?? 0));
             $lineTotal = $qty * $unitPrice;
             $sum += $lineTotal;
 
