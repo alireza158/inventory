@@ -31,6 +31,7 @@
 @endphp
 
 @php
+    $voucherTypes = \App\Models\WarehouseTransfer::typeOptions();
     $regularWarehouses = $warehouses->where('type', '!=', 'personnel')->values();
     $personnelWarehousesByParent = $warehouses
         ->where('type', 'personnel')
@@ -94,6 +95,15 @@
                                     </option>
                                 @endforeach
                             </optgroup>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">نوع حواله</label>
+                    <select name="voucher_type" class="form-select" required>
+                        @foreach($voucherTypes as $typeKey => $typeLabel)
+                            <option value="{{ $typeKey }}" @selected(old('voucher_type', $voucher->voucher_type ?? 'between_warehouses') === $typeKey)>{{ $typeLabel }}</option>
                         @endforeach
                     </select>
                 </div>
