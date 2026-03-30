@@ -196,6 +196,7 @@
             <div class="fw-bold text-danger">{{ $toman($invoice->remaining_amount) }}</div>
           </div>
 
+          @if($canFinanceApprove)
           {{-- Add payment --}}
           <div class="border rounded-3 p-2 p-md-3" style="background:rgba(25,135,84,.04);border-color:rgba(25,135,84,.25)!important">
             <div class="fw-bold mb-2">➕ ثبت پرداخت</div>
@@ -245,6 +246,9 @@
               </div>
             </form>
           </div>
+          @else
+            <div class="alert alert-light border">ثبت پرداخت و چک فقط برای بخش مالی فعال است.</div>
+          @endif
 
           <hr class="my-3">
 
@@ -281,7 +285,7 @@
                            href="{{ asset('storage/'.$p->cheque->image) }}">📷 مشاهده عکس چک</a>
                       </div>
                     @endif
-                  @else
+                  @elseif($canFinanceApprove)
                     <form method="POST" action="{{ route('cheques.store', $p->id) }}" enctype="multipart/form-data" class="mt-2">
                       @csrf
                       <div class="row g-2">
@@ -307,6 +311,8 @@
                         </div>
                       </div>
                     </form>
+                  @else
+                    <div class="small text-muted mt-2">تکمیل اطلاعات چک فقط برای بخش مالی فعال است.</div>
                   @endif
                 </div>
               @endif
