@@ -12,90 +12,82 @@
         ])->values()->all()
         : []);
 
-    $categoriesJson = $categories->map(function ($c) {
-        return [
-            'id' => $c->id,
-            'name' => $c->name,
-            'parent_id' => $c->parent_id,
-        ];
-    })->values();
+    $categoriesJson = $categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'parent_id' => $c->parent_id])->values();
+    $productsJson = $products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'category_id' => $p->category_id])->values();
+    $invoiceOptions = ($invoices ?? collect())->map(fn($inv) => ['uuid' => $inv->uuid, 'label' => $inv->uuid . ' | ' . ($inv->customer_name ?: 'بدون نام')])->values();
 
-    $productsJson = $products->map(function ($p) {
-        return [
-            'id' => $p->id,
-            'name' => $p->name,
-            'sku' => $p->sku,
-            'category_id' => $p->category_id,
-        ];
-    })->values();
-@endphp
-
-@php
+    $voucherTypes = \App\Models\WarehouseTransfer::typeOptions();
     $regularWarehouses = $warehouses->where('type', '!=', 'personnel')->values();
-    $personnelWarehousesByParent = $warehouses
-        ->where('type', 'personnel')
-        ->whereNotNull('parent_id')
-        ->groupBy(fn($warehouse) => $warehouse->parent?->name ?? 'پرسنل')
-        ->sortKeys();
+    $personnelWarehouses = $warehouses->where('type', 'personnel')->whereNotNull('parent_id')->values();
 @endphp
 
 @section('content')
 <div class="purchase-page-wrap">
 <div class="purchase-topbar d-flex justify-content-between align-items-center mb-3">
     <h4 class="page-title mb-0">{{ $isEdit ? 'ویرایش سند حواله' : 'ثبت سند حواله' }}</h4>
-    <a class="btn btn-sm btn-outline-light" href="{{ route('vouchers.index') }}">بازگشت</a>
+    <a class="btn btn-sm btn-outline-light" href="{{ $sectionSlug ? route('vouchers.section.index', $sectionSlug) : route('vouchers.index') }}">بازگشت</a>
 </div>
 
 <div class="card purchase-form">
     <div class="card-body">
         <form method="POST" action="{{ $formAction }}">
             @csrf
-            @if($isEdit)
-                @method('PUT')
-            @endif
+            @if($isEdit) @method('PUT') @endif
 
             <div class="row g-3">
                 <div class="col-md-4">
+                    <label class="form-label">نوع حواله</label>
+                    @if($fixedVoucherType)
+                        <input type="hidden" name="voucher_type" value="{{ $fixedVoucherType }}">
+                    @endif
+                    <select name="voucher_type" class="form-select" id="voucherType" required @disabled($fixedVoucherType)>
+                        @foreach($voucherTypes as $typeKey => $typeLabel)
+                            <option value="{{ $typeKey }}" @selected(old('voucher_type', $fixedVoucherType ?? $voucher->voucher_type ?? 'between_warehouses') === $typeKey)>{{ $typeLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-4" id="fromWarehouseWrap">
                     <label class="form-label">انبار مبدا</label>
                     <select name="from_warehouse_id" class="form-select" id="fromWarehouse" required>
                         <option value="">انتخاب کنید...</option>
                         @foreach($regularWarehouses as $warehouse)
-                            <option value="{{ $warehouse->id }}" @selected(old('from_warehouse_id', $voucher->from_warehouse_id ?? null)==$warehouse->id)>
-                                {{ $warehouse->name }}
-                            </option>
+                            <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('from_warehouse_id', $voucher->from_warehouse_id ?? null)==$warehouse->id)>{{ $warehouse->name }}</option>
                         @endforeach
-
-                        @foreach($personnelWarehousesByParent as $parentName => $personnelWarehouses)
-                            <optgroup label="پرسنل | {{ $parentName }}">
-                                @foreach($personnelWarehouses as $warehouse)
-                                    <option value="{{ $warehouse->id }}" @selected(old('from_warehouse_id', $voucher->from_warehouse_id ?? null)==$warehouse->id)>
-                                        {{ $warehouse->name }}
-                                    </option>
-                                @endforeach
-                            </optgroup>
+                        @foreach($personnelWarehouses as $warehouse)
+                            <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('from_warehouse_id', $voucher->from_warehouse_id ?? null)==$warehouse->id)>{{ $warehouse->name }}</option>
                         @endforeach
                     </select>
+                    <div class="small text-muted mt-1" id="fromWarehouseHint"></div>
                 </div>
-                <div class="col-md-4">
+
+                <div class="col-md-4" id="toWarehouseWrap">
                     <label class="form-label">انبار مقصد</label>
                     <select name="to_warehouse_id" class="form-select" id="toWarehouse" required>
                         <option value="">انتخاب کنید...</option>
                         @foreach($regularWarehouses as $warehouse)
-                            <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('to_warehouse_id', $voucher->to_warehouse_id ?? null)==$warehouse->id)>
-                                {{ $warehouse->name }}
-                            </option>
+                            <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('to_warehouse_id', $voucher->to_warehouse_id ?? null)==$warehouse->id)>{{ $warehouse->name }}</option>
                         @endforeach
-
-                        @foreach($personnelWarehousesByParent as $parentName => $personnelWarehouses)
-                            <optgroup label="پرسنل | {{ $parentName }}">
-                                @foreach($personnelWarehouses as $warehouse)
-                                    <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('to_warehouse_id', $voucher->to_warehouse_id ?? null)==$warehouse->id)>
-                                        {{ $warehouse->name }}
-                                    </option>
-                                @endforeach
-                            </optgroup>
+                        @foreach($personnelWarehouses as $warehouse)
+                            <option value="{{ $warehouse->id }}" data-type="{{ $warehouse->type }}" @selected(old('to_warehouse_id', $voucher->to_warehouse_id ?? null)==$warehouse->id)>{{ $warehouse->name }}</option>
                         @endforeach
                     </select>
+                    <div class="small text-muted mt-1" id="toWarehouseHint"></div>
+                </div>
+
+                <div class="col-md-4" id="invoiceWrap">
+                    <label class="form-label">فاکتور مرجع (مرجوعی مشتری)</label>
+                    <select name="related_invoice_uuid" class="form-select" id="relatedInvoiceSelect">
+                        <option value="">انتخاب کنید...</option>
+                        @foreach($invoiceOptions as $invoiceOption)
+                            <option value="{{ $invoiceOption['uuid'] }}" @selected(old('related_invoice_uuid', $voucher->relatedInvoice?->uuid ?? null) === $invoiceOption['uuid'])>{{ $invoiceOption['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-4" id="beneficiaryWrap">
+                    <label class="form-label">نام تحویل‌گیرنده / ذی‌نفع</label>
+                    <input name="beneficiary_name" class="form-control" value="{{ old('beneficiary_name', $voucher->beneficiary_name ?? null) }}" placeholder="برای پرسنل / شوروم">
                 </div>
 
                 <div class="col-md-4">
@@ -136,131 +128,191 @@
 </div>
 
 <script>
-    const categories = @json($categoriesJson);
-    const products = @json($productsJson);
-    const initialItems = @json($initialItems);
+const categories = @json($categoriesJson);
+const products = @json($productsJson);
+const initialItems = @json($initialItems);
+const centralWarehouseId = {{ (int) $centralWarehouseId }};
+const invoiceProductsApi = "{{ url('/vouchers/invoice') }}";
 
-    const tbody = document.querySelector('#itemsTable tbody');
-    const addBtn = document.getElementById('addItemBtn');
-    const fromWarehouse = document.getElementById('fromWarehouse');
-    const toWarehouse = document.getElementById('toWarehouse');
+const tbody = document.querySelector('#itemsTable tbody');
+const addBtn = document.getElementById('addItemBtn');
+const fromWarehouse = document.getElementById('fromWarehouse');
+const toWarehouse = document.getElementById('toWarehouse');
+const voucherTypeSelect = document.getElementById('voucherType');
+const relatedInvoiceSelect = document.getElementById('relatedInvoiceSelect');
+const fromWarehouseWrap = document.getElementById('fromWarehouseWrap');
+const toWarehouseWrap = document.getElementById('toWarehouseWrap');
+const invoiceWrap = document.getElementById('invoiceWrap');
+const beneficiaryWrap = document.getElementById('beneficiaryWrap');
+const fromWarehouseHint = document.getElementById('fromWarehouseHint');
+const toWarehouseHint = document.getElementById('toWarehouseHint');
 
+let allowedReturnProducts = [];
 
-    function initWarehouseSelects() {
-        if (typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.select2 !== 'function') {
-            return;
-        }
+function rootCategoryOptions(selectedId = '') {
+    const roots = categories.filter((c) => !c.parent_id);
+    return `<option value="">انتخاب...</option>${roots.map((c) => `<option value="${c.id}" ${String(selectedId) === String(c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}`;
+}
+function childCategoryOptions(parentId, selectedId = '') {
+    const children = categories.filter((c) => String(c.parent_id || '') === String(parentId || ''));
+    return `<option value="">انتخاب...</option>${children.map((c) => `<option value="${c.id}" ${String(selectedId) === String(c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}`;
+}
+function resolveParentCategoryId(categoryId) {
+    const current = categories.find((c) => String(c.id) === String(categoryId || ''));
+    return current ? (current.parent_id || current.id) : '';
+}
 
-        [fromWarehouse, toWarehouse].forEach((el) => {
-            if (!el) return;
+function productOptions(categoryId, selectedProductId) {
+    const isReturn = voucherTypeSelect.value === 'customer_return';
+    const filtered = products.filter((p) => {
+        if (String(p.category_id) !== String(categoryId || '')) return false;
+        if (!isReturn) return true;
+        return allowedReturnProducts.some((x) => String(x.product_id) === String(p.id));
+    });
+    return [`<option value="">انتخاب...</option>`]
+        .concat(filtered.map(p => `<option value="${p.id}" ${String(selectedProductId || '') === String(p.id) ? 'selected' : ''}>${p.name} (${p.sku ?? ''})</option>`))
+        .join('');
+}
 
-            const $el = window.jQuery(el);
-            if ($el.data('select2')) return;
+function rowTemplate(i, item = null) {
+    const selectedCategoryId = item?.category_id || '';
+    const selectedParentId = resolveParentCategoryId(selectedCategoryId);
+    const selectedProductId = item?.product_id || '';
 
-            $el.select2({
-                width: '100%',
-                dir: 'rtl',
-                placeholder: 'انتخاب انبار',
-            });
+    return `<tr>
+        <td><select class="form-select root-category-select" data-row="${i}" required>${rootCategoryOptions(selectedParentId)}</select></td>
+        <td><select name="items[${i}][category_id]" class="form-select category-select" data-row="${i}" required>${childCategoryOptions(selectedParentId, selectedCategoryId)}</select></td>
+        <td><select name="items[${i}][product_id]" class="form-select product-select" required>${productOptions(selectedCategoryId, selectedProductId)}</select></td>
+        <td><input name="items[${i}][quantity]" type="number" min="1" class="form-control" value="${item?.quantity || 1}" required></td>
+        <td class="asset-col" style="display:none;"><input name="items[${i}][personnel_asset_code]" class="form-control" pattern="\\d{4}" maxlength="4" value="${item?.personnel_asset_code || ''}"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td>
+    </tr>`;
+}
+
+function bindCategoryEvents() {
+    tbody.querySelectorAll('.root-category-select').forEach((select) => {
+        if (select.dataset.bound === '1') return;
+        select.dataset.bound = '1';
+        select.addEventListener('change', (e) => {
+            const tr = e.target.closest('tr');
+            const categorySelect = tr.querySelector('.category-select');
+            const productSelect = tr.querySelector('.product-select');
+            categorySelect.innerHTML = childCategoryOptions(e.target.value, '');
+            productSelect.innerHTML = productOptions('', null);
         });
-    }
+    });
 
-    function productOptions(categoryId, selectedProductId) {
-        const filtered = products.filter(p => String(p.category_id) === String(categoryId || ''));
-        return [`<option value="">انتخاب...</option>`]
-            .concat(filtered.map(p => `<option value="${p.id}" ${String(selectedProductId || '') === String(p.id) ? 'selected' : ''}>${p.name} (${p.sku ?? ''})</option>`))
-            .join('');
-    }
-
-    function rootCategoryOptions(selectedId = '') {
-        const roots = categories.filter((c) => !c.parent_id);
-        return `<option value="">انتخاب...</option>${roots.map((c) => `<option value="${c.id}" ${String(selectedId) === String(c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}`;
-    }
-
-    function childCategoryOptions(parentId, selectedId = '') {
-        const children = categories.filter((c) => String(c.parent_id || '') === String(parentId || ''));
-        return `<option value="">انتخاب...</option>${children.map((c) => `<option value="${c.id}" ${String(selectedId) === String(c.id) ? 'selected' : ''}>${c.name}</option>`).join('')}`;
-    }
-
-    function resolveParentCategoryId(categoryId) {
-        const current = categories.find((c) => String(c.id) === String(categoryId || ''));
-        if (!current) return '';
-        return current.parent_id || current.id;
-    }
-
-    function rowTemplate(i, item = null) {
-        const selectedCategoryId = item?.category_id || '';
-        const selectedParentId = resolveParentCategoryId(selectedCategoryId);
-        const selectedProductId = item?.product_id || '';
-
-        return `<tr>
-            <td>
-                <select class="form-select root-category-select" data-row="${i}" required>
-                    ${rootCategoryOptions(selectedParentId)}
-                </select>
-            </td>
-            <td>
-                <select name="items[${i}][category_id]" class="form-select category-select" data-row="${i}" required>
-                    ${childCategoryOptions(selectedParentId, selectedCategoryId)}
-                </select>
-            </td>
-            <td>
-                <select name="items[${i}][product_id]" class="form-select product-select" required>
-                    ${productOptions(selectedCategoryId, selectedProductId)}
-                </select>
-            </td>
-            <td><input name="items[${i}][quantity]" type="number" min="1" class="form-control" value="${item?.quantity || 1}" required></td>
-            <td class="asset-col" style="display:none;"><input name="items[${i}][personnel_asset_code]" class="form-control" pattern="\\d{4}" maxlength="4" value="${item?.personnel_asset_code || ''}"></td>
-            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td>
-        </tr>`;
-    }
-
-    function bindCategoryEvents() {
-        tbody.querySelectorAll('.root-category-select').forEach((select) => {
-            if (select.dataset.bound === '1') return;
-            select.dataset.bound = '1';
-            select.addEventListener('change', (e) => {
-                const tr = e.target.closest('tr');
-                const categorySelect = tr.querySelector('.category-select');
-                const productSelect = tr.querySelector('.product-select');
-                categorySelect.innerHTML = childCategoryOptions(e.target.value, '');
-                productSelect.innerHTML = productOptions('', null);
-            });
+    tbody.querySelectorAll('.category-select').forEach((select) => {
+        if (select.dataset.bound === '1') return;
+        select.dataset.bound = '1';
+        select.addEventListener('change', (e) => {
+            const tr = e.target.closest('tr');
+            tr.querySelector('.product-select').innerHTML = productOptions(e.target.value, null);
         });
+    });
+}
 
-        tbody.querySelectorAll('.category-select').forEach((select) => {
-            if (select.dataset.bound === '1') return;
-            select.dataset.bound = '1';
-            select.addEventListener('change', (e) => {
-                const tr = e.target.closest('tr');
-                const productSelect = tr.querySelector('.product-select');
-                productSelect.innerHTML = productOptions(e.target.value, null);
-            });
-        });
-    }
+function addRow(item = null) {
+    tbody.insertAdjacentHTML('beforeend', rowTemplate(tbody.querySelectorAll('tr').length, item));
+    bindCategoryEvents();
+    toggleAssetCode();
+}
 
-    function addRow(item = null) {
-        tbody.insertAdjacentHTML('beforeend', rowTemplate(tbody.querySelectorAll('tr').length, item));
-        bindCategoryEvents();
-        toggleAssetCode();
-    }
+function toggleAssetCode() {
+    const selected = toWarehouse.selectedOptions[0];
+    const isPersonnelDestination = selected && selected.dataset.type === 'personnel';
+    document.querySelectorAll('.asset-col').forEach(el => el.style.display = isPersonnelDestination ? '' : 'none');
+}
 
-    function toggleAssetCode() {
-        const selected = toWarehouse.selectedOptions[0];
-        const isPersonnelDestination = selected && selected.dataset.type === 'personnel';
-        document.querySelectorAll('.asset-col').forEach(el => el.style.display = isPersonnelDestination ? '' : 'none');
-    }
+function filterWarehouseOptions(mode) {
+    [...fromWarehouse.options].forEach((opt) => {
+        if (!opt.value) return;
+        const isPersonnel = opt.dataset.type === 'personnel';
+        opt.hidden = mode === 'non_personnel' ? isPersonnel : !isPersonnel;
+    });
+    [...toWarehouse.options].forEach((opt) => {
+        if (!opt.value) return;
+        const isPersonnel = opt.dataset.type === 'personnel';
+        opt.hidden = mode === 'personnel_only' ? !isPersonnel : (mode === 'non_personnel' ? isPersonnel : false);
+    });
+}
 
-    addBtn.addEventListener('click', () => addRow());
-    toWarehouse.addEventListener('change', toggleAssetCode);
+function applyVoucherTypeRules() {
+    const type = voucherTypeSelect.value;
+    invoiceWrap.style.display = type === 'customer_return' ? '' : 'none';
+    relatedInvoiceSelect.required = type === 'customer_return';
+    beneficiaryWrap.style.display = (type === 'personnel_asset' || type === 'showroom') ? '' : 'none';
 
-    initWarehouseSelects();
-
-    if (initialItems.length) {
-        initialItems.forEach(item => addRow(item));
+    if (type === 'personnel_asset') {
+        filterWarehouseOptions('personnel_only');
+        fromWarehouseHint.textContent = 'برای حواله پرسنل، مبدا از انبارهای عادی و مقصد فقط پرسنل است.';
+        toWarehouseHint.textContent = 'فقط پرسنل تعریف‌شده قابل انتخاب است.';
+        fromWarehouseWrap.style.display = '';
+        toWarehouseWrap.style.display = '';
+    } else if (type === 'between_warehouses' || type === 'showroom') {
+        filterWarehouseOptions('non_personnel');
+        fromWarehouseHint.textContent = 'در این حالت، فقط انبارهای عادی نمایش داده می‌شود.';
+        toWarehouseHint.textContent = 'پرسنل در مقصد نمایش داده نمی‌شود.';
+        fromWarehouseWrap.style.display = '';
+        toWarehouseWrap.style.display = '';
+    } else if (type === 'scrap') {
+        filterWarehouseOptions('non_personnel');
+        fromWarehouse.value = String(centralWarehouseId);
+        fromWarehouse.readOnly = true;
+        fromWarehouseHint.textContent = 'حواله ضایعات فقط از انبار مرکزی ثبت می‌شود.';
+        toWarehouseWrap.style.display = 'none';
+        toWarehouse.value = String(centralWarehouseId);
+    } else if (type === 'customer_return') {
+        filterWarehouseOptions('non_personnel');
+        fromWarehouse.value = String(centralWarehouseId);
+        fromWarehouseHint.textContent = 'مرجوعی مشتری به انبار مقصد شما برمی‌گردد.';
+        fromWarehouseWrap.style.display = 'none';
+        toWarehouseWrap.style.display = '';
     } else {
+        fromWarehouseWrap.style.display = '';
+        toWarehouseWrap.style.display = '';
+        filterWarehouseOptions('non_personnel');
+    }
+
+    rerenderProductSelects();
+}
+
+function rerenderProductSelects() {
+    tbody.querySelectorAll('tr').forEach((tr) => {
+        const categorySelect = tr.querySelector('.category-select');
+        const productSelect = tr.querySelector('.product-select');
+        const selected = productSelect.value;
+        productSelect.innerHTML = productOptions(categorySelect.value, selected);
+    });
+}
+
+async function loadInvoiceProducts() {
+    allowedReturnProducts = [];
+    if (!relatedInvoiceSelect.value) {
+        rerenderProductSelects();
+        return;
+    }
+
+    const res = await fetch(`${invoiceProductsApi}/${relatedInvoiceSelect.value}/products`);
+    if (!res.ok) return;
+    const payload = await res.json();
+    allowedReturnProducts = payload.products || [];
+
+    if (voucherTypeSelect.value === 'customer_return' && tbody.querySelectorAll('tr').length === 0) {
         addRow();
     }
+
+    rerenderProductSelects();
+}
+
+addBtn.addEventListener('click', () => addRow());
+toWarehouse.addEventListener('change', toggleAssetCode);
+voucherTypeSelect.addEventListener('change', applyVoucherTypeRules);
+relatedInvoiceSelect.addEventListener('change', loadInvoiceProducts);
+
+if (initialItems.length) initialItems.forEach(item => addRow(item)); else addRow();
+applyVoucherTypeRules();
+loadInvoiceProducts();
 </script>
 </div>
 @endsection

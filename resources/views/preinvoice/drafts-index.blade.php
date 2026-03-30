@@ -41,10 +41,12 @@
               <td>
                 <div class="d-flex gap-1 justify-content-end">
                   <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش</a>
+                  @if($canFinanceApprove)
                   <form method="POST" action="{{ route('preinvoice.draft.finalize', $o->uuid) }}">
                     @csrf
                     <button class="btn btn-sm btn-success" onclick="return confirm('بعد از تایید مالی، این پیش‌فاکتور به فاکتور/حواله انبار تبدیل می‌شود. ادامه می‌دهید؟')">تایید مالی</button>
                   </form>
+                  @endif
                 </div>
               </td>
             </tr>
