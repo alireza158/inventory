@@ -38,7 +38,16 @@ class InvoiceController extends Controller
             ->where('uuid', $uuid)
             ->firstOrFail();
 
-        return view('invoices.show', compact('invoice'));
+        $canFinanceApprove = $this->canHandleFinanceActions();
+
+        return view('invoices.show', compact('invoice', 'canFinanceApprove'));
+    }
+
+    private function canHandleFinanceActions(): bool
+    {
+        $user = auth()->user();
+
+        return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
     }
 
     public function updateStatus(string $uuid, Request $request)
