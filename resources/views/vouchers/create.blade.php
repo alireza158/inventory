@@ -95,6 +95,22 @@
                     <input name="reference" class="form-control" value="{{ old('reference', $voucher->reference ?? null) }}" placeholder="مثلاً 123">
                 </div>
 
+
+                <div class="col-md-4">
+                    <label class="form-label">فاکتور مرجع (برای مرجوعی مشتری)</label>
+                    <select name="related_invoice_uuid" class="form-select" id="relatedInvoiceSelect">
+                        <option value="">انتخاب کنید...</option>
+                        @foreach($invoiceOptions as $invoiceOption)
+                            <option value="{{ $invoiceOption['uuid'] }}" @selected(old('related_invoice_uuid', $voucher->relatedInvoice?->uuid ?? null) === $invoiceOption['uuid'])>{{ $invoiceOption['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">نام تحویل‌گیرنده / ذی‌نفع (اختیاری)</label>
+                    <input name="beneficiary_name" class="form-control" value="{{ old('beneficiary_name', $voucher->beneficiary_name ?? null) }}" placeholder="برای پرسنل / شوروم">
+                </div>
+
                 <div class="col-12">
                     <label class="form-label">توضیحات (اختیاری)</label>
                     <input name="note" class="form-control" value="{{ old('note', $voucher->note ?? null) }}">
