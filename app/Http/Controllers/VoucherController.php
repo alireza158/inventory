@@ -387,6 +387,10 @@ class VoucherController extends Controller
             }
         }
 
+        if (($data['voucher_type'] ?? null) === WarehouseTransfer::TYPE_CUSTOMER_RETURN && empty($data['related_invoice_uuid'])) {
+            abort(422, 'در حواله مرجوعی مشتری، انتخاب فاکتور مشتری الزامی است.');
+        }
+
         return $data;
     }
 
