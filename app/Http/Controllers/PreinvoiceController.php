@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\CustomerLedger;
+use App\Models\Product;
+use App\Models\StockMovement;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\PreinvoiceOrder;
@@ -30,7 +33,9 @@ class PreinvoiceController extends Controller
             ->orderByDesc('id')
             ->paginate(20);
 
-        return view('preinvoice.drafts-index', compact('orders'));
+        $canFinanceApprove = $this->canHandleFinanceActions();
+
+        return view('preinvoice.drafts-index', compact('orders', 'canFinanceApprove'));
     }
 
     public function saveDraft(Request $request)
@@ -75,7 +80,9 @@ class PreinvoiceController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('preinvoice.edit', compact('order', 'shippingMethods'));
+        $canFinanceApprove = $this->canHandleFinanceActions();
+
+        return view('preinvoice.edit', compact('order', 'shippingMethods', 'canFinanceApprove'));
     }
 
     public function updateDraft(string $uuid, Request $request)
@@ -255,8 +262,17 @@ class PreinvoiceController extends Controller
         }
     }
 
+
+    private function canHandleFinanceActions(): bool
+    {
+        $user = auth()->user();
+
+        return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
+    }
+
     public function finalize(string $uuid)
     {
+        abort_unless($this->canHandleFinanceActions(), 403);
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== 'submitted_finance', 403);
 
@@ -288,6 +304,8 @@ class PreinvoiceController extends Controller
                 'status'              => 'warehouse_pending',
             ]);
 
+            $centralWarehouseId = \App\Services\WarehouseStockService::centralWarehouseId();
+
             foreach ($order->items as $it) {
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
@@ -296,6 +314,38 @@ class PreinvoiceController extends Controller
                     'quantity'   => (int) $it->quantity,
                     'price'      => (int) $it->price,
                     'line_total' => (int) $it->price * (int) $it->quantity,
+                ]);
+
+                \App\Services\WarehouseStockService::change($centralWarehouseId, (int) $it->product_id, -((int) $it->quantity));
+
+                $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
+                if ($product) {
+                    $before = (int) $product->stock;
+                    $after = max(0, $before - (int) $it->quantity);
+                    $product->update(['stock' => $after]);
+
+                    StockMovement::create([
+                        'product_id' => $product->id,
+                        'user_id' => auth()->id(),
+                        'type' => 'out',
+                        'reason' => 'sale',
+                        'quantity' => (int) $it->quantity,
+                        'stock_before' => $before,
+                        'stock_after' => $after,
+                        'reference' => $invoice->uuid,
+                        'note' => 'خروج بابت حواله فروش',
+                    ]);
+                }
+            }
+
+            if (!empty($invoice->customer_id)) {
+                CustomerLedger::create([
+                    'customer_id' => (int) $invoice->customer_id,
+                    'type' => 'debit',
+                    'amount' => (int) $invoice->total,
+                    'reference_type' => Invoice::class,
+                    'reference_id' => $invoice->id,
+                    'note' => 'ثبت بدهکاری بابت فاکتور فروش ' . $invoice->uuid,
                 ]);
             }
 
