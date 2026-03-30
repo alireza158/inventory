@@ -112,6 +112,35 @@ class VoucherController extends Controller
             abort(422, 'فاکتور انتخابی متعلق به مشتری انتخاب‌شده نیست.');
         }
 
+        $requestedByProduct = [];
+        foreach ($data['items'] as $row) {
+            $pid = (int) $row['product_id'];
+            $requestedByProduct[$pid] = ($requestedByProduct[$pid] ?? 0) + (int) $row['quantity'];
+        }
+
+        $alreadyReturnedByProduct = WarehouseTransfer::query()
+            ->where('voucher_type', WarehouseTransfer::TYPE_CUSTOMER_RETURN)
+            ->where('related_invoice_id', $invoice->id)
+            ->with('items')
+            ->get()
+            ->flatMap->items
+            ->groupBy('product_id')
+            ->map(fn($items) => (int) $items->sum('quantity'));
+
+        $invoiceQtyByProduct = $invoice->items
+            ->groupBy('product_id')
+            ->map(fn($items) => (int) $items->sum('quantity'));
+
+        foreach ($requestedByProduct as $productId => $requestedQty) {
+            $invoiced = (int) ($invoiceQtyByProduct[$productId] ?? 0);
+            $alreadyReturned = (int) ($alreadyReturnedByProduct[$productId] ?? 0);
+            $remaining = max($invoiced - $alreadyReturned, 0);
+
+            if ($requestedQty > $remaining) {
+                abort(422, "مقدار برگشتی برای کالا {$productId} بیشتر از تعداد مجاز است. باقی‌مانده مجاز: {$remaining}");
+            }
+        }
+
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
         $payload = [
             'voucher_type' => WarehouseTransfer::TYPE_CUSTOMER_RETURN,
@@ -229,13 +258,30 @@ class VoucherController extends Controller
     {
         $invoice = Invoice::query()->with('items.product')->where('uuid', $uuid)->firstOrFail();
 
+        $returnedQtyByProduct = WarehouseTransfer::query()
+            ->where('voucher_type', WarehouseTransfer::TYPE_CUSTOMER_RETURN)
+            ->where('related_invoice_id', $invoice->id)
+            ->with('items')
+            ->get()
+            ->flatMap->items
+            ->groupBy('product_id')
+            ->map(fn($items) => (int) $items->sum('quantity'));
+
         $products = $invoice->items
-            ->map(fn ($item) => [
-                'product_id' => (int) $item->product_id,
-                'category_id' => (int) ($item->product?->category_id ?? 0),
-                'name' => $item->product?->name ?? ('#' . $item->product_id),
-                'qty' => (int) $item->quantity,
-            ])
+            ->groupBy('product_id')
+            ->map(function ($items, $productId) use ($returnedQtyByProduct) {
+                $first = $items->first();
+                $invoicedQty = (int) $items->sum('quantity');
+                $returnedQty = (int) ($returnedQtyByProduct[$productId] ?? 0);
+
+                return [
+                    'product_id' => (int) $productId,
+                    'category_id' => (int) ($first->product?->category_id ?? 0),
+                    'name' => $first->product?->name ?? ('#' . $productId),
+                    'qty' => $invoicedQty,
+                    'remaining_qty' => max($invoicedQty - $returnedQty, 0),
+                ];
+            })
             ->values();
 
         return response()->json([
@@ -334,14 +380,6 @@ class VoucherController extends Controller
 
             if (!$belongsToCategory) {
                 abort(422, 'ردیف ' . ($index + 1) . ': کالا در دسته‌بندی انتخابی نیست.');
-            }
-
-            if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && !in_array((int) $item['product_id'], $invoiceProductIds, true)) {
-                abort(422, 'ردیف ' . ($index + 1) . ': کالا باید از اقلام همان فاکتور مشتری انتخاب شود.');
-            }
-
-            if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && !in_array((int) $item['product_id'], $invoiceProductIds, true)) {
-                abort(422, 'ردیف ' . ($index + 1) . ': کالا باید از اقلام همان فاکتور مشتری انتخاب شود.');
             }
 
             if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && !in_array((int) $item['product_id'], $invoiceProductIds, true)) {

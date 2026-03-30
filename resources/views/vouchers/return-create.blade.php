@@ -78,6 +78,7 @@ const customerSelect = document.getElementById('customerSelect');
 const invoiceSelect = document.getElementById('invoiceSelect');
 const addItemBtn = document.getElementById('addItemBtn');
 const tbody = document.querySelector('#itemsTable tbody');
+const returnForm = document.getElementById('returnForm');
 
 let invoiceProducts = [];
 
@@ -86,12 +87,31 @@ function itemRow(i){
         <td>
           <select name="items[${i}][product_id]" class="form-select" required>
             <option value="">انتخاب کالا...</option>
-            ${invoiceProducts.map(p => `<option value="${p.product_id}">${p.name} (تعداد فاکتور: ${p.qty})</option>`).join('')}
+            ${invoiceProducts.filter(p => Number(p.remaining_qty || 0) > 0).map(p => `<option value=\"${p.product_id}\" data-max=\"${p.remaining_qty}\">${p.name} (باقی‌مانده مجاز: ${p.remaining_qty})</option>`).join('')}
           </select>
         </td>
         <td><input type="number" min="1" name="items[${i}][quantity]" class="form-control" required></td>
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td>
       </tr>`;
+}
+
+
+function bindMaxQtyForRow(tr){
+    const productSelect = tr.querySelector('select[name$="[product_id]"]');
+    const qtyInput = tr.querySelector('input[name$="[quantity]"]');
+    const sync = () => {
+        const selected = productSelect.selectedOptions[0];
+        const max = Number(selected?.dataset.max || 0);
+        if (max > 0) {
+            qtyInput.max = String(max);
+            if (Number(qtyInput.value || 0) > max) qtyInput.value = String(max);
+        } else {
+            qtyInput.removeAttribute('max');
+        }
+    };
+    productSelect.addEventListener('change', sync);
+    qtyInput.addEventListener('input', sync);
+    sync();
 }
 
 async function loadCustomerInvoices(customerId){
@@ -132,6 +152,15 @@ invoiceSelect.addEventListener('change', () => {
 
 addItemBtn.addEventListener('click', () => {
     tbody.insertAdjacentHTML('beforeend', itemRow(tbody.querySelectorAll('tr').length));
+    bindMaxQtyForRow(tbody.querySelector('tr:last-child'));
+});
+
+returnForm.addEventListener('submit', (e) => {
+    const btn = returnForm.querySelector('button[type="submit"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'در حال ثبت...';
+    }
 });
 </script>
 @endsection
