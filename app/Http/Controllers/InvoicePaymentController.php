@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CustomerLedger;
 use Illuminate\Http\Request;
 
 class InvoicePaymentController extends Controller
@@ -27,13 +28,24 @@ class InvoicePaymentController extends Controller
 
         $paidAt = $data['paid_at'] ?? now()->toDateString();
 
-        $invoice->payments()->create([
+        $payment = $invoice->payments()->create([
             'method' => $data['method'],
             'amount' => (int) $data['amount'],
             'paid_at' => $paidAt,
             'note' => $data['note'] ?? null,
             'receipt_image' => $path,
         ]);
+
+        if (!empty($invoice->customer_id)) {
+            CustomerLedger::create([
+                'customer_id' => (int) $invoice->customer_id,
+                'type' => 'credit',
+                'amount' => (int) $payment->amount,
+                'reference_type' => get_class($payment),
+                'reference_id' => $payment->id,
+                'note' => 'ثبت پرداخت برای فاکتور ' . $invoice->uuid,
+            ]);
+        }
 
         return back()->with('success', '✅ پرداخت ثبت شد.');
     }

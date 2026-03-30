@@ -6,16 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class WarehouseTransfer extends Model
 {
-
+    public const TYPE_SALE = 'sale';
     public const TYPE_BETWEEN_WAREHOUSES = 'between_warehouses';
-    public const TYPE_ORGANIZATION_EXPENSE = 'organization_expense';
+    public const TYPE_SCRAP = 'scrap';
+    public const TYPE_CUSTOMER_RETURN = 'customer_return';
+    public const TYPE_SHOWROOM = 'showroom';
     public const TYPE_PERSONNEL_ASSET = 'personnel_asset';
 
     public static function typeOptions(): array
     {
         return [
             self::TYPE_BETWEEN_WAREHOUSES => 'حواله بین انبار',
-            self::TYPE_ORGANIZATION_EXPENSE => 'حواله هزینه سازمانی',
+            self::TYPE_SCRAP => 'حواله ضایعات',
+            self::TYPE_CUSTOMER_RETURN => 'حواله مرجوعی مشتری',
+            self::TYPE_SHOWROOM => 'حواله شوروم سالن',
             self::TYPE_PERSONNEL_ASSET => 'حواله اموال پرسنل',
         ];
     }
@@ -25,6 +29,9 @@ class WarehouseTransfer extends Model
         'voucher_type',
         'from_warehouse_id',
         'to_warehouse_id',
+        'related_invoice_id',
+        'customer_id',
+        'beneficiary_name',
         'user_id',
         'transferred_at',
         'total_amount',
@@ -54,5 +61,14 @@ class WarehouseTransfer extends Model
     {
         return $this->belongsTo(User::class);
     }
-}
 
+    public function relatedInvoice()
+    {
+        return $this->belongsTo(Invoice::class, 'related_invoice_id');
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
+}

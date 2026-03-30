@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\CustomerLedger;
 use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\StockMovement;
@@ -21,14 +22,14 @@ class VoucherController extends Controller
         $dateTo = $request->get('date_to');
         $voucherType = (string) $request->get('voucher_type', 'all');
 
-        $query = WarehouseTransfer::with(['fromWarehouse', 'toWarehouse', 'user'])
+        $query = WarehouseTransfer::with(['fromWarehouse', 'toWarehouse', 'user', 'relatedInvoice', 'customer'])
             ->when($voucherNo !== '', function ($q) use ($voucherNo) {
                 $q->where(function ($inner) use ($voucherNo) {
                     $inner->where('id', (int) $voucherNo)
                         ->orWhere('reference', 'like', "%{$voucherNo}%");
                 });
             })
-            ->when($voucherType !== 'all' && $voucherType !== 'sale', fn ($q) => $q->where('voucher_type', $voucherType))
+            ->when($voucherType !== 'all' && $voucherType !== WarehouseTransfer::TYPE_SALE, fn ($q) => $q->where('voucher_type', $voucherType))
             ->when($dateFrom, fn ($q) => $q->whereDate('transferred_at', '>=', $dateFrom))
             ->when($dateTo, fn ($q) => $q->whereDate('transferred_at', '<=', $dateTo));
 
@@ -54,13 +55,7 @@ class VoucherController extends Controller
             ->paginate(20, ['*'], 'vouchers_page')
             ->withQueryString();
 
-        return view('vouchers.index', compact(
-            'vouchers',
-            'salesInvoices',
-            'totalAllAmount',
-            'totalAllCount',
-            'voucherType'
-        ));
+        return view('vouchers.index', compact('vouchers', 'salesInvoices', 'totalAllAmount', 'totalAllCount', 'voucherType'));
     }
 
     public function create()
@@ -68,9 +63,10 @@ class VoucherController extends Controller
         $categories = Category::orderBy('name')->get();
         $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
         $warehouses = $this->selectableWarehouses();
+        $invoices = Invoice::query()->latest('id')->limit(300)->get(['id', 'uuid', 'customer_name']);
         $voucher = null;
 
-        return view('vouchers.create', compact('categories', 'products', 'warehouses', 'voucher'));
+        return view('vouchers.create', compact('categories', 'products', 'warehouses', 'voucher', 'invoices'));
     }
 
     public function edit(WarehouseTransfer $voucher)
@@ -78,9 +74,10 @@ class VoucherController extends Controller
         $categories = Category::orderBy('name')->get();
         $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
         $warehouses = $this->selectableWarehouses();
+        $invoices = Invoice::query()->latest('id')->limit(300)->get(['id', 'uuid', 'customer_name']);
         $voucher->load('items.product');
 
-        return view('vouchers.create', compact('voucher', 'categories', 'products', 'warehouses'));
+        return view('vouchers.create', compact('voucher', 'categories', 'products', 'warehouses', 'invoices'));
     }
 
     public function store(Request $request)
@@ -120,12 +117,16 @@ class VoucherController extends Controller
 
     private function validateTransfer(Request $request): array
     {
+        $types = implode(',', array_keys(WarehouseTransfer::typeOptions()));
+
         $data = $request->validate([
-            'voucher_type' => ['required', 'in:' . implode(',', array_keys(WarehouseTransfer::typeOptions()))],
-            'from_warehouse_id' => ['required', 'exists:warehouses,id', 'different:to_warehouse_id'],
+            'voucher_type' => ['required', 'in:' . $types],
+            'from_warehouse_id' => ['required', 'exists:warehouses,id'],
             'to_warehouse_id' => ['required', 'exists:warehouses,id'],
             'reference' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
+            'related_invoice_uuid' => ['nullable', 'string', 'exists:invoices,uuid'],
+            'beneficiary_name' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:categories,id'],
             'items.*.product_id' => ['required', 'exists:products,id'],
@@ -143,18 +144,31 @@ class VoucherController extends Controller
             }
         }
 
+        if (($data['voucher_type'] ?? null) === WarehouseTransfer::TYPE_CUSTOMER_RETURN && empty($data['related_invoice_uuid'])) {
+            abort(422, 'در حواله مرجوعی مشتری، انتخاب فاکتور مشتری الزامی است.');
+        }
+
         return $data;
     }
 
     private function createTransfer(array $data, $transferredAt): WarehouseTransfer
     {
         $toWarehouse = Warehouse::findOrFail($data['to_warehouse_id']);
+        $voucherType = (string) $data['voucher_type'];
+        $relatedInvoice = null;
+
+        if (!empty($data['related_invoice_uuid'])) {
+            $relatedInvoice = Invoice::where('uuid', $data['related_invoice_uuid'])->firstOrFail();
+        }
 
         $transfer = WarehouseTransfer::create([
             'reference' => $data['reference'] ?? null,
-            'voucher_type' => $data['voucher_type'],
+            'voucher_type' => $voucherType,
             'from_warehouse_id' => $data['from_warehouse_id'],
             'to_warehouse_id' => $data['to_warehouse_id'],
+            'related_invoice_id' => $relatedInvoice?->id,
+            'customer_id' => $relatedInvoice?->customer_id,
+            'beneficiary_name' => $data['beneficiary_name'] ?? null,
             'user_id' => auth()->id(),
             'transferred_at' => $transferredAt,
             'total_amount' => 0,
@@ -166,12 +180,28 @@ class VoucherController extends Controller
         foreach ($data['items'] as $item) {
             $product = Product::findOrFail($item['product_id']);
             $qty = (int) $item['quantity'];
-            $unitPrice = (int) ($product->price ?? 0);
+            $unitPrice = in_array($voucherType, [WarehouseTransfer::TYPE_SCRAP, WarehouseTransfer::TYPE_SHOWROOM], true)
+                ? 0
+                : (int) ($product->price ?? 0);
             $lineTotal = $qty * $unitPrice;
             $sum += $lineTotal;
 
-            WarehouseStockService::change((int) $data['from_warehouse_id'], (int) $item['product_id'], -$qty);
-            WarehouseStockService::change((int) $data['to_warehouse_id'], (int) $item['product_id'], $qty);
+            if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
+                WarehouseStockService::change((int) $data['to_warehouse_id'], (int) $item['product_id'], $qty);
+                $this->syncGlobalProductStock((int) $item['product_id'], +$qty);
+                $movementType = 'in';
+                $movementNote = 'مرجوعی از مشتری';
+            } elseif ($voucherType === WarehouseTransfer::TYPE_SCRAP) {
+                WarehouseStockService::change((int) $data['from_warehouse_id'], (int) $item['product_id'], -$qty);
+                $this->syncGlobalProductStock((int) $item['product_id'], -$qty);
+                $movementType = 'out';
+                $movementNote = 'خروج ضایعات از انبار مرکزی';
+            } else {
+                WarehouseStockService::change((int) $data['from_warehouse_id'], (int) $item['product_id'], -$qty);
+                WarehouseStockService::change((int) $data['to_warehouse_id'], (int) $item['product_id'], $qty);
+                $movementType = 'out';
+                $movementNote = 'انتقال از ' . $transfer->fromWarehouse->name . ' به ' . $transfer->toWarehouse->name;
+            }
 
             $before = (int) $product->stock;
 
@@ -186,32 +216,59 @@ class VoucherController extends Controller
             StockMovement::create([
                 'product_id' => $product->id,
                 'user_id' => auth()->id(),
-                'type' => 'out',
-                'reason' => 'transfer',
+                'type' => $movementType,
+                'reason' => $voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN ? 'return' : 'transfer',
                 'quantity' => $qty,
                 'stock_before' => $before,
-                'stock_after' => $before,
+                'stock_after' => (int) Product::find($product->id)->stock,
                 'reference' => $transfer->reference ?: ('TR-' . $transfer->id),
-                'note' => 'انتقال از ' . $transfer->fromWarehouse->name . ' به ' . $transfer->toWarehouse->name,
+                'note' => $movementNote,
             ]);
         }
 
         $transfer->update(['total_amount' => $sum]);
+
+        if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $relatedInvoice && $relatedInvoice->customer_id) {
+            CustomerLedger::create([
+                'customer_id' => $relatedInvoice->customer_id,
+                'type' => 'credit',
+                'amount' => max($sum, 0),
+                'reference_type' => WarehouseTransfer::class,
+                'reference_id' => $transfer->id,
+                'note' => 'مرجوعی کالا از فاکتور ' . $relatedInvoice->uuid,
+            ]);
+        }
 
         return $transfer;
     }
 
     private function rollbackTransfer(WarehouseTransfer $transfer): void
     {
-        $transfer->load('items');
+        $transfer->load('items', 'relatedInvoice');
 
         foreach ($transfer->items as $item) {
-            WarehouseStockService::change((int) $transfer->to_warehouse_id, (int) $item->product_id, -((int) $item->quantity));
-            WarehouseStockService::change((int) $transfer->from_warehouse_id, (int) $item->product_id, (int) $item->quantity);
+            if ($transfer->voucher_type === WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
+                WarehouseStockService::change((int) $transfer->to_warehouse_id, (int) $item->product_id, -((int) $item->quantity));
+                $this->syncGlobalProductStock((int) $item->product_id, -((int) $item->quantity));
+            } elseif ($transfer->voucher_type === WarehouseTransfer::TYPE_SCRAP) {
+                WarehouseStockService::change((int) $transfer->from_warehouse_id, (int) $item->product_id, (int) $item->quantity);
+                $this->syncGlobalProductStock((int) $item->product_id, (int) $item->quantity);
+            } else {
+                WarehouseStockService::change((int) $transfer->to_warehouse_id, (int) $item->product_id, -((int) $item->quantity));
+                WarehouseStockService::change((int) $transfer->from_warehouse_id, (int) $item->product_id, (int) $item->quantity);
+            }
+        }
+
+        if ($transfer->voucher_type === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $transfer->customer_id) {
+            CustomerLedger::query()
+                ->where('reference_type', WarehouseTransfer::class)
+                ->where('reference_id', $transfer->id)
+                ->where('type', 'credit')
+                ->delete();
         }
 
         $reference = $transfer->reference ?: ('TR-' . $transfer->id);
-        StockMovement::where('reason', 'transfer')->where('reference', $reference)->delete();
+        StockMovement::whereIn('reason', ['transfer', 'return'])->where('reference', $reference)->delete();
     }
 
     private function selectableWarehouses()
@@ -227,5 +284,16 @@ class VoucherController extends Controller
             ->orderBy('parent_id')
             ->orderBy('name')
             ->get();
+    }
+
+    private function syncGlobalProductStock(int $productId, int $delta): void
+    {
+        $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+        if (!$product) {
+            return;
+        }
+
+        $newStock = max(0, ((int) $product->stock) + $delta);
+        $product->update(['stock' => $newStock]);
     }
 }

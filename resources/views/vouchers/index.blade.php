@@ -6,7 +6,9 @@
 
     $voucherTypeLabels = [
         'between_warehouses' => 'حواله بین انبار',
-        'organization_expense' => 'حواله هزینه سازمانی',
+        'scrap' => 'حواله ضایعات',
+        'customer_return' => 'حواله مرجوعی مشتری',
+        'showroom' => 'حواله شوروم سالن',
         'personnel_asset' => 'حواله اموال پرسنل',
         'sale' => 'حواله فروش کالا',
     ];
@@ -62,7 +64,9 @@
                     <select name="voucher_type" class="form-select">
                         <option value="all" @selected($voucherType === 'all')>همه</option>
                         <option value="between_warehouses" @selected($voucherType === 'between_warehouses')>بین انبار</option>
-                        <option value="organization_expense" @selected($voucherType === 'organization_expense')>هزینه سازمانی</option>
+                        <option value="scrap" @selected($voucherType === 'scrap')>ضایعات</option>
+                        <option value="customer_return" @selected($voucherType === 'customer_return')>مرجوعی مشتری</option>
+                        <option value="showroom" @selected($voucherType === 'showroom')>شوروم سالن</option>
                         <option value="personnel_asset" @selected($voucherType === 'personnel_asset')>اموال پرسنل</option>
                         <option value="sale" @selected($voucherType === 'sale')>فروش کالا</option>
                     </select>
@@ -82,7 +86,7 @@
     @if($voucherType !== 'sale')
     <div class="card shadow-sm mb-3">
         <div class="card-body">
-            <h6 class="mb-3">حواله‌های داخلی (بین انبار / هزینه سازمانی / اموال پرسنل)</h6>
+            <h6 class="mb-3">حواله‌های داخلی (بین انبار / ضایعات / مرجوعی مشتری / شوروم / اموال پرسنل)</h6>
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead>
@@ -94,7 +98,8 @@
                             <th>از انبار</th>
                             <th>به انبار</th>
                             <th>مبلغ سند</th>
-                            <th>کاربر</th>
+                            <th>کاربر ثبت‌کننده</th>
+                            <th>ذی‌نفع/فاکتور مرجع</th>
                             <th class="text-end">عملیات</th>
                         </tr>
                     </thead>
@@ -109,6 +114,12 @@
                             <td>{{ $voucher->toWarehouse?->name }}</td>
                             <td class="amount-strong">{{ $toToman($voucher->total_amount) }} تومان</td>
                             <td class="text-muted">{{ $voucher->user?->name }}</td>
+                            <td class="small">
+                                @if($voucher->relatedInvoice)
+                                    <div>فاکتور: {{ $voucher->relatedInvoice->uuid }}</div>
+                                @endif
+                                <div>{{ $voucher->beneficiary_name ?: ($voucher->customer?->first_name ? $voucher->customer->first_name . ' ' . $voucher->customer->last_name : '—') }}</div>
+                            </td>
                             <td class="text-end action-btns">
                                 <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.edit', $voucher) }}">ویرایش</a>
                                 <form method="POST" action="{{ route('vouchers.destroy', $voucher) }}" class="d-inline" onsubmit="return confirm('از حذف حواله مطمئن هستید؟')">
@@ -120,7 +131,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center text-muted py-5">حواله‌ای با این فیلتر ثبت نشده است.</td>
+                            <td colspan="10" class="text-center text-muted py-5">حواله‌ای با این فیلتر ثبت نشده است.</td>
                         </tr>
                     @endforelse
                     </tbody>
