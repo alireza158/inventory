@@ -39,12 +39,25 @@
                         </select>
                     </div>
 
+                    <div class="col-md-4">
+                        <label class="form-label">علت برگشت از فروش</label>
+                        <select name="return_reason" class="form-select" required>
+                            <option value="">انتخاب علت...</option>
+                            @foreach($returnReasons as $reasonKey => $reasonTitle)
+                                <option value="{{ $reasonKey }}" @selected(old('return_reason') === $reasonKey)>{{ $reasonTitle }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
                     <div class="col-12">
                         <div class="table-responsive">
                             <table class="table table-striped" id="itemsTable">
                                 <thead>
                                 <tr>
-                                    <th>کالا (از همان فاکتور)</th>
+                                    <th>محصول (جستجو با نام/کد)</th>
+                                    <th>تنوع/طرح</th>
+                                    <th>موجودی تنوع</th>
+                                    <th>حداکثر مجاز مرجوعی</th>
                                     <th>تعداد برگشتی</th>
                                     <th></th>
                                 </tr>
@@ -80,38 +93,72 @@ const addItemBtn = document.getElementById('addItemBtn');
 const tbody = document.querySelector('#itemsTable tbody');
 const returnForm = document.getElementById('returnForm');
 
-let invoiceProducts = [];
+let invoiceVariants = [];
+
+function productOptions(selected='') {
+    const uniq = new Map();
+    invoiceVariants.forEach(v => {
+        const k = String(v.product_id);
+        if (!uniq.has(k)) uniq.set(k, v);
+    });
+    return '<option value="">انتخاب محصول...</option>' + Array.from(uniq.values()).map(p =>
+        `<option value="${p.product_id}" ${String(selected)===String(p.product_id)?'selected':''}>${p.name} ${p.product_code ? '('+p.product_code+')' : ''}</option>`
+    ).join('');
+}
+
+function variantOptions(productId, selected='') {
+    if (!productId) return '<option value="">ابتدا محصول را انتخاب کنید...</option>';
+    const rows = invoiceVariants.filter(v => String(v.product_id)===String(productId) && Number(v.remaining_qty||0) > 0);
+    if (!rows.length) return '<option value="">تنوع مجازی باقی نمانده</option>';
+    return '<option value="">انتخاب تنوع...</option>' + rows.map(v =>
+        `<option value="${v.variant_id}" data-max="${v.remaining_qty}" data-stock="${v.variant_stock || 0}" ${String(selected)===String(v.variant_id)?'selected':''}>${v.variant_name || 'بدون نام'} ${v.variant_code ? '['+v.variant_code+']' : ''}</option>`
+    ).join('');
+}
 
 function itemRow(i){
     return `<tr>
+        <td><select name="items[${i}][product_id]" class="form-select product-select" required>${productOptions()}</select></td>
         <td>
-          <select name="items[${i}][product_id]" class="form-select" required>
-            <option value="">انتخاب کالا...</option>
-            ${invoiceProducts.filter(p => Number(p.remaining_qty || 0) > 0).map(p => `<option value=\"${p.product_id}\" data-max=\"${p.remaining_qty}\">${p.name} (باقی‌مانده مجاز: ${p.remaining_qty})</option>`).join('')}
+          <select name="items[${i}][variant_id]" class="form-select variant-select" required>
+            <option value="">ابتدا محصول را انتخاب کنید...</option>
           </select>
         </td>
-        <td><input type="number" min="1" name="items[${i}][quantity]" class="form-control" required></td>
+        <td><span class="badge text-bg-light stock-badge">—</span></td>
+        <td><span class="badge text-bg-light max-badge">—</span></td>
+        <td><input type="number" min="1" name="items[${i}][quantity]" class="form-control qty" required></td>
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td>
       </tr>`;
 }
 
+function bindRow(tr){
+    const productSelect = tr.querySelector('.product-select');
+    const variantSelect = tr.querySelector('.variant-select');
+    const qtyInput = tr.querySelector('.qty');
+    const stockBadge = tr.querySelector('.stock-badge');
+    const maxBadge = tr.querySelector('.max-badge');
 
-function bindMaxQtyForRow(tr){
-    const productSelect = tr.querySelector('select[name$="[product_id]"]');
-    const qtyInput = tr.querySelector('input[name$="[quantity]"]');
-    const sync = () => {
-        const selected = productSelect.selectedOptions[0];
-        const max = Number(selected?.dataset.max || 0);
+    const syncMax = () => {
+        const opt = variantSelect.selectedOptions[0];
+        const max = Number(opt?.dataset.max || 0);
+        const stock = Number(opt?.dataset.stock || 0);
+        stockBadge.textContent = stock > 0 ? stock.toLocaleString('fa-IR') : '۰';
         if (max > 0) {
             qtyInput.max = String(max);
             if (Number(qtyInput.value || 0) > max) qtyInput.value = String(max);
+            maxBadge.textContent = max.toLocaleString('fa-IR');
         } else {
             qtyInput.removeAttribute('max');
+            maxBadge.textContent = '—';
         }
     };
-    productSelect.addEventListener('change', sync);
-    qtyInput.addEventListener('input', sync);
-    sync();
+
+    productSelect.addEventListener('change', () => {
+        variantSelect.innerHTML = variantOptions(productSelect.value, '');
+        qtyInput.value = '';
+        syncMax();
+    });
+    variantSelect.addEventListener('change', syncMax);
+    qtyInput.addEventListener('input', syncMax);
 }
 
 async function loadCustomerInvoices(customerId){
@@ -126,8 +173,8 @@ async function loadInvoiceProducts(uuid){
     const res = await fetch(`{{ url('/vouchers/invoice') }}/${uuid}/products`);
     if (!res.ok) return;
     const payload = await res.json();
-    invoiceProducts = payload.products || [];
-    addItemBtn.disabled = invoiceProducts.length === 0;
+    invoiceVariants = payload.products || [];
+    addItemBtn.disabled = invoiceVariants.length === 0;
     tbody.innerHTML = '';
 }
 
@@ -152,10 +199,10 @@ invoiceSelect.addEventListener('change', () => {
 
 addItemBtn.addEventListener('click', () => {
     tbody.insertAdjacentHTML('beforeend', itemRow(tbody.querySelectorAll('tr').length));
-    bindMaxQtyForRow(tbody.querySelector('tr:last-child'));
+    bindRow(tbody.querySelector('tr:last-child'));
 });
 
-returnForm.addEventListener('submit', (e) => {
+returnForm.addEventListener('submit', () => {
     const btn = returnForm.querySelector('button[type="submit"]');
     if (btn) {
         btn.disabled = true;

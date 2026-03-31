@@ -12,6 +12,10 @@ class WarehouseTransfer extends Model
     public const TYPE_CUSTOMER_RETURN = 'customer_return';
     public const TYPE_SHOWROOM = 'showroom';
     public const TYPE_PERSONNEL_ASSET = 'personnel_asset';
+    public const RETURN_REASON_WRONG_PICKING = 'wrong_picking';
+    public const RETURN_REASON_WARRANTY = 'warranty';
+    public const RETURN_REASON_PACKAGING_DAMAGE = 'packaging_damage';
+    public const RETURN_REASON_TRANSIT_DAMAGE = 'transit_damage';
 
     public static function typeOptions(): array
     {
@@ -24,6 +28,16 @@ class WarehouseTransfer extends Model
         ];
     }
 
+    public static function returnReasonOptions(): array
+    {
+        return [
+            self::RETURN_REASON_WRONG_PICKING => 'اشتباه در جمع‌آوری سفارش',
+            self::RETURN_REASON_WARRANTY => 'برگشت به دلیل گارانتی (خرابی کالا)',
+            self::RETURN_REASON_PACKAGING_DAMAGE => 'آسیب‌دیدگی به‌دلیل پکینگ/کارتن',
+            self::RETURN_REASON_TRANSIT_DAMAGE => 'شکستگی در مسیر ارسال',
+        ];
+    }
+
     protected $fillable = [
         'reference',
         'voucher_type',
@@ -32,6 +46,7 @@ class WarehouseTransfer extends Model
         'related_invoice_id',
         'customer_id',
         'beneficiary_name',
+        'return_reason',
         'user_id',
         'transferred_at',
         'total_amount',
