@@ -40,7 +40,7 @@
               <td>{{ $o->created_at ? Jalalian::fromDateTime($o->created_at)->format('Y/m/d H:i') : '—' }}</td>
               <td>
                 <div class="d-flex gap-1 justify-content-end">
-                  <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش</a>
+                  <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش فاکتور</a>
                   @if($canFinanceApprove)
                   <form method="POST" action="{{ route('preinvoice.draft.finalize', $o->uuid) }}">
                     @csrf
