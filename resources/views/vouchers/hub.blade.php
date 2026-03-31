@@ -271,6 +271,22 @@
             </a>
         </div>
 
+
+        <div class="col-md-6 col-xl-3">
+            <a class="voucher-card transfer" href="{{ route('vouchers.sale-delivery.index') }}">
+                <div class="voucher-icon transfer">🧾</div>
+                <div class="voucher-title">حواله فروش کالا</div>
+                <div class="voucher-desc">
+                    مدیریت حواله‌های فروش، تغییر وضعیت ارسال و ویرایش اقلام فاکتور از مسیر انبار.
+                </div>
+                <div class="voucher-meta">
+                    <span class="meta-pill">فروش</span>
+                    <span class="meta-pill">حواله</span>
+                    <span class="meta-pill">جمع‌آوری</span>
+                </div>
+            </a>
+        </div>
+
         <div class="col-md-6 col-xl-3">
             <a class="voucher-card scrap" href="{{ route('vouchers.section.index', 'scrap') }}">
                 <div class="voucher-icon scrap">🗑️</div>
@@ -312,6 +328,22 @@
                     <span class="meta-pill">انتقال</span>
                     <span class="meta-pill">مبدا/مقصد</span>
                     <span class="meta-pill">رهگیری</span>
+                </div>
+            </a>
+        </div>
+
+
+        <div class="col-md-6 col-xl-3">
+            <a class="voucher-card transfer" href="{{ route('vouchers.sales.index') }}">
+                <div class="voucher-icon transfer">📦</div>
+                <div class="voucher-title">حواله فروش کالا</div>
+                <div class="voucher-desc">
+                    مدیریت حواله‌های فروش، تغییر وضعیت و ویرایش اقلام فاکتورهای تایید مالی‌شده.
+                </div>
+                <div class="voucher-meta">
+                    <span class="meta-pill">فروش</span>
+                    <span class="meta-pill">ویرایش اقلام</span>
+                    <span class="meta-pill">جمع‌آوری</span>
                 </div>
             </a>
         </div>
