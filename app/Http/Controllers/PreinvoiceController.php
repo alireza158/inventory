@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\InvoicePayment;
+use App\Models\Cheque;
 use App\Models\PreinvoiceOrder;
 use App\Models\ShippingMethod;
 use App\Models\WarehouseStock;
@@ -272,13 +274,46 @@ class PreinvoiceController extends Controller
         return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
     }
 
-    public function finalize(string $uuid)
+    public function finance(string $uuid)
+    {
+        abort_unless($this->canHandleFinanceActions(), 403);
+
+        $order = PreinvoiceOrder::with('items.product', 'items.variant')->where('uuid', $uuid)->firstOrFail();
+        abort_if($order->status !== 'submitted_finance', 403);
+
+        return view('preinvoice.finance', compact('order'));
+    }
+
+    public function finalize(string $uuid, Request $request)
     {
         abort_unless($this->canHandleFinanceActions(), 403);
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== 'submitted_finance', 403);
 
-        $invoice = DB::transaction(function () use ($order) {
+        $validated = $request->validate([
+            'payment_method' => 'nullable|in:cash,card,cheque',
+            'payment_amount' => 'nullable|integer|min:1',
+            'payment_paid_at' => 'nullable|date',
+            'payment_note' => 'nullable|string|max:2000',
+            'payment_receipt_image' => 'nullable|image|max:4096',
+            'cheque_bank_name' => 'nullable|string|max:255',
+            'cheque_number' => 'nullable|string|max:255',
+            'cheque_due_date' => 'nullable|date',
+            'cheque_status' => 'nullable|in:pending,cleared,bounced',
+            'cheque_image' => 'nullable|image|max:4096',
+        ]);
+
+        if (!empty($validated['payment_method']) && empty($validated['payment_amount'])) {
+            throw ValidationException::withMessages(['payment_amount' => 'برای ثبت پرداخت، مبلغ الزامی است.']);
+        }
+
+        if (($validated['payment_method'] ?? null) === 'cheque') {
+            if (empty($validated['cheque_number']) || empty($validated['cheque_due_date'])) {
+                throw ValidationException::withMessages(['cheque_number' => 'برای پرداخت چکی، شماره چک و تاریخ سررسید الزامی است.']);
+            }
+        }
+
+        $invoice = DB::transaction(function () use ($order, $validated, $request) {
             $subtotal = 0;
 
             foreach ($order->items as $it) {
@@ -370,6 +405,47 @@ class PreinvoiceController extends Controller
                     'reference_id' => $invoice->id,
                     'note' => 'ثبت بدهکاری بابت فاکتور فروش ' . $invoice->uuid,
                 ]);
+            }
+
+            if (!empty($validated['payment_method']) && !empty($validated['payment_amount'])) {
+                $receiptPath = $request->hasFile('payment_receipt_image')
+                    ? $request->file('payment_receipt_image')->store('invoices/receipts', 'public')
+                    : null;
+
+                $payment = InvoicePayment::create([
+                    'invoice_id' => $invoice->id,
+                    'method' => $validated['payment_method'],
+                    'amount' => (int) $validated['payment_amount'],
+                    'paid_at' => $validated['payment_paid_at'] ?? now()->toDateString(),
+                    'note' => $validated['payment_note'] ?? null,
+                    'receipt_image' => $receiptPath,
+                ]);
+
+                if (!empty($invoice->customer_id)) {
+                    CustomerLedger::create([
+                        'customer_id' => (int) $invoice->customer_id,
+                        'type' => 'credit',
+                        'amount' => (int) $payment->amount,
+                        'reference_type' => InvoicePayment::class,
+                        'reference_id' => $payment->id,
+                        'note' => 'ثبت پرداخت اولیه برای فاکتور ' . $invoice->uuid,
+                    ]);
+                }
+
+                if ($validated['payment_method'] === 'cheque') {
+                    $chequePath = $request->hasFile('cheque_image')
+                        ? $request->file('cheque_image')->store('invoices/cheques', 'public')
+                        : null;
+
+                    Cheque::create([
+                        'invoice_payment_id' => $payment->id,
+                        'bank_name' => $validated['cheque_bank_name'] ?? null,
+                        'cheque_number' => $validated['cheque_number'] ?? null,
+                        'due_date' => $validated['cheque_due_date'] ?? null,
+                        'image' => $chequePath,
+                        'status' => $validated['cheque_status'] ?? 'pending',
+                    ]);
+                }
             }
 
             $order->update(['status' => 'finance_approved']);
