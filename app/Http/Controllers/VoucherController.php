@@ -490,6 +490,7 @@ class VoucherController extends Controller
 
         $salesInvoices = Invoice::query()
             ->with(['items.product'])
+            ->whereNotNull('preinvoice_order_id')
             ->when($voucherNo !== '', function ($q) use ($voucherNo) {
                 $q->where(function ($inner) use ($voucherNo) {
                     $inner->where('uuid', 'like', "%{$voucherNo}%")

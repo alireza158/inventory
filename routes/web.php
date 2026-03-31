@@ -157,6 +157,9 @@ Route::middleware('auth')->group(function () {
     // Invoices
     Route::prefix('invoices')->group(function () {
         Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/{uuid}/print', [InvoiceController::class, 'print'])->name('invoices.print');
+        Route::get('/{uuid}/edit', [InvoiceController::class, 'edit'])->name('invoices.edit');
+        Route::put('/{uuid}', [InvoiceController::class, 'update'])->name('invoices.update');
         Route::get('/{uuid}', [InvoiceController::class, 'show'])->name('invoices.show');
         Route::post('/{uuid}/status', [InvoiceController::class, 'updateStatus'])->name('invoices.status');
         Route::post('/{uuid}/payments', [InvoicePaymentController::class, 'store'])->name('invoices.payments.store');

@@ -8,7 +8,6 @@ use App\Models\StockMovement;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class InvoiceController extends Controller
 {
@@ -32,116 +31,66 @@ class InvoiceController extends Controller
     }
 
 
-    public function salesVouchers(Request $request)
+    public function edit(string $uuid)
     {
-        $q = trim((string) $request->query('q', ''));
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
 
-        $invoices = Invoice::query()
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($qq) use ($q) {
-                    $qq->where('uuid', 'like', "%{$q}%")
-                       ->orWhere('customer_name', 'like', "%{$q}%")
-                       ->orWhere('customer_mobile', 'like', "%{$q}%");
-                });
-            })
-            ->whereIn('status', ['warehouse_pending', 'warehouse_collecting', 'warehouse_checking', 'warehouse_packing', 'warehouse_sent'])
-            ->orderByDesc('id')
-            ->paginate(20)
-            ->withQueryString();
-
-        return view('vouchers.sales.index', compact('invoices', 'q'));
+        return view('invoices.edit', compact('invoice'));
     }
 
-    public function salesVoucherEdit(string $uuid)
-    {
-        $invoice = Invoice::query()->with(['items.product', 'items.variant'])->where('uuid', $uuid)->firstOrFail();
-
-        return view('vouchers.sales.edit', compact('invoice'));
-    }
-
-    public function salesVoucherUpdate(string $uuid, Request $request)
+    public function update(string $uuid, Request $request)
     {
         $invoice = Invoice::query()->with('items')->where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
-            'status' => 'required|in:warehouse_pending,warehouse_collecting,warehouse_checking,warehouse_packing,warehouse_sent,canceled',
+            'customer_name' => 'required|string|max:255',
+            'customer_mobile' => 'required|string|max:50',
+            'customer_address' => 'nullable|string|max:2000',
             'items' => 'required|array|min:1',
-            'items.*.id' => 'required|integer',
+            'items.*.id' => 'required|exists:invoice_items,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|integer|min:0',
         ]);
 
         DB::transaction(function () use ($invoice, $data) {
-            $centralWarehouseId = WarehouseStockService::centralWarehouseId();
-
-            $oldQtyByProduct = $invoice->items->groupBy('product_id')->map(fn ($rows) => (int) $rows->sum('quantity'));
-            $newQtyByProduct = [];
-
-            foreach ($data['items'] as $row) {
-                $item = $invoice->items->firstWhere('id', (int) $row['id']);
-                if (!$item) {
-                    throw ValidationException::withMessages(['items' => 'یکی از آیتم‌های فاکتور معتبر نیست.']);
-                }
-
-                $productId = (int) $item->product_id;
-                $newQtyByProduct[$productId] = ($newQtyByProduct[$productId] ?? 0) + (int) $row['quantity'];
-            }
-
-            foreach ($newQtyByProduct as $productId => $newQty) {
-                $oldQty = (int) ($oldQtyByProduct[$productId] ?? 0);
-                $delta = $newQty - $oldQty;
-
-                if ($delta > 0) {
-                    WarehouseStockService::change($centralWarehouseId, $productId, -$delta);
-                } elseif ($delta < 0) {
-                    WarehouseStockService::change($centralWarehouseId, $productId, abs($delta));
-                }
-
-                if ($delta !== 0) {
-                    $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
-                    if ($product) {
-                        $before = (int) $product->stock;
-                        $after = $before - $delta;
-                        $product->update(['stock' => $after]);
-
-                        StockMovement::create([
-                            'product_id' => $product->id,
-                            'user_id' => auth()->id(),
-                            'type' => $delta > 0 ? 'out' : 'in',
-                            'reason' => 'sale_edit',
-                            'quantity' => abs($delta),
-                            'stock_before' => $before,
-                            'stock_after' => $after,
-                            'reference' => $invoice->uuid,
-                            'note' => 'اصلاح حواله فروش کالا',
-                        ]);
-                    }
-                }
-            }
-
             $subtotal = 0;
             foreach ($data['items'] as $row) {
                 $item = $invoice->items->firstWhere('id', (int) $row['id']);
-                $qty = (int) $row['quantity'];
-                $price = (int) $row['price'];
-                $line = $qty * $price;
-                $subtotal += $line;
+                if (!$item) {
+                    continue;
+                }
 
+                $lineTotal = (int) $row['quantity'] * (int) $row['price'];
                 $item->update([
-                    'quantity' => $qty,
-                    'price' => $price,
-                    'line_total' => $line,
+                    'quantity' => (int) $row['quantity'],
+                    'price' => (int) $row['price'],
+                    'line_total' => $lineTotal,
                 ]);
+                $subtotal += $lineTotal;
             }
 
+            $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+
             $invoice->update([
+                'customer_name' => $data['customer_name'],
+                'customer_mobile' => $data['customer_mobile'],
+                'customer_address' => $data['customer_address'] ?? '',
                 'subtotal' => $subtotal,
-                'total' => max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0),
-                'status' => $data['status'],
+                'total' => $total,
             ]);
         });
 
-        return redirect()->route('vouchers.sales.edit', $invoice->uuid)->with('success', '✅ حواله فروش بروزرسانی شد.');
+        return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ فاکتور ویرایش شد.');
+    }
+
+    public function print(string $uuid)
+    {
+        $invoice = Invoice::query()->with(['items.product', 'items.variant'])->where('uuid', $uuid)->firstOrFail();
+
+        return view('invoices.print', compact('invoice'));
     }
 
     public function show(string $uuid)
