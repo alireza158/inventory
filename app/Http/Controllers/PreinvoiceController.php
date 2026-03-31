@@ -10,8 +10,10 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\PreinvoiceOrder;
 use App\Models\ShippingMethod;
+use App\Models\WarehouseStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 
 class PreinvoiceController extends Controller
@@ -285,6 +287,29 @@ class PreinvoiceController extends Controller
 
             $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
 
+            $centralWarehouseId = \App\Services\WarehouseStockService::centralWarehouseId();
+
+            $requiredByProduct = $order->items
+                ->groupBy('product_id')
+                ->map(fn ($rows) => (int) $rows->sum('quantity'));
+
+            $availableByProduct = WarehouseStock::query()
+                ->where('warehouse_id', $centralWarehouseId)
+                ->whereIn('product_id', $requiredByProduct->keys())
+                ->pluck('quantity', 'product_id');
+
+            foreach ($requiredByProduct as $productId => $requiredQty) {
+                $availableQty = (int) ($availableByProduct[(int) $productId] ?? 0);
+
+                if ($availableQty < $requiredQty) {
+                    $productName = (string) Product::query()->whereKey((int) $productId)->value('name');
+
+                    throw ValidationException::withMessages([
+                        'products' => "موجودی انبار مرکزی برای محصول «{$productName}» کافی نیست. موجودی: {$availableQty} | درخواست: {$requiredQty}",
+                    ]);
+                }
+            }
+
             $invoice = Invoice::create([
                 'uuid'                => (string) Str::uuid(),
                 'preinvoice_order_id' => $order->id,
@@ -304,8 +329,6 @@ class PreinvoiceController extends Controller
                 'status'              => 'warehouse_pending',
             ]);
 
-            $centralWarehouseId = \App\Services\WarehouseStockService::centralWarehouseId();
-
             foreach ($order->items as $it) {
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
@@ -321,7 +344,7 @@ class PreinvoiceController extends Controller
                 $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
                 if ($product) {
                     $before = (int) $product->stock;
-                    $after = max(0, $before - (int) $it->quantity);
+                    $after = $before - (int) $it->quantity;
                     $product->update(['stock' => $after]);
 
                     StockMovement::create([
