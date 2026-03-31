@@ -276,49 +276,10 @@
         </div>
     </div>
 
-    @if($isCustomerReturn)
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card stat-card">
-                    <div class="card-body">
-                        <div class="stat-label">تعداد برگشت از فروش در این صفحه</div>
-                        <div class="stat-value">{{ number_format($pageCount) }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card stat-card">
-                    <div class="card-body">
-                        <div class="stat-label">جمع مبلغ برگشت‌ها در این صفحه</div>
-                        <div class="stat-value">{{ $toToman($pageTotalAmount) }}</div>
-                        <div class="stat-label mt-2">تومان</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card stat-card">
-                    <div class="card-body">
-                        <div class="stat-label">وضعیت</div>
-                        <div class="stat-value">آماده گزارش‌گیری</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    @if($isCustomerReturn)
-        <div class="card filter-card mb-4">
-            <div class="section-head">
-                <div>
-                    <h6 class="section-title">فیلتر برگشت از فروش</h6>
-                    <div class="section-sub">برای جستجوی دقیق‌تر، مشتری، علت برگشت و بازه زمانی را مشخص کن</div>
-                </div>
-            </div>
-
+    @if($voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN)
+        <div class="card mb-3">
             <div class="card-body">
-                <form method="GET" class="row g-3 align-items-end">
+                <form method="GET" class="row g-2 align-items-end">
                     <div class="col-md-3">
                         <label class="form-label">مشتری</label>
                         <select name="customer_id" class="form-select form-select-sm">
@@ -333,7 +294,6 @@
                             @endforeach
                         </select>
                     </div>
-
                     <div class="col-md-3">
                         <label class="form-label">علت برگشت</label>
                         <select name="return_reason" class="form-select form-select-sm">
@@ -343,160 +303,55 @@
                             @endforeach
                         </select>
                     </div>
-
                     <div class="col-md-2">
                         <label class="form-label">از تاریخ</label>
                         <input type="date" name="date_from" value="{{ $dateFrom }}" class="form-control form-control-sm">
                     </div>
-
                     <div class="col-md-2">
                         <label class="form-label">تا تاریخ</label>
                         <input type="date" name="date_to" value="{{ $dateTo }}" class="form-control form-control-sm">
                     </div>
-
                     <div class="col-md-2 d-flex gap-2">
                         <button class="btn btn-sm btn-primary w-100">فیلتر</button>
-                        <a href="{{ route('vouchers.section.index', $type) }}" class="btn btn-sm btn-outline-secondary w-100">حذف</a>
+                        <a href="{{ route('vouchers.section.index', $type) }}" class="btn btn-sm btn-outline-secondary w-100">حذف فیلتر</a>
                     </div>
                 </form>
             </div>
         </div>
     @endif
 
-    <div class="card table-card">
-        <div class="section-head">
-            <div>
-                <h6 class="section-title">
-                    @if($isCustomerReturn)
-                        لیست برگشت از فروش‌ها
-                    @else
-                        لیست حواله‌ها
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>شماره</th>
+                    <th>تاریخ</th>
+                    <th>مبدا</th>
+                    <th>مقصد</th>
+                    <th>کاربر</th>
+                    <th>فاکتور مرجع</th>
+                    @if($voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN)
+                        <th>علت برگشت</th>
                     @endif
-                </h6>
-                <div class="section-sub">
-                    @if($isCustomerReturn)
-                        نمایش استاندارد برگشت‌های ثبت‌شده با امکان ویرایش و حذف
-                    @else
-                        موارد ثبت‌شده این بخش
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        @if($isCustomerReturn)
-            <div class="desktop-table">
-                <div class="table-responsive">
-                    <table class="table table-clean table-hover align-middle">
-                        <thead>
-                        <tr>
-                            <th>ردیف</th>
-                            <th>اسم مشتری</th>
-                            <th>تاریخ برگشت از فروش</th>
-                            <th>مبلغ کل برگشت از فروش</th>
-                            <th>علت برگشت از فروش</th>
-                            <th class="text-end">عملیات</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @forelse($vouchers as $voucher)
-                            @php
-                                $rowNumber = $loop->iteration + (($vouchers->currentPage() - 1) * $vouchers->perPage());
-                                $customerName =
-                                    $voucher->beneficiary_name
-                                    ?: (
-                                        $voucher->customer
-                                            ? trim(($voucher->customer->first_name ?? '') . ' ' . ($voucher->customer->last_name ?? ''))
-                                            : ''
-                                    )
-                                    ?: '—';
-                            @endphp
-                            <tr>
-                                <td class="fw-bold">{{ $rowNumber }}</td>
-
-                                <td>
-                                    <div class="customer-box">
-                                        <div class="name">{{ $customerName }}</div>
-                                        @if(optional($voucher->customer)->mobile)
-                                            <div class="meta">{{ $voucher->customer->mobile }}</div>
-                                        @endif
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <span class="code-pill">
-                                        {{ $voucher->transferred_at?->format('Y/m/d H:i') ?: '—' }}
-                                    </span>
-                                </td>
-
-                                <td class="money-strong">
-                                    {{ $toToman($voucher->total_amount) }} تومان
-                                </td>
-
-                                <td>
-                                    <span class="reason-pill">
-                                        {{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}
-                                    </span>
-                                </td>
-
-                                <td>
-                                    <div class="action-group">
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.edit', $voucher) }}">ویرایش</a>
-
-                                        <form method="POST" action="{{ route('vouchers.destroy', $voucher) }}" class="d-inline" onsubmit="return confirm('از حذف برگشت از فروش مطمئن هستید؟')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6">
-                                    <div class="empty-state">برگشت از فروشی ثبت نشده است.</div>
-                                </td>
-                            </tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="mobile-cards p-3">
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
                 @forelse($vouchers as $voucher)
-                    @php
-                        $rowNumber = $loop->iteration + (($vouchers->currentPage() - 1) * $vouchers->perPage());
-                        $customerName =
-                            $voucher->beneficiary_name
-                            ?: (
-                                $voucher->customer
-                                    ? trim(($voucher->customer->first_name ?? '') . ' ' . ($voucher->customer->last_name ?? ''))
-                                    : ''
-                            )
-                            ?: '—';
-                    @endphp
-
-                    <div class="return-mobile-card">
-                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                            <div class="title">ردیف {{ $rowNumber }} - {{ $customerName }}</div>
-                            <span class="reason-pill">
-                                {{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}
-                            </span>
-                        </div>
-
-                        <div class="return-grid mt-3">
-                            <div class="item">
-                                <small>تاریخ برگشت</small>
-                                <div>{{ $voucher->transferred_at?->format('Y/m/d H:i') ?: '—' }}</div>
-                            </div>
-
-                            <div class="item">
-                                <small>مبلغ کل</small>
-                                <div>{{ $toToman($voucher->total_amount) }} تومان</div>
-                            </div>
-                        </div>
-
-                        <div class="action-group mt-3">
+                    <tr>
+                        <td>{{ $voucher->id }}</td>
+                        <td>{{ $voucher->reference ?: ('TR-'.$voucher->id) }}</td>
+                        <td>{{ $voucher->transferred_at?->format('Y/m/d H:i') }}</td>
+                        <td>{{ $voucher->fromWarehouse?->name ?: '—' }}</td>
+                        <td>{{ $voucher->toWarehouse?->name ?: '—' }}</td>
+                        <td>{{ $voucher->user?->name ?: '—' }}</td>
+                        <td>{{ $voucher->relatedInvoice?->uuid ?: '—' }}</td>
+                        @if($voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN)
+                            <td>{{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}</td>
+                        @endif
+                        <td>
                             <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.edit', $voucher) }}">ویرایش</a>
 
                             <form method="POST" action="{{ route('vouchers.destroy', $voucher) }}" class="d-inline" onsubmit="return confirm('از حذف برگشت از فروش مطمئن هستید؟')">
@@ -507,7 +362,7 @@
                         </div>
                     </div>
                 @empty
-                    <div class="empty-state">برگشت از فروشی ثبت نشده است.</div>
+                    <tr><td colspan="{{ $voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN ? 9 : 8 }}" class="text-center py-4 text-muted">موردی ثبت نشده است.</td></tr>
                 @endforelse
             </div>
         @else
