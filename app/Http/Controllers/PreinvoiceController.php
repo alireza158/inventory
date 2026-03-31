@@ -276,8 +276,6 @@ class PreinvoiceController extends Controller
 
     public function finance(string $uuid)
     {
-        abort_unless($this->canHandleFinanceActions(), 403);
-
         $order = PreinvoiceOrder::with('items.product', 'items.variant')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== 'submitted_finance', 403);
 
@@ -286,7 +284,6 @@ class PreinvoiceController extends Controller
 
     public function finalize(string $uuid, Request $request)
     {
-        abort_unless($this->canHandleFinanceActions(), 403);
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== 'submitted_finance', 403);
 

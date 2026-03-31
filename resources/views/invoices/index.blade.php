@@ -27,10 +27,13 @@
       <div class="text-muted small">لیست فاکتورهای ثبت نهایی</div>
     </div>
 
-    <form class="d-flex gap-2" method="GET" action="{{ route('invoices.index') }}">
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{{ route('vouchers.index', ['voucher_type' => 'sale']) }}">حواله فروش کالا</a>
+      <form class="d-flex gap-2" method="GET" action="{{ route('invoices.index') }}">
       <input class="form-control" name="q" value="{{ $q }}" placeholder="جستجو کد/نام/موبایل">
       <button class="btn btn-primary">جستجو</button>
     </form>
+    </div>
   </div>
 
   <div class="card">
