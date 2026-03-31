@@ -128,6 +128,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->name('preinvoice.draft.index');
     Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->name('preinvoice.draft.edit');
     Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->name('preinvoice.draft.update');
+    Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->name('preinvoice.draft.finance');
     Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->name('preinvoice.draft.finalize');
 
     // Preinvoice APIs
