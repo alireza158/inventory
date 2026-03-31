@@ -8,10 +8,14 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\InvoicePayment;
+use App\Models\Cheque;
 use App\Models\PreinvoiceOrder;
 use App\Models\ShippingMethod;
+use App\Models\WarehouseStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 
 class PreinvoiceController extends Controller
@@ -200,10 +204,10 @@ class PreinvoiceController extends Controller
         return '';
     }
 
-    private function orderProvinceId(array $validated, ?Customer $customer, int $shippingId): ?int
+    private function orderProvinceId(array $validated, ?Customer $customer, int $shippingId): int
     {
         if ($this->isInPersonShippingId($shippingId)) {
-            return null;
+            return 0;
         }
 
         if (!empty($validated['province_id'])) {
@@ -214,7 +218,7 @@ class PreinvoiceController extends Controller
             return (int) $customer->province_id;
         }
 
-        return null;
+        return 0;
     }
 
     private function orderCityId(array $validated, ?Customer $customer, int $shippingId): ?int
@@ -270,13 +274,43 @@ class PreinvoiceController extends Controller
         return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
     }
 
-    public function finalize(string $uuid)
+    public function finance(string $uuid)
     {
-        abort_unless($this->canHandleFinanceActions(), 403);
+        $order = PreinvoiceOrder::with('items.product', 'items.variant')->where('uuid', $uuid)->firstOrFail();
+        abort_if($order->status !== 'submitted_finance', 403);
+
+        return view('preinvoice.finance', compact('order'));
+    }
+
+    public function finalize(string $uuid, Request $request)
+    {
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== 'submitted_finance', 403);
 
-        $invoice = DB::transaction(function () use ($order) {
+        $validated = $request->validate([
+            'payment_method' => 'nullable|in:cash,card,cheque',
+            'payment_amount' => 'nullable|integer|min:1',
+            'payment_paid_at' => 'nullable|date',
+            'payment_note' => 'nullable|string|max:2000',
+            'payment_receipt_image' => 'nullable|image|max:4096',
+            'cheque_bank_name' => 'nullable|string|max:255',
+            'cheque_number' => 'nullable|string|max:255',
+            'cheque_due_date' => 'nullable|date',
+            'cheque_status' => 'nullable|in:pending,cleared,bounced',
+            'cheque_image' => 'nullable|image|max:4096',
+        ]);
+
+        if (!empty($validated['payment_method']) && empty($validated['payment_amount'])) {
+            throw ValidationException::withMessages(['payment_amount' => 'برای ثبت پرداخت، مبلغ الزامی است.']);
+        }
+
+        if (($validated['payment_method'] ?? null) === 'cheque') {
+            if (empty($validated['cheque_number']) || empty($validated['cheque_due_date'])) {
+                throw ValidationException::withMessages(['cheque_number' => 'برای پرداخت چکی، شماره چک و تاریخ سررسید الزامی است.']);
+            }
+        }
+
+        $invoice = DB::transaction(function () use ($order, $validated, $request) {
             $subtotal = 0;
 
             foreach ($order->items as $it) {
@@ -284,6 +318,29 @@ class PreinvoiceController extends Controller
             }
 
             $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
+
+            $centralWarehouseId = \App\Services\WarehouseStockService::centralWarehouseId();
+
+            $requiredByProduct = $order->items
+                ->groupBy('product_id')
+                ->map(fn ($rows) => (int) $rows->sum('quantity'));
+
+            $availableByProduct = WarehouseStock::query()
+                ->where('warehouse_id', $centralWarehouseId)
+                ->whereIn('product_id', $requiredByProduct->keys())
+                ->pluck('quantity', 'product_id');
+
+            foreach ($requiredByProduct as $productId => $requiredQty) {
+                $availableQty = (int) ($availableByProduct[(int) $productId] ?? 0);
+
+                if ($availableQty < $requiredQty) {
+                    $productName = (string) Product::query()->whereKey((int) $productId)->value('name');
+
+                    throw ValidationException::withMessages([
+                        'products' => "موجودی انبار مرکزی برای محصول «{$productName}» کافی نیست. موجودی: {$availableQty} | درخواست: {$requiredQty}",
+                    ]);
+                }
+            }
 
             $invoice = Invoice::create([
                 'uuid'                => (string) Str::uuid(),
@@ -304,8 +361,6 @@ class PreinvoiceController extends Controller
                 'status'              => 'warehouse_pending',
             ]);
 
-            $centralWarehouseId = \App\Services\WarehouseStockService::centralWarehouseId();
-
             foreach ($order->items as $it) {
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
@@ -321,7 +376,7 @@ class PreinvoiceController extends Controller
                 $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
                 if ($product) {
                     $before = (int) $product->stock;
-                    $after = max(0, $before - (int) $it->quantity);
+                    $after = $before - (int) $it->quantity;
                     $product->update(['stock' => $after]);
 
                     StockMovement::create([
@@ -347,6 +402,47 @@ class PreinvoiceController extends Controller
                     'reference_id' => $invoice->id,
                     'note' => 'ثبت بدهکاری بابت فاکتور فروش ' . $invoice->uuid,
                 ]);
+            }
+
+            if (!empty($validated['payment_method']) && !empty($validated['payment_amount'])) {
+                $receiptPath = $request->hasFile('payment_receipt_image')
+                    ? $request->file('payment_receipt_image')->store('invoices/receipts', 'public')
+                    : null;
+
+                $payment = InvoicePayment::create([
+                    'invoice_id' => $invoice->id,
+                    'method' => $validated['payment_method'],
+                    'amount' => (int) $validated['payment_amount'],
+                    'paid_at' => $validated['payment_paid_at'] ?? now()->toDateString(),
+                    'note' => $validated['payment_note'] ?? null,
+                    'receipt_image' => $receiptPath,
+                ]);
+
+                if (!empty($invoice->customer_id)) {
+                    CustomerLedger::create([
+                        'customer_id' => (int) $invoice->customer_id,
+                        'type' => 'credit',
+                        'amount' => (int) $payment->amount,
+                        'reference_type' => InvoicePayment::class,
+                        'reference_id' => $payment->id,
+                        'note' => 'ثبت پرداخت اولیه برای فاکتور ' . $invoice->uuid,
+                    ]);
+                }
+
+                if ($validated['payment_method'] === 'cheque') {
+                    $chequePath = $request->hasFile('cheque_image')
+                        ? $request->file('cheque_image')->store('invoices/cheques', 'public')
+                        : null;
+
+                    Cheque::create([
+                        'invoice_payment_id' => $payment->id,
+                        'bank_name' => $validated['cheque_bank_name'] ?? null,
+                        'cheque_number' => $validated['cheque_number'] ?? null,
+                        'due_date' => $validated['cheque_due_date'] ?? null,
+                        'image' => $chequePath,
+                        'status' => $validated['cheque_status'] ?? 'pending',
+                    ]);
+                }
             }
 
             $order->update(['status' => 'finance_approved']);

@@ -181,7 +181,11 @@
                                     <span class="badge bg-secondary">{{ $statusFa($inv->status) }}</span>
                                 </td>
                                 <td class="text-end">
-                                    <a class="btn btn-sm btn-outline-primary" href="{{ route('invoices.show', $inv->uuid) }}">جزئیات/تغییر وضعیت</a>
+                                    <div class="btn-group btn-group-sm">
+                                    <a class="btn btn-outline-primary" href="{{ route('invoices.show', $inv->uuid) }}">مشاهده/وضعیت</a>
+                                    <a class="btn btn-outline-secondary" href="{{ route('invoices.edit', $inv->uuid) }}">ویرایش</a>
+                                    <a class="btn btn-outline-dark" target="_blank" href="{{ route('invoices.print', $inv->uuid) }}">چاپ</a>
+                                </div>
                                 </td>
                             </tr>
                         @empty
