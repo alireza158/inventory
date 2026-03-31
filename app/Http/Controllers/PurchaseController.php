@@ -53,7 +53,6 @@ class PurchaseController extends Controller
     public function create()
     {
         $suppliers = Supplier::orderBy('name')->get(['id', 'name', 'phone']);
-        $warehouses = Warehouse::orderBy('name')->get(['id', 'name']);
 
         $categories = Category::query()
             ->orderBy('name')
@@ -106,7 +105,6 @@ class PurchaseController extends Controller
 
         return view('purchases.create', [
             'suppliers' => $suppliers,
-            'warehouses' => $warehouses,
             'categories' => $categories,
             'products' => $products,
             'variants' => $variants,
@@ -119,7 +117,6 @@ class PurchaseController extends Controller
         $purchase->load(['items', 'items.product', 'items.variant']);
 
         $suppliers = Supplier::orderBy('name')->get(['id', 'name', 'phone']);
-        $warehouses = Warehouse::orderBy('name')->get(['id', 'name']);
 
         $categories = Category::query()
             ->orderBy('name')
@@ -172,7 +169,6 @@ class PurchaseController extends Controller
 
         return view('purchases.create', [
             'suppliers' => $suppliers,
-            'warehouses' => $warehouses,
             'categories' => $categories,
             'products' => $products,
             'variants' => $variants,
@@ -185,10 +181,11 @@ class PurchaseController extends Controller
         $data = $this->validatePayload($request);
 
         DB::transaction(function () use ($data) {
+            $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
             $purchase = Purchase::create([
                 'supplier_id' => $data['supplier_id'],
-                'warehouse_id' => $data['warehouse_id'],
+                'warehouse_id' => $centralWarehouseId,
                 'user_id' => auth()->id(),
                 'purchased_at' => now(),
                 'note' => $data['note'] ?? null,
@@ -199,7 +196,7 @@ class PurchaseController extends Controller
                 'total_amount' => 0,
             ]);
 
-            $summary = $this->applyItems($purchase, $data, (int) $data['warehouse_id']);
+            $summary = $this->applyItems($purchase, $data, $centralWarehouseId);
             $purchase->update($summary);
         });
 
@@ -216,7 +213,8 @@ class PurchaseController extends Controller
 
             $purchase->update([
                 'supplier_id' => $data['supplier_id'],
-                'warehouse_id' => $data['warehouse_id'],
+                'warehouse_id' => (int) $data['warehouse_id'],
+                'purchased_at' => $data['purchased_at'] ?? $purchase->purchased_at,
                 'note' => $data['note'] ?? null,
                 'user_id' => auth()->id(),
                 'discount_type' => $data['invoice_discount_type'] ?? null,
@@ -250,11 +248,13 @@ class PurchaseController extends Controller
             'invoice_discount_type' => $invoiceDiscountType,
             'invoice_discount_value' => $invoiceDiscountValue,
             'note' => $note,
+            'warehouse_id' => WarehouseStockService::centralWarehouseId(),
         ]);
 
         $data = $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
+            'purchased_at' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:1000'],
 
             'invoice_discount_type' => ['nullable', 'in:amount,percent,none'],
@@ -302,6 +302,15 @@ class PurchaseController extends Controller
             if (!$isValidVariant) {
                 abort(422, 'مدل انتخاب‌شده برای ردیف ' . ($index + 1) . ' متعلق به کالای انتخابی نیست.');
             }
+        }
+
+        $seenVariants = [];
+        foreach ($data['items'] as $index => $item) {
+            $key = ((int) $item['product_id']) . ':' . ((int) $item['variant_id']);
+            if (isset($seenVariants[$key])) {
+                abort(422, 'مدل/طرح تکراری در ردیف ' . ($index + 1) . ' مجاز نیست. هر مدل برای هر کالا فقط یک بار قابل ثبت است.');
+            }
+            $seenVariants[$key] = true;
         }
 
         return $data;
