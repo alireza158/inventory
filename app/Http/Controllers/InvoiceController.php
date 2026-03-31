@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
@@ -24,6 +25,69 @@ class InvoiceController extends Controller
             ->withQueryString();
 
         return view('invoices.index', compact('invoices', 'q'));
+    }
+
+
+    public function edit(string $uuid)
+    {
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        return view('invoices.edit', compact('invoice'));
+    }
+
+    public function update(string $uuid, Request $request)
+    {
+        $invoice = Invoice::query()->with('items')->where('uuid', $uuid)->firstOrFail();
+
+        $data = $request->validate([
+            'customer_name' => 'required|string|max:255',
+            'customer_mobile' => 'required|string|max:50',
+            'customer_address' => 'nullable|string|max:2000',
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'required|exists:invoice_items,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'required|integer|min:0',
+        ]);
+
+        DB::transaction(function () use ($invoice, $data) {
+            $subtotal = 0;
+            foreach ($data['items'] as $row) {
+                $item = $invoice->items->firstWhere('id', (int) $row['id']);
+                if (!$item) {
+                    continue;
+                }
+
+                $lineTotal = (int) $row['quantity'] * (int) $row['price'];
+                $item->update([
+                    'quantity' => (int) $row['quantity'],
+                    'price' => (int) $row['price'],
+                    'line_total' => $lineTotal,
+                ]);
+                $subtotal += $lineTotal;
+            }
+
+            $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+
+            $invoice->update([
+                'customer_name' => $data['customer_name'],
+                'customer_mobile' => $data['customer_mobile'],
+                'customer_address' => $data['customer_address'] ?? '',
+                'subtotal' => $subtotal,
+                'total' => $total,
+            ]);
+        });
+
+        return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ فاکتور ویرایش شد.');
+    }
+
+    public function print(string $uuid)
+    {
+        $invoice = Invoice::query()->with(['items.product', 'items.variant'])->where('uuid', $uuid)->firstOrFail();
+
+        return view('invoices.print', compact('invoice'));
     }
 
     public function show(string $uuid)

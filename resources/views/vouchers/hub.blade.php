@@ -315,6 +315,21 @@
                 </div>
             </a>
         </div>
+
+        <div class="col-md-6 col-xl-3">
+            <a class="voucher-card transfer" href="{{ route('vouchers.section.index', 'sale') }}">
+                <div class="voucher-icon transfer">🧾</div>
+                <div class="voucher-title">حواله فروش کالا</div>
+                <div class="voucher-desc">
+                    نمایش فاکتورهای تایید مالی‌شده برای عملیات انبار (مشاهده، وضعیت، ویرایش و چاپ).
+                </div>
+                <div class="voucher-meta">
+                    <span class="meta-pill">فروش</span>
+                    <span class="meta-pill">حواله</span>
+                    <span class="meta-pill">انبار</span>
+                </div>
+            </a>
+        </div>
     </div>
 
     <div class="row g-3 mb-4">

@@ -25,6 +25,7 @@ class VoucherController extends Controller
             'scrap' => WarehouseTransfer::TYPE_SCRAP,
             'personnel' => WarehouseTransfer::TYPE_PERSONNEL_ASSET,
             'transfer' => WarehouseTransfer::TYPE_BETWEEN_WAREHOUSES,
+            'sale' => WarehouseTransfer::TYPE_SALE,
         ];
     }
 
@@ -74,11 +75,25 @@ class VoucherController extends Controller
             'scrap' => 'vouchers.scrap.index',
             'personnel' => 'vouchers.personnel.index',
             'transfer' => 'vouchers.transfer.index',
+            'sale' => 'vouchers.sale.index',
             default => 'vouchers.section',
         };
 
+        $salesInvoices = collect();
+        if ($type === 'sale') {
+            $salesInvoices = Invoice::query()
+                ->with(['items.product'])
+                ->whereNotNull('preinvoice_order_id')
+                ->when($dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
+                ->when($dateTo, fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
+                ->orderByDesc('id')
+                ->paginate(20)
+                ->withQueryString();
+        }
+
         return view($view, compact(
             'vouchers',
+            'salesInvoices',
             'type',
             'voucherType',
             'customers',
@@ -258,24 +273,9 @@ class VoucherController extends Controller
                         ->orWhere('reference', 'like', "%{$voucherNo}%");
                 });
             })
-            ->when($voucherType !== 'all' && $voucherType !== WarehouseTransfer::TYPE_SALE, fn ($q) => $q->where('voucher_type', $voucherType))
+            ->when($voucherType !== 'all', fn ($q) => $q->where('voucher_type', $voucherType))
             ->when($dateFrom, fn ($q) => $q->whereDate('transferred_at', '>=', $dateFrom))
             ->when($dateTo, fn ($q) => $q->whereDate('transferred_at', '<=', $dateTo));
-
-        $salesInvoices = Invoice::query()
-            ->with(['items.product'])
-            ->when($voucherNo !== '', function ($q) use ($voucherNo) {
-                $q->where(function ($inner) use ($voucherNo) {
-                    $inner->where('uuid', 'like', "%{$voucherNo}%")
-                        ->orWhere('customer_name', 'like', "%{$voucherNo}%")
-                        ->orWhere('customer_mobile', 'like', "%{$voucherNo}%");
-                });
-            })
-            ->when($dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
-            ->when($dateTo, fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
-            ->orderByDesc('id')
-            ->paginate(20, ['*'], 'sales_page')
-            ->withQueryString();
 
         $totalAllAmount = (int) WarehouseTransfer::sum('total_amount');
         $totalAllCount = (int) WarehouseTransfer::count();
@@ -284,7 +284,7 @@ class VoucherController extends Controller
             ->paginate(20, ['*'], 'vouchers_page')
             ->withQueryString();
 
-        return view('vouchers.index', compact('vouchers', 'salesInvoices', 'totalAllAmount', 'totalAllCount', 'voucherType'));
+        return view('vouchers.index', compact('vouchers', 'totalAllAmount', 'totalAllCount', 'voucherType'));
     }
 
     public function create()
