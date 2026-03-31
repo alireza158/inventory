@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\ShippingMethod;
+use App\Models\WarehouseStock;
+use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 
 class PreinvoiceApiController extends Controller
@@ -13,8 +15,10 @@ class PreinvoiceApiController extends Controller
         $q = trim((string) $request->query('q', ''));
         $qDigits = preg_replace('/\D+/', '', $q); // فقط عدد
 
-        $items = Product::query()
-            ->select(['id', 'name', 'sku', 'short_barcode', 'code', 'price', 'stock'])
+        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+
+        $products = Product::query()
+            ->select(['id', 'name', 'sku', 'short_barcode', 'code', 'price'])
             ->where('is_sellable', true)
             ->when($q !== '', function ($query) use ($q, $qDigits) {
 
@@ -41,7 +45,14 @@ class PreinvoiceApiController extends Controller
             })
             ->orderBy('name')
             ->limit(300)
-            ->get()
+            ->get();
+
+        $stockByProductId = WarehouseStock::query()
+            ->where('warehouse_id', $centralWarehouseId)
+            ->whereIn('product_id', $products->pluck('id'))
+            ->pluck('quantity', 'product_id');
+
+        $items = $products
             ->map(fn ($p) => [
                 'id' => $p->id,
                 'title' => $p->name,
@@ -54,7 +65,7 @@ class PreinvoiceApiController extends Controller
                 'short_barcode' => $p->short_barcode,
 
                 'price' => (int) ($p->price ?? 0),
-                'quantity' => (int) ($p->stock ?? 0),
+                'quantity' => (int) ($stockByProductId[(int) $p->id] ?? 0),
             ])
             ->values();
 
@@ -74,6 +85,12 @@ class PreinvoiceApiController extends Controller
 
         $product->load(['variants' => fn ($q) => $q->orderBy('variant_name')]);
 
+        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+        $centralStock = (int) WarehouseStock::query()
+            ->where('warehouse_id', $centralWarehouseId)
+            ->where('product_id', $product->id)
+            ->value('quantity');
+
         $payload = [
             'id' => $product->id,
             'title' => $product->name,
@@ -84,7 +101,7 @@ class PreinvoiceApiController extends Controller
             'code' => $product->code,
 
             'price' => (int) ($product->price ?? 0),
-            'quantity' => (int) ($product->stock ?? 0),
+            'quantity' => $centralStock,
 
             'varieties' => $product->variants->map(fn ($v) => [
                 'id' => $v->id,

@@ -150,6 +150,7 @@
         <div class="sidebar-submenu">
             <a class="sidebar-sublink {{ $is('purchases.*') }}" href="{{ route('purchases.index') }}">خرید کالا</a>
             <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله</a>
+            <a class="sidebar-sublink {{ $is('vouchers.sales.*') }}" href="{{ route('vouchers.sales.index') }}">حواله فروش کالا</a>
             <a class="sidebar-sublink {{ $is('warehouses.*') }}" href="{{ route('warehouses.index') }}">انبارها</a>
             <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
         </div>
