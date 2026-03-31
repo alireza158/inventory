@@ -43,15 +43,42 @@ class VoucherController extends Controller
     public function sectionIndex(string $type)
     {
         $voucherType = $this->resolveSectionType($type);
+        $customerId = $requestCustomerId = request()->integer('customer_id');
+        $dateFrom = request()->get('date_from');
+        $dateTo = request()->get('date_to');
+        $returnReason = (string) request()->get('return_reason', '');
+        $returnReasons = WarehouseTransfer::returnReasonOptions();
+        $customers = collect();
+
+        if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
+            $customers = Customer::query()
+                ->orderBy('first_name')
+                ->orderBy('last_name')
+                ->get(['id', 'first_name', 'last_name', 'mobile']);
+        }
 
         $vouchers = WarehouseTransfer::query()
             ->with(['fromWarehouse', 'toWarehouse', 'user', 'relatedInvoice'])
             ->where('voucher_type', $voucherType)
+            ->when($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $customerId > 0, fn ($q) => $q->where('customer_id', $customerId))
+            ->when($dateFrom, fn ($q) => $q->whereDate('transferred_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('transferred_at', '<=', $dateTo))
+            ->when($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $returnReason !== '' && isset($returnReasons[$returnReason]), fn ($q) => $q->where('return_reason', $returnReason))
             ->latest('id')
             ->paginate(20)
             ->withQueryString();
 
-        return view('vouchers.section', compact('vouchers', 'type', 'voucherType'));
+        return view('vouchers.section', compact(
+            'vouchers',
+            'type',
+            'voucherType',
+            'customers',
+            'requestCustomerId',
+            'dateFrom',
+            'dateTo',
+            'returnReason',
+            'returnReasons'
+        ));
     }
 
     public function sectionCreate(string $type)
@@ -90,8 +117,9 @@ class VoucherController extends Controller
     {
         $customers = Customer::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'mobile']);
         $warehouses = $this->selectableWarehouses()->where('type', '!=', 'personnel')->values();
+        $returnReasons = WarehouseTransfer::returnReasonOptions();
 
-        return view('vouchers.return-create', compact('customers', 'warehouses'));
+        return view('vouchers.return-create', compact('customers', 'warehouses', 'returnReasons'));
     }
 
     public function returnStore(Request $request)
@@ -100,6 +128,7 @@ class VoucherController extends Controller
             'customer_id' => ['required', 'exists:customers,id'],
             'related_invoice_uuid' => ['required', 'exists:invoices,uuid'],
             'to_warehouse_id' => ['required', 'exists:warehouses,id'],
+            'return_reason' => ['required', 'in:' . implode(',', array_keys(WarehouseTransfer::returnReasonOptions()))],
             'reference' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
@@ -147,6 +176,7 @@ class VoucherController extends Controller
             'from_warehouse_id' => $centralWarehouseId,
             'to_warehouse_id' => (int) $data['to_warehouse_id'],
             'related_invoice_uuid' => $data['related_invoice_uuid'],
+            'return_reason' => $data['return_reason'],
             'reference' => $data['reference'] ?? null,
             'note' => $data['note'] ?? null,
             'items' => array_map(fn($it) => [
@@ -328,6 +358,7 @@ class VoucherController extends Controller
     private function validateTransfer(Request $request): array
     {
         $types = implode(',', array_keys(WarehouseTransfer::typeOptions()));
+        $returnReasons = implode(',', array_keys(WarehouseTransfer::returnReasonOptions()));
 
         $data = $request->validate([
             'voucher_type' => ['required', 'in:' . $types],
@@ -337,6 +368,7 @@ class VoucherController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
             'related_invoice_uuid' => ['nullable', 'string', 'exists:invoices,uuid'],
             'beneficiary_name' => ['nullable', 'string', 'max:255'],
+            'return_reason' => ['nullable', 'in:' . $returnReasons],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:categories,id'],
             'items.*.product_id' => ['required', 'exists:products,id'],
@@ -390,6 +422,9 @@ class VoucherController extends Controller
         if (($data['voucher_type'] ?? null) === WarehouseTransfer::TYPE_CUSTOMER_RETURN && empty($data['related_invoice_uuid'])) {
             abort(422, 'در حواله مرجوعی مشتری، انتخاب فاکتور مشتری الزامی است.');
         }
+        if (($data['voucher_type'] ?? null) === WarehouseTransfer::TYPE_CUSTOMER_RETURN && empty($data['return_reason'])) {
+            abort(422, 'در حواله مرجوعی مشتری، انتخاب علت برگشت الزامی است.');
+        }
 
         return $data;
     }
@@ -412,6 +447,7 @@ class VoucherController extends Controller
             'related_invoice_id' => $relatedInvoice?->id,
             'customer_id' => $relatedInvoice?->customer_id,
             'beneficiary_name' => $data['beneficiary_name'] ?? null,
+            'return_reason' => $data['return_reason'] ?? null,
             'user_id' => auth()->id(),
             'transferred_at' => $transferredAt,
             'total_amount' => 0,

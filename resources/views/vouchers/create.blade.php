@@ -17,6 +17,7 @@
     $invoiceOptions = ($invoices ?? collect())->map(fn($inv) => ['uuid' => $inv->uuid, 'label' => $inv->uuid . ' | ' . ($inv->customer_name ?: 'بدون نام')])->values();
 
     $voucherTypes = \App\Models\WarehouseTransfer::typeOptions();
+    $returnReasonOptions = \App\Models\WarehouseTransfer::returnReasonOptions();
     $regularWarehouses = $warehouses->where('type', '!=', 'personnel')->values();
     $personnelWarehouses = $warehouses->where('type', 'personnel')->whereNotNull('parent_id')->values();
 @endphp
@@ -90,6 +91,16 @@
                     <input name="beneficiary_name" class="form-control" value="{{ old('beneficiary_name', $voucher->beneficiary_name ?? null) }}" placeholder="برای پرسنل / شوروم">
                 </div>
 
+                <div class="col-md-4" id="returnReasonWrap">
+                    <label class="form-label">علت برگشت از فروش</label>
+                    <select name="return_reason" class="form-select" id="returnReasonSelect">
+                        <option value="">انتخاب کنید...</option>
+                        @foreach($returnReasonOptions as $reasonKey => $reasonTitle)
+                            <option value="{{ $reasonKey }}" @selected(old('return_reason', $voucher->return_reason ?? null) === $reasonKey)>{{ $reasonTitle }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="col-md-4">
                     <label class="form-label">شماره حواله (اختیاری)</label>
                     <input name="reference" class="form-control" value="{{ old('reference', $voucher->reference ?? null) }}" placeholder="مثلاً 123">
@@ -160,6 +171,8 @@ const fromWarehouseWrap = document.getElementById('fromWarehouseWrap');
 const toWarehouseWrap = document.getElementById('toWarehouseWrap');
 const invoiceWrap = document.getElementById('invoiceWrap');
 const beneficiaryWrap = document.getElementById('beneficiaryWrap');
+const returnReasonWrap = document.getElementById('returnReasonWrap');
+const returnReasonSelect = document.getElementById('returnReasonSelect');
 const fromWarehouseHint = document.getElementById('fromWarehouseHint');
 const toWarehouseHint = document.getElementById('toWarehouseHint');
 
@@ -258,6 +271,9 @@ function applyVoucherTypeRules() {
     invoiceWrap.style.display = type === 'customer_return' ? '' : 'none';
     relatedInvoiceSelect.required = type === 'customer_return';
     beneficiaryWrap.style.display = (type === 'personnel_asset' || type === 'showroom') ? '' : 'none';
+    returnReasonWrap.style.display = type === 'customer_return' ? '' : 'none';
+    returnReasonSelect.required = type === 'customer_return';
+    if (type !== 'customer_return') returnReasonSelect.value = '';
 
     if (type === 'personnel_asset') {
         filterWarehouseOptions('personnel_only');
