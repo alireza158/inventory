@@ -68,7 +68,15 @@ class VoucherController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('vouchers.section', compact(
+        $view = match ($type) {
+            'return-from-sale' => 'vouchers.section',
+            'scrap' => 'vouchers.scrap.index',
+            'personnel' => 'vouchers.personnel.index',
+            'transfer' => 'vouchers.transfer.index',
+            default => 'vouchers.section',
+        };
+
+        return view($view, compact(
             'vouchers',
             'type',
             'voucherType',
@@ -87,8 +95,12 @@ class VoucherController extends Controller
             return $this->returnCreate();
         }
 
-        $fixedVoucherType = $this->resolveSectionType($type);
-        return $this->createWithType($fixedVoucherType, $type);
+        return match ($type) {
+            'scrap' => $this->scrapCreate(),
+            'personnel' => $this->personnelCreate(),
+            'transfer' => $this->transferCreate(),
+            default => abort(404),
+        };
     }
 
     public function sectionStore(string $type, Request $request)
@@ -255,6 +267,35 @@ class VoucherController extends Controller
     public function create()
     {
         return $this->createWithType();
+    }
+
+    private function scrapCreate()
+    {
+        $categories = Category::orderBy('name')->get();
+        $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+
+        return view('vouchers.scrap.create', compact('categories', 'products', 'centralWarehouseId'));
+    }
+
+    private function personnelCreate()
+    {
+        $categories = Category::orderBy('name')->get();
+        $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $warehouses = $this->selectableWarehouses();
+        $fromWarehouses = $warehouses->where('type', '!=', 'personnel')->values();
+        $personnelWarehouses = $warehouses->where('type', 'personnel')->whereNotNull('parent_id')->values();
+
+        return view('vouchers.personnel.create', compact('categories', 'products', 'fromWarehouses', 'personnelWarehouses'));
+    }
+
+    private function transferCreate()
+    {
+        $categories = Category::orderBy('name')->get();
+        $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $warehouses = $this->selectableWarehouses()->where('type', '!=', 'personnel')->values();
+
+        return view('vouchers.transfer.create', compact('categories', 'products', 'warehouses'));
     }
 
     private function createWithType(?string $fixedVoucherType = null, ?string $sectionSlug = null)

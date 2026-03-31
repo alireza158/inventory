@@ -198,6 +198,16 @@
                         </select>
                     </div>
 
+                    <div class="col-md-4">
+                        <label class="form-label">علت برگشت از فروش</label>
+                        <select name="return_reason" class="form-select" required>
+                            <option value="">انتخاب علت...</option>
+                            @foreach($returnReasons as $reasonKey => $reasonTitle)
+                                <option value="{{ $reasonKey }}" @selected(old('return_reason') === $reasonKey)>{{ $reasonTitle }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
                     <div class="col-12">
                         <div class="hint-box">
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
