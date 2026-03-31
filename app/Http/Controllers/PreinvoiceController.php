@@ -202,10 +202,10 @@ class PreinvoiceController extends Controller
         return '';
     }
 
-    private function orderProvinceId(array $validated, ?Customer $customer, int $shippingId): ?int
+    private function orderProvinceId(array $validated, ?Customer $customer, int $shippingId): int
     {
         if ($this->isInPersonShippingId($shippingId)) {
-            return null;
+            return 0;
         }
 
         if (!empty($validated['province_id'])) {
@@ -216,7 +216,7 @@ class PreinvoiceController extends Controller
             return (int) $customer->province_id;
         }
 
-        return null;
+        return 0;
     }
 
     private function orderCityId(array $validated, ?Customer $customer, int $shippingId): ?int
