@@ -41,9 +41,7 @@
               <td>
                 <div class="d-flex gap-1 justify-content-end">
                   <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش فاکتور</a>
-                  @if($canFinanceApprove)
                   <a class="btn btn-sm btn-success" href="{{ route('preinvoice.draft.finance', $o->uuid) }}">تایید پیش‌فاکتور</a>
-                  @endif
                 </div>
               </td>
             </tr>

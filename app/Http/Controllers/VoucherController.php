@@ -56,6 +56,91 @@ class VoucherController extends Controller
         return view('vouchers.hub');
     }
 
+    public function salesIndex(Request $request)
+    {
+        $q = trim((string) $request->get('q', ''));
+
+        $invoices = Invoice::query()
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($qq) use ($q) {
+                    $qq->where('uuid', 'like', "%{$q}%")
+                        ->orWhere('customer_name', 'like', "%{$q}%")
+                        ->orWhere('customer_mobile', 'like', "%{$q}%");
+                });
+            })
+            ->whereIn('status', ['warehouse_pending', 'warehouse_collecting', 'warehouse_checking', 'warehouse_packing', 'warehouse_sent'])
+            ->orderByDesc('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('vouchers.sales.index', compact('invoices', 'q'));
+    }
+
+    public function salesEdit(string $uuid)
+    {
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        return view('vouchers.sales.edit', compact('invoice'));
+    }
+
+    public function salesUpdate(string $uuid, Request $request)
+    {
+        $invoice = Invoice::query()
+            ->with(['items.product'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'exists:invoice_items,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.price' => ['required', 'integer', 'min:0'],
+        ]);
+
+        DB::transaction(function () use ($invoice, $data) {
+            $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+            $itemsById = $invoice->items->keyBy('id');
+
+            foreach ($data['items'] as $row) {
+                $item = $itemsById[(int) $row['id']] ?? null;
+                if (!$item) {
+                    abort(422, 'آیتم نامعتبر است.');
+                }
+
+                $newQty = (int) $row['quantity'];
+                $newPrice = (int) $row['price'];
+                $deltaQty = $newQty - (int) $item->quantity;
+
+                if ($deltaQty !== 0) {
+                    WarehouseStockService::change($centralWarehouseId, (int) $item->product_id, -$deltaQty);
+
+                    $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
+                    if ($product) {
+                        $product->update(['stock' => (int) $product->stock - $deltaQty]);
+                    }
+                }
+
+                $item->update([
+                    'quantity' => $newQty,
+                    'price' => $newPrice,
+                    'line_total' => $newQty * $newPrice,
+                ]);
+            }
+
+            $subtotal = (int) $invoice->items()->sum('line_total');
+            $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+            $invoice->update([
+                'subtotal' => $subtotal,
+                'total' => $total,
+            ]);
+        });
+
+        return redirect()->route('vouchers.sales.index')->with('success', '✅ آیتم‌های حواله فروش بروزرسانی شد.');
+    }
+
     public function sectionIndex(string $type)
     {
         $voucherType = $this->resolveSectionType($type);

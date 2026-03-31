@@ -92,6 +92,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->name('warehouse.outputs');
 
+    Route::get('/vouchers/sales', [VoucherController::class, 'salesIndex'])->name('vouchers.sales.index');
+    Route::get('/vouchers/sales/{uuid}/edit', [VoucherController::class, 'salesEdit'])->name('vouchers.sales.edit');
+    Route::put('/vouchers/sales/{uuid}', [VoucherController::class, 'salesUpdate'])->name('vouchers.sales.update');
+
     // Warehouses
     Route::get('/warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
     Route::get('/warehouses/{warehouse}/edit', [WarehouseController::class, 'edit'])->name('warehouses.edit');
