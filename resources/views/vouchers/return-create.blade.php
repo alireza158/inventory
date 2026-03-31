@@ -208,60 +208,31 @@
                         </select>
                     </div>
 
-                    <div class="col-12">
-                        <div class="hint-box">
-                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <div>
-                                    <div class="fw-bold mb-1">فاکتور انتخاب‌شده</div>
-                                    <div class="muted" id="selectedInvoiceText">هنوز فاکتوری انتخاب نشده است.</div>
-                                </div>
-                                <div class="d-flex gap-2 flex-wrap">
-                                    <span class="chip">شناسه: <span class="mono" id="selectedInvoiceUuid">—</span></span>
-                                    <span class="chip">تاریخ: <span id="selectedInvoiceDate">—</span></span>
-                                    <span class="chip">جمع فاکتور: <span id="selectedInvoiceTotal">0</span> تومان</span>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="col-md-4">
+                        <label class="form-label">علت برگشت از فروش</label>
+                        <select name="return_reason" class="form-select" required>
+                            <option value="">انتخاب علت...</option>
+                            @foreach($returnReasons as $reasonKey => $reasonTitle)
+                                <option value="{{ $reasonKey }}" @selected(old('return_reason') === $reasonKey)>{{ $reasonTitle }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
-                    <div class="col-12" id="itemsSection" style="display:none;">
-                        <div class="info-card">
-                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                                <div>
-                                    <div class="fw-bold">کالاهای برگشتی</div>
-                                    <div class="muted">فقط از کالاهای همان فاکتور می‌توانی انتخاب کنی.</div>
-                                </div>
-
-                                <button type="button" class="btn btn-outline-primary btn-sm" id="addItemBtn" disabled>
-                                    + افزودن کالا
-                                </button>
-                            </div>
-
-                            <div class="table-responsive">
-                                <table class="table table-bordered align-middle line-table" id="itemsTable">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th style="width:34%">کالا</th>
-                                            <th style="width:20%">قیمت واحد</th>
-                                            <th style="width:16%">باقی‌مانده مجاز</th>
-                                            <th style="width:16%">تعداد برگشتی</th>
-                                            <th style="width:18%">جمع ردیف</th>
-                                            <th style="width:8%">عملیات</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </table>
-                            </div>
-
-                            <div class="line-total-box mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <div>
-                                    <div class="fw-bold">جمع مبلغ برگشت از فروش</div>
-                                    <div class="muted">بر اساس قیمت و تعداد کالاهای انتخاب‌شده</div>
-                                </div>
-                                <div class="fs-5 fw-bold">
-                                    <span id="returnGrandTotal">0</span> تومان
-                                </div>
-                            </div>
+                    <div class="col-12">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="itemsTable">
+                                <thead>
+                                <tr>
+                                    <th>محصول (جستجو با نام/کد)</th>
+                                    <th>تنوع/طرح</th>
+                                    <th>موجودی تنوع</th>
+                                    <th>حداکثر مجاز مرجوعی</th>
+                                    <th>تعداد برگشتی</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -331,162 +302,73 @@ const selectedInvoiceTotal = document.getElementById('selectedInvoiceTotal');
 const selectedInvoiceText = document.getElementById('selectedInvoiceText');
 const returnGrandTotal = document.getElementById('returnGrandTotal');
 
-const invoiceListWrap = document.getElementById('invoiceListWrap');
-const invoiceSearchInput = document.getElementById('invoiceSearchInput');
-const confirmInvoiceBtn = document.getElementById('confirmInvoiceBtn');
+let invoiceVariants = [];
 
-const invoiceModalEl = document.getElementById('invoicePickerModal');
-const invoiceModal = new bootstrap.Modal(invoiceModalEl);
-
-let customerInvoices = [];
-let selectedInvoice = null;
-let invoiceProducts = [];
-
-function toMoney(x) {
-    return Number(x || 0).toLocaleString('fa-IR');
-}
-
-function escapeHtml(str) {
-    return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-function resetInvoiceSelection() {
-    selectedInvoice = null;
-    invoiceProducts = [];
-    relatedInvoiceUuid.value = '';
-    selectedInvoiceUuid.textContent = '—';
-    selectedInvoiceDate.textContent = '—';
-    selectedInvoiceTotal.textContent = '0';
-    selectedInvoiceText.textContent = 'هنوز فاکتوری انتخاب نشده است.';
-    tbody.innerHTML = '';
-    addItemBtn.disabled = true;
-    itemsSection.style.display = 'none';
-    updateGrandTotal();
-}
-
-function updateGrandTotal() {
-    let total = 0;
-
-    tbody.querySelectorAll('tr').forEach(tr => {
-        const qty = Number(tr.querySelector('.qty-input')?.value || 0);
-        const price = Number(tr.querySelector('.price-raw')?.value || 0);
-        total += qty * price;
+function productOptions(selected='') {
+    const uniq = new Map();
+    invoiceVariants.forEach(v => {
+        const k = String(v.product_id);
+        if (!uniq.has(k)) uniq.set(k, v);
     });
-
-    returnGrandTotal.textContent = toMoney(total);
+    return '<option value="">انتخاب محصول...</option>' + Array.from(uniq.values()).map(p =>
+        `<option value="${p.product_id}" ${String(selected)===String(p.product_id)?'selected':''}>${p.name} ${p.product_code ? '('+p.product_code+')' : ''}</option>`
+    ).join('');
 }
 
-function rowTemplate(index) {
-    const options = invoiceProducts
-        .filter(p => Number(p.remaining_qty || 0) > 0)
-        .map(p => {
-            const label = `${p.name} | قیمت: ${toMoney(p.price || 0)} | باقی‌مانده: ${p.remaining_qty}`;
-            return `<option value="${p.product_id}" data-price="${p.price || 0}" data-max="${p.remaining_qty}">${escapeHtml(label)}</option>`;
-        })
-        .join('');
-
-    return `
-        <tr>
-            <td>
-                <select name="items[${index}][product_id]" class="form-select product-select" required>
-                    <option value="">انتخاب کالا...</option>
-                    ${options}
-                </select>
-            </td>
-
-            <td>
-                <input type="text" class="form-control price-view" readonly value="0">
-                <input type="hidden" name="items[${index}][price]" class="price-raw" value="0">
-            </td>
-
-            <td>
-                <input type="text" class="form-control max-view" readonly value="0">
-            </td>
-
-            <td>
-                <input type="number" min="1" name="items[${index}][quantity]" class="form-control qty-input" required>
-            </td>
-
-            <td>
-                <input type="text" class="form-control line-total-view" readonly value="0">
-            </td>
-
-            <td class="text-center">
-                <button type="button" class="btn btn-sm btn-outline-danger remove-row-btn">حذف</button>
-            </td>
-        </tr>
-    `;
+function variantOptions(productId, selected='') {
+    if (!productId) return '<option value="">ابتدا محصول را انتخاب کنید...</option>';
+    const rows = invoiceVariants.filter(v => String(v.product_id)===String(productId) && Number(v.remaining_qty||0) > 0);
+    if (!rows.length) return '<option value="">تنوع مجازی باقی نمانده</option>';
+    return '<option value="">انتخاب تنوع...</option>' + rows.map(v =>
+        `<option value="${v.variant_id}" data-max="${v.remaining_qty}" data-stock="${v.variant_stock || 0}" ${String(selected)===String(v.variant_id)?'selected':''}>${v.variant_name || 'بدون نام'} ${v.variant_code ? '['+v.variant_code+']' : ''}</option>`
+    ).join('');
 }
 
-function refreshRowIndexes() {
-    tbody.querySelectorAll('tr').forEach((tr, index) => {
-        const productSelect = tr.querySelector('.product-select');
-        const qtyInput = tr.querySelector('.qty-input');
-        const priceRaw = tr.querySelector('.price-raw');
-
-        if (productSelect) productSelect.name = `items[${index}][product_id]`;
-        if (qtyInput) qtyInput.name = `items[${index}][quantity]`;
-        if (priceRaw) priceRaw.name = `items[${index}][price]`;
-    });
+function itemRow(i){
+    return `<tr>
+        <td><select name="items[${i}][product_id]" class="form-select product-select" required>${productOptions()}</select></td>
+        <td>
+          <select name="items[${i}][variant_id]" class="form-select variant-select" required>
+            <option value="">ابتدا محصول را انتخاب کنید...</option>
+          </select>
+        </td>
+        <td><span class="badge text-bg-light stock-badge">—</span></td>
+        <td><span class="badge text-bg-light max-badge">—</span></td>
+        <td><input type="number" min="1" name="items[${i}][quantity]" class="form-control qty" required></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td>
+      </tr>`;
 }
 
-function bindRow(tr) {
+function bindRow(tr){
     const productSelect = tr.querySelector('.product-select');
-    const qtyInput = tr.querySelector('.qty-input');
-    const priceView = tr.querySelector('.price-view');
-    const priceRaw = tr.querySelector('.price-raw');
-    const maxView = tr.querySelector('.max-view');
-    const lineTotalView = tr.querySelector('.line-total-view');
+    const variantSelect = tr.querySelector('.variant-select');
+    const qtyInput = tr.querySelector('.qty');
+    const stockBadge = tr.querySelector('.stock-badge');
+    const maxBadge = tr.querySelector('.max-badge');
 
-    function syncRow() {
-        const selected = productSelect.selectedOptions[0];
-        const price = Number(selected?.dataset.price || 0);
-        const max = Number(selected?.dataset.max || 0);
-
-        priceRaw.value = String(price);
-        priceView.value = toMoney(price);
-        maxView.value = toMoney(max);
-
+    const syncMax = () => {
+        const opt = variantSelect.selectedOptions[0];
+        const max = Number(opt?.dataset.max || 0);
+        const stock = Number(opt?.dataset.stock || 0);
+        stockBadge.textContent = stock > 0 ? stock.toLocaleString('fa-IR') : '۰';
         if (max > 0) {
             qtyInput.max = String(max);
-            if (!qtyInput.value || Number(qtyInput.value) < 1) qtyInput.value = '1';
-            if (Number(qtyInput.value) > max) qtyInput.value = String(max);
+            if (Number(qtyInput.value || 0) > max) qtyInput.value = String(max);
+            maxBadge.textContent = max.toLocaleString('fa-IR');
         } else {
             qtyInput.value = '';
             qtyInput.removeAttribute('max');
+            maxBadge.textContent = '—';
         }
+    };
 
-        const lineTotal = (Number(qtyInput.value || 0) * price);
-        lineTotalView.value = toMoney(lineTotal);
-
-        updateGrandTotal();
-    }
-
-    productSelect.addEventListener('change', syncRow);
-
-    qtyInput.addEventListener('input', function () {
-        const max = Number(productSelect.selectedOptions[0]?.dataset.max || 0);
-        if (max > 0 && Number(qtyInput.value || 0) > max) {
-            qtyInput.value = String(max);
-        }
-        if (Number(qtyInput.value || 0) < 1 && qtyInput.value !== '') {
-            qtyInput.value = '1';
-        }
-        syncRow();
+    productSelect.addEventListener('change', () => {
+        variantSelect.innerHTML = variantOptions(productSelect.value, '');
+        qtyInput.value = '';
+        syncMax();
     });
-
-    tr.querySelector('.remove-row-btn').addEventListener('click', function () {
-        tr.remove();
-        refreshRowIndexes();
-        updateGrandTotal();
-    });
-
-    syncRow();
+    variantSelect.addEventListener('change', syncMax);
+    qtyInput.addEventListener('input', syncMax);
 }
 
 function addRow(prefill = null) {
@@ -604,7 +486,8 @@ async function loadInvoiceProducts(uuid) {
     }
 
     const payload = await res.json();
-    invoiceProducts = payload.products || [];
+    invoiceVariants = payload.products || [];
+    addItemBtn.disabled = invoiceVariants.length === 0;
     tbody.innerHTML = '';
     addItemBtn.disabled = invoiceProducts.filter(p => Number(p.remaining_qty || 0) > 0).length === 0;
     itemsSection.style.display = 'block';
@@ -647,12 +530,13 @@ confirmInvoiceBtn.addEventListener('click', async function () {
     await loadInvoiceProducts(selectedInvoice.uuid);
 });
 
-addItemBtn.addEventListener('click', function () {
-    addRow();
+addItemBtn.addEventListener('click', () => {
+    tbody.insertAdjacentHTML('beforeend', itemRow(tbody.querySelectorAll('tr').length));
+    bindRow(tbody.querySelector('tr:last-child'));
 });
 
-returnForm.addEventListener('submit', function () {
-    const btn = document.getElementById('submitBtn');
+returnForm.addEventListener('submit', () => {
+    const btn = returnForm.querySelector('button[type="submit"]');
     if (btn) {
         btn.disabled = true;
         btn.textContent = 'در حال ثبت...';

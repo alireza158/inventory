@@ -1,8 +1,8 @@
 @extends('layouts.app')
 
 @php
-$categoriesJson = $categories->map(fn($c) => ['id'=>$c->id,'name'=>$c->name,'parent_id'=>$c->parent_id])->values();
-$productsJson = $products->map(fn($p) => ['id'=>$p->id,'name'=>$p->name,'sku'=>$p->sku,'category_id'=>$p->category_id])->values();
+$productsJson = $products->map(fn($p) => ['id'=>$p->id,'name'=>$p->name,'code'=>$p->code ?? $p->sku,'category_id'=>$p->category_id])->values();
+$variantsJson = $variants->map(fn($v) => ['id'=>$v->id,'product_id'=>$v->product_id,'name'=>$v->variant_name,'code'=>$v->variant_code,'stock'=>(int)$v->stock])->values();
 @endphp
 
 @section('content')
@@ -22,19 +22,22 @@ $productsJson = $products->map(fn($p) => ['id'=>$p->id,'name'=>$p->name,'sku'=>$
                 <div class="col-md-4"><label class="form-label">نام تحویل‌گیرنده (اختیاری)</label><input name="beneficiary_name" class="form-control" value="{{ old('beneficiary_name') }}"></div>
                 <div class="col-md-6"><label class="form-label">شماره حواله (اختیاری)</label><input name="reference" class="form-control" value="{{ old('reference') }}"></div>
                 <div class="col-md-6"><label class="form-label">توضیحات (اختیاری)</label><input name="note" class="form-control" value="{{ old('note') }}"></div>
-                <div class="col-12"><table class="table" id="itemsTable"><thead><tr><th>سردسته</th><th>دسته‌بندی</th><th>کالا</th><th>تعداد</th><th>کد اموال ۴ رقمی</th><th></th></tr></thead><tbody></tbody></table><button type="button" class="btn btn-outline-secondary btn-sm" id="addItemBtn">+ افزودن ردیف</button></div>
+
+                <div class="col-12">
+                    <table class="table" id="itemsTable"><thead><tr><th>محصول (جستجو با نام/کد)</th><th>تنوع/طرح</th><th>موجودی تنوع</th><th>تعداد</th><th>کد اموال ۴ رقمی</th><th></th></tr></thead><tbody></tbody></table>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addItemBtn">+ افزودن ردیف</button>
+                </div>
                 <div class="col-12"><button class="btn btn-primary">ثبت حواله پرسنل</button></div>
             </div>
         </form>
     </div></div>
 </div>
 <script>
-const categories=@json($categoriesJson),products=@json($productsJson),tbody=document.querySelector('#itemsTable tbody'),addBtn=document.getElementById('addItemBtn');
-function ro(s=''){const r=categories.filter(c=>!c.parent_id);return `<option value="">انتخاب...</option>`+r.map(c=>`<option value="${c.id}" ${String(c.id)===String(s)?'selected':''}>${c.name}</option>`).join('')}
-function co(pid,s=''){const c=categories.filter(x=>String(x.parent_id||'')===String(pid||''));return `<option value="">انتخاب...</option>`+c.map(x=>`<option value="${x.id}" ${String(x.id)===String(s)?'selected':''}>${x.name}</option>`).join('')}
-function po(cid,s=''){const p=products.filter(x=>String(x.category_id)===String(cid||''));return `<option value="">انتخاب...</option>`+p.map(x=>`<option value="${x.id}" ${String(x.id)===String(s)?'selected':''}>${x.name}</option>`).join('')}
-function row(i){return `<tr><td><select class="form-select root" required>${ro()}</select></td><td><select name="items[${i}][category_id]" class="form-select cat" required><option value="">انتخاب...</option></select></td><td><select name="items[${i}][product_id]" class="form-select prod" required><option value="">انتخاب...</option></select></td><td><input name="items[${i}][quantity]" type="number" min="1" value="1" class="form-control" required></td><td><input name="items[${i}][personnel_asset_code]" class="form-control" pattern="\d{4}" maxlength="4"></td><td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td></tr>`}
-function bind(){tbody.querySelectorAll('.root').forEach(el=>{if(el.dataset.b)return;el.dataset.b=1;el.addEventListener('change',e=>{const tr=e.target.closest('tr');tr.querySelector('.cat').innerHTML=co(e.target.value);tr.querySelector('.prod').innerHTML='<option value="">انتخاب...</option>';});});tbody.querySelectorAll('.cat').forEach(el=>{if(el.dataset.b)return;el.dataset.b=1;el.addEventListener('change',e=>{const tr=e.target.closest('tr');tr.querySelector('.prod').innerHTML=po(e.target.value);});});}
-addBtn.addEventListener('click',()=>{tbody.insertAdjacentHTML('beforeend',row(tbody.querySelectorAll('tr').length));bind();}); addBtn.click();
+const products=@json($productsJson),variants=@json($variantsJson),tbody=document.querySelector('#itemsTable tbody'),addBtn=document.getElementById('addItemBtn');
+function po(s=''){return '<option value="">انتخاب محصول...</option>'+products.map(p=>`<option value="${p.id}" ${String(s)===String(p.id)?'selected':''}>${p.name} ${p.code? '('+p.code+')':''}</option>`).join('')}
+function vo(pid,s=''){if(!pid)return '<option value="">ابتدا محصول...</option>';const rows=variants.filter(v=>String(v.product_id)===String(pid));return '<option value="">انتخاب تنوع...</option>'+rows.map(v=>`<option value="${v.id}" data-stock="${v.stock}" ${String(s)===String(v.id)?'selected':''}>${v.name||'بدون نام'} ${v.code? '['+v.code+']':''}</option>`).join('')}
+function row(i){return `<tr><td><select name="items[${i}][product_id]" class="form-select p" required>${po()}</select><input type="hidden" name="items[${i}][category_id]" class="cat-hidden"></td><td><select name="items[${i}][variant_id]" class="form-select v" required><option value="">ابتدا محصول...</option></select></td><td><span class="badge text-bg-light st">—</span></td><td><input name="items[${i}][quantity]" type="number" min="1" class="form-control q" required></td><td><input name="items[${i}][personnel_asset_code]" class="form-control" pattern="\d{4}" maxlength="4"></td><td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td></tr>`}
+function bind(tr){const p=tr.querySelector('.p'),v=tr.querySelector('.v'),q=tr.querySelector('.q'),st=tr.querySelector('.st'),cat=tr.querySelector('.cat-hidden');const sync=()=>{const opt=v.selectedOptions[0];const s=Number(opt?.dataset.stock||0);if(s>0){q.max=String(s);if(Number(q.value||0)>s)q.value=String(s);st.textContent=s.toLocaleString('fa-IR');}else{q.removeAttribute('max');st.textContent='—';}const prod=products.find(x=>String(x.id)===String(p.value));cat.value=prod?String(prod.category_id||''):'';};p.addEventListener('change',()=>{v.innerHTML=vo(p.value);q.value='';sync();});v.addEventListener('change',sync);q.addEventListener('input',sync);}
+addBtn.addEventListener('click',()=>{tbody.insertAdjacentHTML('beforeend',row(tbody.querySelectorAll('tr').length));bind(tbody.querySelector('tr:last-child'));});addBtn.click();
 </script>
 @endsection
