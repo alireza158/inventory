@@ -296,17 +296,40 @@ class VoucherController extends Controller
     {
         $categories = Category::orderBy('name')->get();
         $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
-        $variants = ProductVariant::query()->orderBy('variant_name')->get(['id', 'product_id', 'variant_name', 'variant_code', 'stock']);
+        $variants = ProductVariant::query()
+            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
+            ->orderBy('product_variants.variant_name')
+            ->get([
+                'product_variants.id',
+                'product_variants.product_id',
+                'product_variants.variant_name',
+                'product_variants.variant_code',
+                'product_variants.variety_code',
+                'product_variants.stock',
+                'model_lists.model_name as model_name',
+            ]);
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+        $warehouses = $this->selectableWarehouses()->where('type', '!=', 'personnel')->values();
 
-        return view('vouchers.scrap.create', compact('categories', 'products', 'variants', 'centralWarehouseId'));
+        return view('vouchers.scrap.create', compact('categories', 'products', 'variants', 'centralWarehouseId', 'warehouses'));
     }
 
     private function personnelCreate()
     {
         $categories = Category::orderBy('name')->get();
         $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
-        $variants = ProductVariant::query()->orderBy('variant_name')->get(['id', 'product_id', 'variant_name', 'variant_code', 'stock']);
+        $variants = ProductVariant::query()
+            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
+            ->orderBy('product_variants.variant_name')
+            ->get([
+                'product_variants.id',
+                'product_variants.product_id',
+                'product_variants.variant_name',
+                'product_variants.variant_code',
+                'product_variants.variety_code',
+                'product_variants.stock',
+                'model_lists.model_name as model_name',
+            ]);
         $warehouses = $this->selectableWarehouses();
         $fromWarehouses = $warehouses->where('type', '!=', 'personnel')->values();
         $personnelWarehouses = $warehouses->where('type', 'personnel')->whereNotNull('parent_id')->values();
@@ -318,7 +341,18 @@ class VoucherController extends Controller
     {
         $categories = Category::orderBy('name')->get();
         $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
-        $variants = ProductVariant::query()->orderBy('variant_name')->get(['id', 'product_id', 'variant_name', 'variant_code', 'stock']);
+        $variants = ProductVariant::query()
+            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
+            ->orderBy('product_variants.variant_name')
+            ->get([
+                'product_variants.id',
+                'product_variants.product_id',
+                'product_variants.variant_name',
+                'product_variants.variant_code',
+                'product_variants.variety_code',
+                'product_variants.stock',
+                'model_lists.model_name as model_name',
+            ]);
         $warehouses = $this->selectableWarehouses()->where('type', '!=', 'personnel')->values();
 
         return view('vouchers.transfer.create', compact('categories', 'products', 'variants', 'warehouses'));
