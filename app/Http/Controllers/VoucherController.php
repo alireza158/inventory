@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
@@ -350,6 +351,103 @@ class VoucherController extends Controller
         });
 
         return redirect()->route('vouchers.section.index', 'return-from-sale')->with('success', 'برگشت از فروش ثبت شد.');
+    }
+
+
+    public function saleDeliveryIndex(Request $request)
+    {
+        $q = trim((string) $request->get('q', ''));
+
+        $invoices = Invoice::query()
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($qq) use ($q) {
+                    $qq->where('uuid', 'like', "%{$q}%")
+                        ->orWhere('customer_name', 'like', "%{$q}%")
+                        ->orWhere('customer_mobile', 'like', "%{$q}%");
+                });
+            })
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('vouchers.sale-delivery.index', compact('invoices', 'q'));
+    }
+
+    public function saleDeliveryEdit(string $uuid)
+    {
+        $invoice = Invoice::query()->with(['items.product', 'items.variant'])->where('uuid', $uuid)->firstOrFail();
+
+        return view('vouchers.sale-delivery.edit', compact('invoice'));
+    }
+
+    public function saleDeliveryUpdate(string $uuid, Request $request)
+    {
+        $invoice = Invoice::query()->with(['items.product'])->where('uuid', $uuid)->firstOrFail();
+
+        $data = $request->validate([
+            'status' => ['required', 'in:warehouse_pending,warehouse_collecting,warehouse_checking,warehouse_packing,warehouse_sent,canceled'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'integer', 'exists:invoice_items,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.price' => ['required', 'integer', 'min:0'],
+        ]);
+
+        DB::transaction(function () use ($invoice, $data) {
+            $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+            $map = collect($data['items'])->keyBy(fn ($it) => (int) $it['id']);
+
+            foreach ($invoice->items as $item) {
+                $payload = $map[(int) $item->id] ?? null;
+                if (!$payload) {
+                    continue;
+                }
+
+                $oldQty = (int) $item->quantity;
+                $newQty = (int) $payload['quantity'];
+                $delta = $newQty - $oldQty;
+
+                if ($delta !== 0) {
+                    WarehouseStockService::change($centralWarehouseId, (int) $item->product_id, -$delta);
+
+                    $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
+                    if ($product) {
+                        $before = (int) $product->stock;
+                        $after = $before - $delta;
+                        $product->update(['stock' => $after]);
+
+                        StockMovement::create([
+                            'product_id' => $product->id,
+                            'user_id' => auth()->id(),
+                            'type' => $delta > 0 ? 'out' : 'in',
+                            'reason' => 'sale_edit',
+                            'quantity' => abs($delta),
+                            'stock_before' => $before,
+                            'stock_after' => $after,
+                            'reference' => $invoice->uuid,
+                            'note' => 'اصلاح اقلام حواله فروش کالا',
+                        ]);
+                    }
+                }
+
+                $newPrice = (int) $payload['price'];
+                $item->update([
+                    'quantity' => $newQty,
+                    'price' => $newPrice,
+                    'line_total' => $newQty * $newPrice,
+                ]);
+            }
+
+            $subtotal = (int) $invoice->items()->sum('line_total');
+            $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+
+            $invoice->update([
+                'subtotal' => $subtotal,
+                'total' => $total,
+                'status' => $data['status'],
+            ]);
+        });
+
+        return redirect()->route('vouchers.sale-delivery.index')->with('success', 'حواله فروش کالا بروزرسانی شد.');
     }
 
     public function outputs(Request $request)
