@@ -10,7 +10,6 @@
         'customer_return' => 'حواله مرجوعی مشتری',
         'showroom' => 'حواله شوروم سالن',
         'personnel_asset' => 'حواله اموال پرسنل',
-        'sale' => 'حواله فروش کالا',
     ];
 
     $statusFa = fn($s) => match($s){
@@ -68,7 +67,6 @@
                         <option value="customer_return" @selected($voucherType === 'customer_return')>مرجوعی مشتری</option>
                         <option value="showroom" @selected($voucherType === 'showroom')>شوروم سالن</option>
                         <option value="personnel_asset" @selected($voucherType === 'personnel_asset')>اموال پرسنل</option>
-                        <option value="sale" @selected($voucherType === 'sale')>فروش کالا</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -83,7 +81,6 @@
         </div>
     </form>
 
-    @if($voucherType !== 'sale')
     <div class="card shadow-sm mb-3">
         <div class="card-body">
             <h6 class="mb-3">حواله‌های داخلی (بین انبار / ضایعات / مرجوعی مشتری / شوروم / اموال پرسنل)</h6>
@@ -143,66 +140,6 @@
             </div>
         </div>
     </div>
-    @endif
-
-    @if($voucherType === 'sale' || $voucherType === 'all')
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h6 class="mb-3">حواله فروش کالا (بر پایه فاکتور نهایی)</h6>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead>
-                            <tr>
-                                <th>کد فاکتور</th>
-                                <th>مشتری</th>
-                                <th>محصولات سفارش</th>
-                                <th>تاریخ ثبت سفارش</th>
-                                <th>وضعیت سفارش</th>
-                                <th class="text-end">عملیات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        @forelse($salesInvoices as $inv)
-                            <tr>
-                                <td class="text-muted">{{ $inv->uuid }}</td>
-                                <td>
-                                    <div>{{ $inv->customer_name ?: '—' }}</div>
-                                    <div class="small text-muted">{{ $inv->customer_mobile ?: '—' }}</div>
-                                </td>
-                                <td>
-                                    <ul class="mb-0 ps-3 small">
-                                        @foreach($inv->items as $it)
-                                            <li>{{ $it->product?->name ?? ('#'.$it->product_id) }} × {{ number_format((int)$it->quantity) }}</li>
-                                        @endforeach
-                                    </ul>
-                                </td>
-                                <td>{{ $inv->created_at?->format('Y/m/d H:i') }}</td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ $statusFa($inv->status) }}</span>
-                                </td>
-                                <td class="text-end">
-                                    <div class="btn-group btn-group-sm">
-                                    <a class="btn btn-outline-primary" href="{{ route('invoices.show', $inv->uuid) }}">مشاهده/وضعیت</a>
-                                    <a class="btn btn-outline-secondary" href="{{ route('invoices.edit', $inv->uuid) }}">ویرایش</a>
-                                    <a class="btn btn-outline-dark" target="_blank" href="{{ route('invoices.print', $inv->uuid) }}">چاپ</a>
-                                </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="text-center text-muted py-5">حواله فروشی یافت نشد.</td>
-                            </tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="p-3">
-                    {{ $salesInvoices->appends(request()->except('sales_page'))->links() }}
-                </div>
-            </div>
-        </div>
-    @endif
 
 </div>
 @endsection
