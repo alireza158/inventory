@@ -286,31 +286,17 @@
                       </div>
                     @endif
                   @elseif($canFinanceApprove)
-                    <form method="POST" action="{{ route('cheques.store', $p->id) }}" enctype="multipart/form-data" class="mt-2">
-                      @csrf
-                      <div class="row g-2">
-                        <div class="col-12">
-                          <input class="form-control" name="bank_name" placeholder="بانک">
-                        </div>
-                        <div class="col-12">
-                          <input class="form-control" name="cheque_number" placeholder="شماره چک">
-                        </div>
-
-                        {{-- اگر اینجا هم می‌خوای شمسی بشه، می‌تونیم مثل paid_at درست کنیم.
-                             فعلا میلادی گذاشتم تا بک‌اند اذیت نشه. --}}
-                        <div class="col-12">
-                          <input class="form-control" name="due_date" type="date">
-                        </div>
-
-                        <div class="col-12">
-                          <input class="form-control" name="image" type="file" accept="image/*">
-                        </div>
-
-                        <div class="col-12">
-                          <button class="btn btn-outline-primary btn-sm w-100">ثبت اطلاعات چک</button>
-                        </div>
-                      </div>
-                    </form>
+                    <button
+                      type="button"
+                      class="btn btn-outline-primary btn-sm mt-2"
+                      data-bs-toggle="modal"
+                      data-bs-target="#chequeModal"
+                      data-action="{{ route('cheques.store', $p->id) }}"
+                      data-payment="{{ number_format((int) $p->amount) }}"
+                      data-customer="{{ $invoice->customer_name }}"
+                    >
+                      ثبت اطلاعات چک
+                    </button>
                   @else
                     <div class="small text-muted mt-2">تکمیل اطلاعات چک فقط برای بخش مالی فعال است.</div>
                   @endif
@@ -350,7 +336,68 @@
     </div>
 
   </div>
+
 </div>
+
+@if($canFinanceApprove)
+<div class="modal fade" id="chequeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <form method="POST" id="chequeModalForm" action="#" enctype="multipart/form-data">
+        @csrf
+        <div class="modal-header">
+          <h5 class="modal-title">ثبت اطلاعات چک</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="border rounded-3 p-3 mb-3" style="background:linear-gradient(135deg,#f8f9fa,#eef7ff)">
+            <div class="d-flex justify-content-between align-items-center">
+              <strong>🧾 شِمای چک</strong>
+              <span class="badge bg-warning text-dark">پرداخت چکی</span>
+            </div>
+            <div class="row mt-3 g-2 small">
+              <div class="col-md-6">مشتری: <b id="cheque_customer">—</b></div>
+              <div class="col-md-6 text-md-end">مبلغ پرداخت: <b id="cheque_payment">—</b> تومان</div>
+              <div class="col-12"><div class="border-top mt-2 pt-2 text-muted">پس از ثبت، اطلاعات چک در لیست پرداخت‌ها نمایش داده می‌شود.</div></div>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">نام بانک</label>
+              <input class="form-control" name="bank_name" placeholder="مثال: ملی">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">شماره چک</label>
+              <input class="form-control" name="cheque_number" placeholder="شماره سریال چک">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">تاریخ سررسید</label>
+              <input class="form-control" name="due_date" type="date">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">وضعیت</label>
+              <select class="form-select" name="status">
+                <option value="pending">در انتظار وصول</option>
+                <option value="cleared">وصول شده</option>
+                <option value="bounced">برگشتی</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">تصویر چک</label>
+              <input class="form-control" name="image" type="file" accept="image/*">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
+          <button class="btn btn-primary">ثبت چک</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+@endif
 
 <script>
     (function(){
@@ -462,6 +509,26 @@
     if (form) {
       form.addEventListener('submit', syncPaidAt);
     }
+  })();
+</script>
+
+
+<script>
+  (function () {
+    const modal = document.getElementById('chequeModal');
+    const form = document.getElementById('chequeModalForm');
+    if (!modal || !form) return;
+
+    modal.addEventListener('show.bs.modal', function (event) {
+      const btn = event.relatedTarget;
+      if (!btn) return;
+
+      form.setAttribute('action', btn.getAttribute('data-action') || '#');
+      const paymentEl = document.getElementById('cheque_payment');
+      const customerEl = document.getElementById('cheque_customer');
+      if (paymentEl) paymentEl.textContent = btn.getAttribute('data-payment') || '—';
+      if (customerEl) customerEl.textContent = btn.getAttribute('data-customer') || '—';
+    });
   })();
 </script>
 
