@@ -19,8 +19,8 @@ class InvoiceController extends Controller
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('uuid', 'like', "%{$q}%")
-                       ->orWhere('customer_name', 'like', "%{$q}%")
-                       ->orWhere('customer_mobile', 'like', "%{$q}%");
+                        ->orWhere('customer_name', 'like', "%{$q}%")
+                        ->orWhere('customer_mobile', 'like', "%{$q}%");
                 });
             })
             ->orderByDesc('id')
@@ -30,6 +30,39 @@ class InvoiceController extends Controller
         return view('invoices.index', compact('invoices', 'q'));
     }
 
+    public function salesVouchers(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $status = trim((string) $request->query('status', ''));
+
+        $allowedStatuses = [
+            'warehouse_pending',
+            'warehouse_collecting',
+            'warehouse_checking',
+            'warehouse_packing',
+            'warehouse_sent',
+            'canceled',
+        ];
+
+        $invoices = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($qq) use ($q) {
+                    $qq->where('uuid', 'like', "%{$q}%")
+                        ->orWhere('customer_name', 'like', "%{$q}%")
+                        ->orWhere('customer_mobile', 'like', "%{$q}%");
+                });
+            })
+            ->when(in_array($status, $allowedStatuses, true), function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->whereIn('status', $allowedStatuses)
+            ->orderByDesc('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('vouchers.sales.index', compact('invoices', 'q', 'status'));
+    }
 
     public function edit(string $uuid)
     {
@@ -57,6 +90,7 @@ class InvoiceController extends Controller
 
         DB::transaction(function () use ($invoice, $data) {
             $subtotal = 0;
+
             foreach ($data['items'] as $row) {
                 $item = $invoice->items->firstWhere('id', (int) $row['id']);
                 if (!$item) {
@@ -64,11 +98,13 @@ class InvoiceController extends Controller
                 }
 
                 $lineTotal = (int) $row['quantity'] * (int) $row['price'];
+
                 $item->update([
                     'quantity' => (int) $row['quantity'],
                     'price' => (int) $row['price'],
                     'line_total' => $lineTotal,
                 ]);
+
                 $subtotal += $lineTotal;
             }
 
@@ -88,7 +124,10 @@ class InvoiceController extends Controller
 
     public function print(string $uuid)
     {
-        $invoice = Invoice::query()->with(['items.product', 'items.variant'])->where('uuid', $uuid)->firstOrFail();
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
 
         return view('invoices.print', compact('invoice'));
     }
@@ -97,8 +136,8 @@ class InvoiceController extends Controller
     {
         $invoice = Invoice::query()
             ->with([
-                'items.product',     // ✅ برای نمایش نام محصول
-                'items.variant',     // ✅ برای نمایش نام مدل/واریانت
+                'items.product',
+                'items.variant',
                 'payments.cheque',
                 'notes',
             ])
