@@ -11,7 +11,10 @@
 
 @section('content')
 <style>
-  .datepicker-container { z-index: 3000 !important; }
+  .datepicker-container,
+  .datepicker-plot-area {
+    z-index: 200000 !important;
+  }
 </style>
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -453,36 +456,6 @@
         paymentModalEl.style.display = 'none';
         paymentModalEl.classList.remove('show');
       }
-    });
-
-    paymentModalEl.addEventListener('hidden.bs.modal', function () {
-        stopDatepickerObserver();
-    });
-
-    document.getElementById('savePaymentBtn').addEventListener('click', function () {
-        paymentModalError.classList.add('d-none');
-        paymentModalError.textContent = '';
-
-        const payload = paymentTypeInput.value === 'cheque'
-            ? readChequePayment()
-            : readCashPayment();
-
-        if (payload.error) {
-            paymentModalError.textContent = payload.error;
-            paymentModalError.classList.remove('d-none');
-            return;
-        }
-
-        payments.push(payload);
-        renderPaymentsList();
-
-        if (paymentModal) {
-            paymentModal.hide();
-        } else {
-            paymentModalEl.style.display = 'none';
-            paymentModalEl.classList.remove('show');
-            stopDatepickerObserver();
-        }
     });
 
     renderPaymentsList();
