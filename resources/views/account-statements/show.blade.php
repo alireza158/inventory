@@ -29,6 +29,7 @@
                     <th>شرح</th>
                     <th>بدهکار</th>
                     <th>بستانکار</th>
+                    <th class="text-end">مشاهده/ویرایش</th>
                 </tr>
             </thead>
             <tbody>
@@ -36,6 +37,7 @@
                     @php
                         $invoice = $ledger->reference_type === \App\Models\Invoice::class ? ($invoices[$ledger->reference_id] ?? null) : null;
                         $payment = $ledger->reference_type === \App\Models\InvoicePayment::class ? ($payments[$ledger->reference_id] ?? null) : null;
+                        $relatedInvoice = $invoice ?: (($payment && !empty($payment->invoice_id)) ? ($invoices[$payment->invoice_id] ?? null) : null);
 
                         $description = $ledger->note ?: '—';
 
@@ -59,9 +61,20 @@
                         <td>{{ $description }}</td>
                         <td>{{ $ledger->type === 'debit' ? number_format((int) $ledger->amount) : '—' }}</td>
                         <td>{{ $ledger->type === 'credit' ? number_format((int) $ledger->amount) : '—' }}</td>
+                        <td class="text-end">
+                            @if($relatedInvoice)
+                                <div class="d-flex gap-2 justify-content-end flex-wrap">
+                                    <a href="{{ route('invoices.show', $relatedInvoice->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده فاکتور</a>
+                                    <a href="{{ route('invoices.edit', $relatedInvoice->uuid) }}" class="btn btn-sm btn-primary">ویرایش فاکتور</a>
+                                    <a href="{{ route('vouchers.sales.edit', $relatedInvoice->uuid) }}" class="btn btn-sm btn-outline-secondary">برگشت از فروش</a>
+                                </div>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="text-center py-4 text-muted">گردشی برای این شخص ثبت نشده است.</td></tr>
+                    <tr><td colspan="5" class="text-center py-4 text-muted">گردشی برای این شخص ثبت نشده است.</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -50,15 +50,20 @@ class AccountStatementController extends Controller
             ->unique()
             ->values();
 
-        $invoices = Invoice::query()
-            ->whereIn('id', $invoiceIds)
-            ->get(['id', 'uuid', 'total'])
-            ->keyBy('id');
-
         $payments = InvoicePayment::query()
             ->with('cheque')
             ->whereIn('id', $paymentIds)
             ->get(['id', 'invoice_id', 'method', 'amount', 'paid_at', 'payment_identifier', 'note'])
+            ->keyBy('id');
+
+        $relatedInvoiceIds = $invoiceIds
+            ->merge($payments->pluck('invoice_id')->filter()->unique()->values())
+            ->unique()
+            ->values();
+
+        $invoices = Invoice::query()
+            ->whereIn('id', $relatedInvoiceIds)
+            ->get(['id', 'uuid', 'total'])
             ->keyBy('id');
 
         $totalDebit = (int) CustomerLedger::query()
