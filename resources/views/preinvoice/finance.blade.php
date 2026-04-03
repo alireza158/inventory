@@ -430,6 +430,7 @@
         paymentModalError.classList.remove('d-none');
         return;
       }
+    });
 
       payments.push(payload);
       renderPaymentsList();
