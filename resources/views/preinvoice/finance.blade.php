@@ -153,6 +153,7 @@
     const rowsWrap = document.getElementById('paymentRows');
     const addBtn = document.getElementById('addPaymentRow');
     const guide = document.getElementById('paymentGuide');
+    const form = rowsWrap.closest('form');
 
     const rowTemplate = () => `
       <div class="border rounded p-3 payment-row bg-light-subtle">
@@ -171,7 +172,7 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">مبلغ</label>
-            <input type="number" min="1" class="form-control" data-field="amount" required>
+            <input type="text" inputmode="numeric" class="form-control money" data-field="amount" placeholder="مثلاً 10,000,000" required>
           </div>
           <div class="col-md-4">
             <label class="form-label">تاریخ پرداخت</label>
@@ -244,6 +245,16 @@
       });
       toggleChequeBox(newRow);
       reindexRows();
+
+      if (typeof initJalaliDatepickers === 'function') {
+        initJalaliDatepickers();
+      }
+    });
+
+    form.addEventListener('submit', () => {
+      rowsWrap.querySelectorAll('[data-field="amount"]').forEach((input) => {
+        input.value = (input.value || '').replace(/[^\d]/g, '');
+      });
     });
   })();
 </script>
