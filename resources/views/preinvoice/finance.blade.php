@@ -254,7 +254,6 @@
         <button type="button" class="btn btn-primary" id="savePaymentBtn">ثبت پرداخت</button>
       </div>
     </div>
-  </div>
 </div>
 
 <script>
@@ -458,6 +457,17 @@
         paymentModalEl.classList.remove('show');
       }
     });
-  })();
+
+    renderPaymentsList();
+
+    if (finalizeForm) {
+        finalizeForm.addEventListener('submit', function () {
+            if (finalizeBtn) {
+                finalizeBtn.disabled = true;
+                finalizeBtn.textContent = 'در حال ثبت...';
+            }
+        });
+    }
+})();
 </script>
 @endsection
