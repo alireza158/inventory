@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\AccountStatementController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\CustomerApiController;
@@ -166,6 +167,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/{uuid}/notes', [InvoiceNoteController::class, 'store'])->name('invoices.notes.store');
         Route::post('/payments/{payment}/cheque', [ChequeController::class, 'store'])->name('cheques.store');
     });
+
+    // Account statements (گردش حساب اشخاص)
+    Route::get('/account-statements', [AccountStatementController::class, 'index'])->name('account-statements.index');
+    Route::get('/account-statements/{customer}', [AccountStatementController::class, 'show'])->name('account-statements.show');
 
     // Activity logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
