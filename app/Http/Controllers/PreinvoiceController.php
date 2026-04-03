@@ -34,6 +34,7 @@ class PreinvoiceController extends Controller
     {
         $orders = PreinvoiceOrder::query()
             ->where('status', 'submitted_finance')
+            ->with(['creator:id,name'])
             ->orderByDesc('id')
             ->paginate(20);
 
@@ -276,10 +277,26 @@ class PreinvoiceController extends Controller
 
     public function finance(string $uuid)
     {
-        $order = PreinvoiceOrder::with('items.product', 'items.variant')->where('uuid', $uuid)->firstOrFail();
+        $order = PreinvoiceOrder::with(['items.product', 'items.variant', 'creator:id,name'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
         abort_if($order->status !== 'submitted_finance', 403);
 
-        return view('preinvoice.finance', compact('order'));
+        $customerDebt = 0;
+        $customerCredit = 0;
+
+        if (!empty($order->customer_id)) {
+            $customer = Customer::query()
+                ->withBalance()
+                ->find((int) $order->customer_id);
+
+            if ($customer) {
+                $customerDebt = (int) $customer->debt;
+                $customerCredit = (int) $customer->credit;
+            }
+        }
+
+        return view('preinvoice.finance', compact('order', 'customerDebt', 'customerCredit'));
     }
 
     public function finalize(string $uuid, Request $request)
