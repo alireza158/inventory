@@ -251,7 +251,6 @@
         <button type="button" class="btn btn-primary" id="savePaymentBtn">ثبت پرداخت</button>
       </div>
     </div>
-  </div>
 </div>
 
 <script>
@@ -455,6 +454,47 @@
         paymentModalEl.classList.remove('show');
       }
     });
-  })();
+
+    paymentModalEl.addEventListener('hidden.bs.modal', function () {
+        stopDatepickerObserver();
+    });
+
+    document.getElementById('savePaymentBtn').addEventListener('click', function () {
+        paymentModalError.classList.add('d-none');
+        paymentModalError.textContent = '';
+
+        const payload = paymentTypeInput.value === 'cheque'
+            ? readChequePayment()
+            : readCashPayment();
+
+        if (payload.error) {
+            paymentModalError.textContent = payload.error;
+            paymentModalError.classList.remove('d-none');
+            return;
+        }
+
+        payments.push(payload);
+        renderPaymentsList();
+
+        if (paymentModal) {
+            paymentModal.hide();
+        } else {
+            paymentModalEl.style.display = 'none';
+            paymentModalEl.classList.remove('show');
+            stopDatepickerObserver();
+        }
+    });
+
+    renderPaymentsList();
+
+    if (finalizeForm) {
+        finalizeForm.addEventListener('submit', function () {
+            if (finalizeBtn) {
+                finalizeBtn.disabled = true;
+                finalizeBtn.textContent = 'در حال ثبت...';
+            }
+        });
+    }
+})();
 </script>
 @endsection
