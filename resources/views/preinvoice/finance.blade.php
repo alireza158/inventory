@@ -458,6 +458,18 @@
         paymentModalEl.classList.remove('show');
       }
     });
-  })();
+
+    renderPaymentsList();
+    initDatepickersSafe();
+
+    if (finalizeForm) {
+        finalizeForm.addEventListener('submit', function () {
+            if (finalizeBtn) {
+                finalizeBtn.disabled = true;
+                finalizeBtn.textContent = 'در حال ثبت...';
+            }
+        });
+    }
+})();
 </script>
 @endsection
