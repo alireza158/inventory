@@ -1,9 +1,18 @@
 @extends('layouts.app')
 
+@php
+  use Morilog\Jalali\Jalalian;
+
+  $subtotal = $order->items->sum(fn ($it) => ((int) $it->price) * ((int) $it->quantity));
+  $shipping = (int) $order->shipping_price;
+  $discount = (int) $order->discount_amount;
+  $grandTotal = max($subtotal + $shipping - $discount, 0);
+@endphp
+
 @section('content')
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0">✅ تایید مالی پیش‌فاکتور</h4>
+    <h4 class="mb-0">✅ مشاهده و تایید مالی پیش‌فاکتور</h4>
     <a href="{{ route('preinvoice.draft.index') }}" class="btn btn-outline-secondary">بازگشت به صف مالی</a>
   </div>
 
@@ -17,123 +26,226 @@
     </div>
   @endif
 
-  <div class="card mb-3">
+  <div class="card mb-3 shadow-sm border-0">
     <div class="card-body">
-      <div class="row g-2">
-        <div class="col-md-3"><b>کد:</b> {{ $order->uuid }}</div>
-        <div class="col-md-3"><b>مشتری:</b> {{ $order->customer_name }}</div>
-        <div class="col-md-3"><b>موبایل:</b> {{ $order->customer_mobile }}</div>
-        <div class="col-md-3"><b>جمع کل:</b> {{ number_format((int) $order->total_price) }} تومان</div>
+      <div class="row g-3">
+        <div class="col-md-3 col-sm-6">
+          <div class="text-muted small mb-1">کد پیش‌فاکتور</div>
+          <div class="fw-semibold">{{ $order->uuid }}</div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div class="text-muted small mb-1">تاریخ ثبت پیش‌فاکتور</div>
+          <div class="fw-semibold">{{ $order->created_at ? Jalalian::fromDateTime($order->created_at)->format('Y/m/d H:i') : '—' }}</div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div class="text-muted small mb-1">مشتری</div>
+          <div class="fw-semibold">{{ $order->customer_name ?: '—' }}</div>
+          <small class="text-muted">{{ $order->customer_mobile ?: 'شماره تماس ثبت نشده' }}</small>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div class="text-muted small mb-1">ثبت‌شده توسط</div>
+          <div class="fw-semibold">{{ $order->creator?->name ?? '—' }}</div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div class="text-muted small mb-1">وضعیت حساب مشتری</div>
+          <div class="fw-semibold {{ $customerBalanceStatus === 'بدهکار' ? 'text-danger' : ($customerBalanceStatus === 'بستانکار' ? 'text-success' : '') }}">
+            {{ $customerBalanceStatus }} {{ $customerBalanceStatus === 'تسویه' ? '' : number_format($customerBalanceAmount) . ' تومان' }}
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div class="text-muted small mb-1">وضعیت</div>
+          <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">در انتظار تایید مالی</span>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div class="text-muted small mb-1">جمع کل فاکتور</div>
+          <div class="fw-bold">{{ number_format($grandTotal) }} تومان</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="card mb-3">
-    <div class="card-header">اقلام پیش‌فاکتور</div>
-    <div class="table-responsive">
-      <table class="table mb-0">
-        <thead>
-          <tr>
-            <th>محصول</th>
-            <th>مدل</th>
-            <th>تعداد</th>
-            <th>قیمت</th>
-          </tr>
-        </thead>
-        <tbody>
-          @foreach($order->items as $it)
-            <tr>
-              <td>{{ $it->product?->name ?? ('#'.$it->product_id) }}</td>
-              <td>{{ $it->variant?->variant_name ?? '—' }}</td>
-              <td>{{ number_format((int) $it->quantity) }}</td>
-              <td>{{ number_format((int) $it->price) }}</td>
-            </tr>
-          @endforeach
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <form method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}" enctype="multipart/form-data" class="card">
+  <form method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}" enctype="multipart/form-data" class="card shadow-sm border-0">
     @csrf
-    <div class="card-header">ثبت واریزی / چک (اختیاری) قبل از تایید نهایی</div>
     <div class="card-body">
-      <div class="row g-2">
-        <div class="col-md-3">
-          <label class="form-label">روش پرداخت</label>
-          <select name="payment_method" id="payment_method" class="form-select">
-            <option value="">بدون پرداخت</option>
-            <option value="cash">نقدی</option>
-            <option value="card">واریزی/کارت</option>
-            <option value="cheque">چک</option>
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">مبلغ</label>
-          <input type="number" min="1" name="payment_amount" class="form-control" placeholder="مبلغ">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">تاریخ پرداخت</label>
-          <input type="date" name="payment_paid_at" class="form-control">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">فیش واریزی</label>
-          <input type="file" name="payment_receipt_image" class="form-control" accept="image/*">
-        </div>
-        <div class="col-12">
-          <label class="form-label">یادداشت پرداخت</label>
-          <textarea name="payment_note" class="form-control" rows="2"></textarea>
-        </div>
-      </div>
+      <div class="row g-3">
+        <div class="col-lg-5">
+          <div class="card border h-100">
+            <div class="card-header bg-white">
+              <h6 class="mb-0">ثبت فیش / چک مشتری (اصلی)</h6>
+              <small class="text-muted">می‌توانید چند ردیف پرداخت (نقدی و چک) ثبت کنید.</small>
+            </div>
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">لیست پرداخت‌های ثبت‌شده</h6>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="addPaymentRow">+ افزودن پرداخت</button>
+              </div>
 
-      <div class="mt-3" id="chequeActions" style="display:none;">
-        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#chequeModal">ثبت جزئیات چک</button>
-        <span class="text-muted small me-2">برای پرداخت چکی، جزئیات چک را در پاپ‌آپ ثبت کنید.</span>
+              <div id="paymentRows" class="d-grid gap-3"></div>
+              <div class="alert alert-light border mb-0 small text-muted" id="paymentGuide">
+                هنوز پرداختی اضافه نشده است. در صورت نیاز روی «افزودن پرداخت» بزنید.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-7">
+          <div class="card border h-100">
+            <div class="card-header bg-white">
+              <h6 class="mb-0">اقلام پیش‌فاکتور و خلاصه مالی</h6>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>محصول</th>
+                    <th>مدل</th>
+                    <th>تعداد</th>
+                    <th>مبلغ واحد</th>
+                    <th>جمع ردیف</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @foreach($order->items as $it)
+                    <tr>
+                      <td>{{ $it->product?->name ?? ('#'.$it->product_id) }}</td>
+                      <td>{{ $it->variant?->variant_name ?? '—' }}</td>
+                      <td>{{ number_format((int) $it->quantity) }}</td>
+                      <td>{{ number_format((int) $it->price) }}</td>
+                      <td>{{ number_format(((int) $it->price) * ((int) $it->quantity)) }}</td>
+                    </tr>
+                  @endforeach
+                </tbody>
+              </table>
+            </div>
+            <div class="card-body border-top">
+              <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">جمع اقلام</span>
+                <strong>{{ number_format($subtotal) }} تومان</strong>
+              </div>
+              <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">هزینه ارسال</span>
+                <strong>{{ number_format($shipping) }} تومان</strong>
+              </div>
+              <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">تخفیف لحاظ شده</span>
+                <strong class="text-danger">- {{ number_format($discount) }} تومان</strong>
+              </div>
+              <hr>
+              <div class="d-flex justify-content-between">
+                <span class="fw-semibold">مبلغ نهایی فاکتور</span>
+                <strong class="fs-5">{{ number_format($grandTotal) }} تومان</strong>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="card-footer d-flex justify-content-end gap-2">
       <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-outline-secondary">ویرایش فاکتور</a>
-      <button class="btn btn-success" onclick="return confirm('تایید نهایی انجام شود؟ با تایید، فاکتور ساخته و به حواله انبار ارسال می‌شود.')">تایید نهایی مالی</button>
+      <button class="btn btn-success" onclick="return confirm('تاییدیه نهایی مالی ثبت شود؟ با این کار، پیش‌فاکتور به فاکتور تبدیل می‌شود و در صف حواله فروش انبار قرار می‌گیرد.')">تاییدیه نهایی پیش‌فاکتور از سمت مالی</button>
     </div>
-
-    <input type="hidden" name="cheque_bank_name" id="cheque_bank_name">
-    <input type="hidden" name="cheque_number" id="cheque_number">
-    <input type="hidden" name="cheque_due_date" id="cheque_due_date">
-    <input type="hidden" name="cheque_status" id="cheque_status" value="pending">
-    <input type="file" name="cheque_image" id="cheque_image" class="d-none">
   </form>
 </div>
 
-<div class="modal fade" id="chequeModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">شمای چک و ثبت اطلاعات</h5>
+        <h5 class="modal-title">افزودن پرداخت</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="border rounded p-3 mb-3 bg-light">
-          <div class="fw-bold">🧾 چک</div>
-          <div class="small text-muted">فیلدهای چک را تکمیل کنید.</div>
+        <div class="mb-3">
+          <label class="form-label">نوع پرداخت</label>
+          <select class="form-select" id="paymentTypeInput">
+            <option value="cash">نقدی</option>
+            <option value="cheque">چکی</option>
+          </select>
         </div>
-        <div class="row g-2">
-          <div class="col-12"><input class="form-control" id="cheque_bank_name_ui" placeholder="نام بانک"></div>
-          <div class="col-12"><input class="form-control" id="cheque_number_ui" placeholder="شماره چک"></div>
-          <div class="col-12"><input class="form-control" id="cheque_due_date_ui" type="date"></div>
-          <div class="col-12">
-            <select class="form-select" id="cheque_status_ui">
-              <option value="pending">در انتظار وصول</option>
-              <option value="cleared">وصول شده</option>
-              <option value="bounced">برگشتی</option>
-            </select>
+
+        <div id="cashFields">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">مبلغ</label>
+              <input type="text" inputmode="numeric" id="cashAmountInput" class="form-control money" placeholder="مثلاً 5,000,000">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">تاریخ پرداخت</label>
+              <input type="date" id="cashPaidAtInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">شناسه پرداخت</label>
+              <input type="text" id="cashIdentifierInput" class="form-control" placeholder="کارت به کارت / درگاه">
+            </div>
+            <div class="col-12">
+              <label class="form-label">توضیحات (الزامی)</label>
+              <textarea id="cashNoteInput" class="form-control" rows="2"></textarea>
+            </div>
           </div>
-          <div class="col-12"><input class="form-control" id="cheque_image_ui" type="file" accept="image/*"></div>
         </div>
+
+        <div id="chequeFields" class="d-none">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">شماره چک</label>
+              <input type="text" id="chequeNumberInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">مبلغ چک</label>
+              <input type="text" inputmode="numeric" id="chequeAmountInput" class="form-control money">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">وضعیت</label>
+              <select id="chequeStatusInput" class="form-select">
+                <option value="pending">در انتظار وصول</option>
+                <option value="cleared">وصول شده</option>
+                <option value="bounced">برگشتی</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">تاریخ سررسید</label>
+              <input type="date" id="chequeDueDateInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">تاریخ دریافت چک</label>
+              <input type="date" id="chequeReceivedAtInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">نام مشتری</label>
+              <input type="text" id="chequeCustomerNameInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">شناسه / کد مشتری</label>
+              <input type="text" id="chequeCustomerCodeInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">نام بانک</label>
+              <input type="text" id="chequeBankNameInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">نام شعبه</label>
+              <input type="text" id="chequeBranchNameInput" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">شماره حساب / شبا (اختیاری)</label>
+              <input type="text" id="chequeAccountNumberInput" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">صاحب حساب / صادرکننده چک</label>
+              <input type="text" id="chequeAccountHolderInput" class="form-control">
+            </div>
+            <div class="col-12">
+              <label class="form-label">توضیحات (الزامی)</label>
+              <textarea id="chequeNoteInput" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div id="paymentModalError" class="alert alert-danger mt-3 d-none"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
-        <button type="button" class="btn btn-primary" id="saveCheque">ذخیره اطلاعات چک</button>
+        <button type="button" class="btn btn-primary" id="savePaymentBtn">ثبت پرداخت</button>
       </div>
     </div>
   </div>
@@ -141,30 +253,201 @@
 
 <script>
   (function () {
-    const method = document.getElementById('payment_method');
-    const chequeActions = document.getElementById('chequeActions');
-    function toggleCheque() {
-      chequeActions.style.display = method.value === 'cheque' ? 'block' : 'none';
+    const rowsWrap = document.getElementById('paymentRows');
+    const addBtn = document.getElementById('addPaymentRow');
+    const guide = document.getElementById('paymentGuide');
+    if (!rowsWrap || !addBtn || !guide) return;
+
+    const form = rowsWrap.closest('form');
+    const paymentModalEl = document.getElementById('paymentModal');
+    const paymentModal = window.bootstrap?.Modal
+      ? window.bootstrap.Modal.getOrCreateInstance(paymentModalEl)
+      : null;
+    const paymentTypeInput = document.getElementById('paymentTypeInput');
+    const paymentModalError = document.getElementById('paymentModalError');
+    const payments = [];
+
+    function normalizeAmount(value) {
+      return (value || '').toString().replace(/[^\d]/g, '');
     }
-    method.addEventListener('change', toggleCheque);
-    toggleCheque();
 
-    document.getElementById('saveCheque').addEventListener('click', function () {
-      document.getElementById('cheque_bank_name').value = document.getElementById('cheque_bank_name_ui').value;
-      document.getElementById('cheque_number').value = document.getElementById('cheque_number_ui').value;
-      document.getElementById('cheque_due_date').value = document.getElementById('cheque_due_date_ui').value;
-      document.getElementById('cheque_status').value = document.getElementById('cheque_status_ui').value;
+    function div(a, b) { return ~~(a / b); }
+    function pad(v) { return String(v).padStart(2, '0'); }
+    function jalaliToGregorian(jy, jm, jd) {
+      jy += 1595;
+      let days = -355668 + (365 * jy) + div(jy, 33) * 8 + div((jy % 33) + 3, 4) + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+      let gy = 400 * div(days, 146097);
+      days %= 146097;
+      if (days > 36524) {
+        gy += 100 * div(--days, 36524);
+        days %= 36524;
+        if (days >= 365) days++;
+      }
+      gy += 4 * div(days, 1461);
+      days %= 1461;
+      if (days > 365) {
+        gy += div(days - 1, 365);
+        days = (days - 1) % 365;
+      }
+      let gd = days + 1;
+      const sal_a = [0,31,((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+      let gm = 0;
+      for (gm = 1; gm <= 12 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
+      return `${gy}-${pad(gm)}-${pad(gd)}`;
+    }
+    function normalizeDate(value) {
+      const raw = (value || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+      const m = raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+      if (!m) return '';
+      return jalaliToGregorian(Number(m[1]), Number(m[2]), Number(m[3]));
+    }
 
-      const uiFile = document.getElementById('cheque_image_ui');
-      const hiddenFile = document.getElementById('cheque_image');
-      if (uiFile.files.length > 0) {
-        const dt = new DataTransfer();
-        dt.items.add(uiFile.files[0]);
-        hiddenFile.files = dt.files;
+    function togglePaymentTypeFields() {
+      const isCheque = paymentTypeInput.value === 'cheque';
+      document.getElementById('cashFields').classList.toggle('d-none', isCheque);
+      document.getElementById('chequeFields').classList.toggle('d-none', !isCheque);
+    }
+
+    function buildHiddenInput(name, value) {
+      return `<input type="hidden" name="${name}" value="${String(value ?? '').replace(/"/g, '&quot;')}">`;
+    }
+
+    function renderPaymentsList() {
+      if (payments.length === 0) {
+        rowsWrap.innerHTML = '';
+        guide.classList.remove('d-none');
+        return;
       }
 
-      const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('chequeModal'));
-      modal.hide();
+      guide.classList.add('d-none');
+      rowsWrap.innerHTML = payments.map((payment, idx) => {
+        const title = payment.method === 'cash'
+          ? `نقدی | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} تومان`
+          : `چک | شماره: ${payment.cheque_number} | مبلغ: ${Number(payment.cheque_amount || 0).toLocaleString('en-US')} تومان`;
+
+        const hiddenInputs = Object.entries(payment).map(([key, val]) => buildHiddenInput(`payments[${idx}][${key}]`, val)).join('');
+
+        return `
+          <div class="border rounded p-2 bg-light d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <div class="fw-semibold">${title}</div>
+              <small class="text-muted">${payment.note || '—'}</small>
+              ${hiddenInputs}
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger js-remove-payment" data-index="${idx}">حذف</button>
+          </div>
+        `;
+      }).join('');
+
+      rowsWrap.querySelectorAll('.js-remove-payment').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          payments.splice(Number(btn.dataset.index), 1);
+          renderPaymentsList();
+        });
+      });
+    }
+
+    function readCashPayment() {
+      const amount = normalizeAmount(document.getElementById('cashAmountInput').value);
+      const paidAt = normalizeDate(document.getElementById('cashPaidAtInput').value);
+      const note = (document.getElementById('cashNoteInput').value || '').trim();
+
+      if (!amount || !paidAt || !note) {
+        return { error: 'برای پرداخت نقدی، مبلغ، تاریخ پرداخت و توضیحات الزامی است.' };
+      }
+
+      return {
+        method: 'cash',
+        amount,
+        paid_at: paidAt,
+        payment_identifier: (document.getElementById('cashIdentifierInput').value || '').trim(),
+        note,
+      };
+    }
+
+    function readChequePayment() {
+      const payload = {
+        method: 'cheque',
+        amount: normalizeAmount(document.getElementById('chequeAmountInput').value),
+        paid_at: normalizeDate(document.getElementById('chequeReceivedAtInput').value),
+        note: (document.getElementById('chequeNoteInput').value || '').trim(),
+        cheque_number: (document.getElementById('chequeNumberInput').value || '').trim(),
+        cheque_amount: normalizeAmount(document.getElementById('chequeAmountInput').value),
+        cheque_due_date: normalizeDate(document.getElementById('chequeDueDateInput').value),
+        cheque_received_at: normalizeDate(document.getElementById('chequeReceivedAtInput').value),
+        cheque_customer_name: (document.getElementById('chequeCustomerNameInput').value || '').trim(),
+        cheque_customer_code: (document.getElementById('chequeCustomerCodeInput').value || '').trim(),
+        cheque_bank_name: (document.getElementById('chequeBankNameInput').value || '').trim(),
+        cheque_branch_name: (document.getElementById('chequeBranchNameInput').value || '').trim(),
+        cheque_account_number: (document.getElementById('chequeAccountNumberInput').value || '').trim(),
+        cheque_account_holder: (document.getElementById('chequeAccountHolderInput').value || '').trim(),
+        cheque_status: document.getElementById('chequeStatusInput').value || 'pending',
+      };
+
+      const requiredFields = [
+        payload.amount,
+        payload.paid_at,
+        payload.note,
+        payload.cheque_number,
+        payload.cheque_amount,
+        payload.cheque_due_date,
+        payload.cheque_received_at,
+        payload.cheque_customer_name,
+        payload.cheque_customer_code,
+        payload.cheque_bank_name,
+        payload.cheque_branch_name,
+        payload.cheque_account_holder,
+      ];
+
+      if (requiredFields.some((v) => !v)) {
+        return { error: 'برای ثبت چک، همه فیلدهای اصلی چک و توضیحات را تکمیل کنید.' };
+      }
+
+      return payload;
+    }
+
+    function clearModalFields() {
+      paymentModalEl.querySelectorAll('input, textarea').forEach((el) => el.value = '');
+      document.getElementById('chequeStatusInput').value = 'pending';
+      paymentModalError.classList.add('d-none');
+      paymentModalError.textContent = '';
+      paymentTypeInput.value = 'cash';
+      togglePaymentTypeFields();
+    }
+
+    addBtn.addEventListener('click', () => {
+      clearModalFields();
+      if (paymentModal) {
+        paymentModal.show();
+      } else {
+        paymentModalEl.style.display = 'block';
+        paymentModalEl.classList.add('show');
+      }
+      if (typeof initJalaliDatepickers === 'function') {
+        initJalaliDatepickers();
+      }
+    });
+
+    paymentTypeInput.addEventListener('change', togglePaymentTypeFields);
+
+    document.getElementById('savePaymentBtn').addEventListener('click', () => {
+      paymentModalError.classList.add('d-none');
+      let payload = paymentTypeInput.value === 'cheque' ? readChequePayment() : readCashPayment();
+      if (payload.error) {
+        paymentModalError.textContent = payload.error;
+        paymentModalError.classList.remove('d-none');
+        return;
+      }
+
+      payments.push(payload);
+      renderPaymentsList();
+      if (paymentModal) {
+        paymentModal.hide();
+      } else {
+        paymentModalEl.style.display = 'none';
+        paymentModalEl.classList.remove('show');
+      }
     });
   })();
 </script>
