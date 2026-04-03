@@ -256,9 +256,13 @@
     const rowsWrap = document.getElementById('paymentRows');
     const addBtn = document.getElementById('addPaymentRow');
     const guide = document.getElementById('paymentGuide');
+    if (!rowsWrap || !addBtn || !guide) return;
+
     const form = rowsWrap.closest('form');
     const paymentModalEl = document.getElementById('paymentModal');
-    const paymentModal = bootstrap.Modal.getOrCreateInstance(paymentModalEl);
+    const paymentModal = window.bootstrap?.Modal
+      ? window.bootstrap.Modal.getOrCreateInstance(paymentModalEl)
+      : null;
     const paymentTypeInput = document.getElementById('paymentTypeInput');
     const paymentModalError = document.getElementById('paymentModalError');
     const payments = [];
@@ -414,7 +418,12 @@
 
     addBtn.addEventListener('click', () => {
       clearModalFields();
-      paymentModal.show();
+      if (paymentModal) {
+        paymentModal.show();
+      } else {
+        paymentModalEl.style.display = 'block';
+        paymentModalEl.classList.add('show');
+      }
       if (typeof initJalaliDatepickers === 'function') {
         initJalaliDatepickers();
       }
@@ -430,11 +439,15 @@
         paymentModalError.classList.remove('d-none');
         return;
       }
-    });
 
       payments.push(payload);
       renderPaymentsList();
-      paymentModal.hide();
+      if (paymentModal) {
+        paymentModal.hide();
+      } else {
+        paymentModalEl.style.display = 'none';
+        paymentModalEl.classList.remove('show');
+      }
     });
   })();
 </script>
