@@ -10,7 +10,7 @@
 
     $commerceActive  = $isRoute('persons.*', 'customers.*', 'suppliers.*', 'users.*');
 
-    $invoiceActive   = $isRoute('preinvoice.*', 'invoices.*', 'shipping-methods.*');
+    $invoiceActive   = $isRoute('preinvoice.*', 'invoices.*', 'shipping-methods.*', 'account-statements.*');
 @endphp
 
 <style>
@@ -177,6 +177,7 @@
             @if (Route::has('invoices.index'))
                 <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
             @endif
+            <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب</a>
         </div>
 
 
