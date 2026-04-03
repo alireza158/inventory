@@ -72,7 +72,7 @@
           <div class="card border h-100">
             <div class="card-header bg-white">
               <h6 class="mb-0">ثبت فیش / چک مشتری (اصلی)</h6>
-              <small class="text-muted">می‌توانید چند ردیف پرداخت (نقدی، کارت، چک) ثبت کنید.</small>
+              <small class="text-muted">می‌توانید چند ردیف پرداخت (نقدی و چک) ثبت کنید.</small>
             </div>
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
@@ -148,113 +148,293 @@
   </form>
 </div>
 
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">افزودن پرداخت</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">نوع پرداخت</label>
+          <select class="form-select" id="paymentTypeInput">
+            <option value="cash">نقدی</option>
+            <option value="cheque">چکی</option>
+          </select>
+        </div>
+
+        <div id="cashFields">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">مبلغ</label>
+              <input type="text" inputmode="numeric" id="cashAmountInput" class="form-control money" placeholder="مثلاً 5,000,000">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">تاریخ پرداخت</label>
+              <input type="date" id="cashPaidAtInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">شناسه پرداخت</label>
+              <input type="text" id="cashIdentifierInput" class="form-control" placeholder="کارت به کارت / درگاه">
+            </div>
+            <div class="col-12">
+              <label class="form-label">توضیحات (الزامی)</label>
+              <textarea id="cashNoteInput" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div id="chequeFields" class="d-none">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label">شماره چک</label>
+              <input type="text" id="chequeNumberInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">مبلغ چک</label>
+              <input type="text" inputmode="numeric" id="chequeAmountInput" class="form-control money">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">وضعیت</label>
+              <select id="chequeStatusInput" class="form-select">
+                <option value="pending">در انتظار وصول</option>
+                <option value="cleared">وصول شده</option>
+                <option value="bounced">برگشتی</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">تاریخ سررسید</label>
+              <input type="date" id="chequeDueDateInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">تاریخ دریافت چک</label>
+              <input type="date" id="chequeReceivedAtInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">نام مشتری</label>
+              <input type="text" id="chequeCustomerNameInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">شناسه / کد مشتری</label>
+              <input type="text" id="chequeCustomerCodeInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">نام بانک</label>
+              <input type="text" id="chequeBankNameInput" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">نام شعبه</label>
+              <input type="text" id="chequeBranchNameInput" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">شماره حساب / شبا (اختیاری)</label>
+              <input type="text" id="chequeAccountNumberInput" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">صاحب حساب / صادرکننده چک</label>
+              <input type="text" id="chequeAccountHolderInput" class="form-control">
+            </div>
+            <div class="col-12">
+              <label class="form-label">توضیحات (الزامی)</label>
+              <textarea id="chequeNoteInput" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div id="paymentModalError" class="alert alert-danger mt-3 d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
+        <button type="button" class="btn btn-primary" id="savePaymentBtn">ثبت پرداخت</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   (function () {
     const rowsWrap = document.getElementById('paymentRows');
     const addBtn = document.getElementById('addPaymentRow');
     const guide = document.getElementById('paymentGuide');
     const form = rowsWrap.closest('form');
+    const paymentModalEl = document.getElementById('paymentModal');
+    const paymentModal = bootstrap.Modal.getOrCreateInstance(paymentModalEl);
+    const paymentTypeInput = document.getElementById('paymentTypeInput');
+    const paymentModalError = document.getElementById('paymentModalError');
+    const payments = [];
 
-    const rowTemplate = () => `
-      <div class="border rounded p-3 payment-row bg-light-subtle">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <strong>ردیف پرداخت</strong>
-          <button type="button" class="btn btn-sm btn-outline-danger js-remove-row">حذف</button>
-        </div>
-        <div class="row g-2">
-          <div class="col-md-4">
-            <label class="form-label">روش پرداخت</label>
-            <select class="form-select js-method" data-field="method">
-              <option value="cash">نقدی</option>
-              <option value="card">واریزی/کارت</option>
-              <option value="cheque">چک</option>
-            </select>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">مبلغ</label>
-            <input type="text" inputmode="numeric" class="form-control money" data-field="amount" placeholder="مثلاً 10,000,000" required>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">تاریخ پرداخت</label>
-            <input type="date" class="form-control" data-field="paid_at">
-          </div>
-          <div class="col-12">
-            <label class="form-label">فیش واریزی</label>
-            <input type="file" class="form-control" data-field="receipt_image" accept="image/*">
-          </div>
-          <div class="col-12">
-            <label class="form-label">یادداشت</label>
-            <textarea class="form-control" rows="2" data-field="note" placeholder="توضیح کوتاه..."></textarea>
-          </div>
-        </div>
-        <div class="mt-3 p-2 border rounded bg-white js-cheque-fields d-none">
-          <div class="row g-2">
-            <div class="col-md-6">
-              <label class="form-label">نام بانک</label>
-              <input type="text" class="form-control" data-field="cheque_bank_name">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">شماره چک</label>
-              <input type="text" class="form-control" data-field="cheque_number">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">تاریخ سررسید</label>
-              <input type="date" class="form-control" data-field="cheque_due_date">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">وضعیت چک</label>
-              <select class="form-select" data-field="cheque_status">
-                <option value="pending">در انتظار وصول</option>
-                <option value="cleared">وصول شده</option>
-                <option value="bounced">برگشتی</option>
-              </select>
-            </div>
-            <div class="col-12">
-              <label class="form-label">تصویر چک</label>
-              <input type="file" class="form-control" data-field="cheque_image" accept="image/*">
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+    function normalizeAmount(value) {
+      return (value || '').toString().replace(/[^\d]/g, '');
+    }
 
-    const toggleChequeBox = (row) => {
-      const method = row.querySelector('.js-method').value;
-      const chequeBox = row.querySelector('.js-cheque-fields');
-      chequeBox.classList.toggle('d-none', method !== 'cheque');
-    };
+    function div(a, b) { return ~~(a / b); }
+    function pad(v) { return String(v).padStart(2, '0'); }
+    function jalaliToGregorian(jy, jm, jd) {
+      jy += 1595;
+      let days = -355668 + (365 * jy) + div(jy, 33) * 8 + div((jy % 33) + 3, 4) + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+      let gy = 400 * div(days, 146097);
+      days %= 146097;
+      if (days > 36524) {
+        gy += 100 * div(--days, 36524);
+        days %= 36524;
+        if (days >= 365) days++;
+      }
+      gy += 4 * div(days, 1461);
+      days %= 1461;
+      if (days > 365) {
+        gy += div(days - 1, 365);
+        days = (days - 1) % 365;
+      }
+      let gd = days + 1;
+      const sal_a = [0,31,((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+      let gm = 0;
+      for (gm = 1; gm <= 12 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
+      return `${gy}-${pad(gm)}-${pad(gd)}`;
+    }
+    function normalizeDate(value) {
+      const raw = (value || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+      const m = raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+      if (!m) return '';
+      return jalaliToGregorian(Number(m[1]), Number(m[2]), Number(m[3]));
+    }
 
-    const reindexRows = () => {
-      rowsWrap.querySelectorAll('.payment-row').forEach((row, idx) => {
-        row.querySelectorAll('[data-field]').forEach((input) => {
-          const field = input.getAttribute('data-field');
-          input.setAttribute('name', `payments[${idx}][${field}]`);
+    function togglePaymentTypeFields() {
+      const isCheque = paymentTypeInput.value === 'cheque';
+      document.getElementById('cashFields').classList.toggle('d-none', isCheque);
+      document.getElementById('chequeFields').classList.toggle('d-none', !isCheque);
+    }
+
+    function buildHiddenInput(name, value) {
+      return `<input type="hidden" name="${name}" value="${String(value ?? '').replace(/"/g, '&quot;')}">`;
+    }
+
+    function renderPaymentsList() {
+      if (payments.length === 0) {
+        rowsWrap.innerHTML = '';
+        guide.classList.remove('d-none');
+        return;
+      }
+
+      guide.classList.add('d-none');
+      rowsWrap.innerHTML = payments.map((payment, idx) => {
+        const title = payment.method === 'cash'
+          ? `نقدی | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} تومان`
+          : `چک | شماره: ${payment.cheque_number} | مبلغ: ${Number(payment.cheque_amount || 0).toLocaleString('en-US')} تومان`;
+
+        const hiddenInputs = Object.entries(payment).map(([key, val]) => buildHiddenInput(`payments[${idx}][${key}]`, val)).join('');
+
+        return `
+          <div class="border rounded p-2 bg-light d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <div class="fw-semibold">${title}</div>
+              <small class="text-muted">${payment.note || '—'}</small>
+              ${hiddenInputs}
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger js-remove-payment" data-index="${idx}">حذف</button>
+          </div>
+        `;
+      }).join('');
+
+      rowsWrap.querySelectorAll('.js-remove-payment').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          payments.splice(Number(btn.dataset.index), 1);
+          renderPaymentsList();
         });
       });
+    }
 
-      guide.classList.toggle('d-none', rowsWrap.querySelectorAll('.payment-row').length > 0);
-    };
+    function readCashPayment() {
+      const amount = normalizeAmount(document.getElementById('cashAmountInput').value);
+      const paidAt = normalizeDate(document.getElementById('cashPaidAtInput').value);
+      const note = (document.getElementById('cashNoteInput').value || '').trim();
+
+      if (!amount || !paidAt || !note) {
+        return { error: 'برای پرداخت نقدی، مبلغ، تاریخ پرداخت و توضیحات الزامی است.' };
+      }
+
+      return {
+        method: 'cash',
+        amount,
+        paid_at: paidAt,
+        payment_identifier: (document.getElementById('cashIdentifierInput').value || '').trim(),
+        note,
+      };
+    }
+
+    function readChequePayment() {
+      const payload = {
+        method: 'cheque',
+        amount: normalizeAmount(document.getElementById('chequeAmountInput').value),
+        paid_at: normalizeDate(document.getElementById('chequeReceivedAtInput').value),
+        note: (document.getElementById('chequeNoteInput').value || '').trim(),
+        cheque_number: (document.getElementById('chequeNumberInput').value || '').trim(),
+        cheque_amount: normalizeAmount(document.getElementById('chequeAmountInput').value),
+        cheque_due_date: normalizeDate(document.getElementById('chequeDueDateInput').value),
+        cheque_received_at: normalizeDate(document.getElementById('chequeReceivedAtInput').value),
+        cheque_customer_name: (document.getElementById('chequeCustomerNameInput').value || '').trim(),
+        cheque_customer_code: (document.getElementById('chequeCustomerCodeInput').value || '').trim(),
+        cheque_bank_name: (document.getElementById('chequeBankNameInput').value || '').trim(),
+        cheque_branch_name: (document.getElementById('chequeBranchNameInput').value || '').trim(),
+        cheque_account_number: (document.getElementById('chequeAccountNumberInput').value || '').trim(),
+        cheque_account_holder: (document.getElementById('chequeAccountHolderInput').value || '').trim(),
+        cheque_status: document.getElementById('chequeStatusInput').value || 'pending',
+      };
+
+      const requiredFields = [
+        payload.amount,
+        payload.paid_at,
+        payload.note,
+        payload.cheque_number,
+        payload.cheque_amount,
+        payload.cheque_due_date,
+        payload.cheque_received_at,
+        payload.cheque_customer_name,
+        payload.cheque_customer_code,
+        payload.cheque_bank_name,
+        payload.cheque_branch_name,
+        payload.cheque_account_holder,
+      ];
+
+      if (requiredFields.some((v) => !v)) {
+        return { error: 'برای ثبت چک، همه فیلدهای اصلی چک و توضیحات را تکمیل کنید.' };
+      }
+
+      return payload;
+    }
+
+    function clearModalFields() {
+      paymentModalEl.querySelectorAll('input, textarea').forEach((el) => el.value = '');
+      document.getElementById('chequeStatusInput').value = 'pending';
+      paymentModalError.classList.add('d-none');
+      paymentModalError.textContent = '';
+      paymentTypeInput.value = 'cash';
+      togglePaymentTypeFields();
+    }
 
     addBtn.addEventListener('click', () => {
-      rowsWrap.insertAdjacentHTML('beforeend', rowTemplate());
-      const newRow = rowsWrap.lastElementChild;
-      newRow.querySelector('.js-method').addEventListener('change', () => toggleChequeBox(newRow));
-      newRow.querySelector('.js-remove-row').addEventListener('click', () => {
-        newRow.remove();
-        reindexRows();
-      });
-      toggleChequeBox(newRow);
-      reindexRows();
-
+      clearModalFields();
+      paymentModal.show();
       if (typeof initJalaliDatepickers === 'function') {
         initJalaliDatepickers();
       }
     });
 
-    form.addEventListener('submit', () => {
-      rowsWrap.querySelectorAll('[data-field="amount"]').forEach((input) => {
-        input.value = (input.value || '').replace(/[^\d]/g, '');
-      });
+    paymentTypeInput.addEventListener('change', togglePaymentTypeFields);
+
+    document.getElementById('savePaymentBtn').addEventListener('click', () => {
+      paymentModalError.classList.add('d-none');
+      let payload = paymentTypeInput.value === 'cheque' ? readChequePayment() : readCashPayment();
+      if (payload.error) {
+        paymentModalError.textContent = payload.error;
+        paymentModalError.classList.remove('d-none');
+        return;
+      }
+    });
+
+      payments.push(payload);
+      renderPaymentsList();
+      paymentModal.hide();
     });
   })();
 </script>

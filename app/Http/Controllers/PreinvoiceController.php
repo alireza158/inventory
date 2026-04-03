@@ -313,23 +313,39 @@ class PreinvoiceController extends Controller
 
         $validated = $request->validate([
             'payments' => 'nullable|array',
-            'payments.*.method' => 'required_with:payments|in:cash,card,cheque',
+            'payments.*.method' => 'required_with:payments|in:cash,cheque',
             'payments.*.amount' => 'required_with:payments|integer|min:1',
-            'payments.*.paid_at' => 'nullable|date',
-            'payments.*.note' => 'nullable|string|max:2000',
-            'payments.*.receipt_image' => 'nullable|image|max:4096',
+            'payments.*.paid_at' => 'required_with:payments|date',
+            'payments.*.note' => 'required_with:payments|string|max:2000',
+            'payments.*.payment_identifier' => 'nullable|string|max:255',
             'payments.*.cheque_bank_name' => 'nullable|string|max:255',
+            'payments.*.cheque_branch_name' => 'nullable|string|max:255',
             'payments.*.cheque_number' => 'nullable|string|max:255',
+            'payments.*.cheque_amount' => 'nullable|integer|min:1',
             'payments.*.cheque_due_date' => 'nullable|date',
+            'payments.*.cheque_received_at' => 'nullable|date',
+            'payments.*.cheque_customer_name' => 'nullable|string|max:255',
+            'payments.*.cheque_customer_code' => 'nullable|string|max:255',
+            'payments.*.cheque_account_number' => 'nullable|string|max:255',
+            'payments.*.cheque_account_holder' => 'nullable|string|max:255',
             'payments.*.cheque_status' => 'nullable|in:pending,cleared,bounced',
-            'payments.*.cheque_image' => 'nullable|image|max:4096',
         ]);
 
         foreach (($validated['payments'] ?? []) as $index => $paymentRow) {
             if (($paymentRow['method'] ?? null) === 'cheque') {
-                if (empty($paymentRow['cheque_number']) || empty($paymentRow['cheque_due_date'])) {
+                if (
+                    empty($paymentRow['cheque_number']) ||
+                    empty($paymentRow['cheque_amount']) ||
+                    empty($paymentRow['cheque_due_date']) ||
+                    empty($paymentRow['cheque_received_at']) ||
+                    empty($paymentRow['cheque_customer_name']) ||
+                    empty($paymentRow['cheque_customer_code']) ||
+                    empty($paymentRow['cheque_bank_name']) ||
+                    empty($paymentRow['cheque_branch_name']) ||
+                    empty($paymentRow['cheque_account_holder'])
+                ) {
                     throw ValidationException::withMessages([
-                        "payments.{$index}.cheque_number" => 'برای پرداخت چکی، شماره چک و تاریخ سررسید الزامی است.',
+                        "payments.{$index}.cheque_number" => 'برای پرداخت چکی، تکمیل اطلاعات اصلی چک الزامی است.',
                     ]);
                 }
             }
@@ -430,17 +446,19 @@ class PreinvoiceController extends Controller
             }
 
             foreach (($validated['payments'] ?? []) as $index => $paymentRow) {
-                $receiptPath = $request->hasFile("payments.{$index}.receipt_image")
-                    ? $request->file("payments.{$index}.receipt_image")->store('invoices/receipts', 'public')
-                    : null;
+                $paymentAmount = (int) $paymentRow['amount'];
+                if (($paymentRow['method'] ?? null) === 'cheque') {
+                    $paymentAmount = (int) ($paymentRow['cheque_amount'] ?? 0);
+                }
 
                 $payment = InvoicePayment::create([
                     'invoice_id' => $invoice->id,
                     'method' => $paymentRow['method'],
-                    'amount' => (int) $paymentRow['amount'],
+                    'amount' => $paymentAmount,
                     'paid_at' => $paymentRow['paid_at'] ?? now()->toDateString(),
+                    'payment_identifier' => $paymentRow['payment_identifier'] ?? null,
                     'note' => $paymentRow['note'] ?? null,
-                    'receipt_image' => $receiptPath,
+                    'receipt_image' => null,
                 ]);
 
                 if (!empty($invoice->customer_id)) {
@@ -455,16 +473,19 @@ class PreinvoiceController extends Controller
                 }
 
                 if (($paymentRow['method'] ?? null) === 'cheque') {
-                    $chequePath = $request->hasFile("payments.{$index}.cheque_image")
-                        ? $request->file("payments.{$index}.cheque_image")->store('invoices/cheques', 'public')
-                        : null;
-
                     Cheque::create([
                         'invoice_payment_id' => $payment->id,
                         'bank_name' => $paymentRow['cheque_bank_name'] ?? null,
+                        'branch_name' => $paymentRow['cheque_branch_name'] ?? null,
                         'cheque_number' => $paymentRow['cheque_number'] ?? null,
+                        'amount' => (int) ($paymentRow['cheque_amount'] ?? 0),
                         'due_date' => $paymentRow['cheque_due_date'] ?? null,
-                        'image' => $chequePath,
+                        'received_at' => $paymentRow['cheque_received_at'] ?? null,
+                        'customer_name' => $paymentRow['cheque_customer_name'] ?? null,
+                        'customer_code' => $paymentRow['cheque_customer_code'] ?? null,
+                        'account_number' => $paymentRow['cheque_account_number'] ?? null,
+                        'account_holder' => $paymentRow['cheque_account_holder'] ?? null,
+                        'image' => null,
                         'status' => $paymentRow['cheque_status'] ?? 'pending',
                     ]);
                 }
