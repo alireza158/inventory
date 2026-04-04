@@ -82,16 +82,9 @@
                         }
 
                         if ($transfer) {
-<<<<<<< HEAD
-                            $transferRef = $transfer->reference ?: ('TR-'.$transfer->id);
-                            $transferType = \App\Models\WarehouseTransfer::typeOptions()[$transfer->voucher_type] ?? $transfer->voucher_type;
-
-                            $description = "سند {$transferRef} | نوع: {$transferType} | مبلغ ".number_format((int) $ledger->amount)." تومان";
-=======
                             $transferRef = $transfer->reference ?: ('TR-' . $transfer->id);
                             $transferTypeLabel = \App\Models\WarehouseTransfer::typeOptions()[$transfer->voucher_type] ?? $transfer->voucher_type;
                             $description = "سند {$transferRef} | نوع: {$transferTypeLabel} | مبلغ " . number_format((int) $ledger->amount) . " تومان";
->>>>>>> e1d1c88225bd93ec6e764483a9ff9ffd70d0dd3e
                             $viewUrl = route('vouchers.edit', $transfer->id);
                         }
                     @endphp
