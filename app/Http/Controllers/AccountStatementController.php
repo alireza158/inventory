@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
 use App\Models\InvoicePayment;
+use App\Models\WarehouseTransfer;
 use Illuminate\Http\Request;
 
 class AccountStatementController extends Controller
@@ -50,10 +51,22 @@ class AccountStatementController extends Controller
             ->unique()
             ->values();
 
+        $transferIds = $ledgers->getCollection()
+            ->where('reference_type', WarehouseTransfer::class)
+            ->pluck('reference_id')
+            ->filter()
+            ->unique()
+            ->values();
+
         $payments = InvoicePayment::query()
             ->with('cheque')
             ->whereIn('id', $paymentIds)
             ->get(['id', 'invoice_id', 'method', 'amount', 'paid_at', 'payment_identifier', 'note'])
+            ->keyBy('id');
+
+        $transfers = WarehouseTransfer::query()
+            ->whereIn('id', $transferIds)
+            ->get(['id', 'reference', 'voucher_type'])
             ->keyBy('id');
 
         $relatedInvoiceIds = $invoiceIds
@@ -83,8 +96,7 @@ class AccountStatementController extends Controller
             'ledgers',
             'invoices',
             'payments',
-            'totalDebit',
-            'totalCredit',
+            'transfers',
             'netBalance'
         ));
     }
