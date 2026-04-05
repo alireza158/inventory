@@ -29,6 +29,7 @@ class StockCountDocumentService
                 StockCountDocumentItem::create([
                     'document_id' => $document->id,
                     'product_id' => (int) $item['product_id'],
+                    'product_variant_id' => (int) $item['variant_id'],
                     'system_quantity' => $systemQty,
                     'actual_quantity' => (int) $item['actual_quantity'],
                     'difference_quantity' => (int) $item['actual_quantity'] - $systemQty,
@@ -38,7 +39,7 @@ class StockCountDocumentService
 
             $this->addHistory($document->id, 'created', null, $document->only(['document_number', 'warehouse_id', 'document_date', 'status']), 'ایجاد سند انبارگردانی', $userId);
 
-            return $document->fresh(['warehouse', 'items.product', 'creator']);
+            return $document->fresh(['warehouse', 'items.product', 'items.variant', 'creator']);
         });
     }
 
@@ -49,7 +50,9 @@ class StockCountDocumentService
         }
 
         return DB::transaction(function () use ($document, $payload, $userId) {
-            $oldItems = $document->items()->get()->keyBy('product_id')->toArray();
+            $oldItems = $document->items()->get()
+                ->mapWithKeys(fn ($row) => [((int) $row->product_id) . ':' . ((int) $row->product_variant_id) => $row->toArray()])
+                ->all();
 
             $oldDocument = [
                 'warehouse_id' => (int) $document->warehouse_id,
@@ -72,12 +75,13 @@ class StockCountDocumentService
                 $row = StockCountDocumentItem::create([
                     'document_id' => $document->id,
                     'product_id' => (int) $item['product_id'],
+                    'product_variant_id' => (int) $item['variant_id'],
                     'system_quantity' => $systemQty,
                     'actual_quantity' => (int) $item['actual_quantity'],
                     'difference_quantity' => (int) $item['actual_quantity'] - $systemQty,
                     'description' => $item['description'] ?? null,
                 ]);
-                $newItems[$row->product_id] = $row->toArray();
+                $newItems[((int) $row->product_id) . ':' . ((int) $row->product_variant_id)] = $row->toArray();
             }
 
             $this->addHistory($document->id, 'updated', [
@@ -90,8 +94,8 @@ class StockCountDocumentService
                 'items' => $newItems,
             ], 'ویرایش سند انبارگردانی', $userId);
 
-            $removedProducts = array_diff(array_keys($oldItems), array_keys($newItems));
-            $addedProducts = array_diff(array_keys($newItems), array_keys($oldItems));
+            $removedProducts = array_values(array_diff(array_keys($oldItems), array_keys($newItems)));
+            $addedProducts = array_values(array_diff(array_keys($newItems), array_keys($oldItems)));
 
             if (!empty($removedProducts)) {
                 $this->addHistory($document->id, 'item_removed', $removedProducts, null, 'حذف ردیف از سند', $userId);
@@ -100,7 +104,7 @@ class StockCountDocumentService
                 $this->addHistory($document->id, 'item_added', null, $addedProducts, 'افزودن ردیف به سند', $userId);
             }
 
-            return $document->fresh(['warehouse', 'items.product', 'creator', 'updater']);
+            return $document->fresh(['warehouse', 'items.product', 'items.variant', 'creator', 'updater']);
         });
     }
 
@@ -156,7 +160,7 @@ class StockCountDocumentService
 
             $this->addHistory($document->id, 'finalized', null, ['status' => 'finalized'], 'نهایی‌سازی سند و اعمال تعدیل موجودی', $userId);
 
-            return $document->fresh(['warehouse', 'items.product', 'creator', 'updater', 'finalizer', 'history.doer']);
+            return $document->fresh(['warehouse', 'items.product', 'items.variant', 'creator', 'updater', 'finalizer', 'history.doer']);
         });
     }
 
@@ -177,7 +181,7 @@ class StockCountDocumentService
 
         $this->addHistory($document->id, 'cancelled', null, ['status' => 'cancelled'], 'لغو سند انبارگردانی', $userId);
 
-        return $document->fresh(['warehouse', 'items.product', 'creator', 'updater']);
+        return $document->fresh(['warehouse', 'items.product', 'items.variant', 'creator', 'updater']);
     }
 
     public function getSystemQuantity(int $warehouseId, int $productId, bool $lock = false): int
