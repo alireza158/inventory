@@ -26,6 +26,7 @@ use App\Http\Controllers\StockMovementReportController;
 use App\Http\Controllers\StocktakeController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\ShippingMethodController;
+use App\Http\Controllers\SalesHavalehController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
@@ -101,7 +102,18 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/vouchers/sales', [InvoiceController::class, 'salesVouchers'])->name('vouchers.sales.index');
     Route::get('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherEdit'])->name('vouchers.sales.edit');
+    Route::get('/vouchers/sales/{uuid}/view', [InvoiceController::class, 'salesVoucherShow'])->name('vouchers.sales.show');
+    Route::get('/vouchers/sales/{uuid}/history', [InvoiceController::class, 'salesVoucherHistory'])->name('vouchers.sales.history');
     Route::put('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherUpdate'])->name('vouchers.sales.update');
+
+    // Sales Havaleh APIs
+    Route::post('/sales-havaleh/create-from-financial/{financialId}', [SalesHavalehController::class, 'createFromFinancial'])->name('sales-havaleh.create-from-financial');
+    Route::get('/sales-havaleh/{invoice}', [SalesHavalehController::class, 'show'])->name('sales-havaleh.show');
+    Route::get('/sales-havaleh/{invoice}/view', [SalesHavalehController::class, 'view'])->name('sales-havaleh.view');
+    Route::put('/sales-havaleh/{invoice}', [SalesHavalehController::class, 'update'])->name('sales-havaleh.update');
+    Route::patch('/sales-havaleh/{invoice}/status', [SalesHavalehController::class, 'patchStatus'])->name('sales-havaleh.status');
+    Route::get('/sales-havaleh/{invoice}/history', [SalesHavalehController::class, 'history'])->name('sales-havaleh.history');
+    Route::get('/payments/{payment}/view', [AccountStatementController::class, 'showPayment'])->name('payments.view');
 
     // Warehouses
     Route::get('/warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');

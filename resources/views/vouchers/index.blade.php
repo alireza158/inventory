@@ -13,12 +13,12 @@
     ];
 
     $statusFa = fn($s) => match($s){
-      'warehouse_pending' => 'در انتظار تایید انبار',
-      'warehouse_collecting' => 'در حال جمع‌آوری',
-      'warehouse_checking' => 'چک کردن بار',
-      'warehouse_packing' => 'بسته‌بندی بار',
-      'warehouse_sent' => 'ارسال شد',
-      'canceled' => 'کنسل شده',
+      'pending_warehouse_approval' => 'در انتظار تایید انبار',
+      'collecting' => 'در حال جمع‌آوری',
+      'checking_discrepancy' => 'چک کردن بار',
+      'packing' => 'بسته‌بندی بار',
+      'shipped' => 'ارسال شد',
+      'not_shipped' => 'کنسل شده',
       default => $s,
     };
 @endphp

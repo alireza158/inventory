@@ -61,7 +61,7 @@
 
                         if ($invoice) {
                             $description = "فاکتور #{$invoice->id} | مبلغ فاکتور ".number_format((int) $invoice->total)." تومان | این شخص بدهکار شد";
-                            $viewUrl = route('account-statements.documents.invoices.show', $invoice->uuid);
+                            $viewUrl = route('vouchers.sales.show', $invoice->uuid);
                         }
 
                         if ($payment) {
