@@ -31,6 +31,7 @@
             <thead>
                 <tr>
                     <th>کالا</th>
+                    <th>تنوع</th>
                     <th>موجودی سیستم</th>
                     <th>موجودی واقعی</th>
                     <th>اختلاف</th>
@@ -46,6 +47,7 @@
                 @endphp
                 <tr>
                     <td>{{ $item->product?->name }}</td>
+                    <td>{{ $item->variant?->variant_name ?? '—' }}</td>
                     <td>{{ $item->system_quantity }}</td>
                     <td>{{ $item->actual_quantity }}</td>
                     <td>{{ $diff }}</td>

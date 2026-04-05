@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\StockCountDocument;
 use App\Models\Warehouse;
 use App\Services\StockCountDocumentService;
@@ -51,12 +52,16 @@ class StocktakeController extends Controller
     {
         $warehouses = Warehouse::query()->where('is_active', true)->orderBy('name')->get();
         $products = Product::query()->orderBy('name')->get(['id', 'name', 'sku']);
+        $variants = ProductVariant::query()
+            ->orderBy('variant_name')
+            ->get(['id', 'product_id', 'variant_name', 'variant_code', 'variety_name']);
 
         return view('stocktake.form', [
             'mode' => 'create',
             'document' => null,
             'warehouses' => $warehouses,
             'products' => $products,
+            'variants' => $variants,
         ]);
     }
 
@@ -74,7 +79,7 @@ class StocktakeController extends Controller
 
     public function show(Request $request, StockCountDocument $stockCountDocument)
     {
-        $stockCountDocument->load(['warehouse', 'items.product', 'creator', 'updater', 'finalizer', 'history.doer']);
+        $stockCountDocument->load(['warehouse', 'items.product', 'items.variant', 'creator', 'updater', 'finalizer', 'history.doer']);
 
         if ($request->expectsJson()) {
             return response()->json($stockCountDocument);
@@ -85,7 +90,7 @@ class StocktakeController extends Controller
 
     public function view(Request $request, StockCountDocument $stockCountDocument)
     {
-        $stockCountDocument->load(['warehouse', 'items.product', 'creator', 'updater', 'finalizer', 'history.doer']);
+        $stockCountDocument->load(['warehouse', 'items.product', 'items.variant', 'creator', 'updater', 'finalizer', 'history.doer']);
 
         if ($request->expectsJson()) {
             return response()->json($stockCountDocument);
@@ -96,15 +101,19 @@ class StocktakeController extends Controller
 
     public function edit(StockCountDocument $stockCountDocument)
     {
-        $stockCountDocument->load(['warehouse', 'items.product']);
+        $stockCountDocument->load(['warehouse', 'items.product', 'items.variant']);
         $warehouses = Warehouse::query()->where('is_active', true)->orderBy('name')->get();
         $products = Product::query()->orderBy('name')->get(['id', 'name', 'sku']);
+        $variants = ProductVariant::query()
+            ->orderBy('variant_name')
+            ->get(['id', 'product_id', 'variant_name', 'variant_code', 'variety_name']);
 
         return view('stocktake.form', [
             'mode' => 'edit',
             'document' => $stockCountDocument,
             'warehouses' => $warehouses,
             'products' => $products,
+            'variants' => $variants,
         ]);
     }
 
@@ -156,17 +165,31 @@ class StocktakeController extends Controller
 
     private function validatedPayload(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'document_date' => ['required', 'date'],
             'description' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id', 'distinct'],
+            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id', 'distinct'],
             'items.*.actual_quantity' => ['required', 'integer', 'min:0'],
             'items.*.description' => ['nullable', 'string'],
         ], [
             'items.min' => 'حداقل یک ردیف کالا در سند لازم است.',
-            'items.*.product_id.distinct' => 'تکرار کالا در یک سند مجاز نیست.',
+            'items.*.variant_id.distinct' => 'تکرار تنوع در یک سند مجاز نیست.',
         ]);
+
+        foreach ($data['items'] as $index => $item) {
+            $belongs = ProductVariant::query()
+                ->whereKey((int) $item['variant_id'])
+                ->where('product_id', (int) $item['product_id'])
+                ->exists();
+
+            if (!$belongs) {
+                abort(422, 'ردیف ' . ($index + 1) . ': تنوع انتخابی متعلق به کالای انتخاب شده نیست.');
+            }
+        }
+
+        return $data;
     }
 }
