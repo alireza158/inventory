@@ -47,7 +47,7 @@
                     <th>شرح</th>
                     <th>بدهکار</th>
                     <th>بستانکار</th>
-                    <th class="text-end">مشاهده/ویرایش</th>
+                    <th class="text-end">مشاهده</th>
                 </tr>
             </thead>
             <tbody>
@@ -56,14 +56,12 @@
                         $invoice = $ledger->reference_type === \App\Models\Invoice::class ? ($invoices[$ledger->reference_id] ?? null) : null;
                         $payment = $ledger->reference_type === \App\Models\InvoicePayment::class ? ($payments[$ledger->reference_id] ?? null) : null;
                         $transfer = $ledger->reference_type === \App\Models\WarehouseTransfer::class ? ($transfers[$ledger->reference_id] ?? null) : null;
-                        $relatedInvoice = $invoice ?: (($payment && !empty($payment->invoice_id)) ? ($invoices[$payment->invoice_id] ?? null) : null);
-
                         $description = $ledger->note ?: '—';
                         $viewUrl = null;
 
                         if ($invoice) {
                             $description = "فاکتور #{$invoice->id} | مبلغ فاکتور ".number_format((int) $invoice->total)." تومان | این شخص بدهکار شد";
-                            $viewUrl = route('invoices.show', $invoice->uuid);
+                            $viewUrl = route('vouchers.sales.show', $invoice->uuid);
                         }
 
                         if ($payment) {
@@ -76,16 +74,16 @@
                                 $description = "پرداخت نقدی | مبلغ ".number_format((int) $payment->amount)." تومان | شناسه {$pid} | این شخص بستانکار شد";
                             }
 
-                            if ($relatedInvoice?->uuid) {
-                                $viewUrl = route('invoices.show', $relatedInvoice->uuid);
-                            }
+                            $viewUrl = route('account-statements.documents.payments.show', $payment->id);
                         }
 
                         if ($transfer) {
                             $transferRef = $transfer->reference ?: ('TR-' . $transfer->id);
                             $transferTypeLabel = \App\Models\WarehouseTransfer::typeOptions()[$transfer->voucher_type] ?? $transfer->voucher_type;
                             $description = "سند {$transferRef} | نوع: {$transferTypeLabel} | مبلغ " . number_format((int) $ledger->amount) . " تومان";
-                            $viewUrl = route('vouchers.edit', $transfer->id);
+                            if ($transfer->voucher_type === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
+                                $viewUrl = route('account-statements.documents.returns.show', $transfer->id);
+                            }
                         }
                     @endphp
                     <tr>

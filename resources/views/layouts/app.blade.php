@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'سیستم انبار آریا جانبی') }}</title>
+    <title>@yield('title', config('app.name', 'سیستم انبار آریا جانبی'))</title>
+    @yield('meta')
     <script src="{{ asset('lib/jquery.min.js') }}"></script>
 
     <!-- اگر select2 داری -->

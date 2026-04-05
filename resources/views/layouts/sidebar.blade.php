@@ -6,7 +6,7 @@
 
     $productsActive = $isRoute('products.*', 'categories.*', 'model-lists.*');
 
-    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'warehouses.*', 'stocktake.*', 'stocktake.index');
+    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'warehouses.*', 'stocktake.*', 'stocktake.index', 'asset.*');
 
     $commerceActive  = $isRoute('persons.*', 'customers.*', 'suppliers.*', 'users.*');
 
@@ -153,6 +153,9 @@
             <a class="sidebar-sublink {{ $is('vouchers.sales.*') }}" href="{{ route('vouchers.sales.index') }}">حواله فروش کالا</a>
             <a class="sidebar-sublink {{ $is('warehouses.*') }}" href="{{ route('warehouses.index') }}">انبارها</a>
             <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
+            <a class="sidebar-sublink {{ $is('asset.personnel.*') }}" href="{{ route('asset.personnel.index') }}">امین اموال - پرسنل</a>
+            <a class="sidebar-sublink {{ $is('asset.documents.*') }}" href="{{ route('asset.documents.index') }}">امین اموال - اسناد</a>
+            <a class="sidebar-sublink {{ $is('asset.codes.*') }}" href="{{ route('asset.codes.search') }}">امین اموال - جستجوی کد</a>
         </div>
 
         {{-- Commerce --}}
@@ -185,6 +188,9 @@
         <div class="sidebar-group-label">سایر</div>
         <a class="sidebar-link {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">
             <span class="title">لاگ فعالیت</span>
+        </a>
+        <a class="sidebar-link {{ $is('blog.*') }}" href="{{ route('blog.index') }}">
+            <span class="title">وبلاگ</span>
         </a>
 
     </div>

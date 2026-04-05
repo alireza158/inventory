@@ -399,7 +399,7 @@ class PreinvoiceController extends Controller
                 'discount_amount'     => (int) $order->discount_amount,
                 'subtotal'            => (int) $subtotal,
                 'total'               => (int) $total,
-                'status'              => 'warehouse_pending',
+                'status'              => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
             ]);
 
             foreach ($order->items as $it) {

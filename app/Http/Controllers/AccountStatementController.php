@@ -100,4 +100,41 @@ class AccountStatementController extends Controller
             'netBalance'
         ));
     }
+
+    public function showInvoice(string $uuid)
+    {
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        return view('account-statements.documents.invoice-view', compact('invoice'));
+    }
+
+    public function showReturnFromSale(WarehouseTransfer $voucher)
+    {
+        abort_unless($voucher->voucher_type === WarehouseTransfer::TYPE_CUSTOMER_RETURN, 404);
+
+        $voucher->load([
+            'items.product',
+            'items.variant',
+            'fromWarehouse',
+            'toWarehouse',
+            'relatedInvoice',
+            'customer',
+            'user',
+        ]);
+
+        return view('account-statements.documents.return-from-sale-view', compact('voucher'));
+    }
+
+    public function showPayment(InvoicePayment $payment)
+    {
+        $payment->load([
+            'cheque',
+            'invoice:id,uuid,customer_name,customer_mobile,total',
+        ]);
+
+        return view('account-statements.documents.payment-view', compact('payment'));
+    }
 }
