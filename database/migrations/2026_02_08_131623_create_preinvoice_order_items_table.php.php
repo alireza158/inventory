@@ -7,25 +7,27 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::create('preinvoice_order_items', function (Blueprint $table) {
-            $table->id();
+        if (!Schema::hasTable('preinvoice_order_items')) {
+            Schema::create('preinvoice_order_items', function (Blueprint $table) {
+                $table->id();
 
-            $table->unsignedBigInteger('preinvoice_order_id');
-            $table->unsignedBigInteger('product_id');
-            $table->unsignedBigInteger('variant_id');
+                $table->unsignedBigInteger('preinvoice_order_id');
+                $table->unsignedBigInteger('product_id');
+                $table->unsignedBigInteger('variant_id');
 
-            $table->unsignedInteger('quantity')->default(1);
-            $table->unsignedBigInteger('price')->default(0);
+                $table->unsignedInteger('quantity')->default(1);
+                $table->unsignedBigInteger('price')->default(0);
 
-            $table->timestamps();
+                $table->timestamps();
 
-            $table->foreign('preinvoice_order_id')
-                ->references('id')->on('preinvoice_orders')
-                ->onDelete('cascade');
+                $table->foreign('preinvoice_order_id')
+                    ->references('id')->on('preinvoice_orders')
+                    ->onDelete('cascade');
 
-            $table->index('product_id');
-            $table->index('variant_id');
-        });
+                $table->index('product_id');
+                $table->index('variant_id');
+            });
+        }
     }
 
     public function down(): void
