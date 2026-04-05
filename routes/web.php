@@ -6,7 +6,6 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AccountStatementController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChequeController;
-use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -40,9 +39,6 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard + profile
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
-    Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
-
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
