@@ -186,6 +186,9 @@
         <a class="sidebar-link {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">
             <span class="title">لاگ فعالیت</span>
         </a>
+        <a class="sidebar-link {{ $is('blog.*') }}" href="{{ route('blog.index') }}">
+            <span class="title">وبلاگ</span>
+        </a>
 
     </div>
 </div>
