@@ -66,6 +66,7 @@
                     <thead>
                     <tr>
                         <th style="min-width: 220px;">کالا</th>
+                        <th style="min-width: 240px;">تنوع</th>
                         <th>موجودی سیستم</th>
                         <th>موجودی واقعی</th>
                         <th>اختلاف</th>
@@ -78,6 +79,7 @@
                         $oldItems = old('items');
                         $items = $oldItems ?? ($document?->items?->map(fn($item) => [
                             'product_id' => $item->product_id,
+                            'variant_id' => $item->product_variant_id,
                             'system_quantity' => $item->system_quantity,
                             'actual_quantity' => $item->actual_quantity,
                             'description' => $item->description,
@@ -91,6 +93,23 @@
                                     @foreach($products as $product)
                                         <option value="{{ $product->id }}" @selected((string) ($item['product_id'] ?? '') === (string) $product->id)>
                                             {{ $product->name }} [{{ $product->sku }}]
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </td>
+                            <td>
+                                <select name="items[{{ $index }}][variant_id]" class="form-select variant-select" required @disabled($isEdit && !$isDraft)>
+                                    <option value="">انتخاب...</option>
+                                    @foreach($variants as $variant)
+                                        <option
+                                            value="{{ $variant->id }}"
+                                            data-product-id="{{ $variant->product_id }}"
+                                            @selected((string) ($item['variant_id'] ?? '') === (string) $variant->id)
+                                        >
+                                            {{ $variant->variant_name ?: 'تنوع بدون نام' }}
+                                            @if($variant->variant_code)
+                                                [{{ $variant->variant_code }}]
+                                            @endif
                                         </option>
                                     @endforeach
                                 </select>
@@ -135,6 +154,19 @@
                 @endforeach
             </select>
         </td>
+        <td>
+            <select class="form-select variant-select" required>
+                <option value="">انتخاب...</option>
+                @foreach($variants as $variant)
+                    <option value="{{ $variant->id }}" data-product-id="{{ $variant->product_id }}">
+                        {{ $variant->variant_name ?: 'تنوع بدون نام' }}
+                        @if($variant->variant_code)
+                            [{{ $variant->variant_code }}]
+                        @endif
+                    </option>
+                @endforeach
+            </select>
+        </td>
         <td><input class="form-control system-quantity" type="number" readonly value="0"></td>
         <td><input class="form-control actual-quantity" type="number" min="0" required value="0"></td>
         <td><span class="difference-badge badge text-bg-light">0</span></td>
@@ -154,10 +186,35 @@
     function reindexRows(){
         [...tableBody.querySelectorAll('tr')].forEach((tr, index) => {
             tr.querySelector('.product-select').setAttribute('name', `items[${index}][product_id]`);
+            tr.querySelector('.variant-select').setAttribute('name', `items[${index}][variant_id]`);
             tr.querySelector('.system-quantity').setAttribute('name', `items[${index}][system_quantity]`);
             tr.querySelector('.actual-quantity').setAttribute('name', `items[${index}][actual_quantity]`);
-            tr.querySelector('td:nth-child(5) input').setAttribute('name', `items[${index}][description]`);
+            tr.querySelector('td:nth-child(6) input').setAttribute('name', `items[${index}][description]`);
         });
+    }
+
+    function filterVariantsByProduct(tr){
+        const productId = tr.querySelector('.product-select').value;
+        const variantSelect = tr.querySelector('.variant-select');
+        const currentValue = variantSelect.value;
+
+        let stillValid = false;
+        [...variantSelect.options].forEach((option, index) => {
+            if (index === 0) {
+                option.hidden = false;
+                return;
+            }
+
+            const matches = !productId || option.dataset.productId === productId;
+            option.hidden = !matches;
+            if (matches && option.value === currentValue) {
+                stillValid = true;
+            }
+        });
+
+        if (!stillValid) {
+            variantSelect.value = '';
+        }
     }
 
     async function fillSystemQuantity(tr){
@@ -186,7 +243,10 @@
     }
 
     function bindRow(tr){
-        tr.querySelector('.product-select').addEventListener('change', () => fillSystemQuantity(tr));
+        tr.querySelector('.product-select').addEventListener('change', () => {
+            filterVariantsByProduct(tr);
+            fillSystemQuantity(tr);
+        });
         tr.querySelector('.actual-quantity').addEventListener('input', () => renderDiff(tr));
         const removeBtn = tr.querySelector('.remove-row');
         if (removeBtn) {
@@ -195,6 +255,7 @@
                 reindexRows();
             });
         }
+        filterVariantsByProduct(tr);
         renderDiff(tr);
     }
 

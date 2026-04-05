@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\StockCountDocument;
 use App\Models\StockMovement;
 use App\Models\User;
@@ -18,15 +19,15 @@ class StockCountDocumentTest extends TestCase
 
     public function test_can_create_and_update_draft_document(): void
     {
-        [$user, $warehouse, $products] = $this->seedBaseData();
+        [$user, $warehouse, $products, $variants] = $this->seedBaseData();
 
         $response = $this->actingAs($user)->post(route('stock-count-documents.store'), [
             'warehouse_id' => $warehouse->id,
             'document_date' => '2026-04-05',
             'description' => 'شمارش اولیه',
             'items' => [
-                ['product_id' => $products[0]->id, 'actual_quantity' => 8, 'description' => 'ردیف 1'],
-                ['product_id' => $products[1]->id, 'actual_quantity' => 13, 'description' => 'ردیف 2'],
+                ['product_id' => $products[0]->id, 'variant_id' => $variants[0]->id, 'actual_quantity' => 8, 'description' => 'ردیف 1'],
+                ['product_id' => $products[1]->id, 'variant_id' => $variants[1]->id, 'actual_quantity' => 13, 'description' => 'ردیف 2'],
             ],
         ]);
 
@@ -40,7 +41,7 @@ class StockCountDocumentTest extends TestCase
             'document_date' => '2026-04-06',
             'description' => 'ویرایش سند',
             'items' => [
-                ['product_id' => $products[0]->id, 'actual_quantity' => 9, 'description' => 'اصلاح شد'],
+                ['product_id' => $products[0]->id, 'variant_id' => $variants[0]->id, 'actual_quantity' => 9, 'description' => 'اصلاح شد'],
             ],
         ]);
 
@@ -52,14 +53,14 @@ class StockCountDocumentTest extends TestCase
 
     public function test_finalize_with_negative_and_positive_difference_creates_adjustments(): void
     {
-        [$user, $warehouse, $products] = $this->seedBaseData();
+        [$user, $warehouse, $products, $variants] = $this->seedBaseData();
 
         $this->actingAs($user)->post(route('stock-count-documents.store'), [
             'warehouse_id' => $warehouse->id,
             'document_date' => '2026-04-05',
             'items' => [
-                ['product_id' => $products[0]->id, 'actual_quantity' => 7],
-                ['product_id' => $products[1]->id, 'actual_quantity' => 12],
+                ['product_id' => $products[0]->id, 'variant_id' => $variants[0]->id, 'actual_quantity' => 7],
+                ['product_id' => $products[1]->id, 'variant_id' => $variants[1]->id, 'actual_quantity' => 12],
             ],
         ]);
 
@@ -91,13 +92,13 @@ class StockCountDocumentTest extends TestCase
 
     public function test_finalize_zero_difference_changes_nothing_but_finalizes(): void
     {
-        [$user, $warehouse, $products] = $this->seedBaseData();
+        [$user, $warehouse, $products, $variants] = $this->seedBaseData();
 
         $this->actingAs($user)->post(route('stock-count-documents.store'), [
             'warehouse_id' => $warehouse->id,
             'document_date' => '2026-04-05',
             'items' => [
-                ['product_id' => $products[0]->id, 'actual_quantity' => 10],
+                ['product_id' => $products[0]->id, 'variant_id' => $variants[0]->id, 'actual_quantity' => 10],
             ],
         ]);
 
@@ -115,13 +116,13 @@ class StockCountDocumentTest extends TestCase
 
     public function test_cannot_edit_or_finalize_again_after_finalize(): void
     {
-        [$user, $warehouse, $products] = $this->seedBaseData();
+        [$user, $warehouse, $products, $variants] = $this->seedBaseData();
 
         $this->actingAs($user)->post(route('stock-count-documents.store'), [
             'warehouse_id' => $warehouse->id,
             'document_date' => '2026-04-05',
             'items' => [
-                ['product_id' => $products[0]->id, 'actual_quantity' => 8],
+                ['product_id' => $products[0]->id, 'variant_id' => $variants[0]->id, 'actual_quantity' => 8],
             ],
         ]);
 
@@ -132,7 +133,7 @@ class StockCountDocumentTest extends TestCase
             'warehouse_id' => $warehouse->id,
             'document_date' => '2026-04-05',
             'items' => [
-                ['product_id' => $products[0]->id, 'actual_quantity' => 9],
+                ['product_id' => $products[0]->id, 'variant_id' => $variants[0]->id, 'actual_quantity' => 9],
             ],
         ])->assertStatus(422);
 
@@ -143,14 +144,14 @@ class StockCountDocumentTest extends TestCase
 
     public function test_finalize_is_atomic_and_rolls_back_on_failure(): void
     {
-        [$user, $warehouse, $products] = $this->seedBaseData();
+        [$user, $warehouse, $products, $variants] = $this->seedBaseData();
 
         $this->actingAs($user)->post(route('stock-count-documents.store'), [
             'warehouse_id' => $warehouse->id,
             'document_date' => '2026-04-05',
             'items' => [
-                ['product_id' => $products[0]->id, 'actual_quantity' => 12],
-                ['product_id' => $products[1]->id, 'actual_quantity' => 5],
+                ['product_id' => $products[0]->id, 'variant_id' => $variants[0]->id, 'actual_quantity' => 12],
+                ['product_id' => $products[1]->id, 'variant_id' => $variants[1]->id, 'actual_quantity' => 5],
             ],
         ]);
 
@@ -210,8 +211,22 @@ class StockCountDocumentTest extends TestCase
             'quantity' => 10,
         ]);
 
+        $variantA = ProductVariant::query()->create([
+            'product_id' => $productA->id,
+            'variant_name' => 'تنوع A',
+            'variety_id' => 1001,
+            'sell_price' => 1000,
+        ]);
+
+        $variantB = ProductVariant::query()->create([
+            'product_id' => $productB->id,
+            'variant_name' => 'تنوع B',
+            'variety_id' => 1002,
+            'sell_price' => 1000,
+        ]);
+
         StockMovement::query()->delete();
 
-        return [$user, $warehouse, [$productA, $productB]];
+        return [$user, $warehouse, [$productA, $productB], [$variantA, $variantB]];
     }
 }
