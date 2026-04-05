@@ -12,12 +12,12 @@
   };
 
   $statusFa = fn($s) => match($s){
-    'warehouse_pending' => 'در انتظار تایید انبار',
-    'warehouse_collecting' => 'در حال جمع‌آوری',
-    'warehouse_checking' => 'چک کردن بار',
-    'warehouse_packing' => 'بسته‌بندی بار',
-    'warehouse_sent' => 'ارسال شد',
-    'canceled' => 'کنسل شده',
+    'pending_warehouse_approval' => 'در انتظار تایید انبار',
+    'collecting' => 'در حال جمع‌آوری',
+    'checking_discrepancy' => 'چک کردن بار',
+    'packing' => 'بسته‌بندی بار',
+    'shipped' => 'ارسال شد',
+    'not_shipped' => 'کنسل شده',
     default => $s,
   };
 
@@ -53,12 +53,12 @@
   };
 
   $badgeStatus = fn($s) => match($s){
-    'warehouse_pending' => 'bg-warning text-dark',
-    'warehouse_collecting' => 'bg-primary',
-    'warehouse_checking' => 'bg-info text-dark',
-    'warehouse_packing' => 'bg-secondary',
-    'warehouse_sent' => 'bg-success',
-    'canceled' => 'bg-danger',
+    'pending_warehouse_approval' => 'bg-warning text-dark',
+    'collecting' => 'bg-primary',
+    'checking_discrepancy' => 'bg-info text-dark',
+    'packing' => 'bg-secondary',
+    'shipped' => 'bg-success',
+    'not_shipped' => 'bg-danger',
     default => 'bg-secondary',
   };
 
@@ -171,12 +171,12 @@
           <form method="POST" action="{{ route('invoices.status', $invoice->uuid) }}" class="d-flex gap-2">
             @csrf
             <select name="status" class="form-select">
-              <option value="warehouse_pending" @selected($invoice->status==='warehouse_pending')>در انتظار تایید انبار</option>
-              <option value="warehouse_collecting" @selected($invoice->status==='warehouse_collecting')>در حال جمع‌آوری</option>
-              <option value="warehouse_checking" @selected($invoice->status==='warehouse_checking')>چک کردن بار</option>
-              <option value="warehouse_packing" @selected($invoice->status==='warehouse_packing')>بسته‌بندی بار</option>
-              <option value="warehouse_sent" @selected($invoice->status==='warehouse_sent')>ارسال شد</option>
-              <option value="canceled" @selected($invoice->status==='canceled')>کنسل شده</option>
+              <option value="pending_warehouse_approval" @selected($invoice->status==='pending_warehouse_approval')>در انتظار تایید انبار</option>
+              <option value="collecting" @selected($invoice->status==='collecting')>در حال جمع‌آوری</option>
+              <option value="checking_discrepancy" @selected($invoice->status==='checking_discrepancy')>چک کردن بار</option>
+              <option value="packing" @selected($invoice->status==='packing')>بسته‌بندی بار</option>
+              <option value="shipped" @selected($invoice->status==='shipped')>ارسال شد</option>
+              <option value="not_shipped" @selected($invoice->status==='not_shipped')>کنسل شده</option>
             </select>
             <button class="btn btn-primary">ثبت</button>
           </form>

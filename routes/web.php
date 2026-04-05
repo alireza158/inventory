@@ -6,6 +6,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AccountStatementController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChequeController;
+use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -25,6 +26,10 @@ use App\Http\Controllers\StockMovementReportController;
 use App\Http\Controllers\StocktakeController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\ShippingMethodController;
+use App\Http\Controllers\SalesHavalehController;
+use App\Http\Controllers\AssetPersonnelController;
+use App\Http\Controllers\AssetDocumentController;
+use App\Http\Controllers\AssetTrusteeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
@@ -35,6 +40,8 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard + profile
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+    Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -96,9 +103,46 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->name('warehouse.outputs');
 
+    // Asset trustee module (امین اموال)
+    Route::prefix('warehouse/asset-trustee')->name('asset.')->group(function () {
+        Route::get('/', [AssetTrusteeController::class, 'hub'])->name('hub');
+
+        Route::get('/personnel', [AssetPersonnelController::class, 'index'])->name('personnel.index');
+        Route::get('/personnel/create', [AssetPersonnelController::class, 'create'])->name('personnel.create');
+        Route::post('/personnel', [AssetPersonnelController::class, 'store'])->name('personnel.store');
+        Route::get('/personnel/{personnel}', [AssetPersonnelController::class, 'show'])->name('personnel.show');
+        Route::get('/personnel/{personnel}/edit', [AssetPersonnelController::class, 'edit'])->name('personnel.edit');
+        Route::put('/personnel/{personnel}', [AssetPersonnelController::class, 'update'])->name('personnel.update');
+        Route::patch('/personnel/{personnel}/toggle-status', [AssetPersonnelController::class, 'toggleStatus'])->name('personnel.toggle-status');
+
+        Route::get('/documents', [AssetDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/create', [AssetDocumentController::class, 'create'])->name('documents.create');
+        Route::post('/documents', [AssetDocumentController::class, 'store'])->name('documents.store');
+        Route::get('/documents/{document}', [AssetDocumentController::class, 'show'])->name('documents.show');
+        Route::get('/documents/{document}/view', [AssetDocumentController::class, 'view'])->name('documents.view');
+        Route::get('/documents/{document}/edit', [AssetDocumentController::class, 'edit'])->name('documents.edit');
+        Route::put('/documents/{document}', [AssetDocumentController::class, 'update'])->name('documents.update');
+        Route::patch('/documents/{document}/finalize', [AssetDocumentController::class, 'finalize'])->name('documents.finalize');
+        Route::patch('/documents/{document}/cancel', [AssetDocumentController::class, 'cancel'])->name('documents.cancel');
+
+        Route::get('/search', [AssetDocumentController::class, 'codeSearchPage'])->name('codes.search');
+        Route::get('/codes/{code}', [AssetDocumentController::class, 'findByCode'])->name('codes.find');
+    });
+
     Route::get('/vouchers/sales', [InvoiceController::class, 'salesVouchers'])->name('vouchers.sales.index');
     Route::get('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherEdit'])->name('vouchers.sales.edit');
+    Route::get('/vouchers/sales/{uuid}/view', [InvoiceController::class, 'salesVoucherShow'])->name('vouchers.sales.show');
+    Route::get('/vouchers/sales/{uuid}/history', [InvoiceController::class, 'salesVoucherHistory'])->name('vouchers.sales.history');
     Route::put('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherUpdate'])->name('vouchers.sales.update');
+
+    // Sales Havaleh APIs
+    Route::post('/sales-havaleh/create-from-financial/{financialId}', [SalesHavalehController::class, 'createFromFinancial'])->name('sales-havaleh.create-from-financial');
+    Route::get('/sales-havaleh/{invoice}', [SalesHavalehController::class, 'show'])->name('sales-havaleh.show');
+    Route::get('/sales-havaleh/{invoice}/view', [SalesHavalehController::class, 'view'])->name('sales-havaleh.view');
+    Route::put('/sales-havaleh/{invoice}', [SalesHavalehController::class, 'update'])->name('sales-havaleh.update');
+    Route::patch('/sales-havaleh/{invoice}/status', [SalesHavalehController::class, 'patchStatus'])->name('sales-havaleh.status');
+    Route::get('/sales-havaleh/{invoice}/history', [SalesHavalehController::class, 'history'])->name('sales-havaleh.history');
+    Route::get('/payments/{payment}/view', [AccountStatementController::class, 'showPayment'])->name('payments.view');
 
     // Warehouses
     Route::get('/warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
@@ -170,6 +214,9 @@ Route::middleware('auth')->group(function () {
 
     // Account statements (گردش حساب اشخاص)
     Route::get('/account-statements', [AccountStatementController::class, 'index'])->name('account-statements.index');
+    Route::get('/account-statements/documents/invoices/{uuid}', [AccountStatementController::class, 'showInvoice'])->name('account-statements.documents.invoices.show');
+    Route::get('/account-statements/documents/returns/{voucher}', [AccountStatementController::class, 'showReturnFromSale'])->name('account-statements.documents.returns.show');
+    Route::get('/account-statements/documents/payments/{payment}', [AccountStatementController::class, 'showPayment'])->name('account-statements.documents.payments.show');
     Route::get('/account-statements/{customer}', [AccountStatementController::class, 'show'])->name('account-statements.show');
 
     // Activity logs

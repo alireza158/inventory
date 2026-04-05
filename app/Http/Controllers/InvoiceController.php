@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Invoice;
-use App\Models\Product;
-use App\Models\StockMovement;
-use App\Services\WarehouseStockService;
+use App\Services\SalesHavalehStatusService;
+use App\Services\SalesHavalehService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
+    public function __construct(
+        private readonly SalesHavalehStatusService $statusService,
+        private readonly SalesHavalehService $salesHavalehService,
+    ) {}
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
@@ -27,7 +31,9 @@ class InvoiceController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('invoices.index', compact('invoices', 'q'));
+        $statusLabels = $this->statusService->labels();
+
+        return view('invoices.index', compact('invoices', 'q', 'statusLabels'));
     }
 
     public function salesVouchers(Request $request)
@@ -35,14 +41,7 @@ class InvoiceController extends Controller
         $q = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
 
-        $allowedStatuses = [
-            'warehouse_pending',
-            'warehouse_collecting',
-            'warehouse_checking',
-            'warehouse_packing',
-            'warehouse_sent',
-            'canceled',
-        ];
+        $allowedStatuses = $this->statusService->all();
 
         $invoices = Invoice::query()
             ->with(['items.product', 'items.variant'])
@@ -61,7 +60,69 @@ class InvoiceController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('vouchers.sales.index', compact('invoices', 'q', 'status'));
+        $statusLabels = $this->statusService->labels();
+
+        return view('vouchers.sales.index', compact('invoices', 'q', 'status', 'statusLabels', 'allowedStatuses'));
+    }
+
+    public function salesVoucherShow(string $uuid)
+    {
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant', 'histories.actor'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        $statusLabels = $this->statusService->labels();
+
+        return view('vouchers.sales.show', compact('invoice', 'statusLabels'));
+    }
+
+    public function salesVoucherEdit(string $uuid)
+    {
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        $statusLabels = $this->statusService->labels();
+        $canEditItems = $this->statusService->isEditable($invoice, auth()->user());
+
+        return view('vouchers.sales.edit', compact('invoice', 'statusLabels', 'canEditItems'));
+    }
+
+    public function salesVoucherUpdate(string $uuid, Request $request)
+    {
+        $invoice = Invoice::query()->with('items')->where('uuid', $uuid)->firstOrFail();
+
+        $data = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'required|exists:invoice_items,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'required|integer|min:0',
+        ]);
+
+        $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id());
+
+        return redirect()->route('vouchers.sales.edit', $invoice->uuid)
+            ->with('success', '✅ آیتم‌های حواله فروش با موفقیت بروزرسانی شد.');
+    }
+
+    public function salesVoucherHistory(string $uuid)
+    {
+        $invoice = Invoice::query()->with('histories.actor')->where('uuid', $uuid)->firstOrFail();
+
+        return response()->json([
+            'invoice_uuid' => $invoice->uuid,
+            'history' => $invoice->histories->map(fn ($h) => [
+                'action_type' => $h->action_type,
+                'field_name' => $h->field_name,
+                'old_value' => $h->old_value,
+                'new_value' => $h->new_value,
+                'description' => $h->description,
+                'done_by' => $h->actor?->name,
+                'done_at' => optional($h->done_at)->toDateTimeString(),
+            ])->values(),
+        ]);
     }
 
     public function edit(string $uuid)
@@ -145,8 +206,9 @@ class InvoiceController extends Controller
             ->firstOrFail();
 
         $canFinanceApprove = $this->canHandleFinanceActions();
+        $statusLabels = $this->statusService->labels();
 
-        return view('invoices.show', compact('invoice', 'canFinanceApprove'));
+        return view('invoices.show', compact('invoice', 'canFinanceApprove', 'statusLabels'));
     }
 
     private function canHandleFinanceActions(): bool
@@ -161,12 +223,11 @@ class InvoiceController extends Controller
         $invoice = Invoice::where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
-            'status' => 'required|in:warehouse_pending,warehouse_collecting,warehouse_checking,warehouse_packing,warehouse_sent,canceled',
+            'status' => 'required|string',
+            'note' => 'nullable|string|max:1000',
         ]);
 
-        $invoice->update([
-            'status' => $data['status'],
-        ]);
+        $this->salesHavalehService->changeStatus($invoice, $data['status'], $data['note'] ?? null, auth()->id());
 
         return back()->with('success', '✅ وضعیت بروزرسانی شد.');
     }
