@@ -153,9 +153,7 @@
             <a class="sidebar-sublink {{ $is('vouchers.sales.*') }}" href="{{ route('vouchers.sales.index') }}">حواله فروش کالا</a>
             <a class="sidebar-sublink {{ $is('warehouses.*') }}" href="{{ route('warehouses.index') }}">انبارها</a>
             <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
-            <a class="sidebar-sublink {{ $is('asset.personnel.*') }}" href="{{ route('asset.personnel.index') }}">امین اموال - پرسنل</a>
-            <a class="sidebar-sublink {{ $is('asset.documents.*') }}" href="{{ route('asset.documents.index') }}">امین اموال - اسناد</a>
-            <a class="sidebar-sublink {{ $is('asset.codes.*') }}" href="{{ route('asset.codes.search') }}">امین اموال - جستجوی کد</a>
+            <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
         </div>
 
         {{-- Commerce --}}

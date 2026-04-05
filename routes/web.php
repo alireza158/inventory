@@ -29,6 +29,7 @@ use App\Http\Controllers\ShippingMethodController;
 use App\Http\Controllers\SalesHavalehController;
 use App\Http\Controllers\AssetPersonnelController;
 use App\Http\Controllers\AssetDocumentController;
+use App\Http\Controllers\AssetTrusteeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
@@ -103,7 +104,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->name('warehouse.outputs');
 
     // Asset trustee module (امین اموال)
-    Route::prefix('asset')->name('asset.')->group(function () {
+    Route::prefix('warehouse/asset-trustee')->name('asset.')->group(function () {
+        Route::get('/', [AssetTrusteeController::class, 'hub'])->name('hub');
+
         Route::get('/personnel', [AssetPersonnelController::class, 'index'])->name('personnel.index');
         Route::get('/personnel/create', [AssetPersonnelController::class, 'create'])->name('personnel.create');
         Route::post('/personnel', [AssetPersonnelController::class, 'store'])->name('personnel.store');
@@ -122,7 +125,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/documents/{document}/finalize', [AssetDocumentController::class, 'finalize'])->name('documents.finalize');
         Route::patch('/documents/{document}/cancel', [AssetDocumentController::class, 'cancel'])->name('documents.cancel');
 
-        Route::get('/codes/search', [AssetDocumentController::class, 'codeSearchPage'])->name('codes.search');
+        Route::get('/search', [AssetDocumentController::class, 'codeSearchPage'])->name('codes.search');
         Route::get('/codes/{code}', [AssetDocumentController::class, 'findByCode'])->name('codes.find');
     });
 
