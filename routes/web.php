@@ -171,8 +171,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
 
-    // Stocktake
+    // Stocktake / Stock Count Documents
     Route::get('/stocktake', [StocktakeController::class, 'index'])->name('stocktake.index');
+    Route::get('/stock-count-documents', [StocktakeController::class, 'index'])->name('stock-count-documents.index');
+    Route::get('/stock-count-documents/create', [StocktakeController::class, 'create'])->name('stock-count-documents.create');
+    Route::post('/stock-count-documents', [StocktakeController::class, 'store'])->name('stock-count-documents.store');
+    Route::get('/stock-count-documents/{stockCountDocument}', [StocktakeController::class, 'show'])->name('stock-count-documents.show');
+    Route::get('/stock-count-documents/{stockCountDocument}/view', [StocktakeController::class, 'view'])->name('stock-count-documents.view');
+    Route::get('/stock-count-documents/{stockCountDocument}/edit', [StocktakeController::class, 'edit'])->name('stock-count-documents.edit');
+    Route::put('/stock-count-documents/{stockCountDocument}', [StocktakeController::class, 'update'])->name('stock-count-documents.update');
+    Route::patch('/stock-count-documents/{stockCountDocument}/finalize', [StocktakeController::class, 'finalize'])->name('stock-count-documents.finalize');
+    Route::patch('/stock-count-documents/{stockCountDocument}/cancel', [StocktakeController::class, 'cancel'])->name('stock-count-documents.cancel');
+    Route::get('/stock-count-documents-system-quantity', [StocktakeController::class, 'systemQuantity'])->name('stock-count-documents.system-quantity');
 
     // Preinvoice pages
     Route::get('/preinvoice/create', [PreinvoiceController::class, 'create'])->name('preinvoice.create');
