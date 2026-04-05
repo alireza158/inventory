@@ -70,7 +70,7 @@ class VoucherController extends Controller
                         ->orWhere('customer_mobile', 'like', "%{$q}%");
                 });
             })
-            ->whereIn('status', ['warehouse_pending', 'warehouse_collecting', 'warehouse_checking', 'warehouse_packing', 'warehouse_sent'])
+            ->whereIn('status', ['pending_warehouse_approval', 'collecting', 'checking_discrepancy', 'packing', 'shipped'])
             ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();
@@ -400,7 +400,7 @@ class VoucherController extends Controller
         $invoice = Invoice::query()->with(['items.product'])->where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
-            'status' => ['required', 'in:warehouse_pending,warehouse_collecting,warehouse_checking,warehouse_packing,warehouse_sent,canceled'],
+            'status' => ['required', 'in:pending_warehouse_approval,collecting,checking_discrepancy,packing,shipped,not_shipped'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer', 'exists:invoice_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],

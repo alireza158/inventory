@@ -15,7 +15,7 @@
       <div class="mb-3">
         <label class="form-label">وضعیت</label>
         <select name="status" class="form-select">
-          @foreach(['warehouse_pending','warehouse_collecting','warehouse_checking','warehouse_packing','warehouse_sent','canceled'] as $status)
+          @foreach(['pending_warehouse_approval','collecting','checking_discrepancy','packing','shipped','not_shipped'] as $status)
             <option value="{{ $status }}" @selected($invoice->status===$status)>{{ $status }}</option>
           @endforeach
         </select>
