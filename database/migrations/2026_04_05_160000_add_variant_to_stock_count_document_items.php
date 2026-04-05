@@ -19,15 +19,14 @@ return new class extends Migration {
         });
 
         Schema::table('stock_count_document_items', function (Blueprint $table) {
+            if ($this->hasIndex('stock_count_document_items', 'stock_count_document_items_document_id_product_id_unique')) {
+                $table->dropUnique('stock_count_document_items_document_id_product_id_unique');
+            }
+
             if (!$this->hasIndex('stock_count_document_items', 'stock_count_document_items_doc_product_variant_unique')) {
-                $table->unique(
-                    ['document_id', 'product_id', 'product_variant_id'],
-                    'stock_count_document_items_doc_product_variant_unique'
-                );
+                $table->unique(['document_id', 'product_id', 'product_variant_id'], 'stock_count_document_items_doc_product_variant_unique');
             }
         });
-
-        // Do not drop the old unique yet until dependent foreign keys are identified and updated.
     }
 
     public function down(): void
@@ -40,6 +39,10 @@ return new class extends Migration {
             if (Schema::hasColumn('stock_count_document_items', 'product_variant_id')) {
                 $table->dropConstrainedForeignId('product_variant_id');
             }
+
+            if (!$this->hasIndex('stock_count_document_items', 'stock_count_document_items_document_id_product_id_unique')) {
+                $table->unique(['document_id', 'product_id']);
+            }
         });
     }
 
@@ -47,10 +50,12 @@ return new class extends Migration {
     {
         $database = DB::getDatabaseName();
 
-        return DB::table('information_schema.statistics')
+        $exists = DB::table('information_schema.statistics')
             ->where('table_schema', $database)
             ->where('table_name', $table)
             ->where('index_name', $indexName)
             ->exists();
+
+        return (bool) $exists;
     }
 };
