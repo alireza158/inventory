@@ -27,6 +27,8 @@ use App\Http\Controllers\StocktakeController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\ShippingMethodController;
 use App\Http\Controllers\SalesHavalehController;
+use App\Http\Controllers\AssetPersonnelController;
+use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
@@ -99,6 +101,30 @@ Route::middleware('auth')->group(function () {
     Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
 
     Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->name('warehouse.outputs');
+
+    // Asset trustee module (امین اموال)
+    Route::prefix('asset')->name('asset.')->group(function () {
+        Route::get('/personnel', [AssetPersonnelController::class, 'index'])->name('personnel.index');
+        Route::get('/personnel/create', [AssetPersonnelController::class, 'create'])->name('personnel.create');
+        Route::post('/personnel', [AssetPersonnelController::class, 'store'])->name('personnel.store');
+        Route::get('/personnel/{personnel}', [AssetPersonnelController::class, 'show'])->name('personnel.show');
+        Route::get('/personnel/{personnel}/edit', [AssetPersonnelController::class, 'edit'])->name('personnel.edit');
+        Route::put('/personnel/{personnel}', [AssetPersonnelController::class, 'update'])->name('personnel.update');
+        Route::patch('/personnel/{personnel}/toggle-status', [AssetPersonnelController::class, 'toggleStatus'])->name('personnel.toggle-status');
+
+        Route::get('/documents', [AssetDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/create', [AssetDocumentController::class, 'create'])->name('documents.create');
+        Route::post('/documents', [AssetDocumentController::class, 'store'])->name('documents.store');
+        Route::get('/documents/{document}', [AssetDocumentController::class, 'show'])->name('documents.show');
+        Route::get('/documents/{document}/view', [AssetDocumentController::class, 'view'])->name('documents.view');
+        Route::get('/documents/{document}/edit', [AssetDocumentController::class, 'edit'])->name('documents.edit');
+        Route::put('/documents/{document}', [AssetDocumentController::class, 'update'])->name('documents.update');
+        Route::patch('/documents/{document}/finalize', [AssetDocumentController::class, 'finalize'])->name('documents.finalize');
+        Route::patch('/documents/{document}/cancel', [AssetDocumentController::class, 'cancel'])->name('documents.cancel');
+
+        Route::get('/codes/search', [AssetDocumentController::class, 'codeSearchPage'])->name('codes.search');
+        Route::get('/codes/{code}', [AssetDocumentController::class, 'findByCode'])->name('codes.find');
+    });
 
     Route::get('/vouchers/sales', [InvoiceController::class, 'salesVouchers'])->name('vouchers.sales.index');
     Route::get('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherEdit'])->name('vouchers.sales.edit');
