@@ -1,162 +1,316 @@
 @extends('layouts.app')
 
 @php
-  use Morilog\Jalali\Jalalian;
+    use Morilog\Jalali\Jalalian;
+
+    $statusLabels = [
+        'pending_warehouse_approval' => 'در انتظار تایید انبار',
+        'collecting' => 'در حال جمع‌آوری',
+        'checking_discrepancy' => 'بررسی مغایرت',
+        'final_check' => 'بازبینی نهایی',
+        'packing' => 'بسته‌بندی',
+        'shipped' => 'ارسال‌شده',
+        'not_shipped' => 'ارسال‌نشده',
+    ];
 @endphp
 
 @section('content')
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h4 class="page-title mb-0">داشبورد</h4>
-    <div class="text-muted small">آخرین بروزرسانی: {{ Jalalian::fromDateTime(now())->format('Y/m/d H:i') }}</div>
+<style>
+    .dashboard-shell { background: #F4F7FB; border-radius: 18px; padding: 14px; }
+    .dash-surface {
+        background: #FFFFFF;
+        border: 1px solid #DCE6F2;
+        border-radius: 16px;
+        box-shadow: 0 6px 16px rgba(15, 39, 69, 0.04);
+    }
+    .dash-soft { background: #EEF4FF; }
+    .dash-title { color: #0F2745; font-weight: 800; }
+    .dash-muted { color: #6B7A90; }
+    .dash-kpi-number { color: #0F2745; font-size: 1.8rem; font-weight: 800; line-height: 1.15; }
+    .dash-section-title { color: #102A43; font-weight: 700; font-size: 1rem; }
+    .dash-link-row {
+        border-bottom: 1px solid #E6EDF7;
+        padding-top: 0.7rem !important;
+        padding-bottom: 0.7rem !important;
+        transition: background-color .15s ease;
+        border-radius: 10px;
+    }
+    .dash-link-row:hover { background: #F8FBFF; }
+    .dash-link-row:last-child { border-bottom: 0; }
+    .dash-kpi-accent { width: 38px; height: 4px; border-radius: 999px; margin-bottom: 8px; }
+    .kpi-finance { background: #3B82F6; }
+    .kpi-warehouse { background: #38A3F5; }
+    .kpi-stock { background: #E45C6A; }
+    .kpi-receipt { background: #22A06B; }
+    .dash-summary-head { background: #F8FBFF; border-bottom: 1px solid #E5EDF7; margin: -1rem -1rem 0.9rem; padding: 0.65rem 1rem; border-radius: 16px 16px 0 0; }
+    .dash-progress-bg { background: #E7EEF8 !important; }
+    .dash-shortcut-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: #EEF4FF;
+        color: #3B82F6;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+<div class="dashboard-shell">
+<div class="dash-surface p-3 d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h4 class="mb-1 dash-title fw-bold">داشبورد مدیریتی</h4>
+        <div class="dash-muted small">{{ $todayDateLabel }} | خوش آمدید {{ $userName ?? 'کاربر' }}</div>
+    </div>
+    <div class="dash-muted small">{{ $todayDateTimeLabel }}</div>
+</div>
+
+<div class="dash-surface p-3 mb-4 d-flex flex-wrap gap-2">
+    <a href="{{ route('preinvoice.create') }}" class="btn btn-primary btn-sm">ثبت پیش‌فاکتور</a>
+    <a href="{{ route('vouchers.create') }}" class="btn btn-outline-primary btn-sm">ثبت حواله انبار</a>
+    <a href="{{ route('preinvoice.draft.index') }}" class="btn btn-outline-dark btn-sm">مشاهده صف مالی</a>
 </div>
 
 <div class="row g-3 mb-4">
     <div class="col-md-6 col-xl-3">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted">تعداد محصولات</div>
-                <div class="fs-3 fw-bold mt-1">{{ number_format($totalProducts ?? 0) }}</div>
-                <div class="small text-muted mt-2">کل کالاهای تعریف‌شده</div>
+        <a href="{{ route('preinvoice.draft.index') }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
+            <div class="dash-kpi-accent kpi-finance"></div><div class="dash-muted small">در انتظار مالی</div>
+            <div class="dash-kpi-number mt-1">{{ number_format($kpis['financeQueue']) }}</div>
+        </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <a href="{{ route('vouchers.index') }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
+            <div class="dash-kpi-accent kpi-warehouse"></div><div class="dash-muted small">در انتظار انبار</div>
+            <div class="dash-kpi-number mt-1">{{ number_format($kpis['warehousePending']) }}</div>
+        </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <a href="{{ route('products.index', ['stock_status' => 'low']) }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
+            <div class="dash-kpi-accent kpi-stock"></div><div class="dash-muted small">کالاهای کم‌موجود</div>
+            <div class="dash-kpi-number mt-1">{{ number_format($kpis['lowStock']) }}</div>
+        </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <a href="{{ route('invoices.index') }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
+            <div class="dash-kpi-accent kpi-receipt"></div><div class="dash-muted small">جمع دریافتی امروز</div>
+            <div class="dash-kpi-number mt-1">{{ number_format($kpis['todayReceipts']) }} <span class="fs-6">تومان</span></div>
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="dash-surface p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="dash-section-title">نیازمند رسیدگی</div>
+                <span class="dash-muted small">اولویت روزانه</span>
             </div>
+            @foreach(collect($actionItems)->take(4) as $item)
+                <a href="{{ $item['route'] }}" class="dash-link-row py-2 text-decoration-none d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-semibold text-dark">{{ $item['title'] }}</div>
+                        <div class="dash-muted small">{{ $item['description'] }}</div>
+                    </div>
+                    <span class="badge text-bg-{{ $item['variant'] }}">{{ number_format($item['count']) }}</span>
+                </a>
+            @endforeach
         </div>
     </div>
 
-    <div class="col-md-6 col-xl-3">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted">کالاهای موجود</div>
-                <div class="fs-3 fw-bold mt-1 text-success">{{ number_format($inStock ?? 0) }}</div>
-                <div class="small text-muted mt-2">موجودی بیشتر از صفر</div>
+    <div class="col-lg-5">
+        <div class="dash-surface p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="dash-section-title">هشدارهای مهم</div>
+                <span class="dash-muted small">Critical Alerts</span>
             </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-xl-3">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted">کم‌موجودی</div>
-                <div class="d-flex align-items-end gap-2 mt-1">
-                    <div class="fs-3 fw-bold text-warning">{{ number_format($lowStock ?? 0) }}</div>
-                    <div class="small text-muted mb-1">{{ $lowStockRate ?? 0 }}%</div>
-                </div>
-                <div class="small text-muted mt-2">تا آستانه {{ number_format($lowStockThreshold ?? 0) }}</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-xl-3">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted">ناموجود</div>
-                <div class="fs-3 fw-bold mt-1 text-danger">{{ number_format($outOfStock ?? 0) }}</div>
-                <div class="small text-muted mt-2">موجودی صفر</div>
-            </div>
+            @foreach(collect($warnings)->take(4) as $warning)
+                <a href="{{ $warning['route'] }}" class="dash-link-row py-2 text-decoration-none d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-semibold text-dark">{{ $warning['title'] }}</div>
+                        <div class="dash-muted small">{{ $warning['description'] }}</div>
+                    </div>
+                    <span class="badge text-bg-{{ $warning['variant'] }}">{{ number_format($warning['count']) }}</span>
+                </a>
+            @endforeach
         </div>
     </div>
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="mb-0 fw-bold">آخرین گردش‌های انبار</h6>
-                    <a class="btn btn-sm btn-outline-dark" href="{{ route('movements.index') }}">مشاهده همه</a>
-                </div>
-
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>زمان</th>
-                                <th>محصول</th>
-                                <th>نوع</th>
-                                <th>تعداد</th>
-                                <th>قبل</th>
-                                <th>بعد</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse(($latestMovements ?? []) as $m)
-                                <tr>
-                                    <td class="text-muted small">{{ Jalalian::fromDateTime($m->created_at)->format('Y/m/d H:i') }}</td>
-                                    <td class="fw-semibold">
-                                        {{ $m->product?->name }}
-                                        <div class="text-muted small">{{ $m->product?->sku }}</div>
-                                    </td>
-                                    <td>
-                                        @if($m->type === 'in')
-                                            <span class="badge text-bg-success">ورود</span>
-                                        @else
-                                            <span class="badge text-bg-danger">خروج</span>
-                                        @endif
-                                    </td>
-                                    <td class="fw-bold">{{ number_format($m->quantity) }}</td>
-                                    <td>{{ number_format($m->stock_before) }}</td>
-                                    <td>{{ number_format($m->stock_after) }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">هنوز گردش ثبت نشده.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+    <div class="col-xl-4">
+        <div class="dash-surface p-3 h-100">
+            <div class="dash-summary-head"><div class="dash-section-title">خلاصه فروش</div></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">پیش‌فاکتور این ماه</span><strong>{{ number_format($salesSummary['preinvoicesThisMonth']) }}</strong></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">فاکتور این ماه</span><strong>{{ number_format($salesSummary['invoicesThisMonth']) }}</strong></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">مبلغ فروش این ماه</span><strong>{{ number_format($salesSummary['salesAmountThisMonth']) }}</strong></div>
+            <div class="small d-flex justify-content-between"><span class="dash-muted">برگشت از فروش</span><strong>{{ number_format($salesSummary['returnFromSaleCount']) }}</strong></div>
         </div>
     </div>
 
-    <div class="col-lg-4">
-        <div class="card border-0 shadow-sm mb-3">
-            <div class="card-body">
-                <h6 class="mb-3 fw-bold">خلاصه امروز</h6>
-                <div class="d-flex justify-content-between small mb-2">
-                    <span class="text-muted">ورودی امروز</span>
-                    <span class="fw-semibold text-success">{{ number_format($todayMovements->total_in ?? 0) }}</span>
-                </div>
-                <div class="d-flex justify-content-between small mb-3">
-                    <span class="text-muted">خروجی امروز</span>
-                    <span class="fw-semibold text-danger">{{ number_format($todayMovements->total_out ?? 0) }}</span>
-                </div>
-                <hr>
-                <div class="d-flex justify-content-between">
-                    <span class="text-muted">ارزش موجودی</span>
-                    <span class="fw-bold">{{ number_format($totalStockValue ?? 0) }} تومان</span>
-                </div>
-            </div>
+    <div class="col-xl-4">
+        <div class="dash-surface p-3 h-100">
+            <div class="dash-summary-head"><div class="dash-section-title">خلاصه انبارداری</div></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">حواله‌های امروز</span><strong>{{ number_format($warehouseSummary['todayHavalehCount']) }}</strong></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">در انتظار انبار</span><strong>{{ number_format($warehouseSummary['pendingWarehouse']) }}</strong></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">کالاهای کم‌موجود</span><strong>{{ number_format($warehouseSummary['lowStock']) }}</strong></div>
+            <div class="small d-flex justify-content-between"><span class="dash-muted">کالاهای ناموجود</span><strong>{{ number_format($warehouseSummary['outOfStock']) }}</strong></div>
         </div>
+    </div>
 
-        <div class="card border-0 shadow-sm mb-3">
-            <div class="card-body">
-                <h6 class="mb-3 fw-bold">اقلام نزدیک به اتمام</h6>
-                <ul class="list-group list-group-flush">
-                    @forelse(($topLowStockProducts ?? []) as $product)
-                        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-semibold">{{ $product->name }}</div>
-                                <div class="small text-muted">{{ $product->sku }}</div>
-                            </div>
-                            <span class="badge text-bg-warning">{{ number_format($product->stock) }}</span>
-                        </li>
-                    @empty
-                        <li class="list-group-item px-0 text-muted small">موردی برای نمایش وجود ندارد.</li>
-                    @endforelse
-                </ul>
-            </div>
-        </div>
-
-        <div class="card border-0 shadow-sm">
-            <div class="card-body">
-                <h6 class="mb-3 fw-bold">دسترسی سریع</h6>
-                <div class="d-grid gap-2">
-                    <a class="btn btn-outline-primary" href="{{ route('products.index') }}">کالاها</a>
-                    <a class="btn btn-outline-dark" href="{{ route('movements.index') }}">گردش انبار</a>
-                    <a class="btn btn-outline-secondary" href="{{ route('vouchers.index') }}">حواله‌ها</a>
-                    <a class="btn btn-outline-secondary" href="{{ route('stocktake.index') }}">انبارگردانی</a>
-                </div>
-            </div>
+    <div class="col-xl-4">
+        <div class="dash-surface p-3 h-100">
+            <div class="dash-summary-head"><div class="dash-section-title">خلاصه مالی</div></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">صف مالی</span><strong>{{ number_format($financeSummary['financeQueue']) }}</strong></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">جمع دریافتی امروز</span><strong>{{ number_format($financeSummary['todayReceipts']) }}</strong></div>
+            <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">پرداخت نقدی</span><strong>{{ number_format($financeSummary['todayCashPayments']) }}</strong></div>
+            <div class="small d-flex justify-content-between"><span class="dash-muted">پرداخت چکی</span><strong>{{ number_format($financeSummary['todayChequePayments']) }}</strong></div>
         </div>
     </div>
 </div>
+
+<div class="dash-surface p-3 mb-4" id="monthlyReportsCard"
+     data-endpoint="{{ route('dashboard.monthly-report') }}"
+     data-initial='@json($monthlyReport)'>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+        <div>
+            <div class="dash-section-title mb-1">تحلیل عملکرد ماهانه</div>
+            <div id="monthlyReportRange" class="dash-muted small">بازه: {{ $monthlyReport['range_label'] }}</div>
+        </div>
+        <div class="d-flex gap-2 align-items-end">
+            <div>
+                <label for="reportMonthSelect" class="form-label small dash-muted mb-1">ماه</label>
+                <select id="reportMonthSelect" class="form-select form-select-sm">
+                    @foreach($reportMonths as $monthNumber => $monthLabel)
+                        <option value="{{ $monthNumber }}" @selected($selectedReportMonth == $monthNumber)>{{ $monthLabel }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="reportYearSelect" class="form-label small dash-muted mb-1">سال</label>
+                <select id="reportYearSelect" class="form-select form-select-sm">
+                    @foreach($reportYears as $yearOption)
+                        <option value="{{ $yearOption }}" @selected($selectedReportYear == $yearOption)>{{ $yearOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-2 mb-3">
+        <div class="col-md-4"><div class="rounded-3 p-2" style="background:#EEF4FF;"><div class="dash-muted small">پیش‌فاکتور</div><div class="fw-bold" data-summary="preinvoices">{{ number_format($monthlyReport['summary']['preinvoices']) }}</div></div></div>
+        <div class="col-md-4"><div class="rounded-3 p-2" style="background:#EEF4FF;"><div class="dash-muted small">فاکتور</div><div class="fw-bold" data-summary="invoices">{{ number_format($monthlyReport['summary']['invoices']) }}</div></div></div>
+        <div class="col-md-4"><div class="rounded-3 p-2" style="background:#EEF4FF;"><div class="dash-muted small">مبلغ فروش</div><div class="fw-bold" data-summary="sales_amount">{{ number_format($monthlyReport['summary']['sales_amount']) }} تومان</div></div></div>
+    </div>
+
+    <div id="monthlyHorizontalChart" class="d-grid gap-2"></div>
+
+    <div class="row g-2 mt-2">
+        <div class="col-md-4"><div class="small d-flex justify-content-between dash-muted"><span>فروش ۳۰ روز</span><strong class="text-dark">{{ number_format($rolling30Summary['sales']) }}</strong></div></div>
+        <div class="col-md-4"><div class="small d-flex justify-content-between dash-muted"><span>فاکتور ۳۰ روز</span><strong class="text-dark">{{ number_format($rolling30Summary['invoices']) }}</strong></div></div>
+        <div class="col-md-4"><div class="small d-flex justify-content-between dash-muted"><span>دریافتی ۳۰ روز</span><strong class="text-dark">{{ number_format($rolling30Summary['receipts']) }}</strong></div></div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="dash-surface p-3 h-100">
+            <div class="dash-section-title mb-2">آخرین فعالیت‌ها</div>
+            <div class="dash-link-row py-2 d-flex justify-content-between"><span>آخرین پیش‌فاکتور</span><span class="dash-muted small">{{ $recentActivity['latestPreinvoice']?->customer_name ?? '---' }}</span></div>
+            <div class="dash-link-row py-2 d-flex justify-content-between"><span>آخرین حواله</span><span class="dash-muted small">{{ $recentActivity['latestHavaleh']?->uuid ?? '---' }}</span></div>
+            <div class="dash-link-row py-2 d-flex justify-content-between"><span>آخرین تغییر وضعیت</span><span class="dash-muted small">{{ $statusLabels[$recentActivity['latestStatusChange']?->new_value ?? ''] ?? '---' }}</span></div>
+            <div class="dash-link-row py-2 d-flex justify-content-between"><span>آخرین سند امین اموال</span><span class="dash-muted small">{{ $recentActivity['latestAssetDocument']?->document_number ?? '---' }}</span></div>
+            @foreach($recentActivity['latestUserActivities']->take(2) as $log)
+                <div class="dash-link-row py-2 d-flex justify-content-between">
+                    <span class="small">{{ $log->user?->name ?? 'سیستم' }} - {{ $log->description }}</span>
+                    <span class="dash-muted small">{{ Jalalian::fromDateTime($log->occurred_at)->format('m/d H:i') }}</span>
+                </div>
+            @endforeach
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="dash-surface p-3 h-100">
+            <div class="dash-section-title mb-2">میانبر ماژول‌ها</div>
+            @foreach($moduleShortcuts as $module)
+                <a href="{{ $module['route'] }}" class="dash-link-row py-2 text-decoration-none d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-semibold text-dark">{{ $module['title'] }}</div>
+                        <div class="dash-muted small">{{ $module['description'] }}</div>
+                    </div>
+                    <span class="dash-shortcut-icon"><i class="bi bi-{{ $module['icon'] }}"></i></span>
+                </a>
+            @endforeach
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const card = document.getElementById('monthlyReportsCard');
+    if (!card) return;
+
+    const endpoint = card.dataset.endpoint;
+    const monthSelect = document.getElementById('reportMonthSelect');
+    const yearSelect = document.getElementById('reportYearSelect');
+    const rangeLabelEl = document.getElementById('monthlyReportRange');
+    const chartEl = document.getElementById('monthlyHorizontalChart');
+    const formatNumber = (value) => new Intl.NumberFormat('fa-IR').format(Number(value || 0));
+
+    const summaryEls = {
+        preinvoices: document.querySelector('[data-summary="preinvoices"]'),
+        invoices: document.querySelector('[data-summary="invoices"]'),
+        sales_amount: document.querySelector('[data-summary="sales_amount"]'),
+    };
+
+    function renderChart(report) {
+        chartEl.innerHTML = '';
+
+        (report.metrics || []).slice(0, 5).forEach((metric) => {
+            const row = document.createElement('div');
+            row.innerHTML = `
+                <div class="d-flex justify-content-between mb-1 small">
+                    <span class="fw-semibold">${metric.label}</span>
+                    <span class="dash-muted">${formatNumber(metric.value)} ${metric.unit}</span>
+                </div>
+                <div class="progress dash-progress-bg" style="height:12px;">
+                    <div class="progress-bar bg-${metric.color}" style="width:${metric.percent}%"></div>
+                </div>
+            `;
+            chartEl.appendChild(row);
+        });
+    }
+
+    function renderReport(report) {
+        rangeLabelEl.textContent = `بازه: ${report.range_label}`;
+        if (summaryEls.preinvoices) summaryEls.preinvoices.textContent = formatNumber(report.summary.preinvoices);
+        if (summaryEls.invoices) summaryEls.invoices.textContent = formatNumber(report.summary.invoices);
+        if (summaryEls.sales_amount) summaryEls.sales_amount.textContent = `${formatNumber(report.summary.sales_amount)} تومان`;
+        renderChart(report);
+    }
+
+    let initialReport = null;
+    try { initialReport = JSON.parse(card.dataset.initial || '{}'); } catch (e) { initialReport = null; }
+    if (initialReport && initialReport.metrics) renderReport(initialReport);
+
+    async function fetchReport() {
+        const url = `${endpoint}?report_month=${encodeURIComponent(monthSelect.value)}&report_year=${encodeURIComponent(yearSelect.value)}`;
+        card.classList.add('opacity-75');
+        try {
+            const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
+            if (!response.ok) throw new Error('failed');
+            renderReport(await response.json());
+        } catch (err) {
+            console.error(err);
+        } finally {
+            card.classList.remove('opacity-75');
+        }
+    }
+
+    monthSelect.addEventListener('change', fetchReport);
+    yearSelect.addEventListener('change', fetchReport);
+});
+</script>
 @endsection
