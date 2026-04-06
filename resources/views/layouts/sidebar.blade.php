@@ -6,7 +6,7 @@
 
     $productsActive = $isRoute('products.*');
 
-    $warehouseActive = $isRoute('vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*');
+    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*');
 
     $salesActive = $isRoute('preinvoice.create', 'customers.*', 'persons.*');
 
@@ -145,6 +145,7 @@
         {{-- Warehouse --}}
         <div class="sidebar-section-title {{ $warehouseActive ? 'is-active' : '' }}">انبارداری</div>
         <div class="sidebar-submenu">
+            <a class="sidebar-sublink {{ $is('purchases.*') }}" href="{{ route('purchases.index') }}">خرید کالا</a>
             <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
             <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
             <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
