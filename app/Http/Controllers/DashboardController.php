@@ -13,12 +13,14 @@ use App\Models\Product;
 use App\Models\SalesHavalehHistory;
 use App\Models\StockCountDocument;
 use App\Models\StockMovement;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
+use Morilog\Jalali\Jalalian;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $today = now()->startOfDay();
         $monthStart = now()->startOfMonth();
@@ -196,41 +198,16 @@ class DashboardController extends Controller
             ],
         ];
 
-        $salesByDay = Invoice::query()
-            ->selectRaw('DATE(created_at) as day, COALESCE(SUM(total),0) as total')
-            ->where('created_at', '>=', $last30DaysStart)
-            ->groupBy('day')
-            ->orderBy('day')
-            ->pluck('total', 'day');
+        $jalaliNow = Jalalian::fromDateTime(now());
+        $selectedYear = (int) $request->integer('report_year', $jalaliNow->getYear());
+        $selectedMonth = (int) $request->integer('report_month', $jalaliNow->getMonth());
 
-        $warehouseByDay = Invoice::query()
-            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
-            ->where('created_at', '>=', $last30DaysStart)
-            ->groupBy('day')
-            ->orderBy('day')
-            ->pluck('total', 'day');
+        $monthlyReport = $this->buildMonthlyReport($selectedYear, $selectedMonth);
 
-        $paymentsByMethod = InvoicePayment::query()
-            ->select('method', DB::raw('COALESCE(SUM(amount),0) as total'))
-            ->where('paid_at', '>=', $last30DaysStart->toDateString())
-            ->groupBy('method')
-            ->pluck('total', 'method');
-
-        $chartDays = collect(range(0, 29))->map(fn (int $offset) => Carbon::parse($last30DaysStart)->addDays($offset)->toDateString());
-
-        $charts = [
-            'sales30Days' => $chartDays->map(fn (string $day) => [
-                'label' => Carbon::parse($day)->format('m/d'),
-                'value' => (int) ($salesByDay[$day] ?? 0),
-            ]),
-            'warehouse30Days' => $chartDays->map(fn (string $day) => [
-                'label' => Carbon::parse($day)->format('m/d'),
-                'value' => (int) ($warehouseByDay[$day] ?? 0),
-            ]),
-            'paymentComparison' => [
-                ['label' => 'دریافت نقدی', 'value' => (int) ($paymentsByMethod['cash'] ?? 0)],
-                ['label' => 'دریافت چکی', 'value' => (int) ($paymentsByMethod['cheque'] ?? 0)],
-            ],
+        $rolling30Summary = [
+            'sales' => (int) Invoice::query()->where('created_at', '>=', $last30DaysStart)->sum('total'),
+            'invoices' => Invoice::query()->where('created_at', '>=', $last30DaysStart)->count(),
+            'receipts' => (int) InvoicePayment::query()->where('paid_at', '>=', $last30DaysStart->toDateString())->sum('amount'),
         ];
 
         $moduleShortcuts = [
@@ -241,6 +218,13 @@ class DashboardController extends Controller
             ['title' => 'پیکربندی', 'description' => 'تنظیمات پایه سیستم', 'route' => route('users.index'), 'icon' => 'gear'],
         ];
 
+        $reportMonths = [
+            1 => 'فروردین', 2 => 'اردیبهشت', 3 => 'خرداد', 4 => 'تیر', 5 => 'مرداد', 6 => 'شهریور',
+            7 => 'مهر', 8 => 'آبان', 9 => 'آذر', 10 => 'دی', 11 => 'بهمن', 12 => 'اسفند',
+        ];
+
+        $reportYears = range($jalaliNow->getYear() - 3, $jalaliNow->getYear() + 1);
+
         return view('dashboard.index', [
             'todayDateLabel' => now()->locale('fa')->translatedFormat('l d F Y'),
             'todayDateTimeLabel' => now()->locale('fa')->translatedFormat('Y/m/d H:i'),
@@ -250,10 +234,70 @@ class DashboardController extends Controller
             'salesSummary' => $salesSummary,
             'warehouseSummary' => $warehouseSummary,
             'financeSummary' => $financeSummary,
-            'charts' => $charts,
             'warnings' => $warnings,
             'recentActivity' => $recentActivity,
             'moduleShortcuts' => $moduleShortcuts,
+            'monthlyReport' => $monthlyReport,
+            'reportMonths' => $reportMonths,
+            'reportYears' => $reportYears,
+            'selectedReportMonth' => $selectedMonth,
+            'selectedReportYear' => $selectedYear,
+            'rolling30Summary' => $rolling30Summary,
         ]);
+    }
+
+    public function monthlyReport(Request $request): JsonResponse
+    {
+        $jalaliNow = Jalalian::fromDateTime(now());
+        $year = (int) $request->integer('report_year', $jalaliNow->getYear());
+        $month = (int) $request->integer('report_month', $jalaliNow->getMonth());
+
+        return response()->json($this->buildMonthlyReport($year, $month));
+    }
+
+    private function buildMonthlyReport(int $jalaliYear, int $jalaliMonth): array
+    {
+        $jalaliMonth = max(1, min(12, $jalaliMonth));
+
+        $startJalali = new Jalalian($jalaliYear, $jalaliMonth, 1);
+        $nextMonthJalali = $jalaliMonth === 12
+            ? new Jalalian($jalaliYear + 1, 1, 1)
+            : new Jalalian($jalaliYear, $jalaliMonth + 1, 1);
+
+        $start = $startJalali->toCarbon()->startOfDay();
+        $end = $nextMonthJalali->toCarbon()->subSecond();
+
+        $metrics = [
+            ['key' => 'sales', 'label' => 'مبلغ فروش', 'unit' => 'تومان', 'value' => (int) Invoice::query()->whereBetween('created_at', [$start, $end])->sum('total'), 'color' => 'primary'],
+            ['key' => 'warehouse_vouchers', 'label' => 'حواله‌های انبار', 'unit' => 'عدد', 'value' => Invoice::query()->whereBetween('created_at', [$start, $end])->count(), 'color' => 'info'],
+            ['key' => 'receipts', 'label' => 'دریافتی‌ها', 'unit' => 'تومان', 'value' => (int) InvoicePayment::query()->whereBetween('paid_at', [$start->toDateString(), $end->toDateString()])->sum('amount'), 'color' => 'success'],
+            ['key' => 'invoice_count', 'label' => 'تعداد فاکتورها', 'unit' => 'عدد', 'value' => Invoice::query()->whereBetween('created_at', [$start, $end])->count(), 'color' => 'secondary'],
+            ['key' => 'pending_orders', 'label' => 'سفارش‌های در انتظار', 'unit' => 'عدد', 'value' => PreinvoiceOrder::query()->where('status', 'submitted_finance')->whereBetween('created_at', [$start, $end])->count(), 'color' => 'warning'],
+        ];
+
+        $max = max(1, collect($metrics)->max('value'));
+        $metrics = collect($metrics)->map(fn (array $metric) => $metric + [
+            'percent' => (float) min(100, round(($metric['value'] / $max) * 100, 2)),
+            'display_value' => number_format($metric['value']),
+        ])->values()->all();
+
+        $monthNames = [
+            1 => 'فروردین', 2 => 'اردیبهشت', 3 => 'خرداد', 4 => 'تیر', 5 => 'مرداد', 6 => 'شهریور',
+            7 => 'مهر', 8 => 'آبان', 9 => 'آذر', 10 => 'دی', 11 => 'بهمن', 12 => 'اسفند',
+        ];
+
+        return [
+            'report_year' => $jalaliYear,
+            'report_month' => $jalaliMonth,
+            'range_label' => ($monthNames[$jalaliMonth] ?? 'ماه') . " {$jalaliYear}",
+            'from' => $start->toDateString(),
+            'to' => $end->toDateString(),
+            'summary' => [
+                'preinvoices' => PreinvoiceOrder::query()->whereBetween('created_at', [$start, $end])->count(),
+                'invoices' => Invoice::query()->whereBetween('created_at', [$start, $end])->count(),
+                'sales_amount' => (int) Invoice::query()->whereBetween('created_at', [$start, $end])->sum('total'),
+            ],
+            'metrics' => $metrics,
+        ];
     }
 }
