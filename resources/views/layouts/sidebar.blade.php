@@ -13,6 +13,15 @@
     $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*');
 
     $configActive = $isRoute('model-lists.*', 'categories.*', 'shipping-methods.*', 'users.*', 'activity-logs.*');
+
+    $initialOpenSection = match (true) {
+        $productsActive => 'products',
+        $warehouseActive => 'warehouse',
+        $salesActive => 'sales',
+        $financeActive => 'finance',
+        $configActive => 'config',
+        default => null,
+    };
 @endphp
 
 <style>
@@ -104,6 +113,49 @@
     overflow: hidden; /* قفل اسکرول */
     touch-action: none;
   }
+
+  .sidebar-section-link,
+  .sidebar-accordion-trigger{
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: right;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .sidebar-section-link{
+    color: inherit;
+  }
+
+  .sidebar-accordion-trigger-icon{
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    opacity: .6;
+    transform: rotate(0deg);
+    transition: transform .22s ease, opacity .22s ease;
+  }
+
+  .sidebar-accordion-item.is-open .sidebar-accordion-trigger-icon{
+    transform: rotate(-180deg);
+    opacity: 1;
+  }
+
+  .sidebar-accordion-panel{
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height .26s ease, opacity .18s ease;
+  }
+
+  .sidebar-accordion-item.is-open .sidebar-accordion-panel{
+    opacity: 1;
+  }
 </style>
 
 {{-- بک‌دراپ --}}
@@ -134,53 +186,111 @@
             <div class="app-sidebar__subtitle">مدیریت موجودی و گردش کالا</div>
         </div>
 
-
-        {{-- Dashboard --}}
-        <div class="sidebar-section-title {{ $isRoute('dashboard') ? 'is-active' : '' }}">داشبورد</div>
-        <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ $is('dashboard') }}" href="{{ route('dashboard') }}">نمای مدیریتی</a>
-        </div>
+        {{-- Dashboard (no submenu) --}}
+        <a class="sidebar-section-title sidebar-section-link {{ $isRoute('dashboard') ? 'is-active' : '' }}"
+           href="{{ route('dashboard') }}">
+            <span>داشبورد</span>
+        </a>
 
         {{-- Products --}}
-        <div class="sidebar-section-title {{ $productsActive ? 'is-active' : '' }}">کالاها</div>
-        <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
-            <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
-            <a class="sidebar-sublink {{ $is('products.import.show', 'products.import') }}" href="{{ route('products.import.show') }}">تعریف کالا</a>
+        <div class="sidebar-accordion-item {{ $productsActive ? 'is-open' : '' }}" data-accordion-section="products">
+            <button type="button"
+                    class="sidebar-section-title sidebar-accordion-trigger {{ $productsActive ? 'is-active' : '' }}"
+                    data-accordion-trigger
+                    aria-expanded="{{ $productsActive ? 'true' : 'false' }}">
+                <span>کالاها</span>
+                <svg class="sidebar-accordion-trigger-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="sidebar-accordion-panel" data-accordion-panel>
+                <div class="sidebar-submenu">
+                    <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
+                    <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
+                    <a class="sidebar-sublink {{ $is('products.import.show', 'products.import') }}" href="{{ route('products.import.show') }}">تعریف کالا</a>
+                </div>
+            </div>
         </div>
 
         {{-- Warehouse --}}
-        <div class="sidebar-section-title {{ $warehouseActive ? 'is-active' : '' }}">انبارداری</div>
-        <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ $is('purchases.*') }}" href="{{ route('purchases.index') }}">خرید کالا</a>
-            <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
-            <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
-            <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
+        <div class="sidebar-accordion-item {{ $warehouseActive ? 'is-open' : '' }}" data-accordion-section="warehouse">
+            <button type="button"
+                    class="sidebar-section-title sidebar-accordion-trigger {{ $warehouseActive ? 'is-active' : '' }}"
+                    data-accordion-trigger
+                    aria-expanded="{{ $warehouseActive ? 'true' : 'false' }}">
+                <span>انبارداری</span>
+                <svg class="sidebar-accordion-trigger-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="sidebar-accordion-panel" data-accordion-panel>
+                <div class="sidebar-submenu">
+                    <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
+                    <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
+                    <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
+                </div>
+            </div>
         </div>
 
         {{-- Commerce & Sales --}}
-        <div class="sidebar-section-title {{ $salesActive ? 'is-active' : '' }}">بازرگانی و فروش</div>
-        <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
-            <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
+        <div class="sidebar-accordion-item {{ $salesActive ? 'is-open' : '' }}" data-accordion-section="sales">
+            <button type="button"
+                    class="sidebar-section-title sidebar-accordion-trigger {{ $salesActive ? 'is-active' : '' }}"
+                    data-accordion-trigger
+                    aria-expanded="{{ $salesActive ? 'true' : 'false' }}">
+                <span>بازرگانی و فروش</span>
+                <svg class="sidebar-accordion-trigger-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="sidebar-accordion-panel" data-accordion-panel>
+                <div class="sidebar-submenu">
+                    <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
+                    <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
+                </div>
+            </div>
         </div>
 
         {{-- Finance --}}
-        <div class="sidebar-section-title {{ $financeActive ? 'is-active' : '' }}">مالی</div>
-        <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">صف‌های مالی</a>
-            <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
-            <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+        <div class="sidebar-accordion-item {{ $financeActive ? 'is-open' : '' }}" data-accordion-section="finance">
+            <button type="button"
+                    class="sidebar-section-title sidebar-accordion-trigger {{ $financeActive ? 'is-active' : '' }}"
+                    data-accordion-trigger
+                    aria-expanded="{{ $financeActive ? 'true' : 'false' }}">
+                <span>مالی</span>
+                <svg class="sidebar-accordion-trigger-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="sidebar-accordion-panel" data-accordion-panel>
+                <div class="sidebar-submenu">
+                    <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">صف‌های مالی</a>
+                    <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
+                    <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+                </div>
+            </div>
         </div>
 
         {{-- Configuration --}}
-        <div class="sidebar-section-title {{ $configActive ? 'is-active' : '' }}">پیکربندی</div>
-        <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست گوشی‌ها</a>
-            <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
-            <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
-            <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
-            <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
+        <div class="sidebar-accordion-item {{ $configActive ? 'is-open' : '' }}" data-accordion-section="config">
+            <button type="button"
+                    class="sidebar-section-title sidebar-accordion-trigger {{ $configActive ? 'is-active' : '' }}"
+                    data-accordion-trigger
+                    aria-expanded="{{ $configActive ? 'true' : 'false' }}">
+                <span>پیکربندی</span>
+                <svg class="sidebar-accordion-trigger-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="sidebar-accordion-panel" data-accordion-panel>
+                <div class="sidebar-submenu">
+                    <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست گوشی‌ها</a>
+                    <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
+                    <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
+                    <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
+                    <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -188,13 +298,56 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){
+  var sidebarStorageKey = 'inventory.sidebar.open-section';
+  var initialOpenSection = @json($initialOpenSection);
   var btnOpen = document.getElementById('sidebarToggleBtn');
   var btnClose = document.getElementById('sidebarCloseBtn');
   var backdrop = document.getElementById('sidebarBackdrop');
   var sidebar = document.getElementById('appSidebar');
+  var accordionItems = sidebar ? Array.from(sidebar.querySelectorAll('[data-accordion-section]')) : [];
 
   function isMobile(){
     return window.matchMedia('(max-width: 991.98px)').matches;
+  }
+
+  function getPanel(item){
+    return item.querySelector('[data-accordion-panel]');
+  }
+
+  function setPanelState(item, isOpen){
+    var panel = getPanel(item);
+    var trigger = item.querySelector('[data-accordion-trigger]');
+
+    if(!panel || !trigger){
+      return;
+    }
+
+    item.classList.toggle('is-open', isOpen);
+    trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    panel.style.maxHeight = isOpen ? panel.scrollHeight + 'px' : '0px';
+  }
+
+  function closeOtherSections(openSectionId){
+    accordionItems.forEach(function(item){
+      var sectionId = item.getAttribute('data-accordion-section');
+      setPanelState(item, sectionId === openSectionId);
+    });
+  }
+
+  function applyInitialOpenState(){
+    var storageOpenSection = null;
+    try {
+      storageOpenSection = window.localStorage.getItem(sidebarStorageKey);
+    } catch (error) {
+      storageOpenSection = null;
+    }
+
+    var desiredSection = initialOpenSection || storageOpenSection;
+    var hasDesiredSection = desiredSection && accordionItems.some(function(item){
+      return item.getAttribute('data-accordion-section') === desiredSection;
+    });
+
+    closeOtherSections(hasDesiredSection ? desiredSection : null);
   }
 
   function openSidebar(){
@@ -217,6 +370,32 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // کلیک روی لینک‌ها => بستن خودکار (موبایل)
   if(sidebar){
+    applyInitialOpenState();
+
+    accordionItems.forEach(function(item){
+      var trigger = item.querySelector('[data-accordion-trigger]');
+      if(!trigger){
+        return;
+      }
+
+      trigger.addEventListener('click', function(){
+        var sectionId = item.getAttribute('data-accordion-section');
+        var willOpen = !item.classList.contains('is-open');
+
+        closeOtherSections(willOpen ? sectionId : null);
+
+        try {
+          if(willOpen){
+            window.localStorage.setItem(sidebarStorageKey, sectionId);
+          } else {
+            window.localStorage.removeItem(sidebarStorageKey);
+          }
+        } catch (error) {
+          // localStorage might be disabled in some browsers.
+        }
+      });
+    });
+
     sidebar.addEventListener('click', function(e){
       var a = e.target && e.target.closest ? e.target.closest('a') : null;
       if(a && isMobile()){
@@ -229,6 +408,14 @@ document.addEventListener('DOMContentLoaded', function(){
   // اگر از موبایل رفت روی دسکتاپ، خودکار بسته شود
   window.addEventListener('resize', function(){
     if(!isMobile()) closeSidebar();
+    accordionItems.forEach(function(item){
+      if(item.classList.contains('is-open')){
+        var panel = getPanel(item);
+        if(panel){
+          panel.style.maxHeight = panel.scrollHeight + 'px';
+        }
+      }
+    });
   });
 });
 </script>
