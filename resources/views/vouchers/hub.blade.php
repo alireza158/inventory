@@ -177,9 +177,9 @@
 
 <div class="container voucher-page">
     <div class="hero-box">
-        <div class="hero-title">حواله</div>
+        <div class="hero-title">عملیات انبار</div>
         <p class="hero-sub">
-            از این بخش نوع حواله موردنظر را انتخاب کن و سریع وارد همان فرآیند شو. صفحه ساده‌تر شده تا دسترسی به بخش‌ها راحت‌تر باشد.
+            از این بخش عملیات‌های اصلی انبار را انتخاب کن و سریع وارد همان فرآیند شو. برای جلوگیری از شلوغی سایدبار، همه عملیات‌ها به‌صورت کارت نمایش داده می‌شوند.
         </p>
 
         <div class="hero-actions">
@@ -191,15 +191,15 @@
 
     <div class="section-box">
         <div class="section-head">
-            <h6 class="section-title">انواع حواله</h6>
-            <div class="section-sub">همه بخش‌ها در یک ردیف قرار گرفته‌اند</div>
+            <h6 class="section-title">عملیات‌های اصلی</h6>
+            <div class="section-sub">همه عملیات‌های مرتبط با انبار در یک ردیف قرار گرفته‌اند</div>
         </div>
 
         <div class="voucher-scroll">
             <div class="voucher-row">
                 <a class="voucher-card" href="{{ route('vouchers.sales.index') }}">
                     <div class="voucher-icon">🧾</div>
-                    <div class="voucher-title">حواله فروش کالا</div>
+                    <div class="voucher-title">حواله فروش</div>
                     <div class="voucher-desc">
                         مدیریت حواله‌های فروش و فاکتورهای تاییدشده.
                     </div>
@@ -225,7 +225,7 @@
 
                 <a class="voucher-card" href="{{ route('vouchers.section.index', 'scrap') }}">
                     <div class="voucher-icon">🗑️</div>
-                    <div class="voucher-title">حواله ضایعات</div>
+                    <div class="voucher-title">ضایعات</div>
                     <div class="voucher-desc">
                         انتقال کالاهای معیوب یا خارج از مصرف به انبار ضایعات.
                     </div>
@@ -238,7 +238,7 @@
 
                 <a class="voucher-card" href="{{ route('vouchers.section.index', 'personnel') }}">
                     <div class="voucher-icon">👤</div>
-                    <div class="voucher-title">حواله پرسنل</div>
+                    <div class="voucher-title">تحویل به پرسنل</div>
                     <div class="voucher-desc">
                         ثبت تحویل کالا و تجهیزات به پرسنل.
                     </div>
@@ -251,7 +251,7 @@
 
                 <a class="voucher-card" href="{{ route('vouchers.section.index', 'transfer') }}">
                     <div class="voucher-icon">🚚</div>
-                    <div class="voucher-title">حواله بین انباری</div>
+                    <div class="voucher-title">انتقال بین انبارها</div>
                     <div class="voucher-desc">
                         انتقال کالا بین انبارها با ثبت مبدا و مقصد.
                     </div>
