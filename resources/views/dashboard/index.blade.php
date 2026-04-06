@@ -16,17 +16,48 @@
 
 @section('content')
 <style>
-    .dash-surface { background: #ffffff; border: 1px solid #eef3f9; border-radius: 14px; }
-    .dash-soft { background: #f6f9ff; }
-    .dash-title { color: #102a43; }
-    .dash-muted { color: #6b778c; }
-    .dash-kpi-number { color: #0f2745; font-size: 1.6rem; font-weight: 800; }
-    .dash-section-title { color: #102a43; font-weight: 700; font-size: 1rem; }
-    .dash-link-row { border-bottom: 1px solid #eef3f9; }
+    .dashboard-shell { background: #F4F7FB; border-radius: 18px; padding: 14px; }
+    .dash-surface {
+        background: #FFFFFF;
+        border: 1px solid #DCE6F2;
+        border-radius: 16px;
+        box-shadow: 0 6px 16px rgba(15, 39, 69, 0.04);
+    }
+    .dash-soft { background: #EEF4FF; }
+    .dash-title { color: #0F2745; font-weight: 800; }
+    .dash-muted { color: #6B7A90; }
+    .dash-kpi-number { color: #0F2745; font-size: 1.8rem; font-weight: 800; line-height: 1.15; }
+    .dash-section-title { color: #102A43; font-weight: 700; font-size: 1rem; }
+    .dash-link-row {
+        border-bottom: 1px solid #E6EDF7;
+        padding-top: 0.7rem !important;
+        padding-bottom: 0.7rem !important;
+        transition: background-color .15s ease;
+        border-radius: 10px;
+    }
+    .dash-link-row:hover { background: #F8FBFF; }
     .dash-link-row:last-child { border-bottom: 0; }
+    .dash-kpi-accent { width: 38px; height: 4px; border-radius: 999px; margin-bottom: 8px; }
+    .kpi-finance { background: #3B82F6; }
+    .kpi-warehouse { background: #38A3F5; }
+    .kpi-stock { background: #E45C6A; }
+    .kpi-receipt { background: #22A06B; }
+    .dash-summary-head { background: #F8FBFF; border-bottom: 1px solid #E5EDF7; margin: -1rem -1rem 0.9rem; padding: 0.65rem 1rem; border-radius: 16px 16px 0 0; }
+    .dash-progress-bg { background: #E7EEF8 !important; }
+    .dash-shortcut-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: #EEF4FF;
+        color: #3B82F6;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
 </style>
 
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+<div class="dashboard-shell">
+<div class="dash-surface p-3 d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div>
         <h4 class="mb-1 dash-title fw-bold">داشبورد مدیریتی</h4>
         <div class="dash-muted small">{{ $todayDateLabel }} | خوش آمدید {{ $userName ?? 'کاربر' }}</div>
@@ -43,25 +74,25 @@
 <div class="row g-3 mb-4">
     <div class="col-md-6 col-xl-3">
         <a href="{{ route('preinvoice.draft.index') }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
-            <div class="dash-muted small">در انتظار مالی</div>
+            <div class="dash-kpi-accent kpi-finance"></div><div class="dash-muted small">در انتظار مالی</div>
             <div class="dash-kpi-number mt-1">{{ number_format($kpis['financeQueue']) }}</div>
         </a>
     </div>
     <div class="col-md-6 col-xl-3">
         <a href="{{ route('vouchers.index') }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
-            <div class="dash-muted small">در انتظار انبار</div>
+            <div class="dash-kpi-accent kpi-warehouse"></div><div class="dash-muted small">در انتظار انبار</div>
             <div class="dash-kpi-number mt-1">{{ number_format($kpis['warehousePending']) }}</div>
         </a>
     </div>
     <div class="col-md-6 col-xl-3">
         <a href="{{ route('products.index', ['stock_status' => 'low']) }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
-            <div class="dash-muted small">کالاهای کم‌موجود</div>
+            <div class="dash-kpi-accent kpi-stock"></div><div class="dash-muted small">کالاهای کم‌موجود</div>
             <div class="dash-kpi-number mt-1">{{ number_format($kpis['lowStock']) }}</div>
         </a>
     </div>
     <div class="col-md-6 col-xl-3">
         <a href="{{ route('invoices.index') }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
-            <div class="dash-muted small">جمع دریافتی امروز</div>
+            <div class="dash-kpi-accent kpi-receipt"></div><div class="dash-muted small">جمع دریافتی امروز</div>
             <div class="dash-kpi-number mt-1">{{ number_format($kpis['todayReceipts']) }} <span class="fs-6">تومان</span></div>
         </a>
     </div>
@@ -108,7 +139,7 @@
 <div class="row g-3 mb-4">
     <div class="col-xl-4">
         <div class="dash-surface p-3 h-100">
-            <div class="dash-section-title mb-3">خلاصه فروش</div>
+            <div class="dash-summary-head"><div class="dash-section-title">خلاصه فروش</div></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">پیش‌فاکتور این ماه</span><strong>{{ number_format($salesSummary['preinvoicesThisMonth']) }}</strong></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">فاکتور این ماه</span><strong>{{ number_format($salesSummary['invoicesThisMonth']) }}</strong></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">مبلغ فروش این ماه</span><strong>{{ number_format($salesSummary['salesAmountThisMonth']) }}</strong></div>
@@ -118,7 +149,7 @@
 
     <div class="col-xl-4">
         <div class="dash-surface p-3 h-100">
-            <div class="dash-section-title mb-3">خلاصه انبارداری</div>
+            <div class="dash-summary-head"><div class="dash-section-title">خلاصه انبارداری</div></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">حواله‌های امروز</span><strong>{{ number_format($warehouseSummary['todayHavalehCount']) }}</strong></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">در انتظار انبار</span><strong>{{ number_format($warehouseSummary['pendingWarehouse']) }}</strong></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">کالاهای کم‌موجود</span><strong>{{ number_format($warehouseSummary['lowStock']) }}</strong></div>
@@ -128,7 +159,7 @@
 
     <div class="col-xl-4">
         <div class="dash-surface p-3 h-100">
-            <div class="dash-section-title mb-3">خلاصه مالی</div>
+            <div class="dash-summary-head"><div class="dash-section-title">خلاصه مالی</div></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">صف مالی</span><strong>{{ number_format($financeSummary['financeQueue']) }}</strong></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">جمع دریافتی امروز</span><strong>{{ number_format($financeSummary['todayReceipts']) }}</strong></div>
             <div class="small d-flex justify-content-between mb-2"><span class="dash-muted">پرداخت نقدی</span><strong>{{ number_format($financeSummary['todayCashPayments']) }}</strong></div>
@@ -167,9 +198,9 @@
     </div>
 
     <div class="row g-2 mb-3">
-        <div class="col-md-4"><div class="dash-soft rounded-3 p-2"><div class="dash-muted small">پیش‌فاکتور</div><div class="fw-bold" data-summary="preinvoices">{{ number_format($monthlyReport['summary']['preinvoices']) }}</div></div></div>
-        <div class="col-md-4"><div class="dash-soft rounded-3 p-2"><div class="dash-muted small">فاکتور</div><div class="fw-bold" data-summary="invoices">{{ number_format($monthlyReport['summary']['invoices']) }}</div></div></div>
-        <div class="col-md-4"><div class="dash-soft rounded-3 p-2"><div class="dash-muted small">مبلغ فروش</div><div class="fw-bold" data-summary="sales_amount">{{ number_format($monthlyReport['summary']['sales_amount']) }} تومان</div></div></div>
+        <div class="col-md-4"><div class="rounded-3 p-2" style="background:#EEF4FF;"><div class="dash-muted small">پیش‌فاکتور</div><div class="fw-bold" data-summary="preinvoices">{{ number_format($monthlyReport['summary']['preinvoices']) }}</div></div></div>
+        <div class="col-md-4"><div class="rounded-3 p-2" style="background:#EEF4FF;"><div class="dash-muted small">فاکتور</div><div class="fw-bold" data-summary="invoices">{{ number_format($monthlyReport['summary']['invoices']) }}</div></div></div>
+        <div class="col-md-4"><div class="rounded-3 p-2" style="background:#EEF4FF;"><div class="dash-muted small">مبلغ فروش</div><div class="fw-bold" data-summary="sales_amount">{{ number_format($monthlyReport['summary']['sales_amount']) }} تومان</div></div></div>
     </div>
 
     <div id="monthlyHorizontalChart" class="d-grid gap-2"></div>
@@ -207,11 +238,13 @@
                         <div class="fw-semibold text-dark">{{ $module['title'] }}</div>
                         <div class="dash-muted small">{{ $module['description'] }}</div>
                     </div>
-                    <i class="bi bi-{{ $module['icon'] }} dash-muted"></i>
+                    <span class="dash-shortcut-icon"><i class="bi bi-{{ $module['icon'] }}"></i></span>
                 </a>
             @endforeach
         </div>
     </div>
+</div>
+
 </div>
 
 <script>
@@ -242,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <span class="fw-semibold">${metric.label}</span>
                     <span class="dash-muted">${formatNumber(metric.value)} ${metric.unit}</span>
                 </div>
-                <div class="progress" style="height:10px;background:#eaf1fb;">
+                <div class="progress dash-progress-bg" style="height:12px;">
                     <div class="progress-bar bg-${metric.color}" style="width:${metric.percent}%"></div>
                 </div>
             `;
