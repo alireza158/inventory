@@ -134,6 +134,13 @@
             <div class="app-sidebar__subtitle">مدیریت موجودی و گردش کالا</div>
         </div>
 
+
+        {{-- Dashboard --}}
+        <div class="sidebar-section-title {{ $isRoute('dashboard') ? 'is-active' : '' }}">داشبورد</div>
+        <div class="sidebar-submenu">
+            <a class="sidebar-sublink {{ $is('dashboard') }}" href="{{ route('dashboard') }}">نمای مدیریتی</a>
+        </div>
+
         {{-- Products --}}
         <div class="sidebar-section-title {{ $productsActive ? 'is-active' : '' }}">کالاها</div>
         <div class="sidebar-submenu">
