@@ -12,6 +12,10 @@
         'shipped' => 'ارسال‌شده',
         'not_shipped' => 'ارسال‌نشده',
     ];
+
+    $maxSales = max(1, collect($charts['sales30Days'] ?? [])->max('value'));
+    $maxWarehouse = max(1, collect($charts['warehouse30Days'] ?? [])->max('value'));
+    $maxPayments = max(1, collect($charts['paymentComparison'] ?? [])->max('value'));
 @endphp
 
 @section('content')
@@ -224,64 +228,53 @@
     </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4" id="monthlyReportsCard"
-     data-endpoint="{{ route('dashboard.monthly-report') }}"
-     data-initial='@json($monthlyReport)'>
-    <div class="card-body">
-        <div class="d-flex flex-wrap gap-3 justify-content-between align-items-end mb-3">
-            <div>
-                <h6 class="fw-bold mb-1">تحلیل عملکرد ماهانه</h6>
-                <div class="small text-muted" id="monthlyReportRange">بازه انتخابی: {{ $monthlyReport['range_label'] }}</div>
-            </div>
-            <div class="d-flex gap-2 align-items-end">
-                <div>
-                    <label for="reportMonthSelect" class="form-label small text-muted mb-1">ماه</label>
-                    <select class="form-select form-select-sm" id="reportMonthSelect">
-                        @foreach($reportMonths as $monthNumber => $monthLabel)
-                            <option value="{{ $monthNumber }}" @selected($selectedReportMonth == $monthNumber)>{{ $monthLabel }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="reportYearSelect" class="form-label small text-muted mb-1">سال</label>
-                    <select class="form-select form-select-sm" id="reportYearSelect">
-                        @foreach($reportYears as $yearOption)
-                            <option value="{{ $yearOption }}" @selected($selectedReportYear == $yearOption)>{{ $yearOption }}</option>
-                        @endforeach
-                    </select>
-                </div>
+<div class="row g-3 mb-4">
+    <div class="col-xl-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">نمودار فروش ۳۰ روز اخیر</h6>
+                @foreach(($charts['sales30Days'] ?? []) as $point)
+                    <div class="d-flex align-items-center gap-2 mb-1 small">
+                        <span class="text-muted" style="width:48px">{{ $point['label'] }}</span>
+                        <div class="progress flex-grow-1" style="height:8px;">
+                            <div class="progress-bar bg-primary" style="width: {{ min(100, ($point['value'] / $maxSales) * 100) }}%"></div>
+                        </div>
+                    </div>
+                @endforeach
             </div>
         </div>
-
-        <div class="row g-3 mb-3" id="monthlySummary">
-            <div class="col-md-4">
-                <div class="border rounded-3 p-2 h-100">
-                    <div class="small text-muted">تعداد پیش‌فاکتور</div>
-                    <div class="fs-5 fw-bold" data-summary="preinvoices">{{ number_format($monthlyReport['summary']['preinvoices']) }}</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="border rounded-3 p-2 h-100">
-                    <div class="small text-muted">تعداد فاکتور</div>
-                    <div class="fs-5 fw-bold" data-summary="invoices">{{ number_format($monthlyReport['summary']['invoices']) }}</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="border rounded-3 p-2 h-100">
-                    <div class="small text-muted">مبلغ فروش</div>
-                    <div class="fs-5 fw-bold" data-summary="sales_amount">{{ number_format($monthlyReport['summary']['sales_amount']) }} تومان</div>
-                </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">نمودار حواله‌های ۳۰ روز اخیر</h6>
+                @foreach(($charts['warehouse30Days'] ?? []) as $point)
+                    <div class="d-flex align-items-center gap-2 mb-1 small">
+                        <span class="text-muted" style="width:48px">{{ $point['label'] }}</span>
+                        <div class="progress flex-grow-1" style="height:8px;">
+                            <div class="progress-bar bg-info" style="width: {{ min(100, ($point['value'] / $maxWarehouse) * 100) }}%"></div>
+                        </div>
+                    </div>
+                @endforeach
             </div>
         </div>
-
-        <div id="monthlyHorizontalChart" class="d-grid gap-2"></div>
-
-        <hr>
-        <div class="small text-muted mb-2">خلاصه ۳۰ روز اخیر (ثابت)</div>
-        <div class="row g-2">
-            <div class="col-md-4"><div class="border rounded-3 p-2 small d-flex justify-content-between"><span class="text-muted">فروش ۳۰ روز</span><strong>{{ number_format($rolling30Summary['sales']) }}</strong></div></div>
-            <div class="col-md-4"><div class="border rounded-3 p-2 small d-flex justify-content-between"><span class="text-muted">فاکتور ۳۰ روز</span><strong>{{ number_format($rolling30Summary['invoices']) }}</strong></div></div>
-            <div class="col-md-4"><div class="border rounded-3 p-2 small d-flex justify-content-between"><span class="text-muted">دریافتی ۳۰ روز</span><strong>{{ number_format($rolling30Summary['receipts']) }}</strong></div></div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">مقایسه دریافتی نقدی و چکی (۳۰ روز)</h6>
+                @foreach(($charts['paymentComparison'] ?? []) as $point)
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>{{ $point['label'] }}</span>
+                            <strong>{{ number_format($point['value']) }}</strong>
+                        </div>
+                        <div class="progress" style="height:10px;">
+                            <div class="progress-bar bg-success" style="width: {{ min(100, ($point['value'] / $maxPayments) * 100) }}%"></div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
         </div>
     </div>
 </div>
@@ -349,95 +342,4 @@
         </div>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const card = document.getElementById('monthlyReportsCard');
-    if (!card) return;
-
-    const endpoint = card.dataset.endpoint;
-    const monthSelect = document.getElementById('reportMonthSelect');
-    const yearSelect = document.getElementById('reportYearSelect');
-    const rangeLabelEl = document.getElementById('monthlyReportRange');
-    const chartEl = document.getElementById('monthlyHorizontalChart');
-    const formatNumber = (value) => new Intl.NumberFormat('fa-IR').format(Number(value || 0));
-
-    const summaryEls = {
-        preinvoices: document.querySelector('[data-summary="preinvoices"]'),
-        invoices: document.querySelector('[data-summary="invoices"]'),
-        sales_amount: document.querySelector('[data-summary="sales_amount"]'),
-    };
-
-    function renderChart(report) {
-        chartEl.innerHTML = '';
-
-        (report.metrics || []).forEach((metric) => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'border rounded-3 p-2';
-
-            wrapper.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="small fw-semibold">${metric.label}</span>
-                    <span class="small text-muted">${formatNumber(metric.value)} ${metric.unit}</span>
-                </div>
-                <div class="progress" style="height:12px;">
-                    <div class="progress-bar bg-${metric.color}" style="width:${metric.percent}%"></div>
-                </div>
-            `;
-
-            chartEl.appendChild(wrapper);
-        });
-    }
-
-    function renderReport(report) {
-        rangeLabelEl.textContent = `بازه انتخابی: ${report.range_label}`;
-        if (summaryEls.preinvoices) summaryEls.preinvoices.textContent = formatNumber(report.summary.preinvoices);
-        if (summaryEls.invoices) summaryEls.invoices.textContent = formatNumber(report.summary.invoices);
-        if (summaryEls.sales_amount) summaryEls.sales_amount.textContent = `${formatNumber(report.summary.sales_amount)} تومان`;
-        renderChart(report);
-    }
-
-    let initialReport = null;
-    try {
-        initialReport = JSON.parse(card.dataset.initial || '{}');
-    } catch (e) {
-        initialReport = null;
-    }
-
-    if (initialReport && initialReport.metrics) {
-        renderReport(initialReport);
-    }
-
-    async function fetchReport() {
-        const month = monthSelect.value;
-        const year = yearSelect.value;
-        const url = `${endpoint}?report_month=${encodeURIComponent(month)}&report_year=${encodeURIComponent(year)}`;
-
-        card.classList.add('opacity-75');
-
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json',
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('failed');
-            }
-
-            const data = await response.json();
-            renderReport(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            card.classList.remove('opacity-75');
-        }
-    }
-
-    monthSelect.addEventListener('change', fetchReport);
-    yearSelect.addEventListener('change', fetchReport);
-});
-</script>
 @endsection
