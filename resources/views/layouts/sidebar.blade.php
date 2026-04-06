@@ -4,13 +4,15 @@
     $isRoute = static fn(string ...$patterns): bool => Str::is($patterns, $currentRouteName);
     $is = static fn(string ...$patterns): string => $isRoute(...$patterns) ? 'active' : '';
 
-    $productsActive = $isRoute('products.*', 'categories.*', 'model-lists.*');
+    $productsActive = $isRoute('products.*');
 
-    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'warehouses.*', 'stocktake.*', 'stocktake.index', 'asset.*');
+    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*');
 
-    $commerceActive  = $isRoute('persons.*', 'customers.*', 'suppliers.*', 'users.*');
+    $salesActive = $isRoute('preinvoice.create', 'customers.*', 'persons.*');
 
-    $invoiceActive   = $isRoute('preinvoice.*', 'invoices.*', 'shipping-methods.*', 'account-statements.*');
+    $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*');
+
+    $configActive = $isRoute('model-lists.*', 'categories.*', 'shipping-methods.*', 'users.*', 'activity-logs.*');
 @endphp
 
 <style>
@@ -132,61 +134,47 @@
             <div class="app-sidebar__subtitle">مدیریت موجودی و گردش کالا</div>
         </div>
 
-        {{-- 1) Dashboard --}}
-        <a class="sidebar-link {{ $is('dashboard') }}" href="{{ route('dashboard') }}">
-            <span class="title">داشبورد</span>
-        </a>
-
         {{-- Products --}}
-        <div class="sidebar-section-title {{ $productsActive ? 'is-active' : '' }}">محصولات</div>
+        <div class="sidebar-section-title {{ $productsActive ? 'is-active' : '' }}">کالاها</div>
         <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">کالاها</a>
-            <a class="sidebar-sublink {{ $is('categories.index') }}" href="{{ route('categories.index') }}">دسته‌بندی</a>
-            <a class="sidebar-sublink {{ $is('model-lists.index') }}" href="{{ route('model-lists.index') }}">مدل لیست</a>
+            <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
+            <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
+            <a class="sidebar-sublink {{ $is('products.import.show', 'products.import') }}" href="{{ route('products.import.show') }}">تعریف کالا</a>
         </div>
 
         {{-- Warehouse --}}
         <div class="sidebar-section-title {{ $warehouseActive ? 'is-active' : '' }}">انبارداری</div>
         <div class="sidebar-submenu">
             <a class="sidebar-sublink {{ $is('purchases.*') }}" href="{{ route('purchases.index') }}">خرید کالا</a>
-            <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله</a>
-            <a class="sidebar-sublink {{ $is('vouchers.sales.*') }}" href="{{ route('vouchers.sales.index') }}">حواله فروش کالا</a>
-            <a class="sidebar-sublink {{ $is('warehouses.*') }}" href="{{ route('warehouses.index') }}">انبارها</a>
+            <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
             <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
             <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
         </div>
 
-        {{-- Commerce --}}
-        <div class="sidebar-section-title {{ $commerceActive ? 'is-active' : '' }}">بازرگانی</div>
-        <div class="sidebar-submenu">
-            <a class="sidebar-sublink {{ $is('persons.*') }}" href="{{ route('persons.index') }}">اشخاص</a>
-            <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران</a>
-        </div>
-
-        {{-- Invoice --}}
-        <div class="sidebar-section-title {{ $invoiceActive ? 'is-active' : '' }}">فاکتور</div>
+        {{-- Commerce & Sales --}}
+        <div class="sidebar-section-title {{ $salesActive ? 'is-active' : '' }}">بازرگانی و فروش</div>
         <div class="sidebar-submenu">
             <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
-
-            @if (Route::has('preinvoice.index'))
-                <a class="sidebar-sublink {{ $is('preinvoice.index') }}" href="{{ route('preinvoice.index') }}">پیش‌فاکتورها</a>
-            @endif
-
-            <a class="sidebar-sublink {{ $is('preinvoice.draft.index') }}" href="{{ route('preinvoice.draft.index') }}">صف تایید مالی</a>
-            <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال</a>
-
-            @if (Route::has('invoices.index'))
-                <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
-            @endif
-            <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب</a>
+            <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
         </div>
 
+        {{-- Finance --}}
+        <div class="sidebar-section-title {{ $financeActive ? 'is-active' : '' }}">مالی</div>
+        <div class="sidebar-submenu">
+            <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">صف‌های مالی</a>
+            <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
+            <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+        </div>
 
-        {{-- Other --}}
-        <div class="sidebar-group-label">سایر</div>
-        <a class="sidebar-link {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">
-            <span class="title">لاگ فعالیت</span>
-        </a>
+        {{-- Configuration --}}
+        <div class="sidebar-section-title {{ $configActive ? 'is-active' : '' }}">پیکربندی</div>
+        <div class="sidebar-submenu">
+            <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست گوشی‌ها</a>
+            <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
+            <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
+            <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
+            <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
+        </div>
 
     </div>
 </div>
