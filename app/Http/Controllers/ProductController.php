@@ -330,6 +330,7 @@ class ProductController extends Controller
             'variants.*.sell_price' => ['required', 'integer', 'min:0'],
             'variants.*.buy_price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required', 'integer', 'min:0'],
+            'variants.*.is_active' => ['nullable', 'boolean'],
         ]);
 
         DB::transaction(function () use ($data, $product) {
@@ -367,6 +368,7 @@ class ProductController extends Controller
                     'sell_price' => (int) $v['sell_price'],
                     'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
                     'stock' => (int) $v['stock'],
+                    'is_active' => (bool) ($v['is_active'] ?? true),
                 ];
 
                 if (!empty($v['id'])) {
