@@ -3,9 +3,7 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">ثبت جدید غیرفعال‌سازی</h4>
-    <a href="{{ route('product-deactivation-documents.index') }}" class="btn btn-outline-secondary">
-        بازگشت به لیست
-    </a>
+    <a href="{{ route('product-deactivation-documents.index') }}" class="btn btn-outline-secondary">بازگشت به لیست</a>
 </div>
 
 <div class="card">
@@ -15,13 +13,7 @@
 
             <div class="mb-3">
                 <label class="form-label fw-bold">دلیل غیرفعال‌سازی</label>
-                <textarea
-                    name="reason_text"
-                    class="form-control @error('reason_text') is-invalid @enderror"
-                    rows="3"
-                    placeholder="دلیل را به صورت کامل بنویسید..."
-                >{{ old('reason_text') }}</textarea>
-
+                <textarea name="reason_text" class="form-control @error('reason_text') is-invalid @enderror" rows="3" placeholder="دلیل را به صورت کامل بنویسید...">{{ old('reason_text') }}</textarea>
                 @error('reason_text')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -29,9 +21,7 @@
 
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="mb-0">آیتم‌های سند</h6>
-                <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">
-                    + افزودن ردیف
-                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">+ افزودن ردیف</button>
             </div>
 
             <div class="table-responsive border rounded">
@@ -48,13 +38,12 @@
                     <tbody id="itemsTbody"></tbody>
                 </table>
             </div>
-
             @error('items')
                 <div class="text-danger small mt-2">{{ $message }}</div>
             @enderror
 
             <div class="mt-3">
-                <button type="submit" class="btn btn-danger">ثبت سند</button>
+                <button class="btn btn-danger">ثبت سند</button>
             </div>
         </form>
     </div>
@@ -93,58 +82,29 @@
 </template>
 
 @php
-    $categoryPayload = collect($categories ?? [])->map(function ($c) {
-        return [
-            'id' => (int) $c->id,
-            'name' => (string) $c->name,
-        ];
-    })->values()->all();
-
-    $subcategoryPayload = collect($subcategories ?? [])->map(function ($c) {
-        return [
-            'id' => (int) $c->id,
-            'name' => (string) $c->name,
-            'parent_id' => (int) ($c->parent_id ?? 0),
-        ];
-    })->values()->all();
-
-    $productPayload = collect($products ?? [])->map(function ($p) {
+    $productPayload = $products->map(function ($p) {
         return [
             'id' => (int) $p->id,
             'name' => (string) $p->name,
-            'category_id' => (int) optional($p->category)->id,
-            'parent_category_id' => (int) optional($p->category)->parent_id,
-            'variants' => collect($p->variants ?? [])->map(function ($v) {
-                return [
-                    'id' => (int) $v->id,
-                    'name' => (string) $v->variant_name,
-                ];
-            })->values()->all(),
+            'category_id' => (int) ($p->category?->id ?? 0),
+            'parent_category_id' => (int) ($p->category?->parent_id ?? 0),
+            'variants' => $p->variants->map(fn ($v) => ['id' => (int) $v->id, 'name' => (string) $v->variant_name])->values()->all(),
         ];
-    })->values()->all();
-
-    $oldItems = old('items', [
-        [
-            'category_id' => '',
-            'subcategory_id' => '',
-            'product_id' => '',
-            'variant_id' => '',
-        ]
-    ]);
+    })->values();
 @endphp
 
 <script>
-    const categories = @json($categoryPayload);
-    const subcategories = @json($subcategoryPayload);
+    const categories = @json($categories->map(fn($c) => ['id' => (int) $c->id, 'name' => (string) $c->name])->values());
+    const subcategories = @json($subcategories->map(fn($c) => ['id' => (int) $c->id, 'name' => (string) $c->name, 'parent_id' => (int) $c->parent_id])->values());
     const products = @json($productPayload);
-    const oldItems = @json($oldItems);
+    const oldItems = @json(old('items', [['category_id' => '', 'subcategory_id' => '', 'product_id' => '', 'variant_id' => '']]));
 
     const tbody = document.getElementById('itemsTbody');
     const template = document.getElementById('rowTemplate');
     const addRowBtn = document.getElementById('addRowBtn');
 
     function toOptions(items, placeholder, valueKey = 'id', textKey = 'name') {
-        return `<option value="">${placeholder}</option>` + items.map(function (item) {
+        return `<option value="">${placeholder}</option>` + items.map(item => {
             return `<option value="${item[valueKey]}">${item[textKey]}</option>`;
         }).join('');
     }
@@ -178,17 +138,11 @@
 
         function renderSubcategories() {
             const categoryId = Number(categoryEl.value || 0);
-
-            const items = subcategories.filter(function (s) {
-                return Number(s.parent_id) === categoryId;
-            });
-
+            const items = subcategories.filter(s => Number(s.parent_id) === categoryId);
             subcategoryEl.innerHTML = toOptions(items, 'انتخاب زیر دسته‌بندی');
-
             if (!items.length) {
                 subcategoryEl.value = '';
             }
-
             renderProducts();
         }
 
@@ -196,15 +150,9 @@
             const categoryId = Number(categoryEl.value || 0);
             const subcategoryId = Number(subcategoryEl.value || 0);
 
-            const filteredProducts = products.filter(function (p) {
-                if (!categoryId) {
-                    return true;
-                }
-
-                if (!subcategoryId) {
-                    return Number(p.parent_category_id) === categoryId || Number(p.category_id) === categoryId;
-                }
-
+            const filteredProducts = products.filter(p => {
+                if (!categoryId) return true;
+                if (!subcategoryId) return Number(p.parent_category_id) === categoryId || Number(p.category_id) === categoryId;
                 return Number(p.category_id) === subcategoryId;
             });
 
@@ -214,110 +162,58 @@
 
         function renderVariants() {
             const productId = Number(productEl.value || 0);
-
-            const product = products.find(function (p) {
-                return Number(p.id) === productId;
-            });
-
-            const variantOptions = (product && product.variants) ? product.variants : [];
-
-            variantEl.innerHTML =
-                `<option value="">بدون تنوع (غیرفعال‌سازی کل کالا)</option>` +
-                variantOptions.map(function (v) {
-                    return `<option value="${v.id}">${v.name}</option>`;
-                }).join('');
-
+            const product = products.find(p => Number(p.id) === productId);
+            const variantOptions = (product?.variants || []);
+            variantEl.innerHTML = `<option value="">بدون تنوع (غیرفعال‌سازی کل کالا)</option>` +
+                variantOptions.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
             variantEl.disabled = variantOptions.length === 0;
-
-            if (variantEl.disabled) {
-                variantEl.value = '';
-            }
-
             syncHidden();
         }
 
-        categoryEl.addEventListener('change', function () {
-            subcategoryEl.value = '';
-            productEl.value = '';
-            variantEl.value = '';
+        categoryEl.addEventListener('change', () => {
             renderSubcategories();
             syncHidden();
         });
-
-        subcategoryEl.addEventListener('change', function () {
-            productEl.value = '';
-            variantEl.value = '';
+        subcategoryEl.addEventListener('change', () => {
             renderProducts();
             syncHidden();
         });
-
-        productEl.addEventListener('change', function () {
-            variantEl.value = '';
+        productEl.addEventListener('change', () => {
             renderVariants();
             syncHidden();
         });
-
         variantEl.addEventListener('change', syncHidden);
 
-        row.querySelector('.js-remove-row').addEventListener('click', function () {
-            if (tbody.querySelectorAll('tr').length <= 1) {
-                return;
-            }
-
+        row.querySelector('.js-remove-row').addEventListener('click', () => {
+            if (tbody.querySelectorAll('tr').length <= 1) return;
             row.remove();
             reindexRows();
         });
 
-        if (initial.category_id) {
-            categoryEl.value = String(initial.category_id);
-        }
-
+        if (initial.category_id) categoryEl.value = String(initial.category_id);
         renderSubcategories();
-
-        if (initial.subcategory_id) {
-            subcategoryEl.value = String(initial.subcategory_id);
-        }
-
+        if (initial.subcategory_id) subcategoryEl.value = String(initial.subcategory_id);
         renderProducts();
-
-        if (initial.product_id) {
-            productEl.value = String(initial.product_id);
-        }
-
+        if (initial.product_id) productEl.value = String(initial.product_id);
         renderVariants();
-
-        if (initial.variant_id) {
-            variantEl.value = String(initial.variant_id);
-        }
-
+        if (initial.variant_id) variantEl.value = String(initial.variant_id);
         syncHidden();
     }
 
     function reindexRows() {
-        tbody.querySelectorAll('tr').forEach(function (row, index) {
-            updateInputNames(row, index);
-        });
+        tbody.querySelectorAll('tr').forEach((row, index) => updateInputNames(row, index));
     }
 
     function addRow(initial = {}) {
         const fragment = template.content.cloneNode(true);
         const row = fragment.querySelector('tr');
-
         tbody.appendChild(row);
         bindRow(row, initial);
         reindexRows();
     }
 
-    if (Array.isArray(oldItems) && oldItems.length) {
-        oldItems.forEach(function (item) {
-            addRow(item || {});
-        });
-    } else {
-        addRow({});
-    }
+    oldItems.forEach(item => addRow(item || {}));
 
-    addRowBtn.addEventListener('click', function () {
-        addRow({});
-    });
+    addRowBtn.addEventListener('click', () => addRow({}));
 </script>
 @endsection

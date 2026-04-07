@@ -78,7 +78,7 @@
       <div class="card-body">
 
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-          <h6 class="mb-0">مدل لیست گوشی (دسته‌بندی شده)</h6>
+          <h6 class="mb-0">مدل لیست (دسته‌بندی شده)</h6>
 
           <form method="GET" action="{{ route('model-lists.index') }}" class="d-flex gap-2">
             <input name="q" class="form-control form-control-sm" value="{{ $q ?? '' }}" placeholder="جستجو: مدل/کد/برند">

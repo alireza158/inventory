@@ -4,7 +4,7 @@
     $isRoute = static fn(string ...$patterns): bool => Str::is($patterns, $currentRouteName);
     $is = static fn(string ...$patterns): string => $isRoute(...$patterns) ? 'active' : '';
 
-    $productsActive = $isRoute('products.*', 'product-deactivation-documents.*');
+    $productsActive = $isRoute('products.*', 'product-deactivation-documents.*', 'categories.*', 'model-lists.*');
 
     $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*');
 
@@ -12,7 +12,7 @@
 
     $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*');
 
-    $configActive = $isRoute('model-lists.*', 'categories.*', 'shipping-methods.*', 'users.*', 'activity-logs.*');
+    $configActive = $isRoute('shipping-methods.*', 'users.*', 'activity-logs.*');
 
     $initialOpenSection = match (true) {
         $productsActive => 'products',
@@ -208,6 +208,8 @@
                     <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
                     <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
                     <a class="sidebar-sublink {{ $is('products.import.show', 'products.import') }}" href="{{ route('products.import.show') }}">تعریف کالا</a>
+                    <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
+                    <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست</a>
                     <a class="sidebar-sublink {{ $is('product-deactivation-documents.*') }}" href="{{ route('product-deactivation-documents.index') }}">غیرفعال‌سازی کالا</a>
                 </div>
             </div>
@@ -285,8 +287,6 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
-                    <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست گوشی‌ها</a>
-                    <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
                     <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
                     <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
                     <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
