@@ -80,6 +80,8 @@ Route::middleware('auth')->group(function () {
 
     // Quick category store
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
+    Route::post('/ajax/categories/ensure', [CategoryController::class, 'ensure'])->name('ajax.categories.ensure');
+    Route::post('/ajax/model-lists/ensure', [ModelListController::class, 'ensure'])->name('ajax.model-lists.ensure');
 
     // Stock movements
     Route::get('/products/{product}/movements/create', [StockMovementController::class, 'create'])->name('movements.create');
