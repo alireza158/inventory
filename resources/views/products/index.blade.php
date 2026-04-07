@@ -550,6 +550,11 @@
                                             </td>
                                         </tr>
 
+                                        @if($hasVariants)
+                                            <tr class="collapse bg-light" id="{{ $collapseId }}">
+                                                <td></td>
+                                                <td colspan="7">
+                                                    <div class="p-2">
                                                         <div class="table-responsive">
                                                             <table class="table table-sm mb-0">
                                                                 <thead>
@@ -568,45 +573,23 @@
                                                                             <td class="fw-bold">{{ $v->variant_name }}</td>
                                                                             <td class="mono">{{ $v->variant_code }}</td>
                                                                             <td>
-                                                                                @if((int)$v->stock === 0)
+                                                                                @if((int) $v->stock === 0)
                                                                                     <span class="pill pill-danger">0</span>
                                                                                 @else
                                                                                     <span class="pill pill-success">{{ $v->stock }}</span>
                                                                                 @endif
                                                                             </td>
-                                                                            <td>{{ number_format((int)$v->sell_price) }} تومان</td>
-                                                                            <td>{{ $v->buy_price !== null ? number_format((int)$v->buy_price).' تومان' : '—' }}</td>
+                                                                            <td>{{ number_format((int) $v->sell_price) }} تومان</td>
+                                                                            <td>{{ $v->buy_price !== null ? number_format((int) $v->buy_price) . ' تومان' : '—' }}</td>
                                                                             <td>
                                                                                 <span class="badge {{ $v->is_active ? 'bg-success' : 'bg-secondary' }}">
                                                                                     {{ $v->is_active ? 'فعال' : 'غیرفعال' }}
                                                                                 </span>
                                                                             </td>
                                                                         </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        @foreach($p->variants->sortBy('variant_code') as $v)
-                                                                            <tr>
-                                                                                <td class="fw-bold">{{ $v->variant_name }}</td>
-                                                                                <td class="mono">{{ $v->variant_code }}</td>
-                                                                                <td>
-                                                                                    @if((int) $v->stock === 0)
-                                                                                        <span class="pill pill-danger">0</span>
-                                                                                    @else
-                                                                                        <span class="pill pill-success">{{ $v->stock }}</span>
-                                                                                    @endif
-                                                                                </td>
-                                                                                <td>{{ number_format((int) $v->sell_price) }} تومان</td>
-                                                                                <td>{{ $v->buy_price !== null ? number_format((int) $v->buy_price) . ' تومان' : '—' }}</td>
-                                                                                <td>
-                                                                                    <span class="badge {{ $v->is_active ? 'bg-success' : 'bg-secondary' }}">
-                                                                                        {{ $v->is_active ? 'فعال' : 'غیرفعال' }}
-                                                                                    </span>
-                                                                                </td>
-                                                                            </tr>
-                                                                        @endforeach
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
+                                                                    @endforeach
+                                                                </tbody>
+                                                            </table>
                                                         </div>
                                                     </div>
                                                 </td>
