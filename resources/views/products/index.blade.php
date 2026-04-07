@@ -360,6 +360,17 @@
                                     @php
                                         $hasVariants = $p->variants && $p->variants->count() > 0;
                                         $collapseId = "variantsRow{$p->id}";
+                                        $variantsPayload = $p->variants
+                                            ->sortBy('variant_code')
+                                            ->values()
+                                            ->map(function ($v) {
+                                                return [
+                                                    'id' => (int) $v->id,
+                                                    'name' => $v->variant_name,
+                                                    'stock' => (int) $v->stock,
+                                                    'is_active' => (bool) $v->is_active,
+                                                ];
+                                            });
 
                                         // کد ۴ رقمی PPPP
                                         $short = $p->short_barcode;
@@ -383,7 +394,7 @@
                                                    data-edit-url="{{ route('products.edit', $p) }}"
                                                    data-delete-url="{{ route('products.destroy', $p) }}"
                                                    data-product-name="{{ $p->name }}"
-                                                   data-variants='@json($p->variants->sortBy("variant_code")->values()->map(fn($v) => ["id" => (int)$v->id, "name" => $v->variant_name, "stock" => (int)$v->stock, "is_active" => (bool)$v->is_active]))'
+                                                   data-variants='@json($variantsPayload)'
                                                    data-stock-breakdown='@json($p->warehouseStocks->map(fn($ws) => ["warehouse" => $ws->warehouse?->name, "qty" => (int) $ws->quantity])->values())'>
                                         </td>
 
