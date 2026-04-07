@@ -383,7 +383,7 @@
                                                    data-edit-url="{{ route('products.edit', $p) }}"
                                                    data-delete-url="{{ route('products.destroy', $p) }}"
                                                    data-product-name="{{ $p->name }}"
-                                                   data-variants='@json($p->variants->sortBy("variant_code")->values()->map(fn($v) => ["id" => (int)$v->id, "name" => $v->variant_name, "stock" => (int)$v->stock]))'
+                                                   data-variants='@json($p->variants->sortBy("variant_code")->values()->map(fn($v) => ["id" => (int)$v->id, "name" => $v->variant_name, "stock" => (int)$v->stock, "is_active" => (bool)$v->is_active]))'
                                                    data-stock-breakdown='@json($p->warehouseStocks->map(fn($ws) => ["warehouse" => $ws->warehouse?->name, "qty" => (int) $ws->quantity])->values())'>
                                         </td>
 
@@ -465,6 +465,7 @@
                                                                         <th class="nowrap">موجودی</th>
                                                                         <th class="nowrap">فروش</th>
                                                                         <th class="nowrap">خرید</th>
+                                                                        <th class="nowrap">وضعیت</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
@@ -481,6 +482,11 @@
                                                                             </td>
                                                                             <td>{{ number_format((int)$v->sell_price) }} تومان</td>
                                                                             <td>{{ $v->buy_price !== null ? number_format((int)$v->buy_price).' تومان' : '—' }}</td>
+                                                                            <td>
+                                                                                <span class="badge {{ $v->is_active ? 'bg-success' : 'bg-secondary' }}">
+                                                                                    {{ $v->is_active ? 'فعال' : 'غیرفعال' }}
+                                                                                </span>
+                                                                            </td>
                                                                         </tr>
                                                                     @endforeach
                                                                 </tbody>
