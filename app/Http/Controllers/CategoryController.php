@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\DB;
 
 class CategoryController extends Controller
 {
+    private function normalizeCategoryName(string $value): string
+    {
+        $value = preg_replace('/[\x{200C}\x{200D}\x{200E}\x{200F}\x{FEFF}]/u', ' ', $value);
+        $value = preg_replace('/\s+/u', ' ', (string) $value);
+        $value = trim((string) $value);
+        return mb_strtolower($value, 'UTF-8');
+    }
+
     public function index()
     {
         $rootCategories = Category::query()
@@ -103,6 +111,62 @@ class CategoryController extends Controller
 
         return redirect($redirectTo . '?category_id=' . $category->id)
             ->with('success', 'دسته‌بندی با موفقیت ساخته شد.');
+    }
+
+    public function ensure(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
+        ], [
+            'name.required' => 'نام دسته‌بندی الزامی است.',
+            'name.max' => 'نام دسته‌بندی نمی‌تواند بیشتر از ۲۵۵ کاراکتر باشد.',
+            'parent_id.exists' => 'دسته والد انتخاب‌شده معتبر نیست.',
+        ]);
+
+        $rawName = preg_replace('/\s+/u', ' ', trim((string) $data['name']));
+        if ($rawName === '') {
+            return response()->json([
+                'ok' => false,
+                'message' => 'نام دسته‌بندی نمی‌تواند خالی باشد.',
+            ], 422);
+        }
+
+        $normalizedInput = $this->normalizeCategoryName($rawName);
+        $parentId = isset($data['parent_id']) ? (int) $data['parent_id'] : null;
+
+        $category = null;
+        $created = false;
+
+        DB::transaction(function () use (&$category, &$created, $rawName, $normalizedInput, $parentId) {
+            $existing = Category::query()->lockForUpdate()->get()->first(function (Category $row) use ($normalizedInput) {
+                return $this->normalizeCategoryName((string) $row->name) === $normalizedInput;
+            });
+
+            if ($existing) {
+                $category = $existing;
+                return;
+            }
+
+            $category = Category::create([
+                'name' => $rawName,
+                'code' => $this->generateUniqueTwoDigitCode(),
+                'parent_id' => $parentId,
+            ]);
+            $created = true;
+        });
+
+        return response()->json([
+            'ok' => true,
+            'created' => $created,
+            'message' => $created ? 'دسته‌بندی جدید با موفقیت ساخته شد.' : 'این دسته‌بندی قبلاً ثبت شده بود و همان مورد انتخاب شد.',
+            'item' => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'code' => $category->code,
+                'parent_id' => $category->parent_id,
+            ],
+        ]);
     }
 
     public function fixCodes()
