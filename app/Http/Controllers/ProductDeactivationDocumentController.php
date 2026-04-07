@@ -48,7 +48,9 @@ class ProductDeactivationDocumentController extends Controller
         $products = Product::query()
             ->where(function ($query) {
                 $query->where('is_sellable', true)
-                    ->orWhereHas('variants', fn ($v) => $v->where('is_active', true));
+                    ->orWhereHas('variants', function ($v) {
+                        $v->where('is_active', true);
+                    });
             })
             ->with([
                 'category:id,name,parent_id',
@@ -115,6 +117,7 @@ class ProductDeactivationDocumentController extends Controller
                 'created_by' => (int) auth()->id(),
             ]);
 
+            // بروزرسانی شماره سند
             $doc->update([
                 'document_number' => 'PD-' . now()->format('Ymd') . '-' . str_pad((string) $doc->id, 6, '0', STR_PAD_LEFT),
             ]);
@@ -175,7 +178,10 @@ class ProductDeactivationDocumentController extends Controller
             }
         });
 
-        return redirect()->route('product-deactivation-documents.index')->with('success', 'سند غیرفعال‌سازی با موفقیت ثبت شد.');
+        // هدایت به صفحه لیست اسناد با پیغام موفقیت
+        return redirect()
+            ->route('product-deactivation-documents.index')
+            ->with('success', 'سند غیرفعال‌سازی با موفقیت ثبت شد.');
     }
 
     public function show(ProductDeactivationDocument $productDeactivationDocument)
