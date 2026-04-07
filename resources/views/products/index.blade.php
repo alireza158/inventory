@@ -115,22 +115,47 @@
 
     .product-name-wrap{
         display:flex;
+        flex-direction:column;
         align-items:flex-start;
-        justify-content:space-between;
         gap:8px;
     }
 
-    .status-dot{
-        width:10px;
-        height:10px;
-        border-radius:50%;
-        flex:0 0 10px;
-        margin-top:4px;
-        box-shadow:0 0 0 2px rgba(255,255,255,.9);
+    .sellable-state{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
     }
 
-    .status-dot.active{ background:#22c55e; }
-    .status-dot.inactive{ background:#ef4444; }
+    .sellable-badge{
+        display:inline-flex;
+        align-items:center;
+        border-radius:999px;
+        padding:3px 10px;
+        font-size:12px;
+        font-weight:700;
+        border:1px solid transparent;
+    }
+
+    .sellable-badge.active{
+        color:#166534;
+        background:rgba(34,197,94,.15);
+        border-color:rgba(22,101,52,.2);
+    }
+
+    .sellable-badge.inactive{
+        color:#991b1b;
+        background:rgba(239,68,68,.12);
+        border-color:rgba(153,27,27,.2);
+    }
+
+    .sellable-action-link{
+        font-size:12px;
+        font-weight:600;
+        text-decoration:none;
+    }
+
+    .sellable-action-link:hover{ text-decoration:underline; }
 
     .sortable-link{
         color: inherit;
@@ -524,10 +549,19 @@
                                             <td>
                                                 <div class="product-name-wrap">
                                                     <div class="fw-bold">{{ $p->name }}</div>
-                                                    <span
-                                                        class="status-dot {{ ($p->is_sellable ?? true) ? 'active' : 'inactive' }}"
-                                                        title="{{ ($p->is_sellable ?? true) ? 'فعال' : 'غیرفعال' }}"
-                                                    ></span>
+                                                    <div class="sellable-state">
+                                                        @if($p->is_sellable ?? true)
+                                                            <span class="sellable-badge active">✅ قابل فروش</span>
+                                                            <a href="{{ route('product-deactivation-documents.create') }}" class="sellable-action-link text-danger">
+                                                                ثبت سند غیرفعال‌سازی
+                                                            </a>
+                                                        @else
+                                                            <span class="sellable-badge inactive">⛔ غیرفعال فروش</span>
+                                                            <a href="{{ route('product-deactivation-documents.index', ['product_name' => $p->name]) }}" class="sellable-action-link text-secondary">
+                                                                مشاهده سوابق غیرفعال‌سازی
+                                                            </a>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                             </td>
 
