@@ -9,7 +9,7 @@ use App\Models\ProductDeactivationDocumentItem;
 use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-
+use Morilog\Jalali\Verta;
 class ProductDeactivationDocumentController extends Controller
 {
     public function index(Request $request)
