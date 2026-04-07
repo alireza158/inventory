@@ -331,6 +331,7 @@ class ProductController extends Controller
             'variants.*.sell_price' => ['required', 'integer', 'min:0'],
             'variants.*.buy_price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required', 'integer', 'min:0'],
+            'variants.*.is_active' => ['nullable', 'boolean'],
         ]);
 
         $isSellable = $request->boolean('is_sellable', true);
@@ -371,6 +372,7 @@ class ProductController extends Controller
                     'sell_price' => (int) $v['sell_price'],
                     'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
                     'stock' => (int) $v['stock'],
+                    'is_active' => (bool) ($v['is_active'] ?? true),
                 ];
 
                 if (!empty($v['id'])) {
@@ -383,7 +385,7 @@ class ProductController extends Controller
                         $keepIds[] = $variant->id;
                     }
                 } else {
-                    $variant = ProductVariant::create(array_merge($payload, [
+                $variant = ProductVariant::create(array_merge($payload, [
                         'product_id' => $product->id,
                         'reserved' => 0,
                     ]));
@@ -445,7 +447,7 @@ class ProductController extends Controller
 
         $product->update([
             'stock' => max(0, (int) $product->variants->sum('stock')),
-            'price' => max(0, (int) $product->variants->min('sell_price')),
+            'price' => max(0, (int) ($product->variants->where('is_active', true)->min('sell_price') ?? 0)),
         ]);
     }
 
