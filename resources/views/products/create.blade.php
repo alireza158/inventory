@@ -391,19 +391,6 @@
                                     <div class="mt-2 muted">
                                         دسته‌بندی نهایی انتخاب‌شده برای ثبت کالا استفاده می‌شود.
                                     </div>
-
-                                    <div class="mt-3">
-                                        <label class="form-label">جستجو/افزودن سریع دسته‌بندی</label>
-                                        <select id="categoryQuickSelect" class="form-select">
-                                            <option value="">انتخاب یا تایپ دسته‌بندی...</option>
-                                            @foreach($categories as $cat)
-                                                <option value="{{ $cat->id }}" data-parent-id="{{ $cat->parent_id }}">{{ $cat->name }}{{ $cat->code ? ' (' . $cat->code . ')' : '' }}</option>
-                                            @endforeach
-                                        </select>
-                                        <div class="form-text" id="categoryQuickHelp">
-                                            اگر مقدار جدید وارد کنی، دسته جدید در همان سطح دسته انتخاب‌شده ساخته می‌شود.
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 
@@ -594,8 +581,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const categoryLevelsEl = document.getElementById('categoryLevels');
     const categoryBreadcrumbEl = document.getElementById('categoryBreadcrumb');
     const categorySelectedTitleEl = document.getElementById('categorySelectedTitle');
-    const categoryQuickSelectEl = document.getElementById('categoryQuickSelect');
-    const categoryQuickHelpEl = document.getElementById('categoryQuickHelp');
 
     const modelPickerEl = document.getElementById('modelPicker');
     const modelPickerButton = document.getElementById('modelPickerButton');
@@ -604,9 +589,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const modelPickerList = document.getElementById('modelPickerList');
     const modelSearchInput = document.getElementById('modelSearchInput');
     const modelSelectedTags = document.getElementById('modelSelectedTags');
-    const csrfToken = @json(csrf_token());
-    const ensureCategoryUrl = @json(route('ajax.categories.ensure'));
-    const ensureModelListUrl = @json(route('ajax.model-lists.ensure'));
 
     let selectedModelIds = new Set(oldModelIds.map(function (x) { return parseInt(x, 10); }));
     let categoryPathIds = [];
@@ -630,34 +612,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function normalizeModel3(code) {
         const d = onlyDigits(code).substring(0, 3);
         return padLeft(d, 3, '0');
-    }
-
-    function normalizeForCompare(value) {
-        return String(value || '')
-            .replace(/[\u200c\u200d\u200e\u200f\ufeff]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .toLocaleLowerCase('fa-IR');
-    }
-
-    async function postJson(url, body) {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
-            },
-            body: JSON.stringify(body || {}),
-        });
-
-        const payload = await res.json().catch(function () { return {}; });
-        if (!res.ok) {
-            const err = payload?.message || 'خطا در ثبت اطلاعات.';
-            throw new Error(err);
-        }
-
-        return payload;
     }
 
     function categoryById(id) {
@@ -702,12 +656,6 @@ document.addEventListener('DOMContentLoaded', function () {
         productCodePreviewEl.textContent = cat2 + previewSeq4;
         variantPatternPreviewEl.textContent = cat2 + previewSeq4 + 'MMMDD';
         categorySelectedTitleEl.textContent = cat ? cat.name : 'هنوز انتخاب نشده';
-
-        if (window.jQuery && window.jQuery.fn?.select2 && categoryQuickSelectEl) {
-            window.jQuery(categoryQuickSelectEl).val(cat ? String(cat.id) : '').trigger('change.select2');
-        } else if (categoryQuickSelectEl) {
-            categoryQuickSelectEl.value = cat ? String(cat.id) : '';
-        }
     }
 
     function renderBreadcrumb() {
@@ -851,48 +799,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return list;
     }
 
-    async function createModelListFromInput(inputText) {
-        const trimmed = String(inputText || '').trim();
-        if (!trimmed) {
-            alert('نام مدل لیست نمی‌تواند خالی باشد.');
-            return;
-        }
-        if (!modelBrandGroupEl.value) {
-            alert('برای افزودن مدل جدید، ابتدا گروه برند را انتخاب کن.');
-            return;
-        }
-
-        try {
-            const res = await postJson(ensureModelListUrl, {
-                model_name: trimmed,
-                brand: modelBrandGroupEl.value,
-            });
-
-            const item = res.item || {};
-            const id = parseInt(item.id || '0', 10);
-            if (!id) throw new Error('پاسخ سرور معتبر نیست.');
-
-            const exists = modelLists.find(function (m) {
-                return parseInt(m.id, 10) === id;
-            });
-            if (!exists) {
-                modelLists.push({
-                    id: id,
-                    brand: item.brand || modelBrandGroupEl.value,
-                    model_name: item.model_name || trimmed,
-                    code: item.code || '',
-                });
-            }
-
-            selectedModelIds.add(id);
-            modelSearchInput.value = '';
-            renderModelPicker();
-            alert(res.message || 'مدل لیست با موفقیت انتخاب شد.');
-        } catch (e) {
-            alert(e.message || 'ثبت مدل لیست جدید انجام نشد.');
-        }
-    }
-
     function selectedModelsData() {
         const ids = Array.from(selectedModelIds).map(function (x) { return parseInt(x, 10); });
         return modelLists.filter(function (m) {
@@ -933,8 +839,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const brand = modelBrandGroupEl.value || '';
         const items = filteredModels();
-        const rawKeyword = String(modelSearchInput.value || '').trim();
-        const normalizedKeyword = normalizeForCompare(rawKeyword);
 
         if (!brand) {
             const empty = document.createElement('div');
@@ -947,26 +851,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const exactMatch = modelLists.some(function (m) {
-            if (String(m.brand || '') !== brand) return false;
-            return normalizeForCompare(m.model_name) === normalizedKeyword;
-        });
-
-        if (rawKeyword && !exactMatch) {
-            const addBtn = document.createElement('button');
-            addBtn.type = 'button';
-            addBtn.className = 'btn btn-sm btn-outline-primary w-100 mb-2';
-            addBtn.textContent = 'افزودن مدل لیست جدید: ' + rawKeyword;
-            addBtn.addEventListener('click', function () {
-                createModelListFromInput(rawKeyword);
-            });
-            modelPickerList.appendChild(addBtn);
-        }
-
         if (!items.length) {
             const empty = document.createElement('div');
             empty.className = 'muted p-2';
-            empty.textContent = 'مدلی برای این برند پیدا نشد. می‌توانی از گزینه افزودن استفاده کنی.';
+            empty.textContent = 'مدلی برای این برند پیدا نشد.';
             modelPickerList.appendChild(empty);
             updateSelectedModelsCount();
             renderSelectedModelTags();
@@ -1138,74 +1026,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function selectedCategoryParentForCreate() {
-        const current = selectedCategory();
-        if (!current) return null;
-        if (current.parent_id) return parseInt(current.parent_id, 10);
-        return null;
-    }
-
-    function initCategoryQuickSelect() {
-        if (!window.jQuery || !window.jQuery.fn?.select2 || !categoryQuickSelectEl) return;
-        const $el = window.jQuery(categoryQuickSelectEl);
-
-        $el.select2({
-            width: '100%',
-            dir: 'rtl',
-            tags: true,
-            placeholder: 'انتخاب یا تایپ دسته‌بندی...',
-            language: {
-                noResults: function () { return 'موردی یافت نشد'; },
-            },
-            createTag: function (params) {
-                const term = window.jQuery.trim(params.term || '');
-                if (!term) return null;
-                return { id: '__new__:' + term, text: 'افزودن دسته‌بندی جدید: ' + term, newTag: true, raw: term };
-            },
-        });
-
-        $el.on('select2:select', async function (e) {
-            const data = e.params?.data || {};
-            const val = String(data.id || '');
-
-            if (!val.startsWith('__new__:')) {
-                categoryIdEl.value = val;
-                renderCategoryLevels(getCategoryPath(val));
-                renderVariantPreview();
-                return;
-            }
-
-            const typed = String(data.raw || val.replace('__new__:', '')).trim();
-            if (!typed) return;
-
-            try {
-                const res = await postJson(ensureCategoryUrl, {
-                    name: typed,
-                    parent_id: selectedCategoryParentForCreate(),
-                });
-                const item = res.item || {};
-                const id = String(item.id || '');
-                if (!id) throw new Error('پاسخ سرور معتبر نیست.');
-
-                if (!$el.find('option[value="' + id + '"]').length) {
-                    const text = (item.name || typed) + (item.code ? ' (' + item.code + ')' : '');
-                    const option = new Option(text, id, true, true);
-                    option.dataset.parentId = item.parent_id || '';
-                    $el.append(option);
-                }
-
-                $el.val(id).trigger('change');
-                categoryQuickHelpEl.textContent = res.message || 'دسته‌بندی انتخاب شد.';
-                categoryIdEl.value = id;
-                renderCategoryLevels(getCategoryPath(id));
-                renderVariantPreview();
-            } catch (err) {
-                alert(err.message || 'ثبت دسته‌بندی جدید انجام نشد.');
-                $el.val(categoryIdEl.value || '').trigger('change');
-            }
-        });
-    }
-
     modelPickerButton.addEventListener('click', function () {
         if (modelBrandGroupEl.disabled) return;
 
@@ -1246,7 +1066,6 @@ document.addEventListener('DOMContentLoaded', function () {
         renderCategoryLevels([]);
     }
 
-    initCategoryQuickSelect();
     updateCategoryPreview();
     renderModelPicker();
     renderDesignNotes();
