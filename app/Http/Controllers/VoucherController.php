@@ -263,10 +263,13 @@ class VoucherController extends Controller
         $returnReasons = WarehouseTransfer::returnReasonOptions();
 
         $products = Product::query()
+            ->where('is_sellable', true)
+            ->whereHas('variants', fn ($q) => $q->active())
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
 
         $variants = ProductVariant::query()
+            ->active()
             ->orderBy('variant_name')
             ->get(['id', 'product_id', 'variant_name', 'variant_code', 'stock', 'reserved']);
 
@@ -518,11 +521,14 @@ class VoucherController extends Controller
     private function scrapCreate()
     {
         $products = Product::query()
+            ->where('is_sellable', true)
+            ->whereHas('variants', fn ($q) => $q->active())
             ->select('id', 'name', 'sku', 'code', 'category_id', 'stock')
             ->orderBy('name')
             ->get();
 
         $variants = ProductVariant::query()
+            ->active()
             ->orderBy('product_id')
             ->orderBy('variant_name')
             ->get([
@@ -552,9 +558,15 @@ class VoucherController extends Controller
     private function personnelCreate()
     {
         $categories = Category::orderBy('name')->get();
-        $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $products = Product::query()
+            ->where('is_sellable', true)
+            ->whereHas('variants', fn ($q) => $q->active())
+            ->select('id', 'name', 'sku', 'category_id', 'price')
+            ->orderBy('name')
+            ->get();
 
         $variants = ProductVariant::query()
+            ->active()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
             ->orderBy('product_variants.variant_name')
             ->get([
@@ -577,9 +589,15 @@ class VoucherController extends Controller
     private function transferCreate()
     {
         $categories = Category::orderBy('name')->get();
-        $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $products = Product::query()
+            ->where('is_sellable', true)
+            ->whereHas('variants', fn ($q) => $q->active())
+            ->select('id', 'name', 'sku', 'category_id', 'price')
+            ->orderBy('name')
+            ->get();
 
         $variants = ProductVariant::query()
+            ->active()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
             ->orderBy('product_variants.variant_name')
             ->get([
@@ -827,6 +845,10 @@ class VoucherController extends Controller
                 abort(422, 'ردیف ' . $rowNo . ': تنوع/طرح انتخابی متعلق به کالای انتخاب‌شده نیست.');
             }
 
+            if ($voucherType !== WarehouseTransfer::TYPE_CUSTOMER_RETURN && !(bool) $variant->is_active) {
+                abort(422, 'ردیف ' . $rowNo . ': تنوع انتخابی غیرفعال است.');
+            }
+
             if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && !in_array((int) $item['product_id'], $invoiceProductIds, true)) {
                 abort(422, 'ردیف ' . $rowNo . ': کالا باید از اقلام همان فاکتور مشتری انتخاب شود.');
             }
@@ -901,6 +923,10 @@ class VoucherController extends Controller
 
             if (!$variant) {
                 abort(422, 'تنوع انتخابی برای کالا معتبر نیست.');
+            }
+
+            if ($voucherType !== WarehouseTransfer::TYPE_CUSTOMER_RETURN && !(bool) $variant->is_active) {
+                abort(422, 'تنوع انتخابی غیرفعال است.');
             }
 
             $qty = (int) $item['quantity'];
