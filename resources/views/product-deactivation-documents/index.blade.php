@@ -2,22 +2,18 @@
 
 @section('content')
 @php
-    $productsForJs = collect($products ?? [])->map(function ($product) {
-        return [
-            'id' => (int) $product->id,
-            'name' => (string) $product->name,
-            'is_sellable' => (bool) ($product->is_sellable ?? true),
-            'variants' => collect($product->variants ?? [])->map(function ($variant) {
-                return [
-                    'id' => (int) $variant->id,
-                    'name' => (string) ($variant->variant_name ?? ''),
-                    'is_active' => (bool) ($variant->is_active ?? true),
-                ];
-            })->values()->all(),
-        ];
-    })->values()->all();
-@endphp
+    $toJalali = function ($date) {
+        if (!$date) {
+            return '-';
+        }
 
+        if (class_exists(\Hekmatinasser\Verta\Verta::class)) {
+            return \Hekmatinasser\Verta\Verta::instance($date)->format('Y/m/d H:i');
+        }
+
+        return optional($date)->format('Y/m/d H:i');
+    };
+@endphp
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">لیست اسناد غیرفعال‌سازی کالا</h4>
     <a href="{{ route('product-deactivation-documents.create') }}" class="btn btn-primary">ثبت جدید غیرفعال‌سازی</a>
@@ -79,7 +75,7 @@
             @forelse($documents as $doc)
                 <tr>
                     <td class="fw-bold">{{ $doc->document_number }}</td>
-                    <td>{{ optional($doc->created_at)->format('Y/m/d H:i') }}</td>
+                    <td>{{ $toJalali($doc->created_at) }}</td>
                     <td><span class="badge bg-info-subtle text-dark">{{ (int) ($doc->items_count ?: 1) }}</span></td>
                     <td class="text-wrap" style="min-width: 240px;">{{ $doc->reason_text }}</td>
                     <td>{{ $doc->creator?->name ?? '-' }}</td>

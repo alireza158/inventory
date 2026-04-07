@@ -1,6 +1,19 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    $toJalali = function ($date) {
+        if (!$date) {
+            return '-';
+        }
+
+        if (class_exists(\Hekmatinasser\Verta\Verta::class)) {
+            return \Hekmatinasser\Verta\Verta::instance($date)->format('Y/m/d H:i');
+        }
+
+        return optional($date)->format('Y/m/d H:i');
+    };
+@endphp
 <div class="card">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -10,7 +23,7 @@
 
         <div class="row g-3 mb-3">
             <div class="col-md-3"><b>شناسه سند:</b> {{ $document->document_number }}</div>
-            <div class="col-md-3"><b>تاریخ ثبت:</b> {{ optional($document->created_at)->format('Y/m/d H:i') }}</div>
+            <div class="col-md-3"><b>تاریخ ثبت:</b> {{ $toJalali($document->created_at) }}</div>
             <div class="col-md-3"><b>تعداد آیتم‌ها:</b> {{ (int) ($document->items_count ?: max(1, $document->items->count())) }}</div>
             <div class="col-md-3"><b>ثبت‌کننده:</b> {{ $document->creator?->name ?? '-' }}</div>
             <div class="col-md-12">
