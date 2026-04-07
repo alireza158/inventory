@@ -4,7 +4,7 @@
     $isRoute = static fn(string ...$patterns): bool => Str::is($patterns, $currentRouteName);
     $is = static fn(string ...$patterns): string => $isRoute(...$patterns) ? 'active' : '';
 
-    $productsActive = $isRoute('products.*');
+    $productsActive = $isRoute('products.*', 'product-deactivation-documents.*');
 
     $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*');
 
@@ -208,6 +208,7 @@
                     <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
                     <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
                     <a class="sidebar-sublink {{ $is('products.import.show', 'products.import') }}" href="{{ route('products.import.show') }}">تعریف کالا</a>
+                    <a class="sidebar-sublink {{ $is('product-deactivation-documents.*') }}" href="{{ route('product-deactivation-documents.index') }}">اسناد غیرفعال‌سازی</a>
                 </div>
             </div>
         </div>

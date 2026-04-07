@@ -385,89 +385,12 @@
                             نمایش {{ $products->firstItem() ?? 0 }} تا {{ $products->lastItem() ?? 0 }} از {{ $products->total() ?? 0 }} مورد
                         </div>
                     </div>
-<<<<<<< HEAD
-=======
-                </form>
-            </div>
-        </div>
-
-        {{-- Table --}}
-        <div class="soft-card">
-            <div class="card-body pb-0">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                    <div class="small subtle-text">
-                        نمایش {{ $products->firstItem() ?? 0 }} تا {{ $products->lastItem() ?? 0 }} از {{ $products->total() ?? 0 }} مورد
-                    </div>
-                </div>
-
-                <div class="sheet-wrap">
-                    <div class="table-responsive">
-                        <table class="sheet">
-                            <thead>
-                                <tr>
-                                    <th class="w-1 text-center">
-                                        <input type="checkbox" class="form-check-input" id="selectAllProducts" title="انتخاب همه">
-                                    </th>
-                                    <th class="w-1"></th>
-                                    <th class="nowrap">
-                                        <a href="{{ $sortLink('short_barcode') }}" class="sortable-link">کد کالا <span class="sort-arrow">{{ $sortArrow('short_barcode') }}</span></a>
-                                    </th>
-                                    <th class="nowrap">
-                                        <a href="{{ $sortLink('barcode') }}" class="sortable-link">بارکد کالا <span class="sort-arrow">{{ $sortArrow('barcode') }}</span></a>
-                                    </th>
-                                    <th>
-                                        <a href="{{ $sortLink('name') }}" class="sortable-link">اسم کالا <span class="sort-arrow">{{ $sortArrow('name') }}</span></a>
-                                    </th>
-                                    <th class="nowrap">
-                                        <a href="{{ $sortLink('stock') }}" class="sortable-link">موجودی <span class="sort-arrow">{{ $sortArrow('stock') }}</span></a>
-                                    </th>
-                                    <th class="nowrap">
-                                        <a href="{{ $sortLink('variants_buy_price_min') }}" class="sortable-link">قیمت خرید <span class="sort-arrow">{{ $sortArrow('variants_buy_price_min') }}</span></a>
-                                    </th>
-                                    <th class="nowrap">
-                                        <a href="{{ $sortLink('price') }}" class="sortable-link">قیمت فروش <span class="sort-arrow">{{ $sortArrow('price') }}</span></a>
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                @forelse($products as $p)
-                                    @php
-                                        $hasVariants = $p->variants && $p->variants->count() > 0;
-                                        $collapseId = "variantsRow{$p->id}";
-                                        $variantsPayload = $p->variants
-                                            ->sortBy('variant_code')
-                                            ->values()
-                                            ->map(function ($v) {
-                                                return [
-                                                    'id' => (int) $v->id,
-                                                    'name' => $v->variant_name,
-                                                    'stock' => (int) $v->stock,
-                                                    'is_active' => (bool) $v->is_active,
-                                                ];
-                                            });
-
-                                        // کد ۴ رقمی PPPP
-                                        $short = $p->short_barcode;
-                                        if (!$short && $p->code && strlen($p->code) >= 6) {
-                                            $short = substr($p->code, 2, 4); // CCPPPP -> PPPP
-                                        }
-
-                                        // نمایش نمونه بارکد 11 رقمی از اولین تنوع (به عنوان نمونه)
-                                        $sampleBarcode = null;
-                                        if ($hasVariants) {
-                                            $firstVar = $p->variants->sortBy('variant_code')->first();
-                                            $sampleBarcode = $firstVar?->variant_code;
-                                        }
-                                    @endphp
->>>>>>> daadcaa1594366598c294fff824dedfe9ef4328c
 
                     <div class="sheet-wrap">
                         <div class="table-responsive">
                             <table class="sheet">
                                 <thead>
                                     <tr>
-<<<<<<< HEAD
                                         <th class="w-1 text-center">
                                             <input type="checkbox" class="form-check-input" id="selectAllProducts" title="انتخاب همه">
                                         </th>
@@ -510,18 +433,6 @@
                                         </th>
                                     </tr>
                                 </thead>
-=======
-                                        <td class="text-center">
-                                            <input type="checkbox"
-                                                   class="form-check-input product-checkbox"
-                                                   value="{{ $p->id }}"
-                                                   data-edit-url="{{ route('products.edit', $p) }}"
-                                                   data-delete-url="{{ route('products.destroy', $p) }}"
-                                                   data-product-name="{{ $p->name }}"
-                                                   data-variants='@json($variantsPayload)'
-                                                   data-stock-breakdown='@json($p->warehouseStocks->map(fn($ws) => ["warehouse" => $ws->warehouse?->name, "qty" => (int) $ws->quantity])->values())'>
-                                        </td>
->>>>>>> daadcaa1594366598c294fff824dedfe9ef4328c
 
                                 <tbody>
                                     @forelse($products as $p)
@@ -639,25 +550,37 @@
                                             </td>
                                         </tr>
 
-                                        @if($hasVariants)
-                                            <tr>
-                                                <td colspan="8" class="p-0">
-                                                    <div class="collapse" id="{{ $collapseId }}">
-                                                        <div class="variants-wrap">
-                                                            <div class="small subtle-text mb-2">
-                                                                تنوع‌ها (برای انبار/اسکن): بارکد ۱۱ رقمی هر تنوع
-                                                            </div>
-
-                                                            <div class="table-responsive">
-                                                                <table class="table table-sm mb-0">
-                                                                    <thead>
+                                                        <div class="table-responsive">
+                                                            <table class="table table-sm mb-0">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>نام تنوع</th>
+                                                                        <th class="nowrap">بارکد ۱۱</th>
+                                                                        <th class="nowrap">موجودی</th>
+                                                                        <th class="nowrap">فروش</th>
+                                                                        <th class="nowrap">خرید</th>
+                                                                        <th class="nowrap">وضعیت</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    @foreach($p->variants->sortBy('variant_code') as $v)
                                                                         <tr>
-                                                                            <th>نام تنوع</th>
-                                                                            <th class="nowrap">بارکد ۱۱</th>
-                                                                            <th class="nowrap">موجودی</th>
-                                                                            <th class="nowrap">فروش</th>
-                                                                            <th class="nowrap">خرید</th>
-                                                                            <th class="nowrap">وضعیت</th>
+                                                                            <td class="fw-bold">{{ $v->variant_name }}</td>
+                                                                            <td class="mono">{{ $v->variant_code }}</td>
+                                                                            <td>
+                                                                                @if((int)$v->stock === 0)
+                                                                                    <span class="pill pill-danger">0</span>
+                                                                                @else
+                                                                                    <span class="pill pill-success">{{ $v->stock }}</span>
+                                                                                @endif
+                                                                            </td>
+                                                                            <td>{{ number_format((int)$v->sell_price) }} تومان</td>
+                                                                            <td>{{ $v->buy_price !== null ? number_format((int)$v->buy_price).' تومان' : '—' }}</td>
+                                                                            <td>
+                                                                                <span class="badge {{ $v->is_active ? 'bg-success' : 'bg-secondary' }}">
+                                                                                    {{ $v->is_active ? 'فعال' : 'غیرفعال' }}
+                                                                                </span>
+                                                                            </td>
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>

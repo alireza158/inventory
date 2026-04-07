@@ -7,14 +7,6 @@
 <div class="row g-3">
 <div class="col-md-4"><label class="form-label">نام محصول</label><input name="name" class="form-control" value="{{ old('name',$product->name) }}" required></div>
 <div class="col-md-4"><label class="form-label">دسته‌بندی</label><select name="category_id" class="form-select" required><option value="">انتخاب</option>@foreach($categories as $cat)<option value="{{ $cat->id }}" @selected(old('category_id',$product->category_id)==$cat->id)>{{ $cat->name }} ({{ $cat->code }})</option>@endforeach</select></div>
-<div class="col-md-4">
-    <label class="form-label d-block">وضعیت فروش</label>
-    <input type="hidden" name="is_sellable" value="0">
-    <div class="form-check form-switch mt-2">
-        <input class="form-check-input" type="checkbox" role="switch" id="isSellable" name="is_sellable" value="1" @checked(old('is_sellable', $product->is_sellable ?? true))>
-        <label class="form-check-label" for="isSellable">قابل فروش باشد</label>
-    </div>
-</div>
 </div><hr>
 <div class="d-flex justify-content-between mb-2"><h6>مدل/تنوع/طرح</h6><button type="button" class="btn btn-sm btn-outline-primary" onclick="addVariantRow()">+ افزودن</button></div>
 <table class="table table-sm" id="variantsTable"><thead><tr><th>مدل لیست</th><th>عنوان طرح/رنگ</th><th>کد طرح</th><th>کد نهایی</th><th>فروش</th><th>خرید</th><th>موجودی</th><th>وضعیت</th><th></th></tr></thead><tbody></tbody></table>

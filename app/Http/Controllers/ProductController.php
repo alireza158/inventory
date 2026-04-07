@@ -320,7 +320,6 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name'        => ['required', 'string', 'max:255'],
-            'is_sellable' => ['nullable', 'boolean'],
 
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
@@ -334,15 +333,12 @@ class ProductController extends Controller
             'variants.*.is_active' => ['nullable', 'boolean'],
         ]);
 
-        $isSellable = $request->boolean('is_sellable', true);
-
-        DB::transaction(function () use ($data, $product, $isSellable) {
+        DB::transaction(function () use ($data, $product) {
             $product = Product::query()->lockForUpdate()->findOrFail($product->id);
 
             $product->update([
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
-                'is_sellable' => $isSellable,
             ]);
 
             $keepIds = [];
