@@ -11,14 +11,6 @@ use Illuminate\Support\Facades\DB;
 
 class ModelListController extends Controller
 {
-    private function normalizeModelName(string $value): string
-    {
-        $value = preg_replace('/[\x{200C}\x{200D}\x{200E}\x{200F}\x{FEFF}]/u', ' ', $value);
-        $value = preg_replace('/\s+/u', ' ', (string) $value);
-        $value = trim((string) $value);
-        return mb_strtolower($value, 'UTF-8');
-    }
-
     private function brandGroups(): array
     {
         return [
@@ -164,65 +156,6 @@ class ModelListController extends Controller
     {
         $modelList->delete();
         return redirect()->route('model-lists.index')->with('success', 'مدل حذف شد.');
-    }
-
-    public function ensure(Request $request)
-    {
-        $data = $request->validate([
-            'model_name' => ['required', 'string', 'max:255'],
-            'brand' => ['nullable', 'string', 'max:100'],
-        ], [
-            'model_name.required' => 'نام مدل لیست الزامی است.',
-            'model_name.max' => 'نام مدل لیست نمی‌تواند بیشتر از ۲۵۵ کاراکتر باشد.',
-            'brand.max' => 'نام برند نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد.',
-        ]);
-
-        $modelName = preg_replace('/\s+/u', ' ', trim((string) $data['model_name']));
-        if ($modelName === '') {
-            return response()->json([
-                'ok' => false,
-                'message' => 'نام مدل لیست نمی‌تواند خالی باشد.',
-            ], 422);
-        }
-
-        $brand = preg_replace('/\s+/u', ' ', trim((string) ($data['brand'] ?? '')));
-        if ($brand === '') {
-            $brand = 'سایر';
-        }
-
-        $normalizedInput = $this->normalizeModelName($modelName);
-        $created = false;
-        $modelList = null;
-
-        DB::transaction(function () use (&$modelList, &$created, $normalizedInput, $brand, $modelName) {
-            $existing = ModelList::query()->lockForUpdate()->get()->first(function (ModelList $row) use ($normalizedInput) {
-                return $this->normalizeModelName((string) $row->model_name) === $normalizedInput;
-            });
-
-            if ($existing) {
-                $modelList = $existing;
-                return;
-            }
-
-            $modelList = ModelList::create([
-                'brand' => $brand,
-                'model_name' => $modelName,
-                'code' => $this->nextCode3(),
-            ]);
-            $created = true;
-        });
-
-        return response()->json([
-            'ok' => true,
-            'created' => $created,
-            'message' => $created ? 'مدل لیست جدید با موفقیت ساخته شد.' : 'مدل لیست تکراری بود و مورد موجود انتخاب شد.',
-            'item' => [
-                'id' => $modelList->id,
-                'brand' => $modelList->brand,
-                'model_name' => $modelList->model_name,
-                'code' => $modelList->code,
-            ],
-        ]);
     }
 
     public function assignCodes(): RedirectResponse
