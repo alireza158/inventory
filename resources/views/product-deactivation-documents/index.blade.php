@@ -1,85 +1,214 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    $productsForJs = collect($products ?? [])->map(function ($product) {
+        return [
+            'id' => (int) $product->id,
+            'name' => (string) $product->name,
+            'is_sellable' => (bool) ($product->is_sellable ?? true),
+            'variants' => collect($product->variants ?? [])->map(function ($variant) {
+                return [
+                    'id' => (int) $variant->id,
+                    'name' => (string) ($variant->variant_name ?? ''),
+                    'is_active' => (bool) ($variant->is_active ?? true),
+                ];
+            })->values()->all(),
+        ];
+    })->values()->all();
+@endphp
+
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0">اسناد غیرفعال‌سازی کالا</h4>
-    <a href="{{ route('product-deactivation-documents.create') }}" class="btn btn-primary">ثبت سند جدید</a>
+    <h4 class="mb-0">افزودن سند غیرفعال‌سازی</h4>
+    <a href="{{ route('product-deactivation-documents.index') }}" class="btn btn-outline-secondary">
+        بازگشت
+    </a>
 </div>
 
-<div class="card mb-3">
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <div class="fw-bold mb-2">خطاهای فرم:</div>
+        <ul class="mb-0 ps-3">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+<div class="card">
     <div class="card-body">
-        <form method="GET" class="row g-2">
-            <div class="col-md-2"><input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control" placeholder="از تاریخ"></div>
-            <div class="col-md-2"><input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control" placeholder="تا تاریخ"></div>
-            <div class="col-md-2"><input type="text" name="product_name" value="{{ request('product_name') }}" class="form-control" placeholder="نام محصول"></div>
-            <div class="col-md-2"><input type="text" name="variant_name" value="{{ request('variant_name') }}" class="form-control" placeholder="نام تنوع"></div>
-            <div class="col-md-2">
-                <select name="deactivation_type" class="form-select">
-                    <option value="">نوع عملیات</option>
-                    @foreach($typeLabels as $key => $label)
-                        <option value="{{ $key }}" @selected(request('deactivation_type')===$key)>{{ $label }}</option>
-                    @endforeach
-                </select>
+        <form method="POST" action="{{ route('product-deactivation-documents.store') }}" id="deactivationForm">
+            @csrf
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="deactivation_type" class="form-label">نوع غیرفعال‌سازی</label>
+                    <select name="deactivation_type" id="deactivation_type" class="form-select" required>
+                        <option value="">انتخاب کنید</option>
+                        @foreach ($typeLabels as $key => $label)
+                            <option value="{{ $key }}" @selected(old('deactivation_type') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label for="product_id" class="form-label">محصول</label>
+                    <select name="product_id" id="product_id" class="form-select" required>
+                        <option value="">انتخاب محصول</option>
+                        @foreach ($products as $product)
+                            <option value="{{ $product->id }}" @selected((string) old('product_id') === (string) $product->id)>
+                                {{ $product->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label for="variant_id" class="form-label">تنوع</label>
+                    <select name="variant_id" id="variant_id" class="form-select">
+                        <option value="">ابتدا محصول را انتخاب کنید</option>
+                    </select>
+                    <div class="form-text">
+                        فقط در حالت «غیرفعال‌سازی تنوع» الزامی است.
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label for="reason_type" class="form-label">علت غیرفعال‌سازی</label>
+                    <select name="reason_type" id="reason_type" class="form-select" required>
+                        <option value="">انتخاب علت</option>
+                        @foreach ($reasonLabels as $key => $label)
+                            <option value="{{ $key }}" @selected(old('reason_type') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-8">
+                    <label for="reason_text" class="form-label">توضیح علت</label>
+                    <input
+                        type="text"
+                        name="reason_text"
+                        id="reason_text"
+                        class="form-control"
+                        value="{{ old('reason_text') }}"
+                        placeholder="مثلاً توقف فروش، مشکل کیفیت، اتمام همکاری و ..."
+                        required
+                    >
+                </div>
+
+                <div class="col-12">
+                    <label for="description" class="form-label">توضیحات تکمیلی</label>
+                    <textarea
+                        name="description"
+                        id="description"
+                        class="form-control"
+                        rows="4"
+                        placeholder="توضیحات تکمیلی اختیاری"
+                    >{{ old('description') }}</textarea>
+                </div>
             </div>
-            <div class="col-md-2">
-                <select name="reason_type" class="form-select">
-                    <option value="">علت</option>
-                    @foreach($reasonLabels as $key => $label)
-                        <option value="{{ $key }}" @selected(request('reason_type')===$key)>{{ $label }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-2">
-                <select name="created_by" class="form-select">
-                    <option value="">ثبت‌کننده</option>
-                    @foreach($users as $u)
-                        <option value="{{ $u->id }}" @selected((string)request('created_by')===(string)$u->id)>{{ $u->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-2">
-                <select name="current_status" class="form-select">
-                    <option value="">وضعیت فعلی</option>
-                    <option value="active" @selected(request('current_status')==='active')>فعال</option>
-                    <option value="inactive" @selected(request('current_status')==='inactive')>غیرفعال</option>
-                </select>
-            </div>
-            <div class="col-md-8 d-flex gap-2">
-                <button class="btn btn-outline-primary">جستجو</button>
-                <a href="{{ route('product-deactivation-documents.index') }}" class="btn btn-outline-secondary">حذف فیلتر</a>
+
+            <hr class="my-4">
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">ثبت سند</button>
+                <a href="{{ route('product-deactivation-documents.index') }}" class="btn btn-outline-secondary">انصراف</a>
             </div>
         </form>
     </div>
 </div>
 
-<div class="card">
-    <div class="table-responsive">
-        <table class="table mb-0 align-middle">
-            <thead><tr><th>شماره سند</th><th>تاریخ</th><th>نوع</th><th>محصول</th><th>تنوع</th><th>علت</th><th>ثبت‌کننده</th><th>وضعیت فعلی</th><th></th></tr></thead>
-            <tbody>
-            @forelse($documents as $doc)
-                @php
-                    $isActive = $doc->deactivation_type === \App\Models\ProductDeactivationDocument::TYPE_PRODUCT
-                        ? (bool) ($doc->product?->is_sellable)
-                        : (bool) ($doc->variant?->is_active);
-                @endphp
-                <tr>
-                    <td class="fw-bold">{{ $doc->document_number }}</td>
-                    <td>{{ verta($doc->created_at)->format('Y/m/d H:i') }}</td>
-                    <td>{{ $typeLabels[$doc->deactivation_type] ?? $doc->deactivation_type }}</td>
-                    <td>{{ $doc->product_name_snapshot ?: ($doc->product?->name ?? '-') }}</td>
-                    <td>{{ $doc->variant_name_snapshot ?: ($doc->variant?->variant_name ?? '-') }}</td>
-                    <td>{{ $reasonLabels[$doc->reason_type] ?? $doc->reason_type }}</td>
-                    <td>{{ $doc->creator?->name ?? '-' }}</td>
-                    <td><span class="badge {{ $isActive ? 'bg-success' : 'bg-secondary' }}">{{ $isActive ? 'فعال' : 'غیرفعال' }}</span></td>
-                    <td><a href="{{ route('product-deactivation-documents.show', $doc) }}" class="btn btn-sm btn-outline-dark">مشاهده</a></td>
-                </tr>
-            @empty
-                <tr><td colspan="9" class="text-center py-4 text-muted">سندی ثبت نشده است.</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-    </div>
-    <div class="card-body">{{ $documents->links() }}</div>
-</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const products = @json($productsForJs);
+
+    const typeSelect = document.getElementById('deactivation_type');
+    const productSelect = document.getElementById('product_id');
+    const variantSelect = document.getElementById('variant_id');
+
+    const oldVariantId = @json(old('variant_id'));
+    const oldType = @json(old('deactivation_type'));
+
+    function getSelectedProduct() {
+        const productId = Number(productSelect.value || 0);
+        return products.find(p => Number(p.id) === productId) || null;
+    }
+
+    function renderVariantOptions() {
+        const selectedProduct = getSelectedProduct();
+        const isVariantMode = typeSelect.value === 'variant';
+
+        variantSelect.innerHTML = '';
+
+        if (!selectedProduct) {
+            variantSelect.innerHTML = '<option value="">ابتدا محصول را انتخاب کنید</option>';
+            variantSelect.disabled = true;
+            variantSelect.required = false;
+            return;
+        }
+
+        const variants = Array.isArray(selectedProduct.variants) ? selectedProduct.variants : [];
+
+        if (!variants.length) {
+            variantSelect.innerHTML = '<option value="">این محصول تنوعی ندارد</option>';
+            variantSelect.disabled = true;
+            variantSelect.required = false;
+            return;
+        }
+
+        variantSelect.innerHTML = '<option value="">انتخاب تنوع</option>';
+
+        variants.forEach(function (variant) {
+            const option = document.createElement('option');
+            option.value = String(variant.id);
+            option.textContent = variant.name + (variant.is_active ? '' : ' (غیرفعال)');
+            if (String(oldVariantId || '') === String(variant.id)) {
+                option.selected = true;
+            }
+            variantSelect.appendChild(option);
+        });
+
+        variantSelect.disabled = !isVariantMode;
+        variantSelect.required = isVariantMode;
+
+        if (!isVariantMode) {
+            variantSelect.value = '';
+        }
+    }
+
+    function syncTypeState() {
+        const isVariantMode = typeSelect.value === 'variant';
+        renderVariantOptions();
+
+        if (!isVariantMode) {
+            variantSelect.required = false;
+            variantSelect.disabled = true;
+            variantSelect.value = '';
+        } else {
+            const selectedProduct = getSelectedProduct();
+            if (selectedProduct && Array.isArray(selectedProduct.variants) && selectedProduct.variants.length > 0) {
+                variantSelect.disabled = false;
+                variantSelect.required = true;
+            }
+        }
+    }
+
+    typeSelect.addEventListener('change', syncTypeState);
+    productSelect.addEventListener('change', function () {
+        renderVariantOptions();
+
+        if (typeSelect.value === 'variant') {
+            variantSelect.disabled = false;
+            variantSelect.required = true;
+        }
+    });
+
+    if (oldType === 'variant') {
+        typeSelect.value = 'variant';
+    }
+
+    syncTypeState();
+});
+</script>
 @endsection
