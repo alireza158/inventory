@@ -81,12 +81,15 @@ class ProductDeactivationDocumentController extends Controller
 
         $documents = $query->latest('id')->paginate(20)->withQueryString();
 
+        // ارسال محصولات به ویو
+        $products = Product::all();  // یا هر فیلتری که نیاز دارید
         $typeLabels = ProductDeactivationDocument::typeLabels();
         $reasonLabels = ProductDeactivationDocument::reasonLabels();
         $users = User::query()->orderBy('name')->get(['id', 'name']);
 
         return view('product-deactivation-documents.index', compact(
             'documents',
+            'products',   // اینجا متغیر products اضافه شد
             'typeLabels',
             'reasonLabels',
             'users'
@@ -124,6 +127,7 @@ class ProductDeactivationDocumentController extends Controller
     {
         $reasonKeys = array_keys(ProductDeactivationDocument::reasonLabels());
 
+        // اعتبارسنجی داده‌ها
         $data = $request->validate([
             'deactivation_type' => [
                 'required',
@@ -140,6 +144,7 @@ class ProductDeactivationDocumentController extends Controller
         ]);
 
         DB::transaction(function () use ($data) {
+            // قفل کردن رکورد محصول برای بروزرسانی ایمن
             $product = Product::query()
                 ->whereKey((int) $data['product_id'])
                 ->lockForUpdate()
@@ -147,6 +152,7 @@ class ProductDeactivationDocumentController extends Controller
 
             $variant = null;
 
+            // در صورتی که غیرفعال‌سازی برای تنوع باشد
             if (($data['deactivation_type'] ?? null) === ProductDeactivationDocument::TYPE_VARIANT) {
                 if (empty($data['variant_id'])) {
                     abort(422, 'برای غیرفعال‌سازی تنوع، انتخاب تنوع الزامی است.');
@@ -167,12 +173,14 @@ class ProductDeactivationDocumentController extends Controller
                 }
             }
 
+            // در صورتی که غیرفعال‌سازی برای محصول باشد
             if (($data['deactivation_type'] ?? null) === ProductDeactivationDocument::TYPE_PRODUCT) {
                 if (!(bool) $product->is_sellable) {
                     abort(422, 'این محصول از قبل غیرفعال است.');
                 }
             }
 
+            // ثبت سند غیرفعال‌سازی
             $doc = ProductDeactivationDocument::create([
                 'document_number' => 'TMP-' . now()->format('YmdHis') . '-' . random_int(100, 999),
                 'deactivation_type' => $data['deactivation_type'],
@@ -186,10 +194,12 @@ class ProductDeactivationDocumentController extends Controller
                 'created_by' => (int) auth()->id(),
             ]);
 
+            // بروزرسانی شماره سند
             $doc->update([
                 'document_number' => 'PD-' . now()->format('Ymd') . '-' . str_pad((string) $doc->id, 6, '0', STR_PAD_LEFT),
             ]);
 
+            // بروزرسانی وضعیت محصول یا تنوع
             if ($data['deactivation_type'] === ProductDeactivationDocument::TYPE_PRODUCT) {
                 $product->update(['is_sellable' => false]);
                 $product->variants()->update(['is_active' => false]);
@@ -198,6 +208,7 @@ class ProductDeactivationDocumentController extends Controller
             }
         });
 
+        // هدایت به صفحه لیست اسناد با پیغام موفقیت
         return redirect()
             ->route('product-deactivation-documents.index')
             ->with('success', 'سند غیرفعال‌سازی با موفقیت ثبت شد.');
