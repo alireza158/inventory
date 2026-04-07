@@ -79,7 +79,7 @@
             @forelse($documents as $doc)
                 <tr>
                     <td class="fw-bold">{{ $doc->document_number }}</td>
-                    <td>{{ verta($doc->created_at)->format('Y/m/d H:i') }}</td>
+                    <td>{{ optional($doc->created_at)->format('Y/m/d H:i') }}</td>
                     <td><span class="badge bg-info-subtle text-dark">{{ (int) ($doc->items_count ?: 1) }}</span></td>
                     <td class="text-wrap" style="min-width: 240px;">{{ $doc->reason_text }}</td>
                     <td>{{ $doc->creator?->name ?? '-' }}</td>

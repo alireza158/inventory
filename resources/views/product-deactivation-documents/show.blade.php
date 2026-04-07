@@ -10,7 +10,7 @@
 
         <div class="row g-3 mb-3">
             <div class="col-md-3"><b>شناسه سند:</b> {{ $document->document_number }}</div>
-            <div class="col-md-3"><b>تاریخ ثبت:</b> {{ verta($document->created_at)->format('Y/m/d H:i') }}</div>
+            <div class="col-md-3"><b>تاریخ ثبت:</b> {{ optional($document->created_at)->format('Y/m/d H:i') }}</div>
             <div class="col-md-3"><b>تعداد آیتم‌ها:</b> {{ (int) ($document->items_count ?: max(1, $document->items->count())) }}</div>
             <div class="col-md-3"><b>ثبت‌کننده:</b> {{ $document->creator?->name ?? '-' }}</div>
             <div class="col-md-12">
