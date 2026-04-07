@@ -14,6 +14,7 @@ class ProductDeactivationDocument extends Model
         'deactivation_type',
         'product_id',
         'variant_id',
+        'items_count',
         'reason_type',
         'reason_text',
         'description',
@@ -35,6 +36,11 @@ class ProductDeactivationDocument extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function items()
+    {
+        return $this->hasMany(ProductDeactivationDocumentItem::class, 'document_id');
     }
 
     public static function typeLabels(): array
