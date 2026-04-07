@@ -17,6 +17,7 @@ use App\Http\Controllers\ModelListController;
 use App\Http\Controllers\PreinvoiceApiController;
 use App\Http\Controllers\PreinvoiceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductDeactivationDocumentController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
@@ -56,6 +57,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
 
     Route::post('/products/sync-crm', [ProductController::class, 'syncCrm'])->name('products.sync.crm');
+    Route::get('/product-deactivation-documents', [ProductDeactivationDocumentController::class, 'index'])->name('product-deactivation-documents.index');
+    Route::get('/product-deactivation-documents/create', [ProductDeactivationDocumentController::class, 'create'])->name('product-deactivation-documents.create');
+    Route::post('/product-deactivation-documents', [ProductDeactivationDocumentController::class, 'store'])->name('product-deactivation-documents.store');
+    Route::get('/product-deactivation-documents/{productDeactivationDocument}', [ProductDeactivationDocumentController::class, 'show'])->name('product-deactivation-documents.show');
 
     // Model Lists
     Route::get('/model-lists', [ModelListController::class, 'index'])->name('model-lists.index');

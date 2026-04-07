@@ -8,6 +8,7 @@ class ProductVariant extends Model
 {
     protected $fillable = [
         'product_id',
+        'is_active',
         'variant_name',
         'model_list_id',
         'color_id',
@@ -28,6 +29,7 @@ class ProductVariant extends Model
     ];
 
     protected $casts = [
+        'is_active'  => 'boolean',
         'buy_price'  => 'integer',
         'sell_price' => 'integer',
         'stock'      => 'integer',
@@ -53,5 +55,10 @@ class ProductVariant extends Model
     public function getAvailableStockAttribute(): int
     {
         return max(0, ($this->stock ?? 0) - ($this->reserved ?? 0));
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

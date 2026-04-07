@@ -16,6 +16,7 @@ use App\Models\WarehouseStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
 class PreinvoiceController extends Controller
@@ -127,7 +128,7 @@ class PreinvoiceController extends Controller
         $shippingId = (int) $request->input('shipping_id');
         $isInPerson = $this->isInPersonShippingId($shippingId);
 
-        return $request->validate([
+        $validated = $request->validate([
             'customer_id'       => 'nullable|integer|exists:customers,id',
             'customer_name'     => 'required|string|max:255',
             'customer_mobile'   => 'required|string|max:20',
@@ -143,7 +144,11 @@ class PreinvoiceController extends Controller
 
             'products'              => 'required|array|min:1',
             'products.*.id'         => 'required|integer|exists:products,id,is_sellable,1',
-            'products.*.variety_id' => 'required|integer',
+            'products.*.variety_id' => [
+                'required',
+                'integer',
+                Rule::exists('product_variants', 'id')->where(fn ($query) => $query->where('is_active', true)),
+            ],
             'products.*.quantity'   => 'required|integer|min:1',
             'products.*.price'      => 'nullable|integer|min:0',
         ], [
@@ -154,6 +159,22 @@ class PreinvoiceController extends Controller
             'products.required'         => 'حداقل یک محصول باید ثبت شود.',
             'products.min'              => 'حداقل یک محصول باید ثبت شود.',
         ]);
+
+        foreach (($validated['products'] ?? []) as $index => $productRow) {
+            $isValidVariant = \App\Models\ProductVariant::query()
+                ->whereKey((int) $productRow['variety_id'])
+                ->where('product_id', (int) $productRow['id'])
+                ->where('is_active', true)
+                ->exists();
+
+            if (!$isValidVariant) {
+                throw ValidationException::withMessages([
+                    "products.{$index}.variety_id" => 'تنوع انتخابی برای این کالا نامعتبر یا غیرفعال است.',
+                ]);
+            }
+        }
+
+        return $validated;
     }
 
     private function resolveCustomer(array $validated): ?Customer

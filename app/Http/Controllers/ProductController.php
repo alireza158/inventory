@@ -320,7 +320,6 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name'        => ['required', 'string', 'max:255'],
-            'is_sellable' => ['nullable', 'boolean'],
 
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
@@ -333,15 +332,12 @@ class ProductController extends Controller
             'variants.*.stock' => ['required', 'integer', 'min:0'],
         ]);
 
-        $isSellable = $request->boolean('is_sellable', true);
-
-        DB::transaction(function () use ($data, $product, $isSellable) {
+        DB::transaction(function () use ($data, $product) {
             $product = Product::query()->lockForUpdate()->findOrFail($product->id);
 
             $product->update([
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
-                'is_sellable' => $isSellable,
             ]);
 
             $keepIds = [];
@@ -383,7 +379,7 @@ class ProductController extends Controller
                         $keepIds[] = $variant->id;
                     }
                 } else {
-                    $variant = ProductVariant::create(array_merge($payload, [
+                $variant = ProductVariant::create(array_merge($payload, [
                         'product_id' => $product->id,
                         'reserved' => 0,
                     ]));
@@ -445,7 +441,7 @@ class ProductController extends Controller
 
         $product->update([
             'stock' => max(0, (int) $product->variants->sum('stock')),
-            'price' => max(0, (int) $product->variants->min('sell_price')),
+            'price' => max(0, (int) ($product->variants->where('is_active', true)->min('sell_price') ?? 0)),
         ]);
     }
 
