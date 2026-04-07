@@ -1,12 +1,40 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    $productsForJs = collect($products ?? [])->map(function ($product) {
+        return [
+            'id' => (int) $product->id,
+            'name' => (string) $product->name,
+            'is_sellable' => (bool) ($product->is_sellable ?? true),
+            'variants' => collect($product->variants ?? [])->map(function ($variant) {
+                return [
+                    'id' => (int) $variant->id,
+                    'name' => (string) ($variant->variant_name ?? ''),
+                    'is_active' => (bool) ($variant->is_active ?? true),
+                ];
+            })->values()->all(),
+        ];
+    })->values()->all();
+@endphp
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">لیست اسناد غیرفعال‌سازی کالا</h4>
     <a href="{{ route('product-deactivation-documents.create') }}" class="btn btn-primary">ثبت جدید غیرفعال‌سازی</a>
 </div>
 
-<div class="card mb-3">
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <div class="fw-bold mb-2">خطاهای فرم:</div>
+        <ul class="mb-0 ps-3">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+<div class="card">
     <div class="card-body">
         <form method="GET" class="row g-2">
             <div class="col-md-3">

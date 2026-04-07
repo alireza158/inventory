@@ -7,6 +7,11 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (Schema::hasTable('product_deactivation_documents')) {
+            // جدول قبلاً وجود دارد، نیازی به ایجاد دوباره نیست
+            return;
+        }
+
         Schema::create('product_deactivation_documents', function (Blueprint $table) {
             $table->id();
             $table->string('document_number')->unique();
