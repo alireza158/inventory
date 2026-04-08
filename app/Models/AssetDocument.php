@@ -16,6 +16,9 @@ class AssetDocument extends Model
         'personnel_id',
         'status',
         'description',
+        'signed_form_path',
+        'signed_form_original_name',
+        'signed_form_mime',
         'created_by',
         'updated_by',
     ];
