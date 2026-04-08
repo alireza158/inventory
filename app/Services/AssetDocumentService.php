@@ -6,6 +6,7 @@ use App\Models\AssetDocument;
 use App\Models\AssetDocumentItem;
 use App\Models\AssetDocumentItemCode;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class AssetDocumentService
 {
@@ -32,6 +33,9 @@ class AssetDocumentService
                 'personnel_id' => $header['personnel_id'],
                 'status' => AssetDocument::STATUS_DRAFT,
                 'description' => $header['description'] ?? null,
+                'signed_form_path' => $header['signed_form_path'] ?? null,
+                'signed_form_original_name' => $header['signed_form_original_name'] ?? null,
+                'signed_form_mime' => $header['signed_form_mime'] ?? null,
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
@@ -68,13 +72,21 @@ class AssetDocumentService
 
         return DB::transaction(function () use ($document, $header, $normalizedItems, $userId) {
             $old = $document->toArray();
+            $oldSignedFormPath = $document->signed_form_path;
 
             $document->update([
                 'document_date' => $header['document_date'],
                 'personnel_id' => $header['personnel_id'],
                 'description' => $header['description'] ?? null,
+                'signed_form_path' => $header['signed_form_path'] ?? $document->signed_form_path,
+                'signed_form_original_name' => $header['signed_form_original_name'] ?? $document->signed_form_original_name,
+                'signed_form_mime' => $header['signed_form_mime'] ?? $document->signed_form_mime,
                 'updated_by' => $userId,
             ]);
+
+            if (!empty($header['signed_form_path']) && !empty($oldSignedFormPath) && $oldSignedFormPath !== $header['signed_form_path']) {
+                Storage::disk('private')->delete($oldSignedFormPath);
+            }
 
             $document->items()->delete();
 

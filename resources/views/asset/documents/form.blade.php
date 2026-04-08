@@ -14,7 +14,7 @@ $items = old('items', $isEdit ? $document->items->map(fn($item)=>[
   <a href="{{ route('asset.documents.index') }}" class="btn btn-outline-secondary">بازگشت</a>
 </div>
 
-<form method="POST" action="{{ $action }}" class="card card-body" id="assetDocumentForm">
+<form method="POST" action="{{ $action }}" class="card card-body" id="assetDocumentForm" enctype="multipart/form-data">
   @csrf
   @if($method !== 'POST') @method($method) @endif
 
@@ -23,6 +23,17 @@ $items = old('items', $isEdit ? $document->items->map(fn($item)=>[
     <div class="col-md-4"><label class="form-label">پرسنل</label><select name="personnel_id" class="form-select" required><option value="">انتخاب...</option>@foreach($personnel as $p)<option value="{{ $p->id }}" @selected(old('personnel_id', $document->personnel_id)==$p->id)>{{ $p->full_name }} ({{ $p->personnel_code }})</option>@endforeach</select></div>
     <div class="col-md-4"><label class="form-label">وضعیت</label><input class="form-control" value="{{ $statusLabels[$document->status ?? 'draft'] ?? 'پیش‌نویس' }}" readonly></div>
     <div class="col-12"><label class="form-label">توضیحات</label><textarea name="description" class="form-control" rows="2">{{ old('description', $document->description) }}</textarea></div>
+    <div class="col-12">
+      <label class="form-label">نامه / فرم امضاشده (اختیاری)</label>
+      <input type="file" name="signed_form" class="form-control" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
+      <small class="text-muted">فرمت‌های مجاز: jpg، jpeg، png، webp، pdf (حداکثر ۵ مگابایت)</small>
+      @if($isEdit && $document->signed_form_path)
+        <div class="mt-2">
+          <a href="{{ route('asset.documents.signed-form.view', $document) }}" target="_blank" class="btn btn-sm btn-outline-primary">مشاهده فایل فعلی</a>
+          <a href="{{ route('asset.documents.signed-form.download', $document) }}" class="btn btn-sm btn-outline-secondary">دانلود فایل فعلی</a>
+        </div>
+      @endif
+    </div>
   </div>
 
   <div class="d-flex justify-content-between align-items-center mb-2">
