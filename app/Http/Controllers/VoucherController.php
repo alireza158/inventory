@@ -487,30 +487,73 @@ class VoucherController extends Controller
 
     public function index(Request $request)
     {
-        $voucherNo = trim((string) $request->get('voucher_no', ''));
-        $dateFrom = $request->get('date_from');
-        $dateTo = $request->get('date_to');
-        $voucherType = (string) $request->get('voucher_type', 'all');
+        $tab = in_array((string) $request->query('tab', 'outgoing'), ['outgoing', 'incoming'], true)
+            ? (string) $request->query('tab', 'outgoing')
+            : 'outgoing';
 
-        $query = WarehouseTransfer::with(['fromWarehouse', 'toWarehouse', 'user', 'relatedInvoice', 'customer'])
-            ->when($voucherNo !== '', function ($q) use ($voucherNo) {
-                $q->where(function ($inner) use ($voucherNo) {
-                    $inner->where('id', (int) $voucherNo)
-                        ->orWhere('reference', 'like', "%{$voucherNo}%");
-                });
-            })
-            ->when($voucherType !== 'all', fn ($q) => $q->where('voucher_type', $voucherType))
-            ->when($dateFrom, fn ($q) => $q->whereDate('transferred_at', '>=', $dateFrom))
-            ->when($dateTo, fn ($q) => $q->whereDate('transferred_at', '<=', $dateTo));
+        $filters = [
+            'voucher_no' => trim((string) $request->query('voucher_no', '')),
+            'date_from' => trim((string) $request->query('date_from', '')),
+            'date_to' => trim((string) $request->query('date_to', '')),
+            'reason' => trim((string) $request->query('reason', '')),
+            'warehouse_id' => (int) $request->query('warehouse_id', 0),
+            'product_q' => trim((string) $request->query('product_q', '')),
+        ];
 
-        $totalAllAmount = (int) WarehouseTransfer::sum('total_amount');
-        $totalAllCount = (int) WarehouseTransfer::count();
+        $outgoingReasons = $this->outgoingReasonLabels();
+        $incomingReasons = $this->incomingReasonLabels();
+        $warehouses = Warehouse::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
-        $vouchers = $query->latest('transferred_at')
-            ->paginate(20, ['*'], 'vouchers_page')
-            ->withQueryString();
+        $outgoingQuery = WarehouseTransfer::query()
+            ->with(['fromWarehouse', 'toWarehouse', 'user', 'customer'])
+            ->withCount('items')
+            ->withSum('items as total_quantity', 'quantity')
+            ->whereIn('voucher_type', array_keys($outgoingReasons));
 
-        return view('vouchers.index', compact('vouchers', 'totalAllAmount', 'totalAllCount', 'voucherType'));
+        $incomingQuery = WarehouseTransfer::query()
+            ->with(['fromWarehouse', 'toWarehouse', 'user', 'customer'])
+            ->withCount('items')
+            ->withSum('items as total_quantity', 'quantity')
+            ->whereIn('voucher_type', array_keys($incomingReasons));
+
+        $this->applyVoucherFilters($outgoingQuery, $filters, true);
+        $this->applyVoucherFilters($incomingQuery, $filters, false);
+
+        $outgoingVouchers = $outgoingQuery->latest('transferred_at')->paginate(20, ['*'], 'out_page')->withQueryString();
+        $incomingVouchers = $incomingQuery->latest('transferred_at')->paginate(20, ['*'], 'in_page')->withQueryString();
+
+        $outgoingSummary = [
+            'count' => (int) $outgoingVouchers->total(),
+            'items' => (int) $outgoingVouchers->sum(fn ($v) => (int) ($v->items_count ?? 0)),
+            'qty' => (int) $outgoingVouchers->sum(fn ($v) => (int) ($v->total_quantity ?? 0)),
+        ];
+        $incomingSummary = [
+            'count' => (int) $incomingVouchers->total(),
+            'items' => (int) $incomingVouchers->sum(fn ($v) => (int) ($v->items_count ?? 0)),
+            'qty' => (int) $incomingVouchers->sum(fn ($v) => (int) ($v->total_quantity ?? 0)),
+        ];
+
+        return view('vouchers.index', compact(
+            'tab',
+            'filters',
+            'warehouses',
+            'outgoingReasons',
+            'incomingReasons',
+            'outgoingVouchers',
+            'incomingVouchers',
+            'outgoingSummary',
+            'incomingSummary'
+        ));
+    }
+
+    public function show(WarehouseTransfer $voucher)
+    {
+        $voucher->load(['fromWarehouse', 'toWarehouse', 'user', 'customer', 'relatedInvoice', 'items.product', 'items.variant']);
+
+        return view('vouchers.show', [
+            'voucher' => $voucher,
+            'reasonLabel' => $this->humanReasonLabel($voucher->voucher_type),
+        ]);
     }
 
     public function create()
@@ -1080,6 +1123,57 @@ class VoucherController extends Controller
         StockMovement::whereIn('reason', ['transfer', 'return'])
             ->where('reference', $reference)
             ->delete();
+    }
+
+    private function outgoingReasonLabels(): array
+    {
+        return [
+            WarehouseTransfer::TYPE_SALE => 'فروش',
+            WarehouseTransfer::TYPE_BETWEEN_WAREHOUSES => 'انتقال بین انبارها',
+            WarehouseTransfer::TYPE_PERSONNEL_ASSET => 'تحویل به پرسنل',
+            WarehouseTransfer::TYPE_SCRAP => 'ضایعات',
+            WarehouseTransfer::TYPE_SHOWROOM => 'انتقال به شوروم',
+        ];
+    }
+
+    private function incomingReasonLabels(): array
+    {
+        return [
+            WarehouseTransfer::TYPE_CUSTOMER_RETURN => 'برگشت از مشتری',
+            WarehouseTransfer::TYPE_BETWEEN_WAREHOUSES => 'انتقال از انبار دیگر',
+            WarehouseTransfer::TYPE_SHOWROOM => 'دریافت از انبار دیگر (شوروم)',
+            WarehouseTransfer::TYPE_PERSONNEL_ASSET => 'برگشت/دریافت اموال پرسنلی',
+            WarehouseTransfer::TYPE_SCRAP => 'ورود به انبار ضایعات',
+        ];
+    }
+
+    private function humanReasonLabel(?string $type): string
+    {
+        $labels = $this->outgoingReasonLabels() + $this->incomingReasonLabels() + WarehouseTransfer::typeOptions();
+        return $labels[$type ?? ''] ?? ($type ?: '—');
+    }
+
+    private function applyVoucherFilters($query, array $filters, bool $outgoing): void
+    {
+        $query
+            ->when($filters['voucher_no'] !== '', function ($q) use ($filters) {
+                $voucherNo = $filters['voucher_no'];
+                $q->where(function ($inner) use ($voucherNo) {
+                    $inner->where('id', (int) $voucherNo)
+                        ->orWhere('reference', 'like', "%{$voucherNo}%");
+                });
+            })
+            ->when($filters['date_from'] !== '', fn ($q) => $q->whereDate('transferred_at', '>=', $filters['date_from']))
+            ->when($filters['date_to'] !== '', fn ($q) => $q->whereDate('transferred_at', '<=', $filters['date_to']))
+            ->when($filters['reason'] !== '', fn ($q) => $q->where('voucher_type', $filters['reason']))
+            ->when($filters['warehouse_id'] > 0, function ($q) use ($filters, $outgoing) {
+                $field = $outgoing ? 'from_warehouse_id' : 'to_warehouse_id';
+                $q->where($field, $filters['warehouse_id']);
+            })
+            ->when($filters['product_q'] !== '', function ($q) use ($filters) {
+                $term = $filters['product_q'];
+                $q->whereHas('items.product', fn ($p) => $p->where('name', 'like', "%{$term}%"));
+            });
     }
 
     private function selectableWarehouses()
