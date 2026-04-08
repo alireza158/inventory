@@ -70,6 +70,10 @@ class AssetDocumentController extends Controller
         ], [
             'signed_form.mimes' => 'فرمت فایل نامه امضاشده باید jpg، jpeg، png، webp یا pdf باشد.',
             'signed_form.max' => 'حجم فایل نامه امضاشده نباید بیشتر از ۵ مگابایت باشد.',
+            'items.required' => 'حداقل یک ردیف کالا باید وارد شود.',
+            'items.*.item_name.required' => 'نام کالا در همه ردیف‌ها الزامی است.',
+            'items.*.quantity.required' => 'تعداد در همه ردیف‌ها الزامی است.',
+            'items.*.asset_codes_input.required' => 'ثبت کدهای ۴ رقمی اموال در همه ردیف‌ها الزامی است.',
         ]);
 
         $data = array_merge($data, $this->storeSignedForm($request));
@@ -139,6 +143,10 @@ class AssetDocumentController extends Controller
         ], [
             'signed_form.mimes' => 'فرمت فایل نامه امضاشده باید jpg، jpeg، png، webp یا pdf باشد.',
             'signed_form.max' => 'حجم فایل نامه امضاشده نباید بیشتر از ۵ مگابایت باشد.',
+            'items.required' => 'حداقل یک ردیف کالا باید وارد شود.',
+            'items.*.item_name.required' => 'نام کالا در همه ردیف‌ها الزامی است.',
+            'items.*.quantity.required' => 'تعداد در همه ردیف‌ها الزامی است.',
+            'items.*.asset_codes_input.required' => 'ثبت کدهای ۴ رقمی اموال در همه ردیف‌ها الزامی است.',
         ]);
 
         $data = array_merge($data, $this->storeSignedForm($request));
