@@ -122,6 +122,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/documents', [AssetDocumentController::class, 'store'])->name('documents.store');
         Route::get('/documents/{document}', [AssetDocumentController::class, 'show'])->name('documents.show');
         Route::get('/documents/{document}/view', [AssetDocumentController::class, 'view'])->name('documents.view');
+        Route::get('/documents/{document}/print', [AssetDocumentController::class, 'print'])->name('documents.print');
+        Route::get('/documents/{document}/signed-form', [AssetDocumentController::class, 'signedFormView'])->name('documents.signed-form.view');
+        Route::get('/documents/{document}/signed-form/download', [AssetDocumentController::class, 'signedFormDownload'])->name('documents.signed-form.download');
         Route::get('/documents/{document}/edit', [AssetDocumentController::class, 'edit'])->name('documents.edit');
         Route::put('/documents/{document}', [AssetDocumentController::class, 'update'])->name('documents.update');
         Route::patch('/documents/{document}/finalize', [AssetDocumentController::class, 'finalize'])->name('documents.finalize');
@@ -189,6 +192,11 @@ Route::middleware('auth')->group(function () {
     // Preinvoice pages
     Route::get('/preinvoice/create', [PreinvoiceController::class, 'create'])->name('preinvoice.create');
     Route::post('/preinvoice/draft', [PreinvoiceController::class, 'saveDraft'])->name('preinvoice.draft.save');
+    Route::get('/preinvoice/warehouse', [PreinvoiceController::class, 'warehouseQueue'])->name('preinvoice.warehouse.index');
+    Route::get('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseReview'])->name('preinvoice.warehouse.review');
+    Route::put('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseSave'])->name('preinvoice.warehouse.save');
+    Route::post('/preinvoice/warehouse/{uuid}/approve', [PreinvoiceController::class, 'warehouseApprove'])->name('preinvoice.warehouse.approve');
+    Route::post('/preinvoice/warehouse/{uuid}/reject', [PreinvoiceController::class, 'warehouseReject'])->name('preinvoice.warehouse.reject');
     Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->name('preinvoice.draft.index');
     Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->name('preinvoice.draft.edit');
     Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->name('preinvoice.draft.update');
