@@ -231,7 +231,7 @@
             <div class="h5 mb-0 fw-bold">🧾 ثبت پیش‌فاکتور</div>
             <div class="hint">نسخه جمع‌وجور برای ثبت خریدهای سنگین</div>
         </div>
-        <a class="btn btn-sm btn-outline-secondary" href="{{ route('preinvoice.draft.index') }}">صف تایید مالی</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ route('preinvoice.warehouse.index') }}">صف تایید انبار</a>
     </div>
 
     @if(session('success'))
