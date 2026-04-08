@@ -1,145 +1,117 @@
 @extends('layouts.app')
 
 @section('content')
-@php
-    $toToman = fn($rial) => number_format((int) floor(((int) $rial) / 10));
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h4 class="mb-0">ورودی و خروجی‌های انبار</h4>
+    <a class="btn btn-primary" href="{{ route('vouchers.create') }}">+ ثبت حواله</a>
+  </div>
 
-    $voucherTypeLabels = [
-        'between_warehouses' => 'حواله بین انبار',
-        'scrap' => 'حواله ضایعات',
-        'customer_return' => 'حواله مرجوعی مشتری',
-        'showroom' => 'حواله شوروم سالن',
-        'personnel_asset' => 'حواله اموال پرسنل',
-    ];
-
-    $statusFa = fn($s) => match($s){
-      'pending_warehouse_approval' => 'در انتظار تایید انبار',
-      'collecting' => 'در حال جمع‌آوری',
-      'checking_discrepancy' => 'چک کردن بار',
-      'packing' => 'بسته‌بندی بار',
-      'shipped' => 'ارسال شد',
-      'not_shipped' => 'کنسل شده',
-      default => $s,
-    };
-@endphp
-
-<div class="purchase-page-wrap">
-
-    <div class="purchase-topbar d-flex justify-content-between align-items-center">
-        <h4 class="page-title mb-0">حواله‌ها</h4>
-        <a class="btn btn-light" href="{{ route('vouchers.create') }}">+ ثبت حواله</a>
-    </div>
-
-    <div class="row g-3 mb-3">
-        <div class="col-12">
-            <div class="card stat-card h-100">
-                <div class="card-body d-flex flex-wrap gap-4 justify-content-between align-items-center">
-                    <div>
-                        <div class="label">جمع کل مبلغ حواله‌های داخلی تا الان</div>
-                        <div class="value">{{ $toToman($totalAllAmount) }} تومان</div>
-                    </div>
-                    <div>
-                        <div class="label">تعداد کل حواله‌های داخلی</div>
-                        <div class="value">{{ number_format($totalAllCount) }}</div>
-                    </div>
-                </div>
-            </div>
+  <form method="GET" class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label">از تاریخ</label>
+          <input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] }}">
         </div>
-    </div>
-
-    <form method="GET" class="card filter-card mb-3">
-        <div class="card-body">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label">از تاریخ</label>
-                    <input type="date" name="date_from" class="form-control" value="{{ request('date_from') }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">تا تاریخ</label>
-                    <input type="date" name="date_to" class="form-control" value="{{ request('date_to') }}">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">نوع حواله</label>
-                    <select name="voucher_type" class="form-select">
-                        <option value="all" @selected($voucherType === 'all')>همه</option>
-                        <option value="between_warehouses" @selected($voucherType === 'between_warehouses')>بین انبار</option>
-                        <option value="scrap" @selected($voucherType === 'scrap')>ضایعات</option>
-                        <option value="customer_return" @selected($voucherType === 'customer_return')>مرجوعی مشتری</option>
-                        <option value="showroom" @selected($voucherType === 'showroom')>شوروم سالن</option>
-                        <option value="personnel_asset" @selected($voucherType === 'personnel_asset')>اموال پرسنل</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">شماره/کد</label>
-                    <input name="voucher_no" class="form-control" value="{{ request('voucher_no') }}" placeholder="مثلاً TR-123 یا کد فاکتور">
-                </div>
-                <div class="col-md-2 d-flex gap-2 filter-actions">
-                    <button class="btn btn-primary">جستجو</button>
-                    <a href="{{ route('vouchers.index') }}" class="btn btn-outline-secondary">حذف فیلتر</a>
-                </div>
-            </div>
+        <div class="col-md-2">
+          <label class="form-label">تا تاریخ</label>
+          <input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] }}">
         </div>
-    </form>
-
-    <div class="card shadow-sm mb-3">
-        <div class="card-body">
-            <h6 class="mb-3">حواله‌های داخلی (بین انبار / ضایعات / مرجوعی مشتری / شوروم / اموال پرسنل)</h6>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>تاریخ ثبت</th>
-                            <th>نوع</th>
-                            <th>شماره حواله</th>
-                            <th>از انبار</th>
-                            <th>به انبار</th>
-                            <th>مبلغ سند</th>
-                            <th>کاربر ثبت‌کننده</th>
-                            <th>ذی‌نفع/فاکتور مرجع</th>
-                            <th class="text-end">عملیات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @forelse($vouchers as $voucher)
-                        <tr>
-                            <td class="fw-bold">{{ $loop->iteration + (($vouchers->currentPage() - 1) * $vouchers->perPage()) }}</td>
-                            <td>{{ $voucher->transferred_at?->format('Y/m/d H:i') }}</td>
-                            <td>{{ $voucherTypeLabels[$voucher->voucher_type ?? 'between_warehouses'] ?? ($voucher->voucher_type ?? '—') }}</td>
-                            <td class="text-muted">{{ $voucher->reference ?: ('TR-'.$voucher->id) }}</td>
-                            <td>{{ $voucher->fromWarehouse?->name }}</td>
-                            <td>{{ $voucher->toWarehouse?->name }}</td>
-                            <td class="amount-strong">{{ $toToman($voucher->total_amount) }} تومان</td>
-                            <td class="text-muted">{{ $voucher->user?->name }}</td>
-                            <td class="small">
-                                @if($voucher->relatedInvoice)
-                                    <div>فاکتور: {{ $voucher->relatedInvoice->uuid }}</div>
-                                @endif
-                                <div>{{ $voucher->beneficiary_name ?: ($voucher->customer?->first_name ? $voucher->customer->first_name . ' ' . $voucher->customer->last_name : '—') }}</div>
-                            </td>
-                            <td class="text-end action-btns">
-                                <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.edit', $voucher) }}">ویرایش</a>
-                                <form method="POST" action="{{ route('vouchers.destroy', $voucher) }}" class="d-inline" onsubmit="return confirm('از حذف حواله مطمئن هستید؟')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="btn btn-sm btn-outline-danger">حذف</button>
-                                </form>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="10" class="text-center text-muted py-5">حواله‌ای با این فیلتر ثبت نشده است.</td>
-                        </tr>
-                    @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="p-3">
-                {{ $vouchers->appends(request()->except('vouchers_page'))->links() }}
-            </div>
+        <div class="col-md-2">
+          <label class="form-label">ورودی / خروجی</label>
+          <select name="direction" class="form-select">
+            <option value="">همه</option>
+            @foreach($directionOptions as $key => $label)
+              <option value="{{ $key }}" @selected($filters['direction'] === $key)>{{ $label }}</option>
+            @endforeach
+          </select>
         </div>
+        <div class="col-md-2">
+          <label class="form-label">علت حواله</label>
+          <select name="reason" class="form-select">
+            <option value="">همه</option>
+            @foreach($reasonLabels as $key => $label)
+              <option value="{{ $key }}" @selected($filters['reason'] === $key)>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">شماره حواله</label>
+          <input type="text" class="form-control" name="voucher_no" value="{{ $filters['voucher_no'] }}" placeholder="TR-...">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">ثبت‌کننده</label>
+          <input type="text" class="form-control" name="user_q" value="{{ $filters['user_q'] }}" placeholder="نام کاربر">
+        </div>
+      </div>
+      <div class="mt-2 d-flex gap-2">
+        <button class="btn btn-primary">اعمال فیلتر</button>
+        <a class="btn btn-outline-secondary" href="{{ route('vouchers.index') }}">حذف فیلتر</a>
+      </div>
     </div>
+  </form>
 
+  <div class="row g-2 mb-3">
+    <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><small class="text-muted">تعداد حواله‌ها</small><div class="fs-5 fw-bold">{{ number_format($summary['count']) }}</div></div></div></div>
+    <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><small class="text-muted">تعداد کل ردیف‌ها</small><div class="fs-5 fw-bold">{{ number_format($summary['items']) }}</div></div></div></div>
+    <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><small class="text-muted">جمع کل تعداد اقلام</small><div class="fs-5 fw-bold">{{ number_format($summary['qty']) }}</div></div></div></div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+        <tr>
+          <th>شماره حواله</th>
+          <th>تاریخ</th>
+          <th>علت حواله</th>
+          <th>نوع حرکت</th>
+          <th>انبار مبدا</th>
+          <th>انبار مقصد</th>
+          <th>تعداد آیتم‌ها</th>
+          <th>جمع کل تعداد</th>
+          <th>ثبت‌کننده</th>
+          <th class="text-end">عملیات</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse($vouchers as $voucher)
+          @php($direction = $voucher->voucher_type === 'customer_return' ? 'incoming' : 'outgoing')
+          <tr>
+            <td>{{ $voucher->reference ?: ('TR-' . $voucher->id) }}</td>
+            <td>{{ optional($voucher->transferred_at)->format('Y/m/d H:i') }}</td>
+            <td>{{ $reasonLabels[$voucher->voucher_type] ?? $voucher->voucher_type }}</td>
+            <td>
+              <span class="badge {{ $direction === 'incoming' ? 'bg-success-subtle text-success-emphasis border border-success-subtle' : 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' }}">
+                {{ $directionOptions[$direction] ?? '—' }}
+              </span>
+            </td>
+            <td>{{ $voucher->fromWarehouse?->name ?? '—' }}</td>
+            <td>{{ $voucher->toWarehouse?->name ?? '—' }}</td>
+            <td>{{ number_format((int) ($voucher->items_count ?? 0)) }}</td>
+            <td>{{ number_format((int) ($voucher->total_quantity ?? 0)) }}</td>
+            <td>{{ $voucher->user?->name ?? '—' }}</td>
+            <td class="text-end">
+              <div class="dropdown">
+                <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">عملیات</button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{{ route('vouchers.show', $voucher) }}">مشاهده</a></li>
+                  <li><a class="dropdown-item" href="{{ route('vouchers.show', $voucher) }}?print=1" target="_blank">چاپ</a></li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+        @empty
+          <tr><td colspan="10" class="text-center py-4 text-muted">رکوردی یافت نشد.</td></tr>
+        @endforelse
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    {{ $vouchers->appends(request()->query())->links() }}
+  </div>
 </div>
 @endsection
