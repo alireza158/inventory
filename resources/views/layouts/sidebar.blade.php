@@ -4,9 +4,10 @@
     $isRoute = static fn(string ...$patterns): bool => Str::is($patterns, $currentRouteName);
     $is = static fn(string ...$patterns): string => $isRoute(...$patterns) ? 'active' : '';
 
-    $productsActive = $isRoute('products.*', 'product-deactivation-documents.*', 'categories.*', 'model-lists.*');
+    $productsActive = $isRoute('products.*', 'product-deactivation-documents.*', 'categories.*', 'model-lists.*')
+        && !$isRoute('products.create', 'products.import.show', 'products.import');
 
-    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*');
+    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*', 'preinvoice.warehouse.*', 'products.create', 'products.import.show', 'products.import');
 
     $salesActive = $isRoute('preinvoice.create', 'customers.*', 'persons.*');
 
@@ -206,8 +207,6 @@
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
                     <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
-                    <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
-                    <a class="sidebar-sublink {{ $is('products.import.show', 'products.import') }}" href="{{ route('products.import.show') }}">تعریف کالا</a>
                     <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
                     <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست</a>
                     <a class="sidebar-sublink {{ $is('product-deactivation-documents.*') }}" href="{{ route('product-deactivation-documents.index') }}">غیرفعال‌سازی کالا</a>
@@ -228,7 +227,10 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
-                    <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
+                    <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
+                    <a class="sidebar-sublink {{ $is('products.import.show', 'products.import') }}" href="{{ route('products.import.show') }}">تعریف کالا</a>
+                    <a class="sidebar-sublink {{ $is('preinvoice.warehouse.*') }}" href="{{ route('preinvoice.warehouse.index') }}">در انتظار تایید انبار</a>
+                    <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.all') }}">حواله‌های انبار</a>
                     <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
                     <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
                 </div>
@@ -267,7 +269,7 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
-                    <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">صف‌های مالی</a>
+                    <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">در انتظار تایید مالی</a>
                     <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
                     <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
                 </div>
