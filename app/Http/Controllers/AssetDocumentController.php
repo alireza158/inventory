@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetDocument;
+use App\Models\AssetDocumentItem;
 use App\Models\AssetDocumentItemCode;
 use App\Models\AssetPersonnel;
 use App\Services\AssetCodeService;
@@ -42,6 +43,12 @@ class AssetDocumentController extends Controller
     public function create()
     {
         $personnel = AssetPersonnel::query()->where('is_active', true)->orderBy('full_name')->get();
+        $itemNameSuggestions = AssetDocumentItem::query()
+            ->select('item_name')
+            ->distinct()
+            ->orderBy('item_name')
+            ->limit(200)
+            ->pluck('item_name');
 
         return view('asset.documents.form', [
             'document' => new AssetDocument([
@@ -49,6 +56,7 @@ class AssetDocumentController extends Controller
                 'status' => AssetDocument::STATUS_DRAFT,
             ]),
             'personnel' => $personnel,
+            'itemNameSuggestions' => $itemNameSuggestions,
             'statusLabels' => AssetDocument::statusLabels(),
             'action' => route('asset.documents.store'),
             'method' => 'POST',
@@ -118,10 +126,17 @@ class AssetDocumentController extends Controller
 
         $document->load('items.codes');
         $personnel = AssetPersonnel::query()->where('is_active', true)->orderBy('full_name')->get();
+        $itemNameSuggestions = AssetDocumentItem::query()
+            ->select('item_name')
+            ->distinct()
+            ->orderBy('item_name')
+            ->limit(200)
+            ->pluck('item_name');
 
         return view('asset.documents.form', [
             'document' => $document,
             'personnel' => $personnel,
+            'itemNameSuggestions' => $itemNameSuggestions,
             'statusLabels' => AssetDocument::statusLabels(),
             'action' => route('asset.documents.update', $document),
             'method' => 'PUT',
