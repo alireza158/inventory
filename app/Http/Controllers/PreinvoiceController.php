@@ -2,22 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cheque;
 use App\Models\Customer;
 use App\Models\CustomerLedger;
-use App\Models\Product;
-use App\Models\StockMovement;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoicePayment;
-use App\Models\Cheque;
 use App\Models\PreinvoiceOrder;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
+use App\Models\StockMovement;
 use App\Models\WarehouseStock;
+use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PreinvoiceController extends Controller
 {
@@ -31,10 +33,156 @@ class PreinvoiceController extends Controller
         return view('preinvoice.create', compact('shippingMethods'));
     }
 
+    public function warehouseQueue()
+    {
+        abort_unless($this->canHandleWarehouseActions(), 403);
+
+        $orders = PreinvoiceOrder::query()
+            ->where('status', PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE)
+            ->with(['creator:id,name'])
+            ->withCount('items')
+            ->orderByDesc('id')
+            ->paginate(20);
+
+        return view('preinvoice.warehouse-index', compact('orders'));
+    }
+
+    public function warehouseReview(string $uuid)
+    {
+        abort_unless($this->canHandleWarehouseActions(), 403);
+
+        $order = PreinvoiceOrder::query()
+            ->with([
+                'items.product:id,name',
+                'items.variant:id,product_id,variant_name,stock,reserved,is_active',
+                'creator:id,name',
+                'warehouseReviewer:id,name',
+                'reviews.user:id,name',
+            ])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        abort_if(!in_array($order->status, [PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE, PreinvoiceOrder::STATUS_WAREHOUSE_REJECTED], true), 403);
+
+        $products = Product::query()
+            ->where('is_sellable', true)
+            ->whereHas('variants', fn ($q) => $q->where('is_active', true))
+            ->with(['variants' => fn ($q) => $q->where('is_active', true)->orderBy('variant_name')])
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return view('preinvoice.warehouse-review', compact('order', 'products'));
+    }
+
+    public function warehouseSave(string $uuid, Request $request)
+    {
+        abort_unless($this->canHandleWarehouseActions(), 403);
+
+        $order = PreinvoiceOrder::query()->with('items')->where('uuid', $uuid)->firstOrFail();
+        abort_if(!in_array($order->status, [PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE, PreinvoiceOrder::STATUS_WAREHOUSE_REJECTED], true), 403);
+
+        $data = $this->validateWarehouseReviewPayload($request);
+
+        DB::transaction(function () use ($order, $data) {
+            $before = $this->snapshotItems($order);
+            $this->replaceOrderItems($order, $data['items']);
+
+            $order->update([
+                'status' => PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE,
+                'warehouse_review_note' => $data['warehouse_review_note'] ?? null,
+                'warehouse_reject_reason' => null,
+                'warehouse_reviewed_by' => auth()->id(),
+                'warehouse_reviewed_at' => now(),
+                'total_price' => $this->calculateOrderTotal($order),
+            ]);
+
+            $order->reviews()->create([
+                'user_id' => auth()->id(),
+                'action' => 'warehouse_saved',
+                'reason' => $data['warehouse_review_note'] ?? null,
+                'before_items' => $before,
+                'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
+            ]);
+        });
+
+        return back()->with('success', '✅ تغییرات انبار ذخیره شد.');
+    }
+
+    public function warehouseApprove(string $uuid, Request $request)
+    {
+        abort_unless($this->canHandleWarehouseActions(), 403);
+
+        $order = PreinvoiceOrder::query()->with('items')->where('uuid', $uuid)->firstOrFail();
+        abort_if(!in_array($order->status, [PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE, PreinvoiceOrder::STATUS_WAREHOUSE_REJECTED], true), 403);
+
+        $data = $this->validateWarehouseReviewPayload($request, true);
+
+        DB::transaction(function () use ($order, $data) {
+            $before = $this->snapshotItems($order);
+            $this->replaceOrderItems($order, $data['items']);
+
+            $order->refresh()->load('items');
+            $this->assertOrderHasStock($order);
+
+            $order->update([
+                'status' => PreinvoiceOrder::STATUS_SUBMITTED_FINANCE,
+                'warehouse_review_note' => $data['warehouse_review_note'] ?? null,
+                'warehouse_reject_reason' => null,
+                'warehouse_reviewed_by' => auth()->id(),
+                'warehouse_reviewed_at' => now(),
+                'total_price' => $this->calculateOrderTotal($order),
+            ]);
+
+            $order->reviews()->create([
+                'user_id' => auth()->id(),
+                'action' => 'warehouse_approved',
+                'reason' => $data['warehouse_review_note'] ?? null,
+                'before_items' => $before,
+                'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
+            ]);
+        });
+
+        return redirect()->route('preinvoice.warehouse.index')
+            ->with('success', '✅ تایید انبار انجام شد و پیش‌فاکتور به صف مالی ارسال شد.');
+    }
+
+    public function warehouseReject(string $uuid, Request $request)
+    {
+        abort_unless($this->canHandleWarehouseActions(), 403);
+
+        $order = PreinvoiceOrder::query()->with('items')->where('uuid', $uuid)->firstOrFail();
+        abort_if(!in_array($order->status, [PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE, PreinvoiceOrder::STATUS_WAREHOUSE_REJECTED], true), 403);
+
+        $data = $request->validate([
+            'warehouse_reject_reason' => 'required|string|max:2000',
+        ], [
+            'warehouse_reject_reason.required' => 'دلیل رد پیش‌فاکتور را وارد کنید.',
+        ]);
+
+        DB::transaction(function () use ($order, $data) {
+            $order->update([
+                'status' => PreinvoiceOrder::STATUS_WAREHOUSE_REJECTED,
+                'warehouse_reject_reason' => $data['warehouse_reject_reason'],
+                'warehouse_reviewed_by' => auth()->id(),
+                'warehouse_reviewed_at' => now(),
+            ]);
+
+            $order->reviews()->create([
+                'user_id' => auth()->id(),
+                'action' => 'warehouse_rejected',
+                'reason' => $data['warehouse_reject_reason'],
+                'before_items' => $this->snapshotItems($order),
+                'after_items' => $this->snapshotItems($order),
+            ]);
+        });
+
+        return back()->with('success', '✅ پیش‌فاکتور رد شد و دلیل برگشت ثبت شد.');
+    }
+
     public function draftIndex()
     {
         $orders = PreinvoiceOrder::query()
-            ->where('status', 'submitted_finance')
+            ->where('status', PreinvoiceOrder::STATUS_SUBMITTED_FINANCE)
             ->with(['creator:id,name'])
             ->orderByDesc('id')
             ->paginate(20);
@@ -53,28 +201,28 @@ class PreinvoiceController extends Controller
             $shippingId = (int) $validated['shipping_id'];
 
             $order = PreinvoiceOrder::create([
-                'uuid'        => (string) Str::uuid(),
-                'created_by'  => auth()->id(),
-                'status'      => 'submitted_finance',
+                'uuid' => (string) Str::uuid(),
+                'created_by' => auth()->id(),
+                'status' => PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE,
 
-                'customer_id'       => $customer?->id,
-                'customer_name'     => $this->orderCustomerName($validated, $customer),
-                'customer_mobile'   => $this->orderCustomerMobile($validated, $customer),
-                'customer_address'  => $this->orderCustomerAddress($validated, $customer, $shippingId),
-                'province_id'       => $this->orderProvinceId($validated, $customer, $shippingId),
-                'city_id'           => $this->orderCityId($validated, $customer, $shippingId),
+                'customer_id' => $customer?->id,
+                'customer_name' => $this->orderCustomerName($validated, $customer),
+                'customer_mobile' => $this->orderCustomerMobile($validated, $customer),
+                'customer_address' => $this->orderCustomerAddress($validated, $customer, $shippingId),
+                'province_id' => $this->orderProvinceId($validated, $customer, $shippingId),
+                'city_id' => $this->orderCityId($validated, $customer, $shippingId),
 
-                'shipping_id'       => $shippingId,
-                'shipping_price'    => (int) $this->resolveShippingPrice($shippingId),
-                'discount_amount'   => (int) ($validated['discount_amount'] ?? 0),
-                'total_price'       => (int) $validated['total_price'],
+                'shipping_id' => $shippingId,
+                'shipping_price' => (int) $this->resolveShippingPrice($shippingId),
+                'discount_amount' => (int) ($validated['discount_amount'] ?? 0),
+                'total_price' => (int) $validated['total_price'],
             ]);
 
             $this->syncItems($order, $validated['products']);
         });
 
-        return redirect()->route('preinvoice.draft.index')
-            ->with('success', '✅ پیش‌فاکتور ثبت و برای تایید مالی ارسال شد.');
+        return redirect()->route('preinvoice.warehouse.index')
+            ->with('success', '✅ پیش‌فاکتور ثبت و برای تایید انبار ارسال شد.');
     }
 
     public function editDraft(string $uuid)
@@ -94,7 +242,7 @@ class PreinvoiceController extends Controller
     public function updateDraft(string $uuid, Request $request)
     {
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
-        abort_if($order->status !== 'submitted_finance', 403);
+        abort_if($order->status !== PreinvoiceOrder::STATUS_SUBMITTED_FINANCE, 403);
 
         $validated = $this->validateDraftPayload($request);
 
@@ -103,17 +251,17 @@ class PreinvoiceController extends Controller
             $shippingId = (int) $validated['shipping_id'];
 
             $order->update([
-                'customer_id'       => $customer?->id,
-                'customer_name'     => $this->orderCustomerName($validated, $customer),
-                'customer_mobile'   => $this->orderCustomerMobile($validated, $customer),
-                'customer_address'  => $this->orderCustomerAddress($validated, $customer, $shippingId),
-                'province_id'       => $this->orderProvinceId($validated, $customer, $shippingId),
-                'city_id'           => $this->orderCityId($validated, $customer, $shippingId),
+                'customer_id' => $customer?->id,
+                'customer_name' => $this->orderCustomerName($validated, $customer),
+                'customer_mobile' => $this->orderCustomerMobile($validated, $customer),
+                'customer_address' => $this->orderCustomerAddress($validated, $customer, $shippingId),
+                'province_id' => $this->orderProvinceId($validated, $customer, $shippingId),
+                'city_id' => $this->orderCityId($validated, $customer, $shippingId),
 
-                'shipping_id'       => $shippingId,
-                'shipping_price'    => (int) $this->resolveShippingPrice($shippingId),
-                'discount_amount'   => (int) ($validated['discount_amount'] ?? 0),
-                'total_price'       => (int) $validated['total_price'],
+                'shipping_id' => $shippingId,
+                'shipping_price' => (int) $this->resolveShippingPrice($shippingId),
+                'discount_amount' => (int) ($validated['discount_amount'] ?? 0),
+                'total_price' => (int) $validated['total_price'],
             ]);
 
             $order->items()->delete();
@@ -129,39 +277,39 @@ class PreinvoiceController extends Controller
         $isInPerson = $this->isInPersonShippingId($shippingId);
 
         $validated = $request->validate([
-            'customer_id'       => 'nullable|integer|exists:customers,id',
-            'customer_name'     => 'required|string|max:255',
-            'customer_mobile'   => 'required|string|max:20',
-            'customer_address'  => $isInPerson ? 'nullable|string|max:1000' : 'required|string|max:1000',
-            'province_id'       => $isInPerson ? 'nullable|integer' : 'required|integer',
-            'city_id'           => 'nullable|integer',
+            'customer_id' => 'nullable|integer|exists:customers,id',
+            'customer_name' => 'required|string|max:255',
+            'customer_mobile' => 'required|string|max:20',
+            'customer_address' => $isInPerson ? 'nullable|string|max:1000' : 'required|string|max:1000',
+            'province_id' => $isInPerson ? 'nullable|integer' : 'required|integer',
+            'city_id' => 'nullable|integer',
 
-            'shipping_id'       => 'required|integer|exists:shipping_methods,id',
-            'shipping_price'    => 'nullable|integer|min:0',
+            'shipping_id' => 'required|integer|exists:shipping_methods,id',
+            'shipping_price' => 'nullable|integer|min:0',
 
-            'discount_amount'   => 'nullable|integer|min:0',
-            'total_price'       => 'required|integer|min:0',
+            'discount_amount' => 'nullable|integer|min:0',
+            'total_price' => 'required|integer|min:0',
 
-            'products'              => 'required|array|min:1',
-            'products.*.id'         => 'required|integer|exists:products,id,is_sellable,1',
+            'products' => 'required|array|min:1',
+            'products.*.id' => 'required|integer|exists:products,id,is_sellable,1',
             'products.*.variety_id' => [
                 'required',
                 'integer',
                 Rule::exists('product_variants', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
-            'products.*.quantity'   => 'required|integer|min:1',
-            'products.*.price'      => 'nullable|integer|min:0',
+            'products.*.quantity' => 'required|integer|min:1',
+            'products.*.price' => 'nullable|integer|min:0',
         ], [
-            'customer_name.required'    => 'نام مشتری الزامی است.',
-            'customer_mobile.required'  => 'شماره موبایل مشتری الزامی است.',
+            'customer_name.required' => 'نام مشتری الزامی است.',
+            'customer_mobile.required' => 'شماره موبایل مشتری الزامی است.',
             'customer_address.required' => 'برای روش‌های ارسال غیرحضوری، آدرس الزامی است.',
-            'province_id.required'      => 'برای روش‌های ارسال غیرحضوری، استان الزامی است.',
-            'products.required'         => 'حداقل یک محصول باید ثبت شود.',
-            'products.min'              => 'حداقل یک محصول باید ثبت شود.',
+            'province_id.required' => 'برای روش‌های ارسال غیرحضوری، استان الزامی است.',
+            'products.required' => 'حداقل یک محصول باید ثبت شود.',
+            'products.min' => 'حداقل یک محصول باید ثبت شود.',
         ]);
 
         foreach (($validated['products'] ?? []) as $index => $productRow) {
-            $isValidVariant = \App\Models\ProductVariant::query()
+            $isValidVariant = ProductVariant::query()
                 ->whereKey((int) $productRow['variety_id'])
                 ->where('product_id', (int) $productRow['id'])
                 ->where('is_active', true)
@@ -175,6 +323,119 @@ class PreinvoiceController extends Controller
         }
 
         return $validated;
+    }
+
+    private function validateWarehouseReviewPayload(Request $request, bool $forApprove = false): array
+    {
+        $validated = $request->validate([
+            'warehouse_review_note' => $forApprove ? 'required|string|max:2000' : 'nullable|string|max:2000',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id,is_sellable,1',
+            'items.*.variant_id' => ['required', 'integer', Rule::exists('product_variants', 'id')->where(fn ($q) => $q->where('is_active', true))],
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.price' => 'required|integer|min:0',
+        ], [
+            'warehouse_review_note.required' => 'برای تایید و ارسال به مالی، دلیل/توضیح بازبینی انبار الزامی است.',
+            'items.required' => 'حداقل یک آیتم در پیش‌فاکتور لازم است.',
+            'items.min' => 'حداقل یک آیتم در پیش‌فاکتور لازم است.',
+        ]);
+
+        foreach (($validated['items'] ?? []) as $index => $row) {
+            $isValidVariant = ProductVariant::query()
+                ->whereKey((int) $row['variant_id'])
+                ->where('product_id', (int) $row['product_id'])
+                ->where('is_active', true)
+                ->exists();
+
+            if (!$isValidVariant) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.variant_id" => 'تنوع انتخابی برای کالا معتبر نیست.',
+                ]);
+            }
+        }
+
+        return $validated;
+    }
+
+    private function replaceOrderItems(PreinvoiceOrder $order, array $items): void
+    {
+        $order->items()->delete();
+
+        foreach ($items as $row) {
+            $order->items()->create([
+                'product_id' => (int) $row['product_id'],
+                'variant_id' => (int) $row['variant_id'],
+                'quantity' => (int) $row['quantity'],
+                'price' => (int) $row['price'],
+            ]);
+        }
+    }
+
+    private function snapshotItems(PreinvoiceOrder $order): array
+    {
+        $order->loadMissing(['items.product:id,name', 'items.variant:id,variant_name']);
+
+        return $order->items->map(fn ($item) => [
+            'product_id' => (int) $item->product_id,
+            'product_name' => $item->product?->name,
+            'variant_id' => (int) $item->variant_id,
+            'variant_name' => $item->variant?->variant_name,
+            'quantity' => (int) $item->quantity,
+            'price' => (int) $item->price,
+        ])->values()->all();
+    }
+
+    private function calculateOrderTotal(PreinvoiceOrder $order): int
+    {
+        $subtotal = (int) $order->items()->selectRaw('COALESCE(SUM(quantity * price),0) as total')->value('total');
+
+        return max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
+    }
+
+    private function assertOrderHasStock(PreinvoiceOrder $order): void
+    {
+        $order->loadMissing('items.product', 'items.variant');
+        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+
+        $requiredByVariant = $order->items
+            ->groupBy('variant_id')
+            ->map(fn ($rows) => (int) $rows->sum('quantity'));
+
+        $variants = ProductVariant::query()
+            ->whereIn('id', $requiredByVariant->keys())
+            ->get(['id', 'variant_name', 'stock', 'reserved']);
+
+        foreach ($requiredByVariant as $variantId => $requiredQty) {
+            $variant = $variants->firstWhere('id', (int) $variantId);
+            $availableQty = $variant ? max(0, ((int) $variant->stock - (int) $variant->reserved)) : 0;
+
+            if ($availableQty < $requiredQty) {
+                $name = $variant?->variant_name ?? ('#' . $variantId);
+                throw ValidationException::withMessages([
+                    'items' => "موجودی تنوع «{$name}» کافی نیست. موجودی قابل فروش: {$availableQty} | درخواست: {$requiredQty}",
+                ]);
+            }
+        }
+
+        $requiredByProduct = $order->items
+            ->groupBy('product_id')
+            ->map(fn ($rows) => (int) $rows->sum('quantity'));
+
+        $availableByProduct = WarehouseStock::query()
+            ->where('warehouse_id', $centralWarehouseId)
+            ->whereIn('product_id', $requiredByProduct->keys())
+            ->pluck('quantity', 'product_id');
+
+        foreach ($requiredByProduct as $productId => $requiredQty) {
+            $availableQty = (int) ($availableByProduct[(int) $productId] ?? 0);
+
+            if ($availableQty < $requiredQty) {
+                $productName = (string) Product::query()->whereKey((int) $productId)->value('name');
+                throw ValidationException::withMessages([
+                    'items' => "موجودی انبار مرکزی برای محصول «{$productName}» کافی نیست. موجودی: {$availableQty} | درخواست: {$requiredQty}",
+                ]);
+            }
+        }
     }
 
     private function resolveCustomer(array $validated): ?Customer
@@ -282,12 +543,11 @@ class PreinvoiceController extends Controller
             $order->items()->create([
                 'product_id' => (int) $p['id'],
                 'variant_id' => (int) $p['variety_id'],
-                'quantity'   => (int) $p['quantity'],
-                'price'      => (int) ($p['price'] ?? 0),
+                'quantity' => (int) $p['quantity'],
+                'price' => (int) ($p['price'] ?? 0),
             ]);
         }
     }
-
 
     private function canHandleFinanceActions(): bool
     {
@@ -296,12 +556,19 @@ class PreinvoiceController extends Controller
         return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
     }
 
+    private function canHandleWarehouseActions(): bool
+    {
+        $user = auth()->user();
+
+        return $user && ($user->hasAnyRole(['admin', 'warehouse']) || $user->can('warehouse.approve'));
+    }
+
     public function finance(string $uuid)
     {
         $order = PreinvoiceOrder::with(['items.product', 'items.variant', 'creator:id,name'])
             ->where('uuid', $uuid)
             ->firstOrFail();
-        abort_if($order->status !== 'submitted_finance', 403);
+        abort_if($order->status !== PreinvoiceOrder::STATUS_SUBMITTED_FINANCE, 403);
 
         $customerBalanceStatus = 'تسویه';
         $customerBalanceAmount = 0;
@@ -330,7 +597,7 @@ class PreinvoiceController extends Controller
     public function finalize(string $uuid, Request $request)
     {
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
-        abort_if($order->status !== 'submitted_finance', 403);
+        abort_if($order->status !== PreinvoiceOrder::STATUS_SUBMITTED_FINANCE, 403);
 
         $validated = $request->validate([
             'payments' => 'nullable|array',
@@ -372,7 +639,7 @@ class PreinvoiceController extends Controller
             }
         }
 
-        $invoice = DB::transaction(function () use ($order, $validated, $request) {
+        $invoice = DB::transaction(function () use ($order, $validated) {
             $subtotal = 0;
 
             foreach ($order->items as $it) {
@@ -381,7 +648,7 @@ class PreinvoiceController extends Controller
 
             $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
 
-            $centralWarehouseId = \App\Services\WarehouseStockService::centralWarehouseId();
+            $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
             $requiredByProduct = $order->items
                 ->groupBy('product_id')
@@ -405,22 +672,22 @@ class PreinvoiceController extends Controller
             }
 
             $invoice = Invoice::create([
-                'uuid'                => (string) Str::uuid(),
+                'uuid' => (string) Str::uuid(),
                 'preinvoice_order_id' => $order->id,
 
-                'customer_id'         => $order->customer_id ?? null,
-                'customer_name'       => $order->customer_name,
-                'customer_mobile'     => $order->customer_mobile,
-                'customer_address'    => $order->customer_address,
-                'province_id'         => $order->province_id,
-                'city_id'             => $order->city_id,
+                'customer_id' => $order->customer_id ?? null,
+                'customer_name' => $order->customer_name,
+                'customer_mobile' => $order->customer_mobile,
+                'customer_address' => $order->customer_address,
+                'province_id' => $order->province_id,
+                'city_id' => $order->city_id,
 
-                'shipping_id'         => $order->shipping_id,
-                'shipping_price'      => (int) $order->shipping_price,
-                'discount_amount'     => (int) $order->discount_amount,
-                'subtotal'            => (int) $subtotal,
-                'total'               => (int) $total,
-                'status'              => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+                'shipping_id' => $order->shipping_id,
+                'shipping_price' => (int) $order->shipping_price,
+                'discount_amount' => (int) $order->discount_amount,
+                'subtotal' => (int) $subtotal,
+                'total' => (int) $total,
+                'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
             ]);
 
             foreach ($order->items as $it) {
@@ -428,12 +695,12 @@ class PreinvoiceController extends Controller
                     'invoice_id' => $invoice->id,
                     'product_id' => (int) $it->product_id,
                     'variant_id' => (int) $it->variant_id,
-                    'quantity'   => (int) $it->quantity,
-                    'price'      => (int) $it->price,
+                    'quantity' => (int) $it->quantity,
+                    'price' => (int) $it->price,
                     'line_total' => (int) $it->price * (int) $it->quantity,
                 ]);
 
-                \App\Services\WarehouseStockService::change($centralWarehouseId, (int) $it->product_id, -((int) $it->quantity));
+                WarehouseStockService::change($centralWarehouseId, (int) $it->product_id, -((int) $it->quantity));
 
                 $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
                 if ($product) {
@@ -466,7 +733,7 @@ class PreinvoiceController extends Controller
                 ]);
             }
 
-            foreach (($validated['payments'] ?? []) as $index => $paymentRow) {
+            foreach (($validated['payments'] ?? []) as $paymentRow) {
                 $paymentAmount = (int) $paymentRow['amount'];
                 if (($paymentRow['method'] ?? null) === 'cheque') {
                     $paymentAmount = (int) ($paymentRow['cheque_amount'] ?? 0);
@@ -512,7 +779,7 @@ class PreinvoiceController extends Controller
                 }
             }
 
-            $order->update(['status' => 'finance_approved']);
+            $order->update(['status' => PreinvoiceOrder::STATUS_FINANCE_APPROVED]);
 
             return $invoice;
         });
