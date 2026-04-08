@@ -95,7 +95,7 @@
           <tr>
             <td>{{ $voucher->reference ?: ('TR-' . $voucher->id) }}</td>
             <td>{{ optional($voucher->transferred_at)->format('Y/m/d H:i') }}</td>
-            <td>{{ $activeReasons[$voucher->voucher_type] ?? \\App\\Models\\WarehouseTransfer::typeOptions()[$voucher->voucher_type] ?? $voucher->voucher_type }}</td>
+            <td>{{ $activeReasons[$voucher->voucher_type] ?? \App\Models\WarehouseTransfer::typeOptions()[$voucher->voucher_type] ?? $voucher->voucher_type }}</td>
             <td>{{ $tab === 'outgoing' ? ($voucher->fromWarehouse?->name ?? '—') : ($voucher->toWarehouse?->name ?? '—') }}</td>
             <td>
               @if($tab === 'outgoing')
