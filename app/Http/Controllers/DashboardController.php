@@ -31,7 +31,7 @@ class DashboardController extends Controller
         $kpis = [
             'todayPreinvoices' => PreinvoiceOrder::query()->whereDate('created_at', $today)->count(),
             'todayInvoices' => Invoice::query()->whereDate('created_at', $today)->count(),
-            'financeQueue' => PreinvoiceOrder::query()->where('status', 'submitted_finance')->count(),
+            'financeQueue' => PreinvoiceOrder::query()->where('status', PreinvoiceOrder::STATUS_SUBMITTED_FINANCE)->count(),
             'warehousePending' => Invoice::query()->where('status', Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL)->count(),
             'lowStock' => Product::query()->where('stock', '>', 0)->where('stock', '<=', $lowStockThreshold)->count(),
             'todayReceipts' => (int) InvoicePayment::query()->whereDate('paid_at', $today)->sum('amount'),
@@ -165,7 +165,7 @@ class DashboardController extends Controller
             [
                 'title' => 'سفارش‌های معطل مالی',
                 'count' => PreinvoiceOrder::query()
-                    ->where('status', 'submitted_finance')
+                    ->where('status', PreinvoiceOrder::STATUS_SUBMITTED_FINANCE)
                     ->where('created_at', '<=', now()->subDays(2))
                     ->count(),
                 'description' => 'بیش از ۲ روز در صف مانده‌اند',
@@ -272,7 +272,7 @@ class DashboardController extends Controller
             ['key' => 'warehouse_vouchers', 'label' => 'حواله‌های انبار', 'unit' => 'عدد', 'value' => Invoice::query()->whereBetween('created_at', [$start, $end])->count(), 'color' => 'info'],
             ['key' => 'receipts', 'label' => 'دریافتی‌ها', 'unit' => 'تومان', 'value' => (int) InvoicePayment::query()->whereBetween('paid_at', [$start->toDateString(), $end->toDateString()])->sum('amount'), 'color' => 'success'],
             ['key' => 'invoice_count', 'label' => 'تعداد فاکتورها', 'unit' => 'عدد', 'value' => Invoice::query()->whereBetween('created_at', [$start, $end])->count(), 'color' => 'secondary'],
-            ['key' => 'pending_orders', 'label' => 'سفارش‌های در انتظار', 'unit' => 'عدد', 'value' => PreinvoiceOrder::query()->where('status', 'submitted_finance')->whereBetween('created_at', [$start, $end])->count(), 'color' => 'warning'],
+            ['key' => 'pending_orders', 'label' => 'سفارش‌های در انتظار', 'unit' => 'عدد', 'value' => PreinvoiceOrder::query()->where('status', PreinvoiceOrder::STATUS_SUBMITTED_FINANCE)->whereBetween('created_at', [$start, $end])->count(), 'color' => 'warning'],
         ];
 
         $max = max(1, collect($metrics)->max('value'));

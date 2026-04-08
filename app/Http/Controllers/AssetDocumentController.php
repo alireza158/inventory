@@ -8,6 +8,7 @@ use App\Models\AssetPersonnel;
 use App\Services\AssetCodeService;
 use App\Services\AssetDocumentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class AssetDocumentController extends Controller
 {
@@ -60,13 +61,18 @@ class AssetDocumentController extends Controller
             'document_date' => 'required|date',
             'personnel_id' => 'required|exists:asset_personnel,id',
             'description' => 'nullable|string',
+            'signed_form' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
             'items' => 'required|array|min:1',
             'items.*.item_name' => 'required|string|max:255',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.asset_codes_input' => 'required|string',
             'items.*.description' => 'nullable|string',
+        ], [
+            'signed_form.mimes' => 'فرمت فایل نامه امضاشده باید jpg، jpeg، png، webp یا pdf باشد.',
+            'signed_form.max' => 'حجم فایل نامه امضاشده نباید بیشتر از ۵ مگابایت باشد.',
         ]);
 
+        $data = array_merge($data, $this->storeSignedForm($request));
         $document = $this->service->create($data, $data['items'], auth()->id());
 
         return redirect()->route('asset.documents.show', $document)->with('success', 'سند اموال با موفقیت ثبت شد.');
@@ -76,8 +82,9 @@ class AssetDocumentController extends Controller
     {
         $document->load(['personnel', 'items.codes', 'creator', 'updater', 'histories.actor']);
         $statusLabels = AssetDocument::statusLabels();
+        $isSignedFormImage = $document->signed_form_mime && str_starts_with($document->signed_form_mime, 'image/');
 
-        return view('asset.documents.show', compact('document', 'statusLabels'));
+        return view('asset.documents.show', compact('document', 'statusLabels', 'isSignedFormImage'));
     }
 
     public function view(AssetDocument $document)
@@ -123,16 +130,49 @@ class AssetDocumentController extends Controller
             'document_date' => 'required|date',
             'personnel_id' => 'required|exists:asset_personnel,id',
             'description' => 'nullable|string',
+            'signed_form' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
             'items' => 'required|array|min:1',
             'items.*.item_name' => 'required|string|max:255',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.asset_codes_input' => 'required|string',
             'items.*.description' => 'nullable|string',
+        ], [
+            'signed_form.mimes' => 'فرمت فایل نامه امضاشده باید jpg، jpeg، png، webp یا pdf باشد.',
+            'signed_form.max' => 'حجم فایل نامه امضاشده نباید بیشتر از ۵ مگابایت باشد.',
         ]);
 
+        $data = array_merge($data, $this->storeSignedForm($request));
         $updated = $this->service->update($document, $data, $data['items'], auth()->id());
 
         return redirect()->route('asset.documents.show', $updated)->with('success', 'سند اموال بروزرسانی شد.');
+    }
+
+    public function print(AssetDocument $document)
+    {
+        $document->load(['personnel', 'items.codes', 'creator']);
+
+        return view('asset.documents.print', compact('document'));
+    }
+
+    public function signedFormView(AssetDocument $document)
+    {
+        abort_unless($document->signed_form_path, 404);
+
+        return Storage::disk('private')->response(
+            $document->signed_form_path,
+            $document->signed_form_original_name ?: basename($document->signed_form_path),
+            ['Content-Type' => $document->signed_form_mime ?: 'application/octet-stream']
+        );
+    }
+
+    public function signedFormDownload(AssetDocument $document)
+    {
+        abort_unless($document->signed_form_path, 404);
+
+        return Storage::disk('private')->download(
+            $document->signed_form_path,
+            $document->signed_form_original_name ?: basename($document->signed_form_path)
+        );
     }
 
     public function finalize(AssetDocument $document)
@@ -182,5 +222,21 @@ class AssetDocumentController extends Controller
             'document_status' => $result->item?->document?->status,
             'personnel' => $result->item?->document?->personnel?->full_name,
         ]);
+    }
+
+    private function storeSignedForm(Request $request): array
+    {
+        if (!$request->hasFile('signed_form')) {
+            return [];
+        }
+
+        $file = $request->file('signed_form');
+        $path = $file->store('asset-documents/signed-forms', 'private');
+
+        return [
+            'signed_form_path' => $path,
+            'signed_form_original_name' => $file->getClientOriginalName(),
+            'signed_form_mime' => $file->getClientMimeType(),
+        ];
     }
 }
