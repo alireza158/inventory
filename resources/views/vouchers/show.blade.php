@@ -4,10 +4,7 @@
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">جزئیات حواله انبار</h4>
-    <div class="d-flex gap-2">
-      <button type="button" class="btn btn-dark" onclick="window.print()">چاپ</button>
-      <a href="{{ route('vouchers.all') }}" class="btn btn-outline-secondary">بازگشت</a>
-    </div>
+    <a href="{{ route('vouchers.all') }}" class="btn btn-outline-secondary">بازگشت</a>
   </div>
 
   <div class="card border-0 shadow-sm mb-3">
@@ -15,7 +12,6 @@
       <div class="col-md-4"><strong>شماره حواله:</strong> {{ $voucher->reference ?: ('TR-' . $voucher->id) }}</div>
       <div class="col-md-4"><strong>تاریخ:</strong> {{ optional($voucher->transferred_at)->format('Y/m/d H:i') }}</div>
       <div class="col-md-4"><strong>نوع/علت:</strong> {{ $reasonLabel }}</div>
-      <div class="col-md-4"><strong>ورودی/خروجی:</strong> {{ $directionLabel }}</div>
       <div class="col-md-4"><strong>انبار مبدا:</strong> {{ $voucher->fromWarehouse?->name ?? '—' }}</div>
       <div class="col-md-4"><strong>انبار مقصد:</strong> {{ $voucher->toWarehouse?->name ?? '—' }}</div>
       <div class="col-md-4"><strong>ثبت‌کننده:</strong> {{ $voucher->user?->name ?? '—' }}</div>
@@ -57,7 +53,4 @@
     </div>
   </div>
 </div>
-@if(request()->boolean('print'))
-  <script>window.print();</script>
-@endif
 @endsection
