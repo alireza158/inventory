@@ -487,39 +487,62 @@ class VoucherController extends Controller
 
     public function index(Request $request)
     {
+        $tab = in_array((string) $request->query('tab', 'outgoing'), ['outgoing', 'incoming'], true)
+            ? (string) $request->query('tab', 'outgoing')
+            : 'outgoing';
+
         $filters = [
             'voucher_no' => trim((string) $request->query('voucher_no', '')),
             'date_from' => trim((string) $request->query('date_from', '')),
             'date_to' => trim((string) $request->query('date_to', '')),
             'reason' => trim((string) $request->query('reason', '')),
-            'direction' => trim((string) $request->query('direction', '')),
-            'user_q' => trim((string) $request->query('user_q', '')),
+            'warehouse_id' => (int) $request->query('warehouse_id', 0),
+            'product_q' => trim((string) $request->query('product_q', '')),
         ];
 
-        $reasonLabels = $this->combinedReasonLabels();
-        $directionOptions = $this->directionOptions();
+        $outgoingReasons = $this->outgoingReasonLabels();
+        $incomingReasons = $this->incomingReasonLabels();
+        $warehouses = Warehouse::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
-        $query = WarehouseTransfer::query()
+        $outgoingQuery = WarehouseTransfer::query()
             ->with(['fromWarehouse', 'toWarehouse', 'user', 'customer'])
             ->withCount('items')
             ->withSum('items as total_quantity', 'quantity')
-            ->whereIn('voucher_type', array_keys($reasonLabels));
+            ->whereIn('voucher_type', array_keys($outgoingReasons));
 
-        $this->applyVoucherFilters($query, $filters);
+        $incomingQuery = WarehouseTransfer::query()
+            ->with(['fromWarehouse', 'toWarehouse', 'user', 'customer'])
+            ->withCount('items')
+            ->withSum('items as total_quantity', 'quantity')
+            ->whereIn('voucher_type', array_keys($incomingReasons));
 
-        $vouchers = $query->latest('transferred_at')->paginate(20)->withQueryString();
-        $summary = [
-            'count' => (int) $vouchers->total(),
-            'items' => (int) $vouchers->sum(fn ($v) => (int) ($v->items_count ?? 0)),
-            'qty' => (int) $vouchers->sum(fn ($v) => (int) ($v->total_quantity ?? 0)),
+        $this->applyVoucherFilters($outgoingQuery, $filters, true);
+        $this->applyVoucherFilters($incomingQuery, $filters, false);
+
+        $outgoingVouchers = $outgoingQuery->latest('transferred_at')->paginate(20, ['*'], 'out_page')->withQueryString();
+        $incomingVouchers = $incomingQuery->latest('transferred_at')->paginate(20, ['*'], 'in_page')->withQueryString();
+
+        $outgoingSummary = [
+            'count' => (int) $outgoingVouchers->total(),
+            'items' => (int) $outgoingVouchers->sum(fn ($v) => (int) ($v->items_count ?? 0)),
+            'qty' => (int) $outgoingVouchers->sum(fn ($v) => (int) ($v->total_quantity ?? 0)),
+        ];
+        $incomingSummary = [
+            'count' => (int) $incomingVouchers->total(),
+            'items' => (int) $incomingVouchers->sum(fn ($v) => (int) ($v->items_count ?? 0)),
+            'qty' => (int) $incomingVouchers->sum(fn ($v) => (int) ($v->total_quantity ?? 0)),
         ];
 
         return view('vouchers.index', compact(
+            'tab',
             'filters',
-            'reasonLabels',
-            'directionOptions',
-            'vouchers',
-            'summary'
+            'warehouses',
+            'outgoingReasons',
+            'incomingReasons',
+            'outgoingVouchers',
+            'incomingVouchers',
+            'outgoingSummary',
+            'incomingSummary'
         ));
     }
 
@@ -530,7 +553,6 @@ class VoucherController extends Controller
         return view('vouchers.show', [
             'voucher' => $voucher,
             'reasonLabel' => $this->humanReasonLabel($voucher->voucher_type),
-            'directionLabel' => $this->directionOptions()[$this->directionOfType($voucher->voucher_type)] ?? '—',
         ]);
     }
 
@@ -1103,7 +1125,7 @@ class VoucherController extends Controller
             ->delete();
     }
 
-    private function combinedReasonLabels(): array
+    private function outgoingReasonLabels(): array
     {
         return [
             WarehouseTransfer::TYPE_SALE => 'فروش',
@@ -1111,33 +1133,27 @@ class VoucherController extends Controller
             WarehouseTransfer::TYPE_PERSONNEL_ASSET => 'تحویل به پرسنل',
             WarehouseTransfer::TYPE_SCRAP => 'ضایعات',
             WarehouseTransfer::TYPE_SHOWROOM => 'انتقال به شوروم',
+        ];
+    }
+
+    private function incomingReasonLabels(): array
+    {
+        return [
             WarehouseTransfer::TYPE_CUSTOMER_RETURN => 'برگشت از مشتری',
+            WarehouseTransfer::TYPE_BETWEEN_WAREHOUSES => 'انتقال از انبار دیگر',
+            WarehouseTransfer::TYPE_SHOWROOM => 'دریافت از انبار دیگر (شوروم)',
+            WarehouseTransfer::TYPE_PERSONNEL_ASSET => 'برگشت/دریافت اموال پرسنلی',
+            WarehouseTransfer::TYPE_SCRAP => 'ورود به انبار ضایعات',
         ];
     }
 
     private function humanReasonLabel(?string $type): string
     {
-        $labels = $this->combinedReasonLabels() + WarehouseTransfer::typeOptions();
+        $labels = $this->outgoingReasonLabels() + $this->incomingReasonLabels() + WarehouseTransfer::typeOptions();
         return $labels[$type ?? ''] ?? ($type ?: '—');
     }
 
-    private function directionOptions(): array
-    {
-        return [
-            'outgoing' => 'خروجی',
-            'incoming' => 'ورودی',
-        ];
-    }
-
-    private function directionOfType(?string $type): string
-    {
-        return match ($type) {
-            WarehouseTransfer::TYPE_CUSTOMER_RETURN => 'incoming',
-            default => 'outgoing',
-        };
-    }
-
-    private function applyVoucherFilters($query, array $filters): void
+    private function applyVoucherFilters($query, array $filters, bool $outgoing): void
     {
         $query
             ->when($filters['voucher_no'] !== '', function ($q) use ($filters) {
@@ -1150,19 +1166,13 @@ class VoucherController extends Controller
             ->when($filters['date_from'] !== '', fn ($q) => $q->whereDate('transferred_at', '>=', $filters['date_from']))
             ->when($filters['date_to'] !== '', fn ($q) => $q->whereDate('transferred_at', '<=', $filters['date_to']))
             ->when($filters['reason'] !== '', fn ($q) => $q->where('voucher_type', $filters['reason']))
-            ->when($filters['direction'] !== '', function ($q) use ($filters) {
-                $target = $filters['direction'];
-                $types = collect(array_keys($this->combinedReasonLabels()))
-                    ->filter(fn ($type) => $this->directionOfType($type) === $target)
-                    ->values()
-                    ->all();
-                if (!empty($types)) {
-                    $q->whereIn('voucher_type', $types);
-                }
+            ->when($filters['warehouse_id'] > 0, function ($q) use ($filters, $outgoing) {
+                $field = $outgoing ? 'from_warehouse_id' : 'to_warehouse_id';
+                $q->where($field, $filters['warehouse_id']);
             })
-            ->when($filters['user_q'] !== '', function ($q) use ($filters) {
-                $term = $filters['user_q'];
-                $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$term}%"));
+            ->when($filters['product_q'] !== '', function ($q) use ($filters) {
+                $term = $filters['product_q'];
+                $q->whereHas('items.product', fn ($p) => $p->where('name', 'like', "%{$term}%"));
             });
     }
 
