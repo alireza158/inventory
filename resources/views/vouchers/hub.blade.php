@@ -183,8 +183,8 @@
         </p>
 
         <div class="hero-actions">
-            <a class="btn btn-primary rounded-4 px-4 fw-bold" href="{{ route('warehouse.outputs') }}">
-                مشاهده خروجی‌های انبار
+            <a class="btn btn-primary rounded-4 px-4 fw-bold" href="{{ route('vouchers.index') }}">
+                ورودی و خروجی‌های انبار
             </a>
         </div>
     </div>
