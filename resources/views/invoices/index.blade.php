@@ -45,6 +45,7 @@
             <th>مشتری</th>
             <th class="text-nowrap">موبایل</th>
             <th class="text-nowrap">وضعیت</th>
+            <th class="text-nowrap">وضعیت پرداخت</th>
             <th class="text-nowrap">مبلغ</th>
             <th class="text-nowrap">مانده</th>
             <th class="text-nowrap">تاریخ</th>
@@ -53,25 +54,35 @@
         </thead>
         <tbody>
           @forelse($invoices as $inv)
+            @php
+              $paid = (int) ($inv->paid_total ?? 0);
+              $remaining = max((int) $inv->total - $paid, 0);
+              $payStatus = $remaining <= 0 ? 'تسویه شده' : ($paid > 0 ? 'پرداخت ناقص' : 'پرداخت نشده');
+              $payStatusClass = $remaining <= 0 ? 'bg-success' : ($paid > 0 ? 'bg-warning text-dark' : 'bg-danger');
+            @endphp
             <tr>
               <td class="text-nowrap">{{ $inv->uuid }}</td>
               <td>{{ $inv->customer_name ?: '—' }}</td>
               <td class="text-nowrap">{{ $inv->customer_mobile ?: '—' }}</td>
               <td class="text-nowrap">{{ $statusFa($inv->status) }}</td>
+              <td class="text-nowrap"><span class="badge {{ $payStatusClass }}">{{ $payStatus }}</span></td>
               <td class="text-nowrap">{{ number_format($inv->total) }}</td>
-              <td class="text-nowrap fw-bold {{ $inv->remaining_amount > 0 ? 'text-danger' : 'text-success' }}">
-                {{ number_format($inv->remaining_amount) }}
+              <td class="text-nowrap fw-bold {{ $remaining > 0 ? 'text-danger' : 'text-success' }}">
+                {{ number_format($remaining) }}
               </td>
               <td class="text-nowrap">
                 {{ $inv->created_at ? Jalalian::fromDateTime($inv->created_at)->format('Y/m/d') : '—' }}
               </td>
               <td class="text-nowrap">
-                <a class="btn btn-sm btn-outline-primary" href="{{ route('invoices.show', $inv->uuid) }}">جزئیات</a>
+                <div class="d-flex gap-1">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ route('invoices.show', $inv->uuid) }}">جزئیات</a>
+                  <a class="btn btn-sm btn-outline-dark" href="{{ route('invoices.print', $inv->uuid) }}" target="_blank">چاپ فاکتور</a>
+                </div>
               </td>
             </tr>
           @empty
             <tr>
-              <td colspan="8" class="text-center text-muted py-4">فاکتوری یافت نشد</td>
+              <td colspan="9" class="text-center text-muted py-4">فاکتوری یافت نشد</td>
             </tr>
           @endforelse
         </tbody>
