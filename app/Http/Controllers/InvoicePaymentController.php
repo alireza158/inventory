@@ -31,6 +31,43 @@ class InvoicePaymentController extends Controller
     {
         abort_unless($this->canHandleFinanceActions(), 403);
 
+        $payment = $this->createPaymentRecord($request, $invoice, $invoice->customer_id ? (int) $invoice->customer_id : null);
+
+        return back()->with('success', "✅ پرداخت {$this->methodLabel($payment->method)} با موفقیت ثبت شد.");
+    }
+
+    public function storeForCustomer(Customer $customer, Request $request)
+    {
+        abort_unless($this->canHandleFinanceActions(), 403);
+
+        $data = $request->validate([
+            'invoice_id' => [
+                'required',
+                'integer',
+                Rule::exists('invoices', 'id')->where(fn ($q) => $q->where('customer_id', $customer->id)),
+            ],
+            'method' => 'required|in:cash,card,cheque',
+            'amount' => 'required|integer|min:1',
+            'paid_at' => 'nullable|date',
+            'payment_identifier' => 'nullable|string|max:190',
+            'note' => 'nullable|string|max:2000',
+            'receipt_image' => 'nullable|image|max:4096',
+            'cheque_number' => 'required_if:method,cheque|nullable|string|max:255',
+            'bank_name' => 'nullable|string|max:255',
+            'due_date' => 'nullable|date',
+            'cheque_status' => 'nullable|in:pending,cleared,bounced',
+            'cheque_image' => 'nullable|image|max:4096',
+        ]);
+
+        $invoice = Invoice::query()->findOrFail((int) $data['invoice_id']);
+
+        $payment = $this->persistPayment($invoice, $data, $request, $customer->id);
+
+        return back()->with('success', "✅ پرداخت {$this->methodLabel($payment->method)} برای مشتری ثبت شد.");
+    }
+
+    private function createPaymentRecord(Request $request, Invoice $invoice, ?int $fallbackCustomerId = null): InvoicePayment
+    {
         $data = $request->validate([
             'invoice_id' => [
                 'required',
