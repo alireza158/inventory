@@ -219,9 +219,6 @@
           </div>
 
           @if($canFinanceApprove)
-          <div class="mb-2">
-            <button type="button" class="btn btn-success btn-sm" id="toggleInvoicePaymentForm">➕ افزودن پرداخت</button>
-          </div>
           <div class="border rounded-3 p-2 p-md-3 d-none" id="invoicePaymentFormWrap" style="background:rgba(25,135,84,.04);border-color:rgba(25,135,84,.25)!important">
             <form method="POST" action="{{ route('invoices.payments.store', $invoice->uuid) }}" enctype="multipart/form-data" id="invoicePaymentForm">
               @csrf
@@ -323,6 +320,13 @@
           @endif
 
           <hr class="my-3">
+
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="fw-semibold">واریزی‌های فاکتور</div>
+            @if($canFinanceApprove)
+              <button type="button" class="btn btn-success btn-sm" id="toggleInvoicePaymentForm">➕ افزودن پرداخت</button>
+            @endif
+          </div>
 
           @forelse($invoice->payments as $p)
             @php
