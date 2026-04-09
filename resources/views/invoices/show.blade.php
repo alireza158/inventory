@@ -6,7 +6,6 @@
 
   $methodFa = fn($m) => match($m){
     'cash' => 'نقدی',
-    'card' => 'کارت',
     'cheque' => 'چک',
     default => $m,
   };
@@ -64,7 +63,6 @@
 
   $badgeMethod = fn($m) => match($m){
     'cash' => 'bg-success',
-    'card' => 'bg-primary',
     'cheque' => 'bg-warning text-dark',
     default => 'bg-secondary',
   };
@@ -232,7 +230,6 @@
                   <label class="form-label">نوع پرداخت</label>
                   <select name="method" class="form-select" id="invoice_payment_method" required>
                     <option value="cash">نقدی</option>
-                    <option value="card">کارت</option>
                     <option value="cheque">چکی</option>
                   </select>
                 </div>
@@ -245,12 +242,12 @@
 
                 <div class="col-md-4">
                   <label class="form-label">تاریخ پرداخت</label>
-                  <input id="paid_at_jalali" type="text" class="form-control" placeholder="تاریخ شمسی">
+                  <input id="paid_at_jalali" type="text" class="form-control" placeholder="تاریخ شمسی" required>
                   <input name="paid_at" id="paid_at" type="hidden">
                 </div>
                 <div class="col-md-4">
-                  <label class="form-label">شناسه پرداخت</label>
-                  <input name="payment_identifier" class="form-control" placeholder="اختیاری">
+                  <label class="form-label">اسم بانک (فقط نقدی)</label>
+                  <input name="bank_name" class="form-control" placeholder="مثال: ملی">
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">رسید پرداخت</label>
@@ -265,11 +262,35 @@
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">نام بانک</label>
-                      <input name="bank_name" class="form-control" placeholder="مثال: ملی">
+                      <input name="cheque_bank_name" class="form-control" placeholder="مثال: ملی">
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">تاریخ چک/سررسید</label>
-                      <input name="due_date" type="date" class="form-control">
+                      <label class="form-label">نام شعبه</label>
+                      <input name="cheque_branch_name" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">تاریخ سررسید</label>
+                      <input name="cheque_due_date" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">تاریخ دریافت چک</label>
+                      <input name="cheque_received_at" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">نام مشتری</label>
+                      <input name="cheque_customer_name" class="form-control" value="{{ $invoice->customer_name }}">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">کد/شناسه مشتری</label>
+                      <input name="cheque_customer_code" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">شماره حساب/شبا</label>
+                      <input name="cheque_account_number" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">صاحب حساب</label>
+                      <input name="cheque_account_holder" class="form-control">
                     </div>
                     <div class="col-md-6">
                       <label class="form-label">تصویر چک</label>
@@ -323,8 +344,8 @@
 
               <div class="small text-muted mt-1">
                 ثبت‌کننده: {{ $p->creator?->name ?? '—' }}
-                @if($p->payment_identifier)
-                  | شناسه پرداخت: {{ $p->payment_identifier }}
+                @if($p->method === 'cash')
+                  | بانک: {{ $p->bank_name ?: '—' }}
                 @endif
               </div>
 

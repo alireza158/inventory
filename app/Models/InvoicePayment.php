@@ -13,6 +13,7 @@ class InvoicePayment extends Model
         'method',
         'amount',
         'paid_at',
+        'bank_name',
         'payment_identifier',
         'receipt_image',
         'note',

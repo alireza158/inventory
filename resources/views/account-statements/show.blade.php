@@ -60,7 +60,6 @@
                     <label class="form-label">نوع پرداخت</label>
                     <select name="method" id="as_payment_method" class="form-select" required>
                         <option value="cash">نقدی</option>
-                        <option value="card">کارت</option>
                         <option value="cheque">چکی</option>
                     </select>
                 </div>
@@ -81,11 +80,11 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">تاریخ پرداخت</label>
-                    <input type="date" class="form-control" name="paid_at">
+                    <input type="date" class="form-control" name="paid_at" required>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">شناسه پرداخت</label>
-                    <input type="text" class="form-control" name="payment_identifier" placeholder="اختیاری">
+                    <label class="form-label">اسم بانک (فقط نقدی)</label>
+                    <input type="text" class="form-control" name="bank_name" placeholder="مثال: ملی">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">رسید پرداخت</label>
@@ -100,11 +99,35 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">نام بانک</label>
-                            <input type="text" class="form-control" name="bank_name">
+                            <input type="text" class="form-control" name="cheque_bank_name">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">تاریخ چک</label>
-                            <input type="date" class="form-control" name="due_date">
+                            <label class="form-label">نام شعبه</label>
+                            <input type="text" class="form-control" name="cheque_branch_name">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">تاریخ سررسید</label>
+                            <input type="date" class="form-control" name="cheque_due_date">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">تاریخ دریافت چک</label>
+                            <input type="date" class="form-control" name="cheque_received_at">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">نام مشتری</label>
+                            <input type="text" class="form-control" name="cheque_customer_name" value="{{ $customer->display_name }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">کد/شناسه مشتری</label>
+                            <input type="text" class="form-control" name="cheque_customer_code">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">شماره حساب/شبا</label>
+                            <input type="text" class="form-control" name="cheque_account_number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">صاحب حساب</label>
+                            <input type="text" class="form-control" name="cheque_account_holder">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">وضعیت چک</label>
@@ -168,8 +191,8 @@
                                 $chNumber = $cheque?->cheque_number ?: '—';
                                 $description = "پرداخت چکی شماره {$chNumber} | مبلغ ".number_format((int) $payment->amount)." تومان | ثبت‌کننده: {$creatorName}";
                             } else {
-                                $pid = $payment->payment_identifier ?: '—';
-                                $description = "پرداخت ".($payment->method === 'card' ? 'کارتی' : 'نقدی')." | مبلغ ".number_format((int) $payment->amount)." تومان | شناسه {$pid} | ثبت‌کننده: {$creatorName}";
+                                $bankName = $payment->bank_name ?: '—';
+                                $description = "پرداخت نقدی | مبلغ ".number_format((int) $payment->amount)." تومان | بانک {$bankName} | ثبت‌کننده: {$creatorName}";
                             }
 
                             if ($invoiceUuid) {

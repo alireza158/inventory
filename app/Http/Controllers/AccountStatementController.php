@@ -65,7 +65,7 @@ class AccountStatementController extends Controller
                 'invoice:id,uuid,total,customer_name',
             ])
             ->whereIn('id', $paymentIds)
-            ->get(['id', 'invoice_id', 'customer_id', 'created_by', 'method', 'amount', 'paid_at', 'payment_identifier', 'note'])
+            ->get(['id', 'invoice_id', 'customer_id', 'created_by', 'method', 'amount', 'paid_at', 'bank_name', 'note'])
             ->keyBy('id');
 
         $transfers = WarehouseTransfer::query()
