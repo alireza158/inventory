@@ -91,7 +91,10 @@
       <div class="h5 fw-bold mb-0">🧾 فاکتور</div>
       <div class="text-muted small">{{ $invoice->uuid }}</div>
     </div>
-    <a class="btn btn-outline-secondary" href="{{ route('invoices.index') }}">بازگشت</a>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark" href="{{ route('invoices.print', $invoice->uuid) }}" target="_blank">چاپ فاکتور</a>
+      <a class="btn btn-outline-secondary" href="{{ route('invoices.index') }}">بازگشت</a>
+    </div>
   </div>
 
   <div class="row g-3">
