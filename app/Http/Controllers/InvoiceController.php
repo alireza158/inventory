@@ -186,7 +186,12 @@ class InvoiceController extends Controller
     public function print(string $uuid)
     {
         $invoice = Invoice::query()
-            ->with(['items.product', 'items.variant'])
+            ->with([
+                'items.product',
+                'items.variant',
+                'preinvoiceOrder.creator',
+                'notes',
+            ])
             ->where('uuid', $uuid)
             ->firstOrFail();
 
