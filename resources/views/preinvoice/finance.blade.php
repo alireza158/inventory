@@ -181,8 +181,8 @@
               <input type="text" id="cashPaidAtInput" class="form-control" data-jdp data-jdp-only-date autocomplete="off" dir="ltr" placeholder="1405/01/15">
             </div>
             <div class="col-md-4">
-              <label class="form-label">شناسه پرداخت</label>
-              <input type="text" id="cashIdentifierInput" class="form-control" placeholder="کارت به کارت / درگاه">
+              <label class="form-label">اسم بانک</label>
+              <input type="text" id="cashBankNameInput" class="form-control" placeholder="مثال: ملی">
             </div>
             <div class="col-12">
               <label class="form-label">توضیحات (الزامی)</label>
@@ -357,17 +357,18 @@
     function readCashPayment() {
       const amount = normalizeAmount(document.getElementById('cashAmountInput').value);
       const paidAt = normalizeDate(document.getElementById('cashPaidAtInput').value);
+      const bankName = (document.getElementById('cashBankNameInput').value || '').trim();
       const note = (document.getElementById('cashNoteInput').value || '').trim();
 
-      if (!amount || !paidAt || !note) {
-        return { error: 'برای پرداخت نقدی، مبلغ، تاریخ پرداخت و توضیحات الزامی است.' };
+      if (!amount || !paidAt || !bankName || !note) {
+        return { error: 'برای پرداخت نقدی، مبلغ، تاریخ پرداخت، اسم بانک و توضیحات الزامی است.' };
       }
 
       return {
         method: 'cash',
         amount,
         paid_at: paidAt,
-        payment_identifier: (document.getElementById('cashIdentifierInput').value || '').trim(),
+        bank_name: bankName,
         note,
       };
     }

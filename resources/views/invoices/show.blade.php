@@ -6,7 +6,6 @@
 
   $methodFa = fn($m) => match($m){
     'cash' => 'نقدی',
-    'card' => 'کارت',
     'cheque' => 'چک',
     default => $m,
   };
@@ -64,7 +63,6 @@
 
   $badgeMethod = fn($m) => match($m){
     'cash' => 'bg-success',
-    'card' => 'bg-primary',
     'cheque' => 'bg-warning text-dark',
     default => 'bg-secondary',
   };
@@ -85,13 +83,28 @@
   @if(session('success'))
     <div class="alert alert-success">{{ session('success') }}</div>
   @endif
+  @if($errors->any())
+    <div class="alert alert-danger">
+      <ul class="mb-0 ps-3">
+        @foreach($errors->all() as $error)
+          <li>{{ $error }}</li>
+        @endforeach
+      </ul>
+    </div>
+  @endif
 
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div>
       <div class="h5 fw-bold mb-0">🧾 فاکتور</div>
       <div class="text-muted small">{{ $invoice->uuid }}</div>
     </div>
-    <a class="btn btn-outline-secondary" href="{{ route('invoices.index') }}">بازگشت</a>
+    <div class="d-flex gap-2">
+      @if($canFinanceApprove)
+        <a class="btn btn-success" href="#invoicePayments">افزودن پرداخت</a>
+      @endif
+      <a class="btn btn-outline-dark" href="{{ route('invoices.print', $invoice->uuid) }}" target="_blank">چاپ فاکتور</a>
+      <a class="btn btn-outline-secondary" href="{{ route('invoices.index') }}">بازگشت</a>
+    </div>
   </div>
 
   <div class="row g-3">
@@ -184,76 +197,142 @@
         </div>
 
         {{-- Payments --}}
-        <div class="card-soft p-3 p-md-4 mb-3">
-          <div class="section-title mb-2">💳 پرداخت‌ها</div>
+        <div class="card-soft p-3 p-md-4 mb-3" id="invoicePayments">
+          @php
+            $paidAmount = (int) $invoice->paid_amount;
+            $remainingAmount = max((int) $invoice->total - $paidAmount, 0);
+            $paymentState = $remainingAmount <= 0 ? 'تسویه شده' : ($paidAmount > 0 ? 'پرداخت ناقص' : 'پرداخت نشده');
+            $paymentStateClass = $remainingAmount <= 0 ? 'bg-success' : ($paidAmount > 0 ? 'bg-warning text-dark' : 'bg-danger');
+          @endphp
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="section-title">💳 پرداخت‌ها</div>
+            <span class="badge {{ $paymentStateClass }}">{{ $paymentState }}</span>
+          </div>
 
           <div class="d-flex justify-content-between">
             <div class="hint">پرداخت شده</div>
-            <div class="fw-bold">{{ $toman($invoice->paid_amount) }}</div>
+            <div class="fw-bold">{{ $toman($paidAmount) }}</div>
           </div>
           <div class="d-flex justify-content-between mb-3">
             <div class="hint">مانده</div>
-            <div class="fw-bold text-danger">{{ $toman($invoice->remaining_amount) }}</div>
+            <div class="fw-bold {{ $remainingAmount > 0 ? 'text-danger' : 'text-success' }}">{{ $toman($remainingAmount) }}</div>
           </div>
 
           @if($canFinanceApprove)
-          {{-- Add payment --}}
-          <div class="border rounded-3 p-2 p-md-3" style="background:rgba(25,135,84,.04);border-color:rgba(25,135,84,.25)!important">
-            <div class="fw-bold mb-2">➕ ثبت پرداخت</div>
-
-            <form method="POST" action="{{ route('invoices.payments.store', $invoice->uuid) }}" enctype="multipart/form-data">
+          <div class="mb-2">
+            <button type="button" class="btn btn-success btn-sm" id="toggleInvoicePaymentForm">➕ افزودن پرداخت</button>
+          </div>
+          <div class="border rounded-3 p-2 p-md-3 d-none" id="invoicePaymentFormWrap" style="background:rgba(25,135,84,.04);border-color:rgba(25,135,84,.25)!important">
+            <form method="POST" action="{{ route('invoices.payments.store', $invoice->uuid) }}" enctype="multipart/form-data" id="invoicePaymentForm">
               @csrf
               <div class="row g-2">
-
-                <div class="col-4">
-                  <select name="method" class="form-select" required>
+                <div class="col-md-4">
+                  <label class="form-label">نوع پرداخت</label>
+                  <select name="method" class="form-select" id="invoice_payment_method" required>
                     <option value="cash">نقدی</option>
-                    <option value="card">کارت</option>
-                    <option value="cheque">چک</option>
+                    <option value="cheque">چکی</option>
                   </select>
                 </div>
 
-                <div class="col-8">
-                    {{-- نمایش با جداکننده --}}
-                    <input id="amount_view" type="text" inputmode="numeric"
-                           class="form-control" placeholder="مبلغ (تومان)" autocomplete="off" required>
+                <div class="col-md-8">
+                  <label class="form-label">مبلغ پرداخت</label>
+                  <input id="amount_view" type="text" inputmode="numeric" class="form-control" placeholder="مبلغ (تومان)" autocomplete="off" required>
+                  <input name="amount" id="amount" type="hidden">
+                </div>
 
-                    {{-- مقدار واقعی برای ارسال --}}
-                    <input name="amount" id="amount" type="hidden">
-                  </div>
-
-
-                {{-- Jalali picker (view) + hidden Gregorian --}}
-                <div class="col-12">
-                  <input id="paid_at_jalali" type="text" class="form-control" placeholder="تاریخ پرداخت (شمسی)">
+                <div class="col-md-4">
+                  <label class="form-label">تاریخ پرداخت</label>
+                  <input id="paid_at_jalali" type="text" class="form-control" placeholder="تاریخ شمسی" required>
                   <input name="paid_at" id="paid_at" type="hidden">
-                  <div class="hint mt-1">اختیاری — اگر خالی باشد، امروز ثبت می‌شود.</div>
                 </div>
-
-                <div class="col-12">
+                <div class="col-md-4">
+                  <label class="form-label">اسم بانک (فقط نقدی)</label>
+                  <input name="bank_name" class="form-control" placeholder="مثال: ملی">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">رسید پرداخت</label>
                   <input name="receipt_image" type="file" class="form-control" accept="image/*">
-                  <div class="hint mt-1">اختیاری — عکس رسید/فیش</div>
+                </div>
+
+                <div class="col-12 cheque-fields d-none">
+                  <div class="row g-2">
+                    <div class="col-md-4">
+                      <label class="form-label">شماره چک</label>
+                      <input name="cheque_number" class="form-control" placeholder="شماره سریال چک">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">نام بانک</label>
+                      <input name="cheque_bank_name" class="form-control" placeholder="مثال: ملی">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">نام شعبه</label>
+                      <input name="cheque_branch_name" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">تاریخ سررسید</label>
+                      <input name="cheque_due_date" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">تاریخ دریافت چک</label>
+                      <input name="cheque_received_at" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">نام مشتری</label>
+                      <input name="cheque_customer_name" class="form-control" value="{{ $invoice->customer_name }}">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">کد/شناسه مشتری</label>
+                      <input name="cheque_customer_code" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">شماره حساب/شبا</label>
+                      <input name="cheque_account_number" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">صاحب حساب</label>
+                      <input name="cheque_account_holder" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">تصویر چک</label>
+                      <input name="cheque_image" type="file" class="form-control" accept="image/*">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">وضعیت چک</label>
+                      <select name="cheque_status" class="form-select">
+                        <option value="pending">در انتظار وصول</option>
+                        <option value="cleared">وصول شده</option>
+                        <option value="bounced">برگشتی</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="col-12">
-                  <textarea name="note" class="form-control" rows="2" placeholder="یادداشت پرداخت (اختیاری)"></textarea>
+                  <label class="form-label">یادداشت</label>
+                  <textarea name="note" class="form-control" rows="2" placeholder="اختیاری"></textarea>
                 </div>
 
                 <div class="col-12">
                   <button class="btn btn-success w-100">ثبت پرداخت</button>
                 </div>
-
               </div>
             </form>
           </div>
           @else
-            <div class="alert alert-light border">ثبت پرداخت و چک فقط برای بخش مالی فعال است.</div>
+            <div class="alert alert-light border">ثبت پرداخت فقط برای کاربران مالی/مدیر فعال است.</div>
           @endif
 
           <hr class="my-3">
 
-          {{-- Payments list --}}
           @forelse($invoice->payments as $p)
+            @php
+              $chequeStatusFa = match($p->cheque?->status){
+                'pending' => 'در انتظار وصول',
+                'cleared' => 'وصول شده',
+                'bounced' => 'برگشتی',
+                default => '—',
+              };
+            @endphp
             <div class="border rounded-3 p-2 mb-2">
               <div class="d-flex justify-content-between align-items-center gap-2">
                 <div class="d-flex align-items-center gap-2">
@@ -263,43 +342,31 @@
                 <div class="text-muted small">{{ $jalali($p->paid_at) }}</div>
               </div>
 
-              @if($p->receipt_image)
-                <div class="mt-2">
-                  <a target="_blank" class="btn btn-sm btn-outline-secondary"
-                     href="{{ asset('storage/'.$p->receipt_image) }}">📎 مشاهده رسید</a>
+              <div class="small text-muted mt-1">
+                ثبت‌کننده: {{ $p->creator?->name ?? '—' }}
+                @if($p->method === 'cash')
+                  | بانک: {{ $p->bank_name ?: '—' }}
+                @endif
+              </div>
+
+              @if($p->method === 'cheque' && $p->cheque)
+                <div class="small text-muted mt-1">
+                  شماره چک: {{ $p->cheque->cheque_number ?: '—' }} |
+                  بانک: {{ $p->cheque->bank_name ?: '—' }} |
+                  تاریخ چک: {{ $jalali($p->cheque->due_date) }} |
+                  وضعیت: {{ $chequeStatusFa }}
                 </div>
               @endif
 
-              @if($p->method === 'cheque')
-                <div class="mt-2 p-2 rounded-3" style="background:rgba(255,193,7,.12)">
-                  @if($p->cheque)
-                    <div class="small text-muted">
-                      بانک: {{ $p->cheque->bank_name ?: '—' }} |
-                      شماره چک: {{ $p->cheque->cheque_number ?: '—' }} |
-                      سررسید: {{ $jalali($p->cheque->due_date) }} |
-                      وضعیت: {{ $p->cheque->status ?: '—' }}
-                    </div>
-                    @if($p->cheque->image)
-                      <div class="mt-2">
-                        <a target="_blank" class="btn btn-sm btn-outline-warning"
-                           href="{{ asset('storage/'.$p->cheque->image) }}">📷 مشاهده عکس چک</a>
-                      </div>
-                    @endif
-                  @elseif($canFinanceApprove)
-                    <button
-                      type="button"
-                      class="btn btn-outline-primary btn-sm mt-2"
-                      data-bs-toggle="modal"
-                      data-bs-target="#chequeModal"
-                      data-action="{{ route('cheques.store', $p->id) }}"
-                      data-payment="{{ number_format((int) $p->amount) }}"
-                      data-customer="{{ $invoice->customer_name }}"
-                    >
-                      ثبت اطلاعات چک
-                    </button>
-                  @else
-                    <div class="small text-muted mt-2">تکمیل اطلاعات چک فقط برای بخش مالی فعال است.</div>
-                  @endif
+              @if($p->receipt_image)
+                <div class="mt-2">
+                  <a target="_blank" class="btn btn-sm btn-outline-secondary" href="{{ asset('storage/'.$p->receipt_image) }}">📎 رسید پرداخت</a>
+                </div>
+              @endif
+
+              @if($p->method === 'cheque' && $p->cheque?->image)
+                <div class="mt-2">
+                  <a target="_blank" class="btn btn-sm btn-outline-warning" href="{{ asset('storage/'.$p->cheque->image) }}">📷 تصویر چک</a>
                 </div>
               @endif
 
@@ -338,66 +405,6 @@
   </div>
 
 </div>
-
-@if($canFinanceApprove)
-<div class="modal fade" id="chequeModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <form method="POST" id="chequeModalForm" action="#" enctype="multipart/form-data">
-        @csrf
-        <div class="modal-header">
-          <h5 class="modal-title">ثبت اطلاعات چک</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="border rounded-3 p-3 mb-3" style="background:linear-gradient(135deg,#f8f9fa,#eef7ff)">
-            <div class="d-flex justify-content-between align-items-center">
-              <strong>🧾 شِمای چک</strong>
-              <span class="badge bg-warning text-dark">پرداخت چکی</span>
-            </div>
-            <div class="row mt-3 g-2 small">
-              <div class="col-md-6">مشتری: <b id="cheque_customer">—</b></div>
-              <div class="col-md-6 text-md-end">مبلغ پرداخت: <b id="cheque_payment">—</b> تومان</div>
-              <div class="col-12"><div class="border-top mt-2 pt-2 text-muted">پس از ثبت، اطلاعات چک در لیست پرداخت‌ها نمایش داده می‌شود.</div></div>
-            </div>
-          </div>
-
-          <div class="row g-2">
-            <div class="col-md-6">
-              <label class="form-label">نام بانک</label>
-              <input class="form-control" name="bank_name" placeholder="مثال: ملی">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">شماره چک</label>
-              <input class="form-control" name="cheque_number" placeholder="شماره سریال چک">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">تاریخ سررسید</label>
-              <input class="form-control" name="due_date" type="date">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">وضعیت</label>
-              <select class="form-select" name="status">
-                <option value="pending">در انتظار وصول</option>
-                <option value="cleared">وصول شده</option>
-                <option value="bounced">برگشتی</option>
-              </select>
-            </div>
-            <div class="col-12">
-              <label class="form-label">تصویر چک</label>
-              <input class="form-control" name="image" type="file" accept="image/*">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
-          <button class="btn btn-primary">ثبت چک</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-@endif
 
 <script>
     (function(){
@@ -515,20 +522,27 @@
 
 <script>
   (function () {
-    const modal = document.getElementById('chequeModal');
-    const form = document.getElementById('chequeModalForm');
-    if (!modal || !form) return;
+    const toggleBtn = document.getElementById('toggleInvoicePaymentForm');
+    const formWrap = document.getElementById('invoicePaymentFormWrap');
+    const methodSelect = document.getElementById('invoice_payment_method');
+    if (!formWrap) return;
 
-    modal.addEventListener('show.bs.modal', function (event) {
-      const btn = event.relatedTarget;
-      if (!btn) return;
+    const chequeBlocks = formWrap.querySelectorAll('.cheque-fields');
 
-      form.setAttribute('action', btn.getAttribute('data-action') || '#');
-      const paymentEl = document.getElementById('cheque_payment');
-      const customerEl = document.getElementById('cheque_customer');
-      if (paymentEl) paymentEl.textContent = btn.getAttribute('data-payment') || '—';
-      if (customerEl) customerEl.textContent = btn.getAttribute('data-customer') || '—';
+    function setChequeVisibility() {
+      const isCheque = methodSelect && methodSelect.value === 'cheque';
+      chequeBlocks.forEach((el) => el.classList.toggle('d-none', !isCheque));
+    }
+
+    toggleBtn?.addEventListener('click', function () {
+      formWrap.classList.toggle('d-none');
+      if (!formWrap.classList.contains('d-none')) {
+        formWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     });
+
+    methodSelect?.addEventListener('change', setChequeVisibility);
+    setChequeVisibility();
   })();
 </script>
 

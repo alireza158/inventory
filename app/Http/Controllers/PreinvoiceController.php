@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cheque;
 use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
-use App\Models\InvoicePayment;
 use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -15,6 +13,7 @@ use App\Models\ShippingMethod;
 use App\Models\StockMovement;
 use App\Models\WarehouseStock;
 use App\Services\WarehouseStockService;
+use App\Services\PaymentRegistrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -23,6 +22,10 @@ use Illuminate\Validation\ValidationException;
 
 class PreinvoiceController extends Controller
 {
+    public function __construct(private readonly PaymentRegistrationService $paymentService)
+    {
+    }
+
     public function create()
     {
         $shippingMethods = ShippingMethod::query()
@@ -616,8 +619,8 @@ class PreinvoiceController extends Controller
             'payments.*.method' => 'required_with:payments|in:cash,cheque',
             'payments.*.amount' => 'required_with:payments|integer|min:1',
             'payments.*.paid_at' => 'required_with:payments|date',
-            'payments.*.note' => 'required_with:payments|string|max:2000',
-            'payments.*.payment_identifier' => 'nullable|string|max:255',
+            'payments.*.note' => 'nullable|string|max:2000',
+            'payments.*.bank_name' => 'required_if:payments.*.method,cash|nullable|string|max:255',
             'payments.*.cheque_bank_name' => 'nullable|string|max:255',
             'payments.*.cheque_branch_name' => 'nullable|string|max:255',
             'payments.*.cheque_number' => 'nullable|string|max:255',
@@ -635,7 +638,7 @@ class PreinvoiceController extends Controller
             if (($paymentRow['method'] ?? null) === 'cheque') {
                 if (
                     empty($paymentRow['cheque_number']) ||
-                    empty($paymentRow['cheque_amount']) ||
+                    empty($paymentRow['amount']) ||
                     empty($paymentRow['cheque_due_date']) ||
                     empty($paymentRow['cheque_received_at']) ||
                     empty($paymentRow['cheque_customer_name']) ||
@@ -648,6 +651,10 @@ class PreinvoiceController extends Controller
                         "payments.{$index}.cheque_number" => 'برای پرداخت چکی، تکمیل اطلاعات اصلی چک الزامی است.',
                     ]);
                 }
+            } elseif (empty($paymentRow['bank_name'])) {
+                throw ValidationException::withMessages([
+                    "payments.{$index}.bank_name" => 'برای پرداخت نقدی، نام بانک الزامی است.',
+                ]);
             }
         }
 
@@ -746,49 +753,17 @@ class PreinvoiceController extends Controller
             }
 
             foreach (($validated['payments'] ?? []) as $paymentRow) {
-                $paymentAmount = (int) $paymentRow['amount'];
-                if (($paymentRow['method'] ?? null) === 'cheque') {
-                    $paymentAmount = (int) ($paymentRow['cheque_amount'] ?? 0);
+                $payload = $paymentRow;
+                if (($payload['method'] ?? null) === 'cheque') {
+                    $payload['cheque_amount'] = (int) ($payload['amount'] ?? 0);
                 }
 
-                $payment = InvoicePayment::create([
-                    'invoice_id' => $invoice->id,
-                    'method' => $paymentRow['method'],
-                    'amount' => $paymentAmount,
-                    'paid_at' => $paymentRow['paid_at'] ?? now()->toDateString(),
-                    'payment_identifier' => $paymentRow['payment_identifier'] ?? null,
-                    'note' => $paymentRow['note'] ?? null,
-                    'receipt_image' => null,
-                ]);
-
-                if (!empty($invoice->customer_id)) {
-                    CustomerLedger::create([
-                        'customer_id' => (int) $invoice->customer_id,
-                        'type' => 'credit',
-                        'amount' => (int) $payment->amount,
-                        'reference_type' => InvoicePayment::class,
-                        'reference_id' => $payment->id,
-                        'note' => 'ثبت پرداخت اولیه برای فاکتور ' . $invoice->uuid,
-                    ]);
-                }
-
-                if (($paymentRow['method'] ?? null) === 'cheque') {
-                    Cheque::create([
-                        'invoice_payment_id' => $payment->id,
-                        'bank_name' => $paymentRow['cheque_bank_name'] ?? null,
-                        'branch_name' => $paymentRow['cheque_branch_name'] ?? null,
-                        'cheque_number' => $paymentRow['cheque_number'] ?? null,
-                        'amount' => (int) ($paymentRow['cheque_amount'] ?? 0),
-                        'due_date' => $paymentRow['cheque_due_date'] ?? null,
-                        'received_at' => $paymentRow['cheque_received_at'] ?? null,
-                        'customer_name' => $paymentRow['cheque_customer_name'] ?? null,
-                        'customer_code' => $paymentRow['cheque_customer_code'] ?? null,
-                        'account_number' => $paymentRow['cheque_account_number'] ?? null,
-                        'account_holder' => $paymentRow['cheque_account_holder'] ?? null,
-                        'image' => null,
-                        'status' => $paymentRow['cheque_status'] ?? 'pending',
-                    ]);
-                }
+                $this->paymentService->registerForInvoice(
+                    $invoice,
+                    $payload,
+                    $invoice->customer_id ? (int) $invoice->customer_id : null,
+                    auth()->id()
+                );
             }
 
             $order->update(['status' => PreinvoiceOrder::STATUS_FINANCE_APPROVED]);

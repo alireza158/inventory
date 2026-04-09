@@ -470,19 +470,85 @@ class VoucherController extends Controller
 
     public function outputs(Request $request)
     {
-        $q = trim((string) $request->get('q', ''));
+        $filters = [
+            'voucher_no' => trim((string) $request->query('voucher_no', '')),
+            'date_from' => trim((string) $request->query('date_from', '')),
+            'date_to' => trim((string) $request->query('date_to', '')),
+            'reason' => trim((string) $request->query('reason', '')),
+            'from_warehouse_id' => (int) $request->query('from_warehouse_id', 0),
+            'destination' => trim((string) $request->query('destination', '')),
+            'user_q' => trim((string) $request->query('user_q', '')),
+        ];
 
-        $outputs = StockMovement::query()
-            ->with(['product', 'user'])
-            ->where('type', 'out')
-            ->when($q !== '', function ($query) use ($q) {
-                $query->whereHas('product', fn ($p) => $p->where('name', 'like', "%{$q}%"));
+        $reasonLabels = collect($this->combinedReasonLabels())
+            ->filter(fn ($label, $type) => $this->directionOfType((string) $type) === 'outgoing')
+            ->all();
+
+        $query = WarehouseTransfer::query()
+            ->with(['fromWarehouse', 'toWarehouse', 'user', 'customer', 'relatedInvoice'])
+            ->withCount('items')
+            ->withSum('items as total_quantity', 'quantity')
+            ->whereIn('voucher_type', array_keys($reasonLabels));
+
+        $query
+            ->when($filters['voucher_no'] !== '', function ($q) use ($filters) {
+                $voucherNo = $filters['voucher_no'];
+                $q->where(function ($inner) use ($voucherNo) {
+                    $inner->where('id', (int) $voucherNo)
+                        ->orWhere('reference', 'like', "%{$voucherNo}%");
+                });
             })
+            ->when($filters['date_from'] !== '', fn ($q) => $q->whereDate('transferred_at', '>=', $filters['date_from']))
+            ->when($filters['date_to'] !== '', fn ($q) => $q->whereDate('transferred_at', '<=', $filters['date_to']))
+            ->when($filters['reason'] !== '', fn ($q) => $q->where('voucher_type', $filters['reason']))
+            ->when($filters['from_warehouse_id'] > 0, fn ($q) => $q->where('from_warehouse_id', $filters['from_warehouse_id']))
+            ->when($filters['user_q'] !== '', function ($q) use ($filters) {
+                $term = $filters['user_q'];
+                $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$term}%"));
+            })
+            ->when($filters['destination'] !== '', function ($q) use ($filters) {
+                $term = $filters['destination'];
+                $q->where(function ($inner) use ($term) {
+                    $inner->whereHas('toWarehouse', fn ($w) => $w->where('name', 'like', "%{$term}%"))
+                        ->orWhereHas('customer', fn ($c) => $c->where('first_name', 'like', "%{$term}%")->orWhere('last_name', 'like', "%{$term}%"))
+                        ->orWhereHas('relatedInvoice', fn ($i) => $i->where('customer_name', 'like', "%{$term}%"))
+                        ->orWhere('beneficiary_name', 'like', "%{$term}%");
+                });
+            });
+
+        $outputs = $query
+            ->latest('transferred_at')
             ->latest('id')
-            ->paginate(30)
+            ->paginate(20)
             ->withQueryString();
 
-        return view('vouchers.outputs', compact('outputs', 'q'));
+        $outputs->getCollection()->transform(function (WarehouseTransfer $voucher) use ($reasonLabels) {
+            $voucher->setAttribute('voucher_no', $voucher->reference ?: ('TR-' . $voucher->id));
+            $voucher->setAttribute('reason_label', $reasonLabels[$voucher->voucher_type] ?? $this->humanReasonLabel($voucher->voucher_type));
+            $voucher->setAttribute('destination_label', $this->outputDestinationLabel($voucher));
+            $voucher->setAttribute('status_label', $this->outputStatusLabel($voucher));
+
+            return $voucher;
+        });
+
+        $summary = [
+            'count' => (int) $outputs->total(),
+            'items' => (int) $outputs->sum(fn ($v) => (int) ($v->items_count ?? 0)),
+            'qty' => (int) $outputs->sum(fn ($v) => (int) ($v->total_quantity ?? 0)),
+        ];
+
+        $fromWarehouses = Warehouse::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return view('vouchers.outputs', compact(
+            'outputs',
+            'filters',
+            'reasonLabels',
+            'fromWarehouses',
+            'summary'
+        ));
     }
 
     public function index(Request $request)
@@ -1113,6 +1179,62 @@ class VoucherController extends Controller
             WarehouseTransfer::TYPE_SHOWROOM => 'انتقال به شوروم',
             WarehouseTransfer::TYPE_CUSTOMER_RETURN => 'برگشت از مشتری',
         ];
+    }
+
+    private function outputDestinationLabel(WarehouseTransfer $voucher): string
+    {
+        $customerName = trim((string) ($voucher->customer?->first_name ?? '') . ' ' . (string) ($voucher->customer?->last_name ?? ''));
+        $invoiceCustomer = trim((string) ($voucher->relatedInvoice?->customer_name ?? ''));
+        $beneficiary = trim((string) ($voucher->beneficiary_name ?? ''));
+
+        return match ($voucher->voucher_type) {
+            WarehouseTransfer::TYPE_BETWEEN_WAREHOUSES
+                => $voucher->toWarehouse?->name ? ('انبار: ' . $voucher->toWarehouse->name) : 'انبار مقصد نامشخص',
+
+            WarehouseTransfer::TYPE_PERSONNEL_ASSET
+                => $beneficiary !== ''
+                    ? ('پرسنل: ' . $beneficiary)
+                    : ($voucher->toWarehouse?->personnel_name
+                        ? ('پرسنل: ' . $voucher->toWarehouse->personnel_name)
+                        : ($voucher->toWarehouse?->name ? ('پرسنل: ' . $voucher->toWarehouse->name) : 'پرسنل')),
+
+            WarehouseTransfer::TYPE_SCRAP
+                => $voucher->toWarehouse?->name ? ('ضایعات: ' . $voucher->toWarehouse->name) : 'ضایعات',
+
+            WarehouseTransfer::TYPE_SHOWROOM
+                => $voucher->toWarehouse?->name ? ('شوروم: ' . $voucher->toWarehouse->name) : 'شوروم',
+
+            WarehouseTransfer::TYPE_SALE
+                => $customerName !== ''
+                    ? ('مشتری: ' . $customerName)
+                    : ($invoiceCustomer !== ''
+                        ? ('مشتری: ' . $invoiceCustomer)
+                        : ($beneficiary !== '' ? ('مقصد: ' . $beneficiary) : 'مشتری')),
+
+            default
+                => $voucher->toWarehouse?->name ?? ($beneficiary !== '' ? $beneficiary : '—'),
+        };
+    }
+
+    private function outputStatusLabel(WarehouseTransfer $voucher): string
+    {
+        $status = (string) ($voucher->relatedInvoice?->status ?? '');
+        if ($status === '') {
+            return '—';
+        }
+
+        $labels = [
+            'pending_warehouse_approval' => 'در انتظار تایید انبار',
+            'collecting' => 'در حال جمع‌آوری',
+            'checking_discrepancy' => 'در حال بررسی مغایرت',
+            'packing' => 'در حال بسته‌بندی',
+            'shipped' => 'ارسال شده',
+            'draft' => 'پیش‌نویس',
+            'finalized' => 'نهایی شده',
+            'cancelled' => 'لغو شده',
+        ];
+
+        return $labels[$status] ?? $status;
     }
 
     private function humanReasonLabel(?string $type): string
