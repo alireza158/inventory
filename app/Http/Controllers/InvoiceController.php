@@ -20,6 +20,7 @@ class InvoiceController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $invoices = Invoice::query()
+            ->withSum('payments as paid_total', 'amount')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('uuid', 'like', "%{$q}%")
@@ -205,6 +206,7 @@ class InvoiceController extends Controller
                 'items.product',
                 'items.variant',
                 'payments.cheque',
+                'payments.creator',
                 'notes',
             ])
             ->where('uuid', $uuid)

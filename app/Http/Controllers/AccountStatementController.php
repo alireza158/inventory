@@ -59,9 +59,13 @@ class AccountStatementController extends Controller
             ->values();
 
         $payments = InvoicePayment::query()
-            ->with('cheque')
+            ->with([
+                'cheque',
+                'creator:id,name',
+                'invoice:id,uuid,total,customer_name',
+            ])
             ->whereIn('id', $paymentIds)
-            ->get(['id', 'invoice_id', 'method', 'amount', 'paid_at', 'payment_identifier', 'note'])
+            ->get(['id', 'invoice_id', 'customer_id', 'created_by', 'method', 'amount', 'paid_at', 'payment_identifier', 'note'])
             ->keyBy('id');
 
         $transfers = WarehouseTransfer::query()
@@ -91,13 +95,19 @@ class AccountStatementController extends Controller
 
         $netBalance = (int) $customer->opening_balance + $totalDebit - $totalCredit;
 
+        $customerInvoices = Invoice::query()
+            ->where('customer_id', $customer->id)
+            ->orderByDesc('id')
+            ->get(['id', 'uuid', 'total']);
+
         return view('account-statements.show', compact(
             'customer',
             'ledgers',
             'invoices',
             'payments',
             'transfers',
-            'netBalance'
+            'netBalance',
+            'customerInvoices'
         ));
     }
 

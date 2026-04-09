@@ -13,6 +13,16 @@
     <a href="{{ route('account-statements.index') }}" class="btn btn-outline-secondary">بازگشت به لیست اشخاص</a>
 </div>
 
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <ul class="mb-0 ps-3">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
         <div class="row g-3 align-items-center">
@@ -34,6 +44,92 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="fw-bold mb-0">➕ ثبت پرداخت جدید</h6>
+            <span class="text-muted small">ثبت سریع پرداخت نقدی/چکی برای این مشتری</span>
+        </div>
+        <form method="POST" action="{{ route('account-statements.payments.store', $customer->id) }}" enctype="multipart/form-data" id="accountStatementPaymentForm">
+            @csrf
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">نوع پرداخت</label>
+                    <select name="method" id="as_payment_method" class="form-select" required>
+                        <option value="cash">نقدی</option>
+                        <option value="card">کارت</option>
+                        <option value="cheque">چکی</option>
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">فاکتور مرتبط</label>
+                    <select name="invoice_id" class="form-select" required>
+                        <option value="">انتخاب فاکتور</option>
+                        @foreach($customerInvoices as $invoiceOption)
+                            <option value="{{ $invoiceOption->id }}">
+                                {{ $invoiceOption->uuid }} | {{ number_format((int) $invoiceOption->total) }} تومان
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">مبلغ</label>
+                    <input type="number" min="1" step="1" class="form-control" name="amount" placeholder="مبلغ پرداخت" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">تاریخ پرداخت</label>
+                    <input type="date" class="form-control" name="paid_at">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">شناسه پرداخت</label>
+                    <input type="text" class="form-control" name="payment_identifier" placeholder="اختیاری">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">رسید پرداخت</label>
+                    <input type="file" class="form-control" name="receipt_image" accept="image/*">
+                </div>
+
+                <div class="col-12 as-cheque-fields d-none">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label">شماره چک</label>
+                            <input type="text" class="form-control" name="cheque_number">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">نام بانک</label>
+                            <input type="text" class="form-control" name="bank_name">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">تاریخ چک</label>
+                            <input type="date" class="form-control" name="due_date">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">وضعیت چک</label>
+                            <select name="cheque_status" class="form-select">
+                                <option value="pending">در انتظار وصول</option>
+                                <option value="cleared">وصول شده</option>
+                                <option value="bounced">برگشتی</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">تصویر چک</label>
+                            <input type="file" class="form-control" name="cheque_image" accept="image/*">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">یادداشت</label>
+                    <textarea name="note" class="form-control" rows="2" placeholder="اختیاری"></textarea>
+                </div>
+                <div class="col-12">
+                    <button class="btn btn-success">ثبت پرداخت</button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -65,13 +161,19 @@
                         }
 
                         if ($payment) {
+                            $creatorName = $payment->creator?->name ?: 'نامشخص';
+                            $invoiceUuid = $payment->invoice?->uuid ?: ($invoices[$payment->invoice_id]->uuid ?? null);
                             if ($payment->method === 'cheque') {
                                 $cheque = $payment->cheque;
                                 $chNumber = $cheque?->cheque_number ?: '—';
-                                $description = "پرداخت چکی شماره {$chNumber} | مبلغ ".number_format((int) $payment->amount)." تومان | این شخص بستانکار شد";
+                                $description = "پرداخت چکی شماره {$chNumber} | مبلغ ".number_format((int) $payment->amount)." تومان | ثبت‌کننده: {$creatorName}";
                             } else {
                                 $pid = $payment->payment_identifier ?: '—';
-                                $description = "پرداخت نقدی | مبلغ ".number_format((int) $payment->amount)." تومان | شناسه {$pid} | این شخص بستانکار شد";
+                                $description = "پرداخت ".($payment->method === 'card' ? 'کارتی' : 'نقدی')." | مبلغ ".number_format((int) $payment->amount)." تومان | شناسه {$pid} | ثبت‌کننده: {$creatorName}";
+                            }
+
+                            if ($invoiceUuid) {
+                                $description .= " | فاکتور {$invoiceUuid}";
                             }
 
                             $viewUrl = route('account-statements.documents.payments.show', $payment->id);
@@ -108,4 +210,18 @@
 
     <div class="card-footer bg-white">{{ $ledgers->links() }}</div>
 </div>
+
+<script>
+    (function () {
+        const methodSelect = document.getElementById('as_payment_method');
+        if (!methodSelect) return;
+        const chequeBlocks = document.querySelectorAll('.as-cheque-fields');
+        const toggle = () => {
+            const isCheque = methodSelect.value === 'cheque';
+            chequeBlocks.forEach((item) => item.classList.toggle('d-none', !isCheque));
+        };
+        methodSelect.addEventListener('change', toggle);
+        toggle();
+    })();
+</script>
 @endsection

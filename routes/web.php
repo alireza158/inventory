@@ -234,6 +234,7 @@ Route::middleware('auth')->group(function () {
 
     // Account statements (گردش حساب اشخاص)
     Route::get('/account-statements', [AccountStatementController::class, 'index'])->name('account-statements.index');
+    Route::post('/account-statements/{customer}/payments', [InvoicePaymentController::class, 'storeForCustomer'])->name('account-statements.payments.store');
     Route::get('/account-statements/documents/invoices/{uuid}', [AccountStatementController::class, 'showInvoice'])->name('account-statements.documents.invoices.show');
     Route::get('/account-statements/documents/returns/{voucher}', [AccountStatementController::class, 'showReturnFromSale'])->name('account-statements.documents.returns.show');
     Route::get('/account-statements/documents/payments/{payment}', [AccountStatementController::class, 'showPayment'])->name('account-statements.documents.payments.show');
