@@ -82,27 +82,72 @@ class CategoryController extends Controller
     public function quickStore(Request $request)
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:categories,name'],
+            'name' => ['required', 'string', 'max:255'],
             'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
             'redirect_to' => ['nullable', 'string'],
         ]);
 
-        $category = null;
+        $name = trim((string) $data['name']);
+        if ($name === '') {
+            return $this->quickStoreValidationErrorResponse($request, 'نام دسته‌بندی نمی‌تواند خالی باشد.');
+        }
 
-        DB::transaction(function () use (&$category, $data) {
+        $parentId = isset($data['parent_id']) ? (int) $data['parent_id'] : null;
+
+        $result = ['category' => null, 'created' => false];
+
+        DB::transaction(function () use (&$result, $name, $parentId) {
+            $existing = Category::query()
+                ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($name)])
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                $result['category'] = $existing;
+                return;
+            }
+
             $code = $this->generateUniqueTwoDigitCode();
 
-            $category = Category::create([
-                'name' => $data['name'],
+            $result['category'] = Category::create([
+                'name' => $name,
                 'code' => $code,
-                'parent_id' => $data['parent_id'] ?? null,
+                'parent_id' => $parentId,
             ]);
+            $result['created'] = true;
         });
+
+        $category = $result['category'];
+        $created = (bool) $result['created'];
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'id' => (int) $category->id,
+                'name' => (string) $category->name,
+                'code' => (string) ($category->code ?? ''),
+                'parent_id' => $category->parent_id ? (int) $category->parent_id : null,
+                'created' => $created,
+                'message' => $created
+                    ? 'دسته‌بندی جدید با موفقیت ثبت شد.'
+                    : 'این دسته‌بندی از قبل وجود دارد و انتخاب شد.',
+            ]);
+        }
 
         $redirectTo = $data['redirect_to'] ?? route('products.index');
 
         return redirect($redirectTo . '?category_id=' . $category->id)
-            ->with('success', 'دسته‌بندی با موفقیت ساخته شد.');
+            ->with('success', $created ? 'دسته‌بندی با موفقیت ساخته شد.' : 'این دسته‌بندی از قبل وجود داشت و انتخاب شد.');
+    }
+
+    private function quickStoreValidationErrorResponse(Request $request, string $message)
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+            ], 422);
+        }
+
+        return back()->withErrors(['name' => $message]);
     }
 
     public function fixCodes()

@@ -198,6 +198,39 @@
         background:#fcfdff;
     }
 
+    .picker-actions{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+        margin-top:10px;
+    }
+
+    .inline-create{
+        margin-top:10px;
+        border:1px dashed #dbe6f3;
+        border-radius:12px;
+        background:#f8fbff;
+        padding:10px;
+    }
+
+    .inline-create[hidden]{
+        display:none !important;
+    }
+
+    .tiny-feedback{
+        font-size:12px;
+        margin-top:6px;
+    }
+
+    .tiny-feedback.error{
+        color:var(--danger);
+    }
+
+    .tiny-feedback.success{
+        color:var(--ok);
+    }
+
     .picker-item{
         display:flex;
         align-items:flex-start;
@@ -384,6 +417,24 @@
                                 <label class="form-label">دسته‌بندی به‌صورت درختی</label>
 
                                 <div class="tree-box">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                        <div class="muted">از همین‌جا می‌توانید دسته‌بندی جدید هم اضافه کنید.</div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="openCategoryQuickAdd">+ افزودن دسته‌بندی جدید</button>
+                                    </div>
+
+                                    <div class="inline-create mb-2" id="categoryQuickAddBox" hidden>
+                                        <div class="row g-2">
+                                            <div class="col-md-8">
+                                                <input type="text" id="categoryQuickName" class="form-control" maxlength="255" placeholder="نام دسته‌بندی جدید...">
+                                            </div>
+                                            <div class="col-md-4 d-flex gap-2">
+                                                <button type="button" class="btn btn-primary btn-sm w-100" id="submitCategoryQuickAdd">ثبت</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelCategoryQuickAdd">×</button>
+                                            </div>
+                                        </div>
+                                        <div class="tiny-feedback" id="categoryQuickFeedback"></div>
+                                    </div>
+
                                     <div class="row g-2" id="categoryLevels"></div>
 
                                     <div class="tree-breadcrumb" id="categoryBreadcrumb"></div>
@@ -468,6 +519,18 @@
 
                                                     <div class="picker-panel" id="modelPickerPanel">
                                                         <input type="text" class="picker-search" id="modelSearchInput" placeholder="جستجو در مدل‌ها...">
+                                                        <div class="picker-actions">
+                                                            <button type="button" class="btn btn-sm btn-outline-primary" id="openModelQuickAdd">+ افزودن مدل جدید</button>
+                                                            <span class="muted">در همان لیست</span>
+                                                        </div>
+                                                        <div class="inline-create" id="modelQuickAddBox" hidden>
+                                                            <div class="d-flex gap-2">
+                                                                <input type="text" class="form-control form-control-sm" id="modelQuickName" maxlength="255" placeholder="نام مدل جدید...">
+                                                                <button type="button" class="btn btn-primary btn-sm" id="submitModelQuickAdd">ثبت</button>
+                                                                <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelModelQuickAdd">×</button>
+                                                            </div>
+                                                            <div class="tiny-feedback" id="modelQuickFeedback"></div>
+                                                        </div>
                                                         <div class="picker-list" id="modelPickerList"></div>
                                                     </div>
                                                 </div>
@@ -553,12 +616,13 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const categories = @json($categoriesJs);
-    const modelLists = @json($modelListsJs);
+    let categories = @json($categoriesJs);
+    let modelLists = @json($modelListsJs);
     const previewSeq4 = @json($previewSeq4);
     const oldCategoryId = @json($oldCategoryId);
     const oldModelIds = @json($oldModelIds);
     const oldDesignNotes = @json($oldDesignNotes);
+    const csrfToken = @json(csrf_token());
 
     const categoryIdEl = document.getElementById('categoryId');
     const useModelsEl = document.getElementById('useModels');
@@ -581,6 +645,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const categoryLevelsEl = document.getElementById('categoryLevels');
     const categoryBreadcrumbEl = document.getElementById('categoryBreadcrumb');
     const categorySelectedTitleEl = document.getElementById('categorySelectedTitle');
+    const openCategoryQuickAddEl = document.getElementById('openCategoryQuickAdd');
+    const categoryQuickAddBoxEl = document.getElementById('categoryQuickAddBox');
+    const categoryQuickNameEl = document.getElementById('categoryQuickName');
+    const submitCategoryQuickAddEl = document.getElementById('submitCategoryQuickAdd');
+    const cancelCategoryQuickAddEl = document.getElementById('cancelCategoryQuickAdd');
+    const categoryQuickFeedbackEl = document.getElementById('categoryQuickFeedback');
 
     const modelPickerEl = document.getElementById('modelPicker');
     const modelPickerButton = document.getElementById('modelPickerButton');
@@ -589,6 +659,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const modelPickerList = document.getElementById('modelPickerList');
     const modelSearchInput = document.getElementById('modelSearchInput');
     const modelSelectedTags = document.getElementById('modelSelectedTags');
+    const openModelQuickAddEl = document.getElementById('openModelQuickAdd');
+    const modelQuickAddBoxEl = document.getElementById('modelQuickAddBox');
+    const modelQuickNameEl = document.getElementById('modelQuickName');
+    const submitModelQuickAddEl = document.getElementById('submitModelQuickAdd');
+    const cancelModelQuickAddEl = document.getElementById('cancelModelQuickAdd');
+    const modelQuickFeedbackEl = document.getElementById('modelQuickFeedback');
 
     let selectedModelIds = new Set(oldModelIds.map(function (x) { return parseInt(x, 10); }));
     let categoryPathIds = [];
@@ -602,6 +678,40 @@ document.addEventListener('DOMContentLoaded', function () {
         ch = ch || '0';
         while (s.length < len) s = ch + s;
         return s;
+    }
+
+    function setFeedback(el, message, type) {
+        if (!el) return;
+        el.className = 'tiny-feedback' + (type ? (' ' + type) : '');
+        el.textContent = message || '';
+    }
+
+    function clearFeedback(el) {
+        setFeedback(el, '', '');
+    }
+
+    async function postJson(url, payload) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify(payload || {}),
+        });
+
+        const json = await response.json().catch(function () {
+            return {};
+        });
+
+        if (!response.ok) {
+            const err = new Error(json.message || 'خطا در ثبت اطلاعات.');
+            err.payload = json;
+            throw err;
+        }
+
+        return json;
     }
 
     function normalizeCategory2(code) {
@@ -647,6 +757,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function selectedCategory() {
         return categoryById(categoryIdEl.value);
+    }
+
+    function currentCategoryParentIdForQuickAdd() {
+        const selected = selectedCategory();
+        return selected ? parseInt(selected.id, 10) : null;
     }
 
     function updateCategoryPreview() {
@@ -1026,6 +1141,123 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function toggleCategoryQuickAdd(open) {
+        categoryQuickAddBoxEl.hidden = !open;
+        if (open) {
+            clearFeedback(categoryQuickFeedbackEl);
+            setTimeout(function () {
+                categoryQuickNameEl.focus();
+            }, 20);
+        }
+    }
+
+    async function quickAddCategory() {
+        const rawName = String(categoryQuickNameEl.value || '');
+        const name = rawName.trim();
+
+        if (!name) {
+            setFeedback(categoryQuickFeedbackEl, 'نام دسته‌بندی نمی‌تواند خالی باشد.', 'error');
+            return;
+        }
+
+        submitCategoryQuickAddEl.disabled = true;
+        setFeedback(categoryQuickFeedbackEl, 'در حال ثبت...', '');
+
+        try {
+            const parentId = currentCategoryParentIdForQuickAdd();
+            const data = await postJson(@json(route('categories.quickStore')), {
+                name: name,
+                parent_id: parentId,
+            });
+
+            const exists = categories.some(function (c) { return parseInt(c.id, 10) === parseInt(data.id, 10); });
+            if (!exists) {
+                categories.push({
+                    id: parseInt(data.id, 10),
+                    name: String(data.name || ''),
+                    code: String(data.code || ''),
+                    parent_id: data.parent_id === null ? null : parseInt(data.parent_id, 10),
+                });
+            }
+
+            categoryIdEl.value = String(data.id);
+            categoryQuickNameEl.value = '';
+            setFeedback(categoryQuickFeedbackEl, data.message || 'با موفقیت ثبت شد.', 'success');
+            renderCategoryLevels(getCategoryPath(data.id));
+            renderVariantPreview();
+            setTimeout(function () {
+                toggleCategoryQuickAdd(false);
+            }, 500);
+        } catch (error) {
+            setFeedback(categoryQuickFeedbackEl, error.message || 'ثبت دسته‌بندی انجام نشد.', 'error');
+        } finally {
+            submitCategoryQuickAddEl.disabled = false;
+        }
+    }
+
+    function toggleModelQuickAdd(open) {
+        modelQuickAddBoxEl.hidden = !open;
+        if (open) {
+            clearFeedback(modelQuickFeedbackEl);
+            setTimeout(function () {
+                modelQuickNameEl.focus();
+            }, 20);
+        }
+    }
+
+    async function quickAddModel() {
+        const brand = String(modelBrandGroupEl.value || '').trim();
+        const name = String(modelQuickNameEl.value || '').trim();
+
+        if (!brand) {
+            setFeedback(modelQuickFeedbackEl, 'ابتدا گروه برند را انتخاب کنید.', 'error');
+            return;
+        }
+        if (!name) {
+            setFeedback(modelQuickFeedbackEl, 'نام مدل نمی‌تواند خالی باشد.', 'error');
+            return;
+        }
+
+        submitModelQuickAddEl.disabled = true;
+        setFeedback(modelQuickFeedbackEl, 'در حال ثبت...', '');
+
+        try {
+            const data = await postJson(@json(route('model-lists.quick-store')), {
+                brand: brand,
+                model_name: name,
+            });
+
+            const idx = modelLists.findIndex(function (m) {
+                return parseInt(m.id, 10) === parseInt(data.id, 10);
+            });
+
+            const row = {
+                id: parseInt(data.id, 10),
+                brand: String(data.brand || ''),
+                model_name: String(data.model_name || ''),
+                code: String(data.code || ''),
+            };
+
+            if (idx === -1) {
+                modelLists.push(row);
+            } else {
+                modelLists[idx] = row;
+            }
+
+            selectedModelIds.add(parseInt(data.id, 10));
+            modelQuickNameEl.value = '';
+            setFeedback(modelQuickFeedbackEl, data.message || 'مدل ثبت شد.', 'success');
+            renderModelPicker();
+            setTimeout(function () {
+                toggleModelQuickAdd(false);
+            }, 500);
+        } catch (error) {
+            setFeedback(modelQuickFeedbackEl, error.message || 'ثبت مدل انجام نشد.', 'error');
+        } finally {
+            submitModelQuickAddEl.disabled = false;
+        }
+    }
+
     modelPickerButton.addEventListener('click', function () {
         if (modelBrandGroupEl.disabled) return;
 
@@ -1045,6 +1277,34 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     modelSearchInput.addEventListener('input', renderModelPicker);
+    openModelQuickAddEl.addEventListener('click', function () {
+        if (modelBrandGroupEl.disabled) return;
+        toggleModelQuickAdd(modelQuickAddBoxEl.hidden);
+    });
+    cancelModelQuickAddEl.addEventListener('click', function () {
+        toggleModelQuickAdd(false);
+    });
+    submitModelQuickAddEl.addEventListener('click', quickAddModel);
+    modelQuickNameEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            quickAddModel();
+        }
+    });
+
+    openCategoryQuickAddEl.addEventListener('click', function () {
+        toggleCategoryQuickAdd(categoryQuickAddBoxEl.hidden);
+    });
+    cancelCategoryQuickAddEl.addEventListener('click', function () {
+        toggleCategoryQuickAdd(false);
+    });
+    submitCategoryQuickAddEl.addEventListener('click', quickAddCategory);
+    categoryQuickNameEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            quickAddCategory();
+        }
+    });
 
     useModelsEl.addEventListener('change', syncSections);
     useDesignsEl.addEventListener('change', syncSections);
@@ -1052,6 +1312,8 @@ document.addEventListener('DOMContentLoaded', function () {
     modelBrandGroupEl.addEventListener('change', function () {
         selectedModelIds = new Set();
         modelSearchInput.value = '';
+        toggleModelQuickAdd(false);
+        clearFeedback(modelQuickFeedbackEl);
         renderModelPicker();
     });
 

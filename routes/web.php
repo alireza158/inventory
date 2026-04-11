@@ -71,6 +71,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/model-lists/assign-codes', [ModelListController::class, 'assignCodes'])->name('model-lists.assign-codes');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
     Route::post('/model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])->name('model-lists.import-phone-catalog');
+    Route::post('/model-lists/quick-store', [ModelListController::class, 'quickStore'])->name('model-lists.quick-store');
 
     // Shipping methods
     Route::get('/shipping-methods', [ShippingMethodController::class, 'index'])->name('shipping-methods.index');

@@ -112,6 +112,57 @@ class ModelListController extends Controller
         return redirect()->route('model-lists.index')->with('success', 'مدل با موفقیت ذخیره شد.');
     }
 
+    public function quickStore(Request $request)
+    {
+        $data = $request->validate([
+            'brand' => ['required', 'string', 'max:100'],
+            'model_name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $brand = trim((string) $data['brand']);
+        $modelName = trim((string) $data['model_name']);
+
+        if ($modelName === '') {
+            return response()->json(['message' => 'نام مدل نمی‌تواند خالی باشد.'], 422);
+        }
+
+        $result = ['model' => null, 'created' => false];
+
+        DB::transaction(function () use (&$result, $brand, $modelName) {
+            $existing = ModelList::query()
+                ->whereRaw('LOWER(TRIM(model_name)) = ?', [mb_strtolower($modelName)])
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                $result['model'] = $existing;
+                return;
+            }
+
+            $code = $this->nextCode3();
+            $result['model'] = ModelList::create([
+                'brand' => $brand,
+                'model_name' => $modelName,
+                'code' => $code,
+            ]);
+            $result['created'] = true;
+        });
+
+        $model = $result['model'];
+        $created = (bool) $result['created'];
+
+        return response()->json([
+            'id' => (int) $model->id,
+            'brand' => (string) ($model->brand ?? ''),
+            'model_name' => (string) ($model->model_name ?? ''),
+            'code' => (string) ($model->code ?? ''),
+            'created' => $created,
+            'message' => $created
+                ? 'مدل لیست جدید با موفقیت ثبت شد.'
+                : 'این مدل از قبل وجود دارد و انتخاب شد.',
+        ]);
+    }
+
     public function update(Request $request, ModelList $modelList): RedirectResponse
     {
         $data = $request->validate([
