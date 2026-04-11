@@ -93,7 +93,7 @@
 </template>
 
 @php
-    $categoryPayload = collect($categories ?? [])->map(function ($c) {
+    $categoryPayload = collect($rootCategories ?? [])->map(function ($c) {
         return [
             'id' => (int) $c->id,
             'name' => (string) $c->name,

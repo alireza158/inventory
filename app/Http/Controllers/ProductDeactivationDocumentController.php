@@ -99,7 +99,7 @@ class ProductDeactivationDocumentController extends Controller
                 return $product;
             });
 
-        $categories = $allCategories
+        $rootCategories = $allCategories
             ->whereNull('parent_id')
             ->values();
 
@@ -108,7 +108,7 @@ class ProductDeactivationDocumentController extends Controller
             ->filter(fn (Category $category) => $categoriesById->get((int) $category->parent_id)?->parent_id === null)
             ->values();
 
-        return view('product-deactivation-documents.create', compact('products', 'categories', 'subcategories'));
+        return view('product-deactivation-documents.create', compact('products', 'rootCategories', 'subcategories'));
     }
 
     public function store(Request $request)
