@@ -112,8 +112,8 @@
         return [
             'id' => (int) $p->id,
             'name' => (string) $p->name,
-            'category_id' => (int) optional($p->category)->id,
-            'parent_category_id' => (int) optional($p->category)->parent_id,
+            'root_category_id' => (int) ($p->root_category_id ?? 0),
+            'subcategory_id' => (int) ($p->subcategory_id ?? 0),
             'variants' => collect($p->variants ?? [])->map(function ($v) {
                 return [
                     'id' => (int) $v->id,
@@ -138,6 +138,14 @@
     const subcategories = @json($subcategoryPayload);
     const products = @json($productPayload);
     const oldItems = @json($oldItems);
+    const rootCategoryIds = new Set(categories.map((c) => Number(c.id || 0)));
+    const categoryParentMap = new Map();
+    categories.forEach((category) => {
+        categoryParentMap.set(Number(category.id || 0), 0);
+    });
+    subcategories.forEach((category) => {
+        categoryParentMap.set(Number(category.id || 0), Number(category.parent_id || 0));
+    });
 
     const tbody = document.getElementById('itemsTbody');
     const template = document.getElementById('rowTemplate');
@@ -202,10 +210,10 @@
                 }
 
                 if (!subcategoryId) {
-                    return Number(p.parent_category_id) === categoryId || Number(p.category_id) === categoryId;
+                    return Number(p.root_category_id) === categoryId;
                 }
 
-                return Number(p.category_id) === subcategoryId;
+                return Number(p.subcategory_id) === subcategoryId;
             });
 
             productEl.innerHTML = toOptions(filteredProducts, 'انتخاب کالا');
@@ -268,8 +276,21 @@
             reindexRows();
         });
 
-        if (initial.category_id) {
-            categoryEl.value = String(initial.category_id);
+        const initialCategoryId = Number(initial.category_id || 0);
+        const initialSubcategoryId = Number(initial.subcategory_id || 0);
+
+        if (initialCategoryId) {
+            if (rootCategoryIds.has(initialCategoryId)) {
+                categoryEl.value = String(initialCategoryId);
+            } else {
+                const parentId = Number(categoryParentMap.get(initialCategoryId) || 0);
+                if (rootCategoryIds.has(parentId)) {
+                    categoryEl.value = String(parentId);
+                    if (!initialSubcategoryId) {
+                        initial.subcategory_id = String(initialCategoryId);
+                    }
+                }
+            }
         }
 
         renderSubcategories();
