@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\ProductDeactivationDocumentItem;
 use App\Models\ProductVariant;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 
 class ProductDeactivationDocumentController extends Controller
@@ -45,6 +46,39 @@ class ProductDeactivationDocumentController extends Controller
 
     public function create()
     {
+        $allCategories = Category::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'parent_id']);
+
+        $categoriesById = $allCategories->keyBy('id');
+
+        $resolveCategoryPath = static function (?int $categoryId) use ($categoriesById): array {
+            if (!$categoryId || !$categoriesById->has($categoryId)) {
+                return ['root_id' => null, 'subcategory_id' => null];
+            }
+
+            $current = $categoriesById->get($categoryId);
+            $trail = [];
+
+            while ($current) {
+                array_unshift($trail, $current);
+
+                if (!$current->parent_id) {
+                    break;
+                }
+
+                $current = $categoriesById->get((int) $current->parent_id);
+            }
+
+            $root = $trail[0] ?? null;
+            $subcategory = $trail[1] ?? null;
+
+            return [
+                'root_id' => $root ? (int) $root->id : null,
+                'subcategory_id' => $subcategory ? (int) $subcategory->id : null,
+            ];
+        };
+
         $products = Product::query()
             ->where(function ($query) {
                 $query->where('is_sellable', true)
@@ -57,17 +91,22 @@ class ProductDeactivationDocumentController extends Controller
                 'variants' => fn ($q) => $q->where('is_active', true)->orderBy('variant_name'),
             ])
             ->orderBy('name')
-            ->get(['id', 'name', 'is_sellable', 'category_id']);
+            ->get(['id', 'name', 'is_sellable', 'category_id'])
+            ->map(function (Product $product) use ($resolveCategoryPath) {
+                $path = $resolveCategoryPath($product->category_id ? (int) $product->category_id : null);
+                $product->setAttribute('root_category_id', $path['root_id']);
+                $product->setAttribute('subcategory_id', $path['subcategory_id']);
+                return $product;
+            });
 
-        $categories = Category::query()
+        $categories = $allCategories
             ->whereNull('parent_id')
-            ->orderBy('name')
-            ->get(['id', 'name']);
+            ->values();
 
-        $subcategories = Category::query()
+        $subcategories = $allCategories
             ->whereNotNull('parent_id')
-            ->orderBy('name')
-            ->get(['id', 'name', 'parent_id']);
+            ->filter(fn (Category $category) => $categoriesById->get((int) $category->parent_id)?->parent_id === null)
+            ->values();
 
         return view('product-deactivation-documents.create', compact('products', 'categories', 'subcategories'));
     }
@@ -87,6 +126,43 @@ class ProductDeactivationDocumentController extends Controller
             'items.min' => 'حداقل یک ردیف کالا برای غیرفعال‌سازی وارد کنید.',
             'items.*.product_id.required' => 'انتخاب کالا برای هر ردیف الزامی است.',
         ]);
+
+        $rootCategoryIds = Category::query()
+            ->whereNull('parent_id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $rootCategoryLookup = array_fill_keys($rootCategoryIds, true);
+
+        $subcategoryParentMap = Category::query()
+            ->whereNotNull('parent_id')
+            ->pluck('parent_id', 'id')
+            ->mapWithKeys(fn ($parentId, $subcategoryId) => [(int) $subcategoryId => (int) $parentId])
+            ->all();
+
+        $messages = [];
+
+        foreach (($data['items'] ?? []) as $index => $item) {
+            $categoryId = (int) ($item['category_id'] ?? 0);
+            $subcategoryId = (int) ($item['subcategory_id'] ?? 0);
+
+            if ($categoryId && !isset($rootCategoryLookup[$categoryId])) {
+                $messages["items.{$index}.category_id"] = 'فقط دسته‌بندی اصلی قابل انتخاب است.';
+            }
+
+            if ($subcategoryId) {
+                $expectedParentId = (int) ($subcategoryParentMap[$subcategoryId] ?? 0);
+
+                if (!$expectedParentId || ($categoryId && $expectedParentId !== $categoryId)) {
+                    $messages["items.{$index}.subcategory_id"] = 'زیر‌دسته انتخاب‌شده با دسته‌بندی اصلی مطابقت ندارد.';
+                }
+            }
+        }
+
+        if (!empty($messages)) {
+            throw ValidationException::withMessages($messages);
+        }
 
         DB::transaction(function () use ($data) {
             $firstItem = $data['items'][0];
@@ -135,7 +211,7 @@ class ProductDeactivationDocumentController extends Controller
                         ->first();
 
                     if (!$variant) {
-                        throw \Illuminate\Validation\ValidationException::withMessages([
+                        throw ValidationException::withMessages([
                             "items.{$index}.variant_id" => 'تنوع انتخاب‌شده با کالای همین ردیف مطابقت ندارد.',
                         ]);
                     }
