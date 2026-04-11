@@ -229,6 +229,7 @@
                 <div class="sidebar-submenu">
                     <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
                     <a class="sidebar-sublink {{ $is('products.import.show', 'products.import') }}" href="{{ route('products.import.show') }}">تعریف کالا</a>
+                    <a class="sidebar-sublink {{ $is('purchases.create') }}" href="{{ route('purchases.create') }}">خرید زدن کالا</a>
                     <a class="sidebar-sublink {{ $is('preinvoice.warehouse.*') }}" href="{{ route('preinvoice.warehouse.index') }}">در انتظار تایید انبار</a>
                     <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
                     <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
