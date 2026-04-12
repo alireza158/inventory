@@ -172,7 +172,6 @@ class CrmUserService
             $permissionNames = $roleMap[$roleName] ?? $defaultPermissions;
 
             if (in_array('*', $permissionNames, true)) {
-                $role->syncPermissions(Permission::query()->get());
                 continue;
             }
 
