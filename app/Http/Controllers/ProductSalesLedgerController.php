@@ -69,6 +69,7 @@ class ProductSalesLedgerController extends Controller
         }
 
         $summary = (clone $query)
+            ->select([])
             ->selectRaw('COALESCE(SUM(invoice_items.quantity), 0) as total_quantity')
             ->selectRaw('COALESCE(SUM(invoice_items.line_total), 0) as total_amount')
             ->first();
