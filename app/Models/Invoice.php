@@ -26,6 +26,8 @@ class Invoice extends Model
     public function notes() { return $this->hasMany(InvoiceNote::class)->latest(); }
     public function attachments() { return $this->hasMany(InvoiceAttachment::class)->latest(); }
     public function preinvoiceOrder() { return $this->belongsTo(PreinvoiceOrder::class); }
+    public function customer() { return $this->belongsTo(Customer::class); }
+    public function statusChangedByUser() { return $this->belongsTo(User::class, 'status_changed_by'); }
     public function histories() { return $this->hasMany(SalesHavalehHistory::class)->latest('done_at'); }
 
     public function getPaidAmountAttribute(): int
