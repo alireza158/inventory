@@ -128,7 +128,6 @@ class CrmUserService
             'username' => $normalized['username'],
             'is_active' => $normalized['is_active'],
             'sync_source' => 'crm',
-            'source_role' => $normalized['roles'] !== [] ? implode(',', $normalized['roles']) : null,
             'crm_role_raw' => $normalized['roles'],
             'synced_at' => now(),
             'last_crm_payload' => $rawUser,
