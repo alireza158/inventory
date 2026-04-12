@@ -21,9 +21,24 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'external_crm_id',
+        'crm_user_id',
         'name',
         'email',
         'phone',
+        'username',
+        'is_active',
+        'sync_source',
+        'source_role',
+        'crm_role_raw',
+        'synced_at',
+        'last_crm_payload',
+        'crm_created_at',
+        'crm_updated_at',
+        'avatar',
+        'department',
+        'position',
+        'personnel_code',
+        'branch',
         'password',
         'manager_id',
     ];
@@ -48,6 +63,12 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'synced_at' => 'datetime',
+            'crm_created_at' => 'datetime',
+            'crm_updated_at' => 'datetime',
+            'crm_role_raw' => 'array',
+            'last_crm_payload' => 'array',
         ];
     }
 

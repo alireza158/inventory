@@ -44,4 +44,13 @@ return [
         'token' => env('EXTERNAL_SYNC_TOKEN'),
     ],
 
+    'crm' => [
+        'base_url' => env('CRM_BASE_URL'),
+        'users_endpoint' => env('CRM_USERS_ENDPOINT', '/external/users'),
+        'api_token' => env('CRM_API_TOKEN'),
+        'sync_enabled' => env('CRM_SYNC_ENABLED', true),
+        'timeout' => env('CRM_SYNC_TIMEOUT', 30),
+        'verify_ssl' => env('CRM_SYNC_VERIFY_SSL', true),
+    ],
+
 ];

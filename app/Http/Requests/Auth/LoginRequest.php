@@ -43,8 +43,16 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         $loginColumn = Schema::hasColumn('users', 'phone') ? 'phone' : 'email';
+        $credentials = [
+            $loginColumn => $this->string('phone')->toString(),
+            'password' => $this->string('password')->toString(),
+        ];
 
-        if (! Auth::attempt([$loginColumn => $this->string('phone')->toString(), 'password' => $this->string('password')->toString()], $this->boolean('remember'))) {
+        if (Schema::hasColumn('users', 'is_active')) {
+            $credentials['is_active'] = true;
+        }
+
+        if (! Auth::attempt($credentials, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([

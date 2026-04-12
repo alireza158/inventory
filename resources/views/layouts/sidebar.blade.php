@@ -1,5 +1,23 @@
 @php
     $currentRouteName = request()->route()?->getName() ?? '';
+    $authUser = auth()->user();
+    $userRoleNames = $authUser ? $authUser->roles->pluck('name')->all() : [];
+    $accessRules = config('sidebar_access.links', []);
+    $canSeeRoute = static function (string $routeName) use ($userRoleNames, $accessRules): bool {
+        $rule = $accessRules[$routeName] ?? null;
+
+        if (!$rule) {
+            return true;
+        }
+
+        $allowedRoles = $rule['roles'] ?? [];
+
+        if ($allowedRoles === []) {
+            return true;
+        }
+
+        return count(array_intersect($allowedRoles, $userRoleNames)) > 0;
+    };
 
     $isRoute = static fn(string ...$patterns): bool => Str::is($patterns, $currentRouteName);
     $is = static fn(string ...$patterns): string => $isRoute(...$patterns) ? 'active' : '';
@@ -14,6 +32,10 @@
     $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*');
 
     $configActive = $isRoute('shipping-methods.*', 'users.*', 'activity-logs.*');
+
+    $canViewSales = $canSeeRoute('preinvoice.create') || $canSeeRoute('customers.index');
+    $canViewFinance = $canSeeRoute('preinvoice.draft.index') || $canSeeRoute('account-statements.index') || $canSeeRoute('invoices.index');
+    $canViewConfig = $canSeeRoute('shipping-methods.index') || $canSeeRoute('users.index') || $canSeeRoute('activity-logs.index');
 
     $initialOpenSection = match (true) {
         $productsActive => 'products',
@@ -239,6 +261,7 @@
         </div>
 
         {{-- Commerce & Sales --}}
+        @if($canViewSales)
         <div class="sidebar-accordion-item {{ $salesActive ? 'is-open' : '' }}" data-accordion-section="sales">
             <button type="button"
                     class="sidebar-section-title sidebar-accordion-trigger {{ $salesActive ? 'is-active' : '' }}"
@@ -251,13 +274,19 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
-                    <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
-                    <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
+                    @if($canSeeRoute('preinvoice.create'))
+                        <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
+                    @endif
+                    @if($canSeeRoute('customers.index'))
+                        <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
+                    @endif
                 </div>
             </div>
         </div>
+        @endif
 
         {{-- Finance --}}
+        @if($canViewFinance)
         <div class="sidebar-accordion-item {{ $financeActive ? 'is-open' : '' }}" data-accordion-section="finance">
             <button type="button"
                     class="sidebar-section-title sidebar-accordion-trigger {{ $financeActive ? 'is-active' : '' }}"
@@ -270,14 +299,22 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
-                    <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">در انتظار تایید مالی</a>
-                    <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
-                    <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+                    @if($canSeeRoute('preinvoice.draft.index'))
+                        <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">در انتظار تایید مالی</a>
+                    @endif
+                    @if($canSeeRoute('account-statements.index'))
+                        <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
+                    @endif
+                    @if($canSeeRoute('invoices.index'))
+                        <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+                    @endif
                 </div>
             </div>
         </div>
+        @endif
 
         {{-- Configuration --}}
+        @if($canViewConfig)
         <div class="sidebar-accordion-item {{ $configActive ? 'is-open' : '' }}" data-accordion-section="config">
             <button type="button"
                     class="sidebar-section-title sidebar-accordion-trigger {{ $configActive ? 'is-active' : '' }}"
@@ -290,12 +327,19 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
-                    <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
-                    <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
-                    <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
+                    @if($canSeeRoute('shipping-methods.index'))
+                        <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
+                    @endif
+                    @if($canSeeRoute('users.index'))
+                        <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
+                    @endif
+                    @if($canSeeRoute('activity-logs.index'))
+                        <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
+                    @endif
                 </div>
             </div>
         </div>
+        @endif
 
     </div>
 </div>
