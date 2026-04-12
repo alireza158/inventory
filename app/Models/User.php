@@ -28,7 +28,6 @@ class User extends Authenticatable
         'username',
         'is_active',
         'sync_source',
-        'source_role',
         'crm_role_raw',
         'synced_at',
         'last_crm_payload',
