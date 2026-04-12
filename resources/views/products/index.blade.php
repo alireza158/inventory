@@ -347,6 +347,7 @@
                             </select>
 
                             <button class="btn btn-sm btn-stock-breakdown" type="button" id="bulkStockBtn">📦 موجودی انبار به تفکیک</button>
+                            <button class="btn btn-sm btn-outline-primary" type="button" id="bulkSalesLedgerBtn">📒 کارتکس فروش</button>
                         </div>
 
                         <div class="small subtle-text mt-2" id="variantHelpText">
@@ -510,6 +511,7 @@
                                                     value="{{ $p->id }}"
                                                     data-edit-url="{{ route('products.edit', $p) }}"
                                                     data-delete-url="{{ route('products.destroy', $p) }}"
+                                                    data-sales-ledger-url="{{ route('products.sales-ledger', $p) }}"
                                                     data-product-name="{{ $p->name }}"
                                                     data-variants='@json($variantsPayload)'
                                                     data-stock-breakdown='@json($stockBreakdownPayload)'
@@ -829,7 +831,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         if (variantHelpTextEl) {
-            variantHelpTextEl.textContent = 'برای نمایش موجودی انبار به تفکیک، تنوع محصول را انتخاب کنید.';
+            variantHelpTextEl.textContent = 'برای «موجودی انبار» و «کارتکس فروش»، در صورت نیاز تنوع را انتخاب کنید.';
         }
     }
 
@@ -964,6 +966,25 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             modal.show();
+        });
+
+        document.getElementById('bulkSalesLedgerBtn')?.addEventListener('click', function () {
+            const selected = getSingleSelected();
+            if (!selected) return;
+
+            const baseUrl = selected.dataset.salesLedgerUrl;
+            if (!baseUrl) return;
+
+            const params = new URLSearchParams();
+            const selectedVariantId = variantSelectEl?.value ? String(variantSelectEl.value) : '';
+
+            if (selectedVariantId) {
+                params.set('variant_id', selectedVariantId);
+            } else {
+                params.delete('variant_id');
+            }
+
+            window.location.href = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
         });
 
         updateVariantSelectState();

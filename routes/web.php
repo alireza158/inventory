@@ -17,6 +17,7 @@ use App\Http\Controllers\ModelListController;
 use App\Http\Controllers\PreinvoiceApiController;
 use App\Http\Controllers\PreinvoiceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductSalesLedgerController;
 use App\Http\Controllers\ProductDeactivationDocumentController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProfileController;
@@ -47,6 +48,7 @@ Route::middleware('auth')->group(function () {
 
     // Products + categories
     Route::resource('products', ProductController::class)->except(['show']);
+    Route::get('/products/{product}/sales-ledger', [ProductSalesLedgerController::class, 'index'])->name('products.sales-ledger');
     Route::resource('categories', CategoryController::class)->except(['show']);
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
 
