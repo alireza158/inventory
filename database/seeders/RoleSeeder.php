@@ -15,9 +15,8 @@ class RoleSeeder extends Seeder
         $adminRole = Role::firstOrCreate(['name' => 'admin']);
         $employeeRole = Role::firstOrCreate(['name' => 'employee']);
         $usersViewPermission = Permission::findOrCreate('users.view', 'web');
-        $allPermission = Permission::findOrCreate('*', 'web');
 
-        $adminRole->syncPermissions([$usersViewPermission, $allPermission]);
+        $adminRole->syncPermissions(Permission::query()->get());
         $employeeRole->syncPermissions([$usersViewPermission]);
 
         // ادمین اولیه (اگر وجود نداشت)
