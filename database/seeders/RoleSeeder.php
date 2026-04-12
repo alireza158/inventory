@@ -3,9 +3,10 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RoleSeeder extends Seeder
 {
@@ -13,6 +14,11 @@ class RoleSeeder extends Seeder
     {
         $adminRole = Role::firstOrCreate(['name' => 'admin']);
         $employeeRole = Role::firstOrCreate(['name' => 'employee']);
+        $usersViewPermission = Permission::findOrCreate('users.view', 'web');
+        $allPermission = Permission::findOrCreate('*', 'web');
+
+        $adminRole->syncPermissions([$usersViewPermission, $allPermission]);
+        $employeeRole->syncPermissions([$usersViewPermission]);
 
         // ادمین اولیه (اگر وجود نداشت)
         $admin = User::firstOrCreate(
