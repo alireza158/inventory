@@ -55,6 +55,7 @@
                         <th>نام کاربری</th>
                         <th>مدیر</th>
                         <th>نقش‌ها</th>
+                        <th>role خام ERP</th>
                         <th>منبع</th>
                         <th>وضعیت</th>
                         <th>آخرین sync</th>
@@ -71,6 +72,7 @@
                             <td>{{ $user->username ?? '-' }}</td>
                             <td>{{ $user->manager?->name ?? '-' }}</td>
                             <td>{{ $user->roles->pluck('name')->implode('، ') ?: '-' }}</td>
+                            <td>{{ $user->source_role ?? '-' }}</td>
                             <td>
                                 @if($user->sync_source === 'crm')
                                     <span class="badge bg-info-subtle text-info">CRM</span>
@@ -89,7 +91,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="11" class="text-center text-muted py-4">هنوز کاربری سینک نشده است.</td>
+                            <td colspan="12" class="text-center text-muted py-4">هنوز کاربری سینک نشده است.</td>
                         </tr>
                     @endforelse
                 </tbody>

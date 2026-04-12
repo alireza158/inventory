@@ -13,7 +13,8 @@ return new class extends Migration
             $table->string('username')->nullable()->after('phone');
             $table->boolean('is_active')->default(true)->after('username');
             $table->string('sync_source')->nullable()->after('is_active');
-            $table->json('crm_role_raw')->nullable()->after('sync_source');
+            $table->string('source_role')->nullable()->after('sync_source');
+            $table->json('crm_role_raw')->nullable()->after('source_role');
             $table->timestamp('synced_at')->nullable()->after('crm_role_raw');
             $table->json('last_crm_payload')->nullable()->after('synced_at');
             $table->timestamp('crm_created_at')->nullable()->after('last_crm_payload');
@@ -34,6 +35,7 @@ return new class extends Migration
                 'username',
                 'is_active',
                 'sync_source',
+                'source_role',
                 'crm_role_raw',
                 'synced_at',
                 'last_crm_payload',
@@ -48,4 +50,3 @@ return new class extends Migration
         });
     }
 };
-
