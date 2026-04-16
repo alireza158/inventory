@@ -25,6 +25,12 @@
     };
 @endphp
 
+@php
+    $user = auth()->user();
+
+    $hasRole = fn(array $roles) =>
+        $user && $user->hasAnyRole($roles);
+@endphp
 <style>
 
   /* ===== Backdrop ===== */
@@ -193,6 +199,7 @@
             <span>داشبورد</span>
         </a>
 
+
         {{-- Products --}}
         <div class="sidebar-accordion-item {{ $productsActive ? 'is-open' : '' }}" data-accordion-section="products">
             <button type="button"
@@ -214,6 +221,8 @@
             </div>
         </div>
 
+
+@if($hasRole(['Admin']) || $hasRole(['StorageUser']) || $hasRole(['StorageManager']))
         {{-- Warehouse --}}
         <div class="sidebar-accordion-item {{ $warehouseActive ? 'is-open' : '' }}" data-accordion-section="warehouse">
             <button type="button"
@@ -237,6 +246,8 @@
                 </div>
             </div>
         </div>
+@endif
+
 
         {{-- Commerce & Sales --}}
         <div class="sidebar-accordion-item {{ $salesActive ? 'is-open' : '' }}" data-accordion-section="sales">
@@ -256,7 +267,7 @@
                 </div>
             </div>
         </div>
-
+@if($hasRole(['Admin']) || $hasRole(['Accountant']) )
         {{-- Finance --}}
         <div class="sidebar-accordion-item {{ $financeActive ? 'is-open' : '' }}" data-accordion-section="finance">
             <button type="button"
@@ -276,6 +287,9 @@
                 </div>
             </div>
         </div>
+@endif
+
+@if($hasRole(['Admin'])  )
 
         {{-- Configuration --}}
         <div class="sidebar-accordion-item {{ $configActive ? 'is-open' : '' }}" data-accordion-section="config">
@@ -296,7 +310,7 @@
                 </div>
             </div>
         </div>
-
+@endif
     </div>
 </div>
 

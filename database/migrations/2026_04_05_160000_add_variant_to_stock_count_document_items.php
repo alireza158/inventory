@@ -2,60 +2,75 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::table('stock_count_document_items', function (Blueprint $table) {
-            if (!Schema::hasColumn('stock_count_document_items', 'product_variant_id')) {
-                $table->foreignId('product_variant_id')
-                    ->nullable()
-                    ->after('product_id')
-                    ->constrained('product_variants')
-                    ->restrictOnDelete();
-            }
-        });
 
-        Schema::table('stock_count_document_items', function (Blueprint $table) {
-            if ($this->hasIndex('stock_count_document_items', 'stock_count_document_items_document_id_product_id_unique')) {
-                $table->dropUnique('stock_count_document_items_document_id_product_id_unique');
-            }
+            // 1️⃣ حذف FK های وابسته (خیلی مهم)
+            $table->dropForeign(['document_id']);
+            $table->dropForeign(['product_id']);
 
-            if (!$this->hasIndex('stock_count_document_items', 'stock_count_document_items_doc_product_variant_unique')) {
-                $table->unique(['document_id', 'product_id', 'product_variant_id'], 'stock_count_document_items_doc_product_variant_unique');
-            }
+            // 2️⃣ حذف unique قدیمی
+            $table->dropUnique('stock_count_document_items_document_id_product_id_unique');
+
+            // 3️⃣ اضافه کردن ستون variant
+            $table->foreignId('product_variant_id')
+                ->nullable()
+                ->after('product_id')
+                ->constrained('product_variants')
+                ->restrictOnDelete();
+
+            // 4️⃣ ساخت unique جدید
+            $table->unique(
+                ['document_id', 'product_id', 'product_variant_id'],
+                'stock_count_doc_product_variant_unique'
+            );
+
+            // 5️⃣ اضافه کردن دوباره FK ها
+            $table->foreign('document_id')
+                ->references('id')
+                ->on('stock_count_documents')
+                ->cascadeOnDelete();
+
+            $table->foreign('product_id')
+                ->references('id')
+                ->on('products')
+                ->restrictOnDelete();
         });
     }
 
     public function down(): void
     {
         Schema::table('stock_count_document_items', function (Blueprint $table) {
-            if ($this->hasIndex('stock_count_document_items', 'stock_count_document_items_doc_product_variant_unique')) {
-                $table->dropUnique('stock_count_document_items_doc_product_variant_unique');
-            }
 
-            if (Schema::hasColumn('stock_count_document_items', 'product_variant_id')) {
-                $table->dropConstrainedForeignId('product_variant_id');
-            }
+            // حذف FK ها
+            $table->dropForeign(['document_id']);
+            $table->dropForeign(['product_id']);
 
-            if (!$this->hasIndex('stock_count_document_items', 'stock_count_document_items_document_id_product_id_unique')) {
-                $table->unique(['document_id', 'product_id']);
-            }
+            $table->dropUnique('stock_count_doc_product_variant_unique');
+
+            $table->dropConstrainedForeignId('product_variant_id');
+
+            // بازگرداندن unique قبلی
+            $table->unique(
+                ['document_id', 'product_id'],
+                'stock_count_document_items_document_id_product_id_unique'
+            );
+
+            // بازگرداندن FK ها
+            $table->foreign('document_id')
+                ->references('id')
+                ->on('stock_count_documents')
+                ->cascadeOnDelete();
+
+            $table->foreign('product_id')
+                ->references('id')
+                ->on('products')
+                ->restrictOnDelete();
         });
-    }
-
-    private function hasIndex(string $table, string $indexName): bool
-    {
-        $database = DB::getDatabaseName();
-
-        $exists = DB::table('information_schema.statistics')
-            ->where('table_schema', $database)
-            ->where('table_name', $table)
-            ->where('index_name', $indexName)
-            ->exists();
-
-        return (bool) $exists;
     }
 };

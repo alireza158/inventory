@@ -425,10 +425,16 @@ class ProductController extends Controller
     }
 
     public function syncCrm(CrmProductSyncService $service)
-    {
-        $res = $service->sync();
-        return redirect()->route('products.index')->with('success', "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']}");
-    }
+{
+    $res = $service->sync();
+
+    return redirect()
+        ->route('products.index')
+        ->with(
+            'success',
+            "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']} | خطا: {$res['failed']}"
+        );
+}
 
     // ---------------- Helpers ----------------
 

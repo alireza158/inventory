@@ -52,5 +52,10 @@ return [
         'timeout' => env('CRM_SYNC_TIMEOUT', 30),
         'verify_ssl' => env('CRM_SYNC_VERIFY_SSL', true),
     ],
-
+'ariya_crm' => [
+    'base_url'            => env('ARIYA_CRM_BASE_URL', 'https://api.ariyajanebi.ir'),
+    'products_url'        => env('ARIYA_CRM_PRODUCTS_URL', 'https://api.ariyajanebi.ir/v1/front/products'),
+    'token'               => env('ARIYA_CRM_TOKEN'),
+    'default_category_id' => env('ARIYA_DEFAULT_CATEGORY_ID', 1),
+],
 ];

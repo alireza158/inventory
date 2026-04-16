@@ -247,8 +247,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
 
     // Users (External CRM)
-    Route::get('/users', [UserController::class, 'index'])->middleware('permission:users.view|*')->name('users.index');
-    Route::post('/users/sync', [UserController::class, 'sync'])->middleware('role:admin')->name('users.sync');
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
 });
 
 require __DIR__ . '/auth.php';
