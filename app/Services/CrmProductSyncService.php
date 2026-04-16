@@ -21,71 +21,145 @@ class CrmProductSyncService
     {
         $url = $this->getProductsUrl();
 
+        Log::info('[CRM_SYNC] Sync started', [
+            'url' => $url,
+        ]);
+
         $request = Http::timeout(60)
             ->retry(3, 500)
             ->acceptJson();
 
-        $token = (string) config('services.ariya_crm.token', '');
+        $token = trim((string) config('services.ariya_crm.token', ''));
         if ($token !== '') {
             $request = $request->withToken($token);
         }
 
         $created = 0;
         $updated = 0;
-        $failed  = 0;
+        $failed = 0;
 
         $nextUrl = $url;
+        $page = 1;
 
         while ($nextUrl) {
-            $payload = $request->get($nextUrl)->throw()->json();
+            try {
+                Log::info('[CRM_SYNC] Requesting page', [
+                    'page' => $page,
+                    'url' => $nextUrl,
+                ]);
 
-            $items = Arr::get($payload, 'data.products.data', []);
-            if (!is_array($items)) {
-                $items = [];
-            }
+                $response = $request->get($nextUrl);
 
-            foreach ($items as $item) {
-                try {
-                    if (Arr::get($item, 'status') !== 'available') {
-    continue;
-}
-                    $result = DB::transaction(function () use ($item) {
-                        return $this->syncSingleProduct((array) $item);
-                    });
+                Log::info('[CRM_SYNC] Response received', [
+                    'page' => $page,
+                    'status' => $response->status(),
+                    'successful' => $response->successful(),
+                ]);
 
-                    if ($result === 'created') {
-                        $created++;
-                    } else {
-                        $updated++;
-                    }
-                } catch (\Throwable $e) {
-                    $failed++;
+                $payload = $response->throw()->json();
 
-                    Log::error('CRM product sync failed', [
-                        'crm_product_id' => Arr::get($item, 'id'),
-                        'title'          => Arr::get($item, 'title'),
-                        'message'        => $e->getMessage(),
-                        'trace'          => $e->getTraceAsString(),
+                $items = Arr::get($payload, 'data.products.data', []);
+                if (!is_array($items)) {
+                    Log::warning('[CRM_SYNC] data.products.data is not array', [
+                        'page' => $page,
+                        'type' => gettype($items),
                     ]);
+                    $items = [];
                 }
-            }
 
-            // pagination واقعی را از چند مسیر ممکن چک می‌کنیم
-            $nextUrl =
-                Arr::get($payload, 'data.products.next_page_url')
-                ?? Arr::get($payload, 'data.next_page_url')
-                ?? Arr::get($payload, 'links.next')
-                ?? null;
+                Log::info('[CRM_SYNC] Page parsed', [
+                    'page' => $page,
+                    'items_count' => count($items),
+                ]);
 
-            if (is_string($nextUrl) && $nextUrl !== '' && !str_starts_with($nextUrl, 'http')) {
-                $base = rtrim((string) config('services.ariya_crm.base_url', 'https://api.ariyajanebi.ir'), '/');
-                $nextUrl = $base . '/' . ltrim($nextUrl, '/');
-            }
+                foreach ($items as $index => $item) {
+                    $item = (array) $item;
 
-            if (!is_string($nextUrl) || $nextUrl === '') {
-                $nextUrl = null;
+                    try {
+                        Log::info('[CRM_SYNC] Product sync started', [
+                            'page' => $page,
+                            'index' => $index,
+                            'crm_product_id' => Arr::get($item, 'id'),
+                            'title' => Arr::get($item, 'title'),
+                            'status' => Arr::get($item, 'status'),
+                        ]);
+
+                        if ((string) Arr::get($item, 'status') !== 'available') {
+                            Log::info('[CRM_SYNC] Product skipped due to unavailable status', [
+                                'crm_product_id' => Arr::get($item, 'id'),
+                                'status' => Arr::get($item, 'status'),
+                            ]);
+                            continue;
+                        }
+
+                        $result = DB::transaction(function () use ($item) {
+                            return $this->syncSingleProduct($item);
+                        });
+
+                        Log::info('[CRM_SYNC] Product sync finished', [
+                            'crm_product_id' => Arr::get($item, 'id'),
+                            'result' => $result,
+                        ]);
+
+                        if ($result === 'created') {
+                            $created++;
+                        } else {
+                            $updated++;
+                        }
+                    } catch (\Throwable $e) {
+                        $failed++;
+
+                        Log::error('[CRM_SYNC] Product sync failed', [
+                            'crm_product_id' => Arr::get($item, 'id'),
+                            'title' => Arr::get($item, 'title'),
+                            'message' => $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                    }
+                }
+
+                $nextUrl =
+                    Arr::get($payload, 'data.products.next_page_url')
+                    ?? Arr::get($payload, 'data.next_page_url')
+                    ?? Arr::get($payload, 'links.next')
+                    ?? null;
+
+                if (is_string($nextUrl) && $nextUrl !== '' && !str_starts_with($nextUrl, 'http')) {
+                    $base = rtrim((string) config('services.ariya_crm.base_url', 'https://api.ariyajanebi.ir'), '/');
+                    $nextUrl = $base . '/' . ltrim($nextUrl, '/');
+                }
+
+                if (!is_string($nextUrl) || $nextUrl === '') {
+                    $nextUrl = null;
+                }
+
+                Log::info('[CRM_SYNC] Pagination resolved', [
+                    'page' => $page,
+                    'next_url' => $nextUrl,
+                ]);
+
+                $page++;
+            } catch (\Throwable $e) {
+                Log::error('[CRM_SYNC] Page sync failed', [
+                    'page' => $page,
+                    'url' => $nextUrl,
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
+                throw $e;
             }
         }
+
+        Log::info('[CRM_SYNC] Sync finished', [
+            'created' => $created,
+            'updated' => $updated,
+            'failed' => $failed,
+        ]);
 
         return compact('created', 'updated', 'failed');
     }
@@ -104,35 +178,71 @@ class CrmProductSyncService
 
         $varieties = Arr::get($item, 'varieties', []);
         if (!is_array($varieties)) {
+            Log::warning('[CRM_SYNC] Varieties is not array', [
+                'crm_product_id' => $externalId,
+                'type' => gettype($varieties),
+            ]);
             $varieties = [];
         }
 
         $basePrice = $this->extractProductPrice($item, $varieties);
-        $baseQty   = $this->extractProductQuantity($item, $varieties);
+        $baseQty = $this->extractProductQuantity($item, $varieties);
+
+        Log::info('[CRM_SYNC] Product base data extracted', [
+            'crm_product_id' => $externalId,
+            'name' => $name,
+            'varieties_count' => count($varieties),
+            'base_price' => $basePrice,
+            'base_qty' => $baseQty,
+        ]);
 
         $category = $this->resolveDefaultCategory();
-        $sku      = 'ARIYA-' . $externalId;
+        $sku = 'ARIYA-' . $externalId;
 
         $product = Product::query()
             ->lockForUpdate()
             ->where('sku', $sku)
             ->first();
 
-        
+        $isNew = !$product;
+
+        Log::info('[CRM_SYNC] Product lookup completed', [
+            'crm_product_id' => $externalId,
+            'sku' => $sku,
+            'is_new' => $isNew,
+            'product_id' => $product?->id,
+        ]);
+
+        if (!$product) {
             [$productCode6, $seq4] = $this->generateProductCode($category);
 
             $product = new Product();
-            
-            $product->sku           = $sku;
-            $product->code          = $productCode6;
+            $product->sku = $sku;
+            $product->code = $productCode6;
             $product->short_barcode = $seq4;
-            $product->stock         = 0;
-            $product->price         = 0;
-       
+            $product->stock = 0;
+            $product->price = 0;
+
+            Log::info('[CRM_SYNC] New product initialized', [
+                'crm_product_id' => $externalId,
+                'sku' => $sku,
+                'code' => $productCode6,
+                'short_barcode' => $seq4,
+            ]);
+        } else {
+            $this->ensureProductCodeIntegrity($product, $category);
+
+            Log::info('[CRM_SYNC] Existing product code checked', [
+                'crm_product_id' => $externalId,
+                'product_id' => $product->id,
+                'code' => $product->code,
+                'short_barcode' => $product->short_barcode,
+            ]);
+        }
 
         $product->category_id = $category->id;
-        $product->name        = $name;
-dd($product->name );
+        $product->name = $name;
+
         if ($this->hasColumn('products', 'external_id')) {
             $product->external_id = $externalId;
         }
@@ -145,7 +255,18 @@ dd($product->name );
             $product->synced_at = Carbon::now();
         }
 
+        Log::info('[CRM_SYNC] Product before save', [
+            'crm_product_id' => $externalId,
+            'product_id' => $product->id,
+            'attributes' => $product->getAttributes(),
+        ]);
+
         $product->save();
+
+        Log::info('[CRM_SYNC] Product saved', [
+            'crm_product_id' => $externalId,
+            'product_id' => $product->id,
+        ]);
 
         if (count($varieties) > 0) {
             $this->syncProductVariants($product, $varieties);
@@ -155,11 +276,22 @@ dd($product->name );
 
         $this->recalcProductSummary($product, $basePrice);
 
+        Log::info('[CRM_SYNC] Product summary recalculated', [
+            'crm_product_id' => $externalId,
+            'product_id' => $product->id,
+        ]);
+
         return $isNew ? 'created' : 'updated';
     }
 
     private function syncProductVariants(Product $product, array $varieties): void
     {
+        Log::info('[CRM_SYNC] syncProductVariants started', [
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'varieties_count' => count($varieties),
+        ]);
+
         $existingVariants = ProductVariant::query()
             ->where('product_id', $product->id)
             ->lockForUpdate()
@@ -197,10 +329,9 @@ dd($product->name );
             $reservedDesign2[$design2] = true;
 
             $title = $this->resolveVariantTitle($variety, $index);
-
             $sellPrice = $this->extractVariantPrice($variety);
-            $buyPrice  = $this->extractVariantBuyPrice($variety);
-            $stock     = max(0, (int) (Arr::get($variety, 'quantity') ?? 0));
+            $buyPrice = $this->extractVariantBuyPrice($variety);
+            $stock = max(0, (int) (Arr::get($variety, 'quantity') ?? 0));
 
             $payload = [
                 'product_id'    => $product->id,
@@ -235,12 +366,31 @@ dd($product->name );
                 $payload['unique_key'] = $uniqueKey !== '' ? $uniqueKey : null;
             }
 
+            Log::info('[CRM_SYNC] Variant payload prepared', [
+                'product_id' => $product->id,
+                'index' => $index,
+                'crm_variety_id' => Arr::get($variety, 'id'),
+                'identity' => $identity,
+                'existing_variant_id' => $existing?->id,
+                'payload' => $payload,
+            ]);
+
             if ($existing) {
                 $existing->update($payload);
                 $keptIds[] = $existing->id;
+
+                Log::info('[CRM_SYNC] Existing variant updated', [
+                    'product_id' => $product->id,
+                    'variant_id' => $existing->id,
+                ]);
             } else {
                 $newVariant = ProductVariant::create($payload);
                 $keptIds[] = $newVariant->id;
+
+                Log::info('[CRM_SYNC] New variant created', [
+                    'product_id' => $product->id,
+                    'variant_id' => $newVariant->id,
+                ]);
             }
         }
 
@@ -262,11 +412,24 @@ dd($product->name );
             $staleUpdate['synced_at'] = Carbon::now();
         }
 
+        $staleCount = (clone $staleQuery)->count();
         $staleQuery->update($staleUpdate);
+
+        Log::info('[CRM_SYNC] Stale variants disabled', [
+            'product_id' => $product->id,
+            'stale_count' => $staleCount,
+            'kept_ids' => $keptIds,
+        ]);
     }
 
     private function syncBaseVariant(Product $product, int $basePrice, int $baseQty): void
     {
+        Log::info('[CRM_SYNC] syncBaseVariant started', [
+            'product_id' => $product->id,
+            'base_price' => $basePrice,
+            'base_qty' => $baseQty,
+        ]);
+
         $baseVariantCode = $product->code . '00000';
 
         $variant = ProductVariant::query()
@@ -307,10 +470,26 @@ dd($product->name );
             $payload['synced_at'] = Carbon::now();
         }
 
+        Log::info('[CRM_SYNC] Base variant payload prepared', [
+            'product_id' => $product->id,
+            'variant_id' => $variant?->id,
+            'payload' => $payload,
+        ]);
+
         if ($variant) {
             $variant->update($payload);
+
+            Log::info('[CRM_SYNC] Base variant updated', [
+                'product_id' => $product->id,
+                'variant_id' => $variant->id,
+            ]);
         } else {
             $variant = ProductVariant::create($payload);
+
+            Log::info('[CRM_SYNC] Base variant created', [
+                'product_id' => $product->id,
+                'variant_id' => $variant->id,
+            ]);
         }
 
         $disableOthers = [
@@ -325,10 +504,16 @@ dd($product->name );
             $disableOthers['synced_at'] = Carbon::now();
         }
 
-        ProductVariant::query()
+        $disabledCount = ProductVariant::query()
             ->where('product_id', $product->id)
             ->where('id', '!=', $variant->id)
             ->update($disableOthers);
+
+        Log::info('[CRM_SYNC] Other variants disabled for base product', [
+            'product_id' => $product->id,
+            'kept_variant_id' => $variant->id,
+            'disabled_count' => $disabledCount,
+        ]);
     }
 
     private function recalcProductSummary(Product $product, int $fallbackPrice = 0): void
@@ -345,6 +530,13 @@ dd($product->name );
         }
 
         $minPrice = $priceQuery->min('sell_price');
+
+        Log::info('[CRM_SYNC] Product summary calculated', [
+            'product_id' => $product->id,
+            'stock_sum' => $stock,
+            'min_price' => $minPrice,
+            'fallback_price' => $fallbackPrice,
+        ]);
 
         $product->update([
             'stock' => max(0, $stock),
@@ -468,7 +660,7 @@ dd($product->name );
         $currentSeq4 = (string) ($product->short_barcode ?? '');
 
         $codeIsValid = preg_match('/^\d{6}$/', $currentCode) === 1;
-        $seqIsValid  = preg_match('/^\d{4}$/', $currentSeq4) === 1;
+        $seqIsValid = preg_match('/^\d{4}$/', $currentSeq4) === 1;
 
         if (!$codeIsValid && $seqIsValid) {
             $product->code = $cat2 . $currentSeq4;
@@ -517,7 +709,7 @@ dd($product->name );
 
     private function buildVariantCode11(string $productCode6, string $model3, string $design2, ?int $ignoreId = null): string
     {
-        $model3  = $this->normalizeModel3($model3);
+        $model3 = $this->normalizeModel3($model3);
         $design2 = preg_match('/^\d{2}$/', $design2) ? $design2 : '00';
 
         $code = $productCode6 . $model3 . $design2;
@@ -528,6 +720,11 @@ dd($product->name );
             ->exists();
 
         if ($exists) {
+            Log::error('[CRM_SYNC] Duplicate variant code detected', [
+                'variant_code' => $code,
+                'ignore_id' => $ignoreId,
+            ]);
+
             throw new RuntimeException("کد تنوع تکراری است: {$code}");
         }
 
