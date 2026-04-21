@@ -27,12 +27,18 @@
       <div class="text-muted small">لیست فاکتورهای ثبت نهایی</div>
     </div>
 
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
+      <form class="d-flex gap-2" method="GET" action="{{ route('invoices.index') }}">
+        <input type="date" class="form-control" name="date" value="{{ $dateInput ?? now()->toDateString() }}">
+        <input type="hidden" name="q" value="{{ $q }}">
+        <button class="btn btn-outline-success" type="submit" name="export" value="daily_csv">خروجی روزانه اکسل (CSV)</button>
+      </form>
       <a class="btn btn-outline-secondary" href="{{ route('vouchers.index', ['voucher_type' => 'sale']) }}">حواله فروش کالا</a>
       <form class="d-flex gap-2" method="GET" action="{{ route('invoices.index') }}">
-      <input class="form-control" name="q" value="{{ $q }}" placeholder="جستجو کد/نام/موبایل">
-      <button class="btn btn-primary">جستجو</button>
-    </form>
+        <input type="date" class="form-control" name="date" value="{{ $dateInput ?? now()->toDateString() }}">
+        <input class="form-control" name="q" value="{{ $q }}" placeholder="جستجو کد/نام/موبایل">
+        <button class="btn btn-primary">جستجو</button>
+      </form>
     </div>
   </div>
 

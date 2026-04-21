@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use App\Services\SalesHavalehStatusService;
 use App\Services\SalesHavalehService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends Controller
 {
@@ -18,8 +20,11 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $dateInput = trim((string) $request->query('date', ''));
+        $reportDate = $this->resolveReportDate($dateInput);
 
-        $invoices = Invoice::query()
+        $baseQuery = Invoice::query()
+            ->with(['payments.cheque'])
             ->withSum('payments as paid_total', 'amount')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
@@ -27,14 +32,24 @@ class InvoiceController extends Controller
                         ->orWhere('customer_name', 'like', "%{$q}%")
                         ->orWhere('customer_mobile', 'like', "%{$q}%");
                 });
-            })
+            });
+
+        if ($reportDate) {
+            $baseQuery->whereDate('created_at', $reportDate->toDateString());
+        }
+
+        if ($request->input('export') === 'daily_csv' && $reportDate) {
+            return $this->exportDailyCustomerFinanceCsv((clone $baseQuery)->orderBy('id')->get(), $reportDate);
+        }
+
+        $invoices = $baseQuery
             ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();
 
         $statusLabels = $this->statusService->labels();
 
-        return view('invoices.index', compact('invoices', 'q', 'statusLabels'));
+        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput'));
     }
 
     public function salesVouchers(Request $request)
@@ -237,5 +252,112 @@ class InvoiceController extends Controller
         $this->salesHavalehService->changeStatus($invoice, $data['status'], $data['note'] ?? null, auth()->id());
 
         return back()->with('success', '✅ وضعیت بروزرسانی شد.');
+    }
+
+    private function resolveReportDate(string $dateInput): ?Carbon
+    {
+        if ($dateInput === '') {
+            return now();
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', $dateInput)->startOfDay();
+        } catch (\Throwable) {
+            return now();
+        }
+    }
+
+    private function exportDailyCustomerFinanceCsv($invoices, Carbon $reportDate): StreamedResponse
+    {
+        $filename = 'daily-customer-finance-' . $reportDate->format('Ymd') . '.csv';
+
+        return response()->streamDownload(function () use ($invoices, $reportDate) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'report_date',
+                'customer_name',
+                'customer_mobile',
+                'invoice_number',
+                'invoice_date',
+                'row_type',
+                'amount',
+                'payment_method',
+                'payment_date',
+                'payment_bank_name',
+                'payment_identifier',
+                'cheque_number',
+                'cheque_due_date',
+                'cheque_received_at',
+                'cheque_bank_name',
+                'cheque_branch_name',
+                'cheque_account_number',
+                'cheque_account_holder',
+                'cheque_customer_name',
+                'cheque_customer_code',
+                'cheque_status',
+                'note',
+            ]);
+
+            foreach ($invoices as $invoice) {
+                fputcsv($handle, [
+                    $reportDate->toDateString(),
+                    $invoice->customer_name ?? '',
+                    $invoice->customer_mobile ?? '',
+                    $invoice->uuid,
+                    optional($invoice->created_at)->format('Y-m-d'),
+                    'invoice',
+                    (int) $invoice->total,
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                ]);
+
+                foreach ($invoice->payments as $payment) {
+                    $cheque = $payment->cheque;
+                    fputcsv($handle, [
+                        $reportDate->toDateString(),
+                        $invoice->customer_name ?? '',
+                        $invoice->customer_mobile ?? '',
+                        $invoice->uuid,
+                        optional($invoice->created_at)->format('Y-m-d'),
+                        'payment',
+                        (int) $payment->amount,
+                        $payment->method,
+                        $payment->paid_at,
+                        $payment->bank_name ?? '',
+                        $payment->payment_identifier ?? '',
+                        $cheque?->cheque_number ?? '',
+                        $cheque?->due_date ?? '',
+                        $cheque?->received_at ?? '',
+                        $cheque?->bank_name ?? '',
+                        $cheque?->branch_name ?? '',
+                        $cheque?->account_number ?? '',
+                        $cheque?->account_holder ?? '',
+                        $cheque?->customer_name ?? '',
+                        $cheque?->customer_code ?? '',
+                        $cheque?->status ?? '',
+                        $payment->note ?? '',
+                    ]);
+                }
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 }
