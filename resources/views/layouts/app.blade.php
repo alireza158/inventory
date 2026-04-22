@@ -7,28 +7,25 @@
 
     <title>@yield('title', config('app.name', 'سیستم انبار آریا جانبی'))</title>
     @yield('meta')
-    <script src="{{ asset('lib/jquery.min.js') }}"></script>
 
-    <!-- اگر select2 داری -->
+    <script src="{{ asset('lib/jquery-3.7.1.js') }}"></script>
     <script src="{{ asset('lib/select2.min.js') }}"></script>
-
-    <!-- Jalali Datepicker -->
-    <link rel="stylesheet" href="{{ asset('lib/jalalidatepicker.min.css') }}">
+    <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ asset('lib/jalalidatepicker.min.js') }}"></script>
 
-    <!-- Bootstrap (اختیاری، فقط اگر نیاز داری) -->
-    <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
-
+    <link rel="stylesheet" href="{{ asset('lib/bootstrap.rtl.min.css') }}"/>
+    <link rel="stylesheet" href="{{ asset('lib/select2.min.css') }}"/>
+    <link rel="stylesheet" href="{{ asset('lib/jalalidatepicker.min.css') }}">
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}"/>
-     <link rel="stylesheet" href="{{ asset('lib/bootstrap.rtl.min.css') }}"/>
- <link rel="stylesheet" href="{{ asset('lib/select2.min.css') }}"/>
- <script src="{{ asset('lib/jquery-3.7.1.js') }}"></script>
+    <link rel="stylesheet" href="{{ asset('css/instrument-sans.css') }}">
+
+    <style>
+        body, button, input, select, textarea {
+  font-family: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif !important;
+        }
+    </style>
 </head>
-<style>
-    body, button, input, select, textarea {
-      font-family: "Vazirmatn", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif !important;
-    }
-  </style>
+
 <style>
   /* Topbar روی موبایل ثابت/چسبنده */
   .app-topbar{
