@@ -20,7 +20,10 @@ class PreinvoiceApiController extends Controller
         $products = Product::query()
             ->select(['id', 'name', 'sku', 'short_barcode', 'code', 'price'])
             ->where('is_sellable', true)
-            ->whereHas('variants', fn ($q) => $q->active())
+            ->whereHas('variants', fn ($q) => $q->active()->where('stock', '>', 0))
+            ->whereHas('warehouseStocks', function ($q) use ($centralWarehouseId) {
+                $q->where('warehouse_id', $centralWarehouseId)->where('quantity', '>', 0);
+            })
             ->when($q !== '', function ($query) use ($q, $qDigits) {
 
                 // ✅ اگر عدد وارد شد و طولش <= 4 یعنی PPPP
@@ -83,9 +86,9 @@ class PreinvoiceApiController extends Controller
     public function product(Product $product)
     {
         abort_unless((bool) $product->is_sellable, 404);
-        abort_unless($product->variants()->active()->exists(), 404);
+        abort_unless($product->variants()->active()->where('stock', '>', 0)->exists(), 404);
 
-        $product->load(['variants' => fn ($q) => $q->active()->orderBy('variant_name')]);
+        $product->load(['variants' => fn ($q) => $q->active()->where('stock', '>', 0)->with('modelList')->orderBy('variant_name')]);
 
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
         $centralStock = (int) WarehouseStock::query()
@@ -109,6 +112,10 @@ class PreinvoiceApiController extends Controller
                 'id' => $v->id,
                 'price' => (int) ($v->sell_price ?? 0),
                 'quantity' => (int) ($v->stock ?? 0),
+                'variant_name' => (string) ($v->variant_name ?? ''),
+                'variety_name' => (string) ($v->variety_name ?? ''),
+                'variety_code' => (string) ($v->variety_code ?? ''),
+                'model_list_name' => (string) ($v->modelList?->model_name ?? ''),
 
                 // ✅ بارکد 11 رقمی تنوع (برای اسکن/نمایش آینده)
                 'barcode' => $v->variant_code,
