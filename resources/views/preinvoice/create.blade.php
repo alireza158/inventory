@@ -940,6 +940,7 @@ function addProductBlock(prefill) {
     container.appendChild(block);
 
     const productSelect = block.querySelector('.product-select');
+    let productChangeToken = 0;
     initProductSelect2(productSelect);
 
     block.querySelectorAll('.remove-block-btn').forEach(function (btn) {
@@ -967,6 +968,7 @@ function addProductBlock(prefill) {
     });
 
     productSelect.addEventListener('change', async function () {
+        const token = ++productChangeToken;
         const pid = productSelect.value || '';
         const list = block.querySelector('.varieties-list-container');
 
@@ -980,6 +982,9 @@ function addProductBlock(prefill) {
         }
 
         const product = await getProductDetails(pid);
+        if (token !== productChangeToken) return;
+
+        list.innerHTML = '';
         const name = productTitle(product) || '—';
         const code = product && product.code ? product.code : '—';
 
@@ -1031,6 +1036,17 @@ async function addVarietyRow(block, productId, prefillRow) {
                 '<label class="compact-label">مدل‌لیست</label>' +
                 '<select class="form-select form-select-sm model-select" required>' +
                     '<option value="">در حال بارگذاری...</option>' +
+                '</select>' +
+                '<div class="mt-1 d-flex gap-2 flex-wrap">' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">مدل‌لیست: <span class="selected-model-label">—</span></span>' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">طرح‌بندی: <span class="selected-design-label">—</span></span>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="col-md-3">' +
+                '<label class="compact-label">طرح‌بندی</label>' +
+                '<select class="form-select form-select-sm design-select" required disabled>' +
+                    '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>' +
                 '</select>' +
                 '<div class="mt-1 d-flex gap-2 flex-wrap">' +
                     '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">مدل‌لیست: <span class="selected-model-label">—</span></span>' +

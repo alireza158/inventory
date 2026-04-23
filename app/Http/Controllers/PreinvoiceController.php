@@ -224,7 +224,7 @@ class PreinvoiceController extends Controller
             $this->syncItems($order, $validated['products']);
         });
 
-        return redirect()->route('preinvoice.warehouse.index')
+        return redirect()->route('preinvoice.create')
             ->with('success', '✅ پیش‌فاکتور ثبت و برای تایید انبار ارسال شد.');
     }
 
