@@ -561,6 +561,7 @@ class PreinvoiceController extends Controller
 
     private function canHandleWarehouseActions(): bool
     {
+        return true;
         $user = auth()->user();
         if (!$user) {
             return false;
