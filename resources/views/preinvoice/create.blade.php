@@ -30,7 +30,10 @@
         background: linear-gradient(180deg, #f6f8fc 0%, #eef2f9 100%);
         font-size: 14px;
     }
-    .page-shell { max-width: 1140px; }
+
+    .page-shell {
+        max-width: 1140px;
+    }
 
     .card-soft {
         background: #fff;
@@ -78,7 +81,9 @@
         letter-spacing: 1px;
     }
 
-    .fs-7 { font-size: .82rem; }
+    .fs-7 {
+        font-size: .82rem;
+    }
 
     .compact-label {
         font-size: .82rem;
@@ -222,6 +227,64 @@
     .select2-container .select2-selection--single .select2-selection__arrow {
         height: 36px !important;
     }
+
+    .qty-box {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .qty-btn {
+        width: 36px;
+        height: 36px;
+        border: 1px solid #dbe3ef;
+        background: #fff;
+        border-radius: 10px;
+        font-size: 18px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all .15s ease;
+        flex: 0 0 36px;
+        user-select: none;
+    }
+
+    .qty-btn:hover {
+        background: #f8fafc;
+        transform: translateY(-1px);
+    }
+
+    .qty-btn:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .qty-box .quantity-input {
+        text-align: center;
+        min-width: 0;
+    }
+
+    .qty-box .quantity-input::-webkit-outer-spin-button,
+    .qty-box .quantity-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .qty-box .quantity-input[type=number] {
+        -moz-appearance: textfield;
+    }
+
+    @media (max-width: 767.98px) {
+        .qty-btn {
+            width: 40px;
+            height: 40px;
+            flex-basis: 40px;
+            font-size: 20px;
+        }
+    }
 </style>
 
 <div class="container page-shell py-3">
@@ -258,7 +321,6 @@
     <form action="{{ route('preinvoice.draft.save') }}" method="POST" id="orderForm">
         @csrf
 
-        {{-- Customer --}}
         <div class="card-soft p-3 mb-3">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                 <div>
@@ -284,19 +346,30 @@
 
                 <div class="col-md-6">
                     <label class="compact-label">نام مشتری</label>
-                    <input type="text" name="customer_name" id="customer_name" class="form-control form-control-sm"
-                           value="{{ old('customer_name') }}" required>
+                    <input
+                        type="text"
+                        name="customer_name"
+                        id="customer_name"
+                        class="form-control form-control-sm"
+                        value="{{ old('customer_name') }}"
+                        required
+                    >
                 </div>
 
                 <div class="col-md-6">
                     <label class="compact-label">شماره موبایل</label>
-                    <input type="text" name="customer_mobile" id="customer_mobile" class="form-control form-control-sm"
-                           value="{{ old('customer_mobile') }}" required>
+                    <input
+                        type="text"
+                        name="customer_mobile"
+                        id="customer_mobile"
+                        class="form-control form-control-sm"
+                        value="{{ old('customer_mobile') }}"
+                        required
+                    >
                 </div>
             </div>
         </div>
 
-        {{-- Shipping --}}
         <div class="card-soft p-3 mb-3">
             <div class="section-title mb-2">🚚 ارسال و مقصد</div>
 
@@ -340,7 +413,6 @@
             </div>
         </div>
 
-        {{-- Products --}}
         <div class="card-soft mb-3">
             <div class="p-3 border-bottom">
                 <div class="section-title mb-1">🛍️ محصولات</div>
@@ -356,25 +428,41 @@
             </div>
         </div>
 
-        {{-- Summary --}}
         <div class="card-soft p-3 mb-3">
             <div class="section-title mb-2">💳 جمع‌بندی</div>
 
             <div class="row g-2">
                 <div class="col-md-4">
                     <label class="compact-label">تخفیف (تومان)</label>
-                    <input type="number" name="discount_amount" id="discount" class="form-control form-control-sm summary-input"
-                           value="{{ old('discount_amount', 0) }}">
+                    <input
+                        type="number"
+                        name="discount_amount"
+                        id="discount"
+                        class="form-control form-control-sm summary-input"
+                        value="{{ old('discount_amount', 0) }}"
+                    >
                 </div>
 
                 <div class="col-md-4">
                     <label class="compact-label">هزینه ارسال</label>
-                    <input type="text" id="shipping_price_view" class="form-control form-control-sm summary-input" readonly value="0 تومان">
+                    <input
+                        type="text"
+                        id="shipping_price_view"
+                        class="form-control form-control-sm summary-input"
+                        readonly
+                        value="0 تومان"
+                    >
                 </div>
 
                 <div class="col-md-4">
                     <label class="compact-label">جمع کل (تومان)</label>
-                    <input type="text" name="total_price" id="total_price" class="form-control form-control-sm fw-bold summary-input" readonly>
+                    <input
+                        type="text"
+                        name="total_price"
+                        id="total_price"
+                        class="form-control form-control-sm fw-bold summary-input"
+                        readonly
+                    >
                 </div>
             </div>
 
@@ -737,9 +825,13 @@ function setStockUI(row, stockQty) {
         qtyInput.min = '1';
         qtyInput.max = String(qty);
 
-        const cur = parseInt(qtyInput.value || '0', 10);
-        if (cur < 1) qtyInput.value = '1';
-        if (cur > qty) qtyInput.value = String(qty);
+        const cur = parseInt(String(qtyInput.value || '').trim(), 10);
+        if (Number.isFinite(cur)) {
+            if (cur < 1) qtyInput.value = '1';
+            if (cur > qty) qtyInput.value = String(qty);
+        } else if (String(qtyInput.value || '').trim() !== '') {
+            qtyInput.value = '1';
+        }
 
         badge.className = 'badge bg-success stock-badge';
         badge.textContent = 'موجودی: ' + qty;
@@ -752,17 +844,73 @@ function setStockUI(row, stockQty) {
         badge.className = 'badge bg-danger stock-badge';
         badge.textContent = 'ناموجود';
     }
+
+    refreshQtyButtons(row);
 }
 
-function clampQtyInput(input) {
+function clampQtyInput(input, allowEmpty = false) {
+    const raw = String(input.value || '').trim();
+
+    if (allowEmpty && raw === '') {
+        return;
+    }
+
     const min = parseInt(input.min || '0', 10) || 0;
     const max = parseInt(input.max || '0', 10) || 0;
-    let val = parseInt(input.value || '0', 10) || 0;
+    let val = parseInt(raw, 10);
+
+    if (!Number.isFinite(val)) val = min;
 
     if (max > 0 && val > max) val = max;
     if (val < min) val = min;
 
     input.value = String(val);
+}
+
+function changeQty(input, delta) {
+    if (!input || input.disabled) return;
+
+    const min = parseInt(input.min || '0', 10) || 0;
+    const max = parseInt(input.max || '0', 10) || 0;
+    const raw = String(input.value || '').trim();
+    let current = parseInt(raw, 10);
+
+    if (!Number.isFinite(current)) {
+        current = min > 0 ? min : 0;
+    }
+
+    current += delta;
+
+    if (max > 0 && current > max) current = max;
+    if (current < min) current = min;
+
+    input.value = String(current);
+    refreshQtyButtons(input.closest('.variety-row'));
+    updateTotal();
+}
+
+function refreshQtyButtons(row) {
+    if (!row) return;
+
+    const input = row.querySelector('.quantity-input');
+    const minusBtn = row.querySelector('.qty-minus');
+    const plusBtn = row.querySelector('.qty-plus');
+
+    if (!input || !minusBtn || !plusBtn) return;
+
+    const min = parseInt(input.min || '0', 10) || 0;
+    const max = parseInt(input.max || '0', 10) || 0;
+    const raw = String(input.value || '').trim();
+    const val = parseInt(raw, 10);
+
+    if (input.disabled) {
+        minusBtn.disabled = true;
+        plusBtn.disabled = true;
+        return;
+    }
+
+    minusBtn.disabled = Number.isFinite(val) ? val <= min : false;
+    plusBtn.disabled = (max > 0 && Number.isFinite(val)) ? val >= max : false;
 }
 
 function updateBlockSummary(block) {
@@ -777,7 +925,8 @@ function updateBlockSummary(block) {
 
     rows.forEach(function (row) {
         const price = parseFloat(row.querySelector('.price-raw') ? row.querySelector('.price-raw').value : 0) || 0;
-        const quantity = parseInt(row.querySelector('.quantity-input') ? row.querySelector('.quantity-input').value : 0, 10) || 0;
+        const rawQty = row.querySelector('.quantity-input') ? row.querySelector('.quantity-input').value : 0;
+        const quantity = parseInt(String(rawQty || '').trim(), 10) || 0;
         subtotal += price * quantity;
     });
 
@@ -800,8 +949,10 @@ function updateTotal() {
 
     document.querySelectorAll('.variety-row').forEach(function (row) {
         const price = parseFloat(row.querySelector('.price-raw') ? row.querySelector('.price-raw').value : 0) || 0;
-        const quantity = parseInt(row.querySelector('.quantity-input') ? row.querySelector('.quantity-input').value : 0, 10) || 0;
+        const rawQty = row.querySelector('.quantity-input') ? row.querySelector('.quantity-input').value : 0;
+        const quantity = parseInt(String(rawQty || '').trim(), 10) || 0;
         total += price * quantity;
+        refreshQtyButtons(row);
     });
 
     const finalTotal = Math.max(total + shipping - discount, 0);
@@ -1043,16 +1194,18 @@ async function addVarietyRow(block, productId, prefillRow) {
                 '<select class="form-select form-select-sm design-select" required disabled>' +
                     '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>' +
                 '</select>' +
-              
             '</div>' +
 
-           
             '<div class="col-md-2">' +
                 '<label class="compact-label">تعداد</label>' +
-                '<input type="number" name="products[' + idx + '][quantity]" class="form-control form-control-sm quantity-input" min="1" value="1" required>' +
+                '<div class="qty-box">' +
+                    '<button type="button" class="qty-btn qty-plus" title="افزایش">+</button>' +
+                    '<input type="number" name="products[' + idx + '][quantity]" class="form-control form-control-sm quantity-input" min="1" value="1" inputmode="numeric" required>' +
+                    '<button type="button" class="qty-btn qty-minus" title="کاهش">−</button>' +
+                '</div>' +
             '</div>' +
 
-            '<div class="col-md-4">' +
+            '<div class="col-md-3">' +
                 '<label class="compact-label">قیمت واحد</label>' +
                 '<input type="text" class="form-control form-control-sm price-view" readonly>' +
                 '<input type="hidden" name="products[' + idx + '][price]" class="price-raw" value="0">' +
@@ -1079,6 +1232,8 @@ async function addVarietyRow(block, productId, prefillRow) {
     const codeBadge = row.querySelector('.code11-badge');
     const modelLabelEl = row.querySelector('.selected-model-label');
     const designLabelEl = row.querySelector('.selected-design-label');
+    const plusBtn = row.querySelector('.qty-plus');
+    const minusBtn = row.querySelector('.qty-minus');
 
     row.querySelector('.remove-variety-btn').addEventListener('click', function () {
         if (list.children.length <= 1) {
@@ -1089,9 +1244,39 @@ async function addVarietyRow(block, productId, prefillRow) {
         updateTotal();
     });
 
+    plusBtn.addEventListener('click', function () {
+        changeQty(qtyInput, 1);
+    });
+
+    minusBtn.addEventListener('click', function () {
+        changeQty(qtyInput, -1);
+    });
+
     qtyInput.addEventListener('input', function () {
-        clampQtyInput(qtyInput);
+        const raw = String(qtyInput.value || '');
+
+        if (raw !== '' && !/^\d+$/.test(raw)) {
+            qtyInput.value = raw.replace(/[^\d]/g, '');
+        }
+
+        refreshQtyButtons(row);
         updateTotal();
+    });
+
+    qtyInput.addEventListener('blur', function () {
+        clampQtyInput(qtyInput, false);
+        refreshQtyButtons(row);
+        updateTotal();
+    });
+
+    qtyInput.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            changeQty(qtyInput, 1);
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            changeQty(qtyInput, -1);
+        }
     });
 
     const product = await getProductDetails(productId);
@@ -1138,7 +1323,9 @@ async function addVarietyRow(block, productId, prefillRow) {
     });
 
     if (prefillRow) {
-        if (prefillRow.quantity) qtyInput.value = String(prefillRow.quantity);
+        if (prefillRow.quantity !== undefined && prefillRow.quantity !== null) {
+            qtyInput.value = String(prefillRow.quantity);
+        }
     }
 
     function applySelectedVariety(v) {
@@ -1150,6 +1337,7 @@ async function addVarietyRow(block, productId, prefillRow) {
             codeBadge.textContent = '—';
             modelLabelEl.textContent = '—';
             designLabelEl.textContent = '—';
+            refreshQtyButtons(row);
             updateTotal();
             return;
         }
@@ -1166,13 +1354,14 @@ async function addVarietyRow(block, productId, prefillRow) {
         modelLabelEl.textContent = varietyModelLabel(v);
         designLabelEl.textContent = varietyDesignLabel(v);
 
-        clampQtyInput(qtyInput);
+        clampQtyInput(qtyInput, false);
 
         if (prefillRow && prefillRow.price !== undefined && prefillRow.price !== null) {
             priceRaw.value = String(prefillRow.price);
             priceView.value = formatPrice(prefillRow.price) + ' تومان';
         }
 
+        refreshQtyButtons(row);
         updateTotal();
     }
 
@@ -1230,6 +1419,8 @@ async function addVarietyRow(block, productId, prefillRow) {
             applySelectedVariety(null);
         }
     }
+
+    refreshQtyButtons(row);
 }
 
 function initFromOldOrEdit() {
@@ -1301,7 +1492,13 @@ function initFromOldOrEdit() {
             });
 
             document.querySelectorAll('.quantity-input').forEach(function (el) {
-                el.value = String(toInt(el.value));
+                const raw = String(el.value || '').trim();
+                if (raw === '') {
+                    const min = parseInt(el.min || '0', 10) || 0;
+                    el.value = String(min > 0 ? min : 0);
+                } else {
+                    el.value = String(toInt(el.value));
+                }
             });
         }, { capture: true });
     });
