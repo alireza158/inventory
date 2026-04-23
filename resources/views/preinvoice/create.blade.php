@@ -1032,6 +1032,10 @@ async function addVarietyRow(block, productId, prefillRow) {
                 '<select class="form-select form-select-sm model-select" required>' +
                     '<option value="">در حال بارگذاری...</option>' +
                 '</select>' +
+                '<div class="mt-1 d-flex gap-2 flex-wrap">' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">مدل‌لیست: <span class="selected-model-label">—</span></span>' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">طرح‌بندی: <span class="selected-design-label">—</span></span>' +
+                '</div>' +
             '</div>' +
 
             '<div class="col-md-3">' +
