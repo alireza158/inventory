@@ -691,30 +691,25 @@ function productTitle(product) {
     return normalizeText(product && (product.title || product.name || ''));
 }
 
-function buildVarietyLabel(v) {
-    if (!v) return '—';
-
-    if (normalizeText(v.variant_name)) return normalizeText(v.variant_name);
-    if (normalizeText(v.variety_name)) return normalizeText(v.variety_name);
-
-    const attrs = (v && v.attributes) ? v.attributes : [];
-    if (Array.isArray(attrs) && attrs.length) {
-        const joined = attrs.map(function (a) {
-            return (a && a.pivot ? a.pivot.value : '');
-        }).join(' ').trim();
-        if (joined) return joined;
-    }
-
-    if (normalizeText(v.unique_attributes_key)) return normalizeText(v.unique_attributes_key);
-
-    return 'تنوع #' + (v.id || '');
-}
-
 function getProductVarieties(product) {
     if (!product) return [];
     if (Array.isArray(product.varieties)) return product.varieties;
     if (Array.isArray(product.variants)) return product.variants;
     return [];
+}
+
+function varietyModelLabel(v) {
+    return normalizeText(v && v.model_list_name) || '—';
+}
+
+function varietyDesignLabel(v) {
+    const designName = normalizeText(v && v.variety_name);
+    const designCode = normalizeText(v && v.variety_code);
+
+    if (designName && designCode) return designName + ' (' + designCode + ')';
+    if (designName) return designName;
+    if (designCode) return designCode;
+    return normalizeText(v && v.variant_name) || '—';
 }
 
 function productStockValue(product) {
@@ -821,10 +816,8 @@ function collapseBlock(block) {
     }
 
     const hasValidRow = Array.from(block.querySelectorAll('.variety-row')).some(function (row) {
-        const varietyEl = row.querySelector('.variety-select');
-        if (!varietyEl) return false;
-        if (varietyEl.disabled) return true;
-        return !!varietyEl.value;
+        const varietyEl = row.querySelector('.selected-variety-id');
+        return !!(varietyEl && varietyEl.value);
     });
 
     if (!hasValidRow) {
@@ -947,6 +940,7 @@ function addProductBlock(prefill) {
     container.appendChild(block);
 
     const productSelect = block.querySelector('.product-select');
+    let productChangeToken = 0;
     initProductSelect2(productSelect);
 
     block.querySelectorAll('.remove-block-btn').forEach(function (btn) {
@@ -974,6 +968,7 @@ function addProductBlock(prefill) {
     });
 
     productSelect.addEventListener('change', async function () {
+        const token = ++productChangeToken;
         const pid = productSelect.value || '';
         const list = block.querySelector('.varieties-list-container');
 
@@ -987,6 +982,9 @@ function addProductBlock(prefill) {
         }
 
         const product = await getProductDetails(pid);
+        if (token !== productChangeToken) return;
+
+        list.innerHTML = '';
         const name = productTitle(product) || '—';
         const code = product && product.code ? product.code : '—';
 
@@ -1032,12 +1030,24 @@ async function addVarietyRow(block, productId, prefillRow) {
     const row = createEl(
         '<div class="variety-row row g-2 align-items-end">' +
             '<input type="hidden" name="products[' + idx + '][id]" class="hidden-product-id" value="' + String(productId) + '">' +
+            '<input type="hidden" name="products[' + idx + '][variety_id]" class="selected-variety-id" value="">' +
 
-            '<div class="col-md-5">' +
-                '<label class="compact-label">تنوع / مدل / طرح</label>' +
-                '<select name="products[' + idx + '][variety_id]" class="form-select form-select-sm variety-select" required>' +
+            '<div class="col-md-3">' +
+                '<label class="compact-label">مدل‌لیست</label>' +
+                '<select class="form-select form-select-sm model-select" required>' +
                     '<option value="">در حال بارگذاری...</option>' +
                 '</select>' +
+            '</div>' +
+
+            '<div class="col-md-3">' +
+                '<label class="compact-label">طرح‌بندی</label>' +
+                '<select class="form-select form-select-sm design-select" required disabled>' +
+                    '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>' +
+                '</select>' +
+                '<div class="mt-1 d-flex gap-2 flex-wrap">' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">مدل‌لیست: <span class="selected-model-label">—</span></span>' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">طرح‌بندی: <span class="selected-design-label">—</span></span>' +
+                '</div>' +
             '</div>' +
 
             '<div class="col-md-2">' +
@@ -1063,11 +1073,15 @@ async function addVarietyRow(block, productId, prefillRow) {
 
     list.appendChild(row);
 
-    const varietySelect = row.querySelector('.variety-select');
+    const modelSelect = row.querySelector('.model-select');
+    const designSelect = row.querySelector('.design-select');
+    const varietyInput = row.querySelector('.selected-variety-id');
     const qtyInput = row.querySelector('.quantity-input');
     const priceRaw = row.querySelector('.price-raw');
     const priceView = row.querySelector('.price-view');
     const codeBadge = row.querySelector('.code11-badge');
+    const modelLabelEl = row.querySelector('.selected-model-label');
+    const designLabelEl = row.querySelector('.selected-design-label');
 
     row.querySelector('.remove-variety-btn').addEventListener('click', function () {
         if (list.children.length <= 1) {
@@ -1084,68 +1098,61 @@ async function addVarietyRow(block, productId, prefillRow) {
     });
 
     const product = await getProductDetails(productId);
-    const varieties = getProductVarieties(product);
+    const varieties = getProductVarieties(product).filter(function (v) {
+        return varietyStockValue(v) > 0;
+    });
 
-    varietySelect.innerHTML = '';
+    modelSelect.innerHTML = '<option value="">انتخاب مدل‌لیست...</option>';
+    designSelect.innerHTML = '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>';
+    designSelect.disabled = true;
 
     if (!varieties.length) {
-        const opt = document.createElement('option');
-        opt.value = '0';
-        opt.textContent = 'بدون تنوع';
-        varietySelect.appendChild(opt);
-        varietySelect.value = '0';
-        varietySelect.disabled = true;
+        modelSelect.innerHTML = '<option value="">مدل موجودی‌دار ندارد</option>';
+        modelSelect.disabled = true;
+        designSelect.innerHTML = '<option value="">طرح موجودی‌دار ندارد</option>';
 
-        const price = Number(product && product.price ? product.price : 0);
-        const stock = productStockValue(product);
-
-        if (prefillRow && prefillRow.quantity) qtyInput.value = String(prefillRow.quantity);
-
-        priceRaw.value = String(price);
-        priceView.value = formatPrice(price) + ' تومان';
-        setStockUI(row, stock);
-        codeBadge.textContent = (product && product.code ? String(product.code) : '—');
-        clampQtyInput(qtyInput);
+        qtyInput.value = '0';
+        qtyInput.disabled = true;
+        priceRaw.value = '0';
+        priceView.value = '';
+        varietyInput.value = '';
+        setStockUI(row, 0);
+        codeBadge.textContent = '—';
+        modelLabelEl.textContent = '—';
+        designLabelEl.textContent = '—';
         updateTotal();
         return;
     }
 
-    const opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = 'انتخاب تنوع...';
-    varietySelect.appendChild(opt0);
-
+    const modelGroups = new Map();
     varieties.forEach(function (v) {
+        const key = varietyModelLabel(v);
+        if (!modelGroups.has(key)) modelGroups.set(key, []);
+        modelGroups.get(key).push(v);
+    });
+
+    Array.from(modelGroups.keys()).sort(function (a, b) {
+        return a.localeCompare(b, 'fa');
+    }).forEach(function (modelName) {
         const opt = document.createElement('option');
-        opt.value = String(v.id);
-        opt.textContent = buildVarietyLabel(v);
-        varietySelect.appendChild(opt);
+        opt.value = modelName;
+        opt.textContent = modelName;
+        modelSelect.appendChild(opt);
     });
 
     if (prefillRow) {
         if (prefillRow.quantity) qtyInput.value = String(prefillRow.quantity);
-        if (prefillRow.variety_id !== undefined && prefillRow.variety_id !== null) {
-            varietySelect.value = String(prefillRow.variety_id);
-        }
     }
 
-    function applySelectedVariety() {
-        const vid = parseInt(varietySelect.value || 0, 10);
-
-        if (!vid) {
+    function applySelectedVariety(v) {
+        if (!v) {
+            varietyInput.value = '';
             priceRaw.value = '0';
             priceView.value = '';
             setStockUI(row, 0);
             codeBadge.textContent = '—';
-            updateTotal();
-            return;
-        }
-
-        const v = varieties.find(function (x) {
-            return Number(x.id) === Number(vid);
-        });
-
-        if (!v) {
+            modelLabelEl.textContent = '—';
+            designLabelEl.textContent = '—';
             updateTotal();
             return;
         }
@@ -1154,10 +1161,13 @@ async function addVarietyRow(block, productId, prefillRow) {
         const stock = varietyStockValue(v);
         const code11 = (v.variant_code || v.code || v.barcode || '');
 
+        varietyInput.value = String(v.id);
         priceRaw.value = String(price);
         priceView.value = formatPrice(price) + ' تومان';
         setStockUI(row, stock);
         codeBadge.textContent = code11 ? String(code11) : ('VID-' + String(v.id));
+        modelLabelEl.textContent = varietyModelLabel(v);
+        designLabelEl.textContent = varietyDesignLabel(v);
 
         clampQtyInput(qtyInput);
 
@@ -1169,8 +1179,60 @@ async function addVarietyRow(block, productId, prefillRow) {
         updateTotal();
     }
 
-    varietySelect.addEventListener('change', applySelectedVariety);
-    applySelectedVariety();
+    function fillDesignsByModel(modelName) {
+        const designs = modelGroups.get(modelName) || [];
+        designSelect.innerHTML = '<option value="">انتخاب طرح‌بندی...</option>';
+        designSelect.disabled = designs.length === 0;
+
+        designs.forEach(function (v) {
+            const opt = document.createElement('option');
+            opt.value = String(v.id);
+            opt.textContent = varietyDesignLabel(v);
+            designSelect.appendChild(opt);
+        });
+    }
+
+    modelSelect.addEventListener('change', function () {
+        fillDesignsByModel(modelSelect.value);
+        applySelectedVariety(null);
+    });
+
+    designSelect.addEventListener('change', function () {
+        const vid = parseInt(designSelect.value || 0, 10);
+        const selected = varieties.find(function (v) {
+            return Number(v.id) === Number(vid);
+        }) || null;
+        applySelectedVariety(selected);
+    });
+
+    const prefillVariantId = parseInt(prefillRow && prefillRow.variety_id ? prefillRow.variety_id : 0, 10);
+    const prefillVariant = prefillVariantId
+        ? (varieties.find(function (v) { return Number(v.id) === Number(prefillVariantId); }) || null)
+        : null;
+
+    if (prefillVariant) {
+        const prefillModel = varietyModelLabel(prefillVariant);
+        modelSelect.value = prefillModel;
+        fillDesignsByModel(prefillModel);
+        designSelect.value = String(prefillVariant.id);
+        applySelectedVariety(prefillVariant);
+    } else {
+        modelSelect.value = modelSelect.options.length > 1 ? modelSelect.options[1].value : '';
+        if (modelSelect.value) {
+            fillDesignsByModel(modelSelect.value);
+            if (designSelect.options.length > 1) {
+                designSelect.value = designSelect.options[1].value;
+                const selected = varieties.find(function (v) {
+                    return Number(v.id) === Number(designSelect.value);
+                }) || null;
+                applySelectedVariety(selected);
+            } else {
+                applySelectedVariety(null);
+            }
+        } else {
+            applySelectedVariety(null);
+        }
+    }
 }
 
 function initFromOldOrEdit() {
