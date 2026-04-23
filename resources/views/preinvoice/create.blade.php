@@ -694,6 +694,18 @@ function productTitle(product) {
 function buildVarietyLabel(v) {
     if (!v) return '—';
 
+    const modelName = normalizeText(v.model_list_name);
+    const designName = normalizeText(v.variety_name);
+    const designCode = normalizeText(v.variety_code);
+
+    if (modelName || designName || designCode) {
+        const chunks = [];
+        if (modelName) chunks.push('مدل: ' + modelName);
+        if (designName) chunks.push('طرح: ' + designName);
+        if (designCode) chunks.push('کد طرح: ' + designCode);
+        return chunks.join(' | ');
+    }
+
     if (normalizeText(v.variant_name)) return normalizeText(v.variant_name);
     if (normalizeText(v.variety_name)) return normalizeText(v.variety_name);
 
@@ -715,6 +727,20 @@ function getProductVarieties(product) {
     if (Array.isArray(product.varieties)) return product.varieties;
     if (Array.isArray(product.variants)) return product.variants;
     return [];
+}
+
+function varietyModelLabel(v) {
+    return normalizeText(v && v.model_list_name) || '—';
+}
+
+function varietyDesignLabel(v) {
+    const designName = normalizeText(v && v.variety_name);
+    const designCode = normalizeText(v && v.variety_code);
+
+    if (designName && designCode) return designName + ' (' + designCode + ')';
+    if (designName) return designName;
+    if (designCode) return designCode;
+    return normalizeText(v && v.variant_name) || '—';
 }
 
 function productStockValue(product) {
@@ -1038,6 +1064,10 @@ async function addVarietyRow(block, productId, prefillRow) {
                 '<select name="products[' + idx + '][variety_id]" class="form-select form-select-sm variety-select" required>' +
                     '<option value="">در حال بارگذاری...</option>' +
                 '</select>' +
+                '<div class="mt-1 d-flex gap-2 flex-wrap">' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">مدل‌لیست: <span class="selected-model-label">—</span></span>' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">طرح‌بندی: <span class="selected-design-label">—</span></span>' +
+                '</div>' +
             '</div>' +
 
             '<div class="col-md-2">' +
@@ -1068,6 +1098,8 @@ async function addVarietyRow(block, productId, prefillRow) {
     const priceRaw = row.querySelector('.price-raw');
     const priceView = row.querySelector('.price-view');
     const codeBadge = row.querySelector('.code11-badge');
+    const modelLabelEl = row.querySelector('.selected-model-label');
+    const designLabelEl = row.querySelector('.selected-design-label');
 
     row.querySelector('.remove-variety-btn').addEventListener('click', function () {
         if (list.children.length <= 1) {
@@ -1105,6 +1137,8 @@ async function addVarietyRow(block, productId, prefillRow) {
         priceView.value = formatPrice(price) + ' تومان';
         setStockUI(row, stock);
         codeBadge.textContent = (product && product.code ? String(product.code) : '—');
+        modelLabelEl.textContent = '—';
+        designLabelEl.textContent = 'بدون طرح';
         clampQtyInput(qtyInput);
         updateTotal();
         return;
@@ -1137,6 +1171,8 @@ async function addVarietyRow(block, productId, prefillRow) {
             priceView.value = '';
             setStockUI(row, 0);
             codeBadge.textContent = '—';
+            modelLabelEl.textContent = '—';
+            designLabelEl.textContent = '—';
             updateTotal();
             return;
         }
@@ -1158,6 +1194,8 @@ async function addVarietyRow(block, productId, prefillRow) {
         priceView.value = formatPrice(price) + ' تومان';
         setStockUI(row, stock);
         codeBadge.textContent = code11 ? String(code11) : ('VID-' + String(v.id));
+        modelLabelEl.textContent = varietyModelLabel(v);
+        designLabelEl.textContent = varietyDesignLabel(v);
 
         clampQtyInput(qtyInput);
 

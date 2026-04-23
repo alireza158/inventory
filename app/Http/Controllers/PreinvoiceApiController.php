@@ -85,7 +85,7 @@ class PreinvoiceApiController extends Controller
         abort_unless((bool) $product->is_sellable, 404);
         abort_unless($product->variants()->active()->exists(), 404);
 
-        $product->load(['variants' => fn ($q) => $q->active()->orderBy('variant_name')]);
+        $product->load(['variants' => fn ($q) => $q->active()->with('modelList')->orderBy('variant_name')]);
 
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
         $centralStock = (int) WarehouseStock::query()
@@ -109,6 +109,10 @@ class PreinvoiceApiController extends Controller
                 'id' => $v->id,
                 'price' => (int) ($v->sell_price ?? 0),
                 'quantity' => (int) ($v->stock ?? 0),
+                'variant_name' => (string) ($v->variant_name ?? ''),
+                'variety_name' => (string) ($v->variety_name ?? ''),
+                'variety_code' => (string) ($v->variety_code ?? ''),
+                'model_list_name' => (string) ($v->modelList?->model_name ?? ''),
 
                 // ✅ بارکد 11 رقمی تنوع (برای اسکن/نمایش آینده)
                 'barcode' => $v->variant_code,
