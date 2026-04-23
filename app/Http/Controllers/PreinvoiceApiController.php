@@ -21,9 +21,6 @@ class PreinvoiceApiController extends Controller
             ->select(['id', 'name', 'sku', 'short_barcode', 'code', 'price'])
             ->where('is_sellable', true)
             ->whereHas('variants', fn ($q) => $q->active()->where('stock', '>', 0))
-            ->whereHas('warehouseStocks', function ($q) use ($centralWarehouseId) {
-                $q->where('warehouse_id', $centralWarehouseId)->where('quantity', '>', 0);
-            })
             ->when($q !== '', function ($query) use ($q, $qDigits) {
 
                 // ✅ اگر عدد وارد شد و طولش <= 4 یعنی PPPP

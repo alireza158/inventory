@@ -1049,6 +1049,17 @@ async function addVarietyRow(block, productId, prefillRow) {
                 '</div>' +
             '</div>' +
 
+            '<div class="col-md-3">' +
+                '<label class="compact-label">طرح‌بندی</label>' +
+                '<select class="form-select form-select-sm design-select" required disabled>' +
+                    '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>' +
+                '</select>' +
+                '<div class="mt-1 d-flex gap-2 flex-wrap">' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">مدل‌لیست: <span class="selected-model-label">—</span></span>' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">طرح‌بندی: <span class="selected-design-label">—</span></span>' +
+                '</div>' +
+            '</div>' +
+
             '<div class="col-md-2">' +
                 '<label class="compact-label">تعداد</label>' +
                 '<input type="number" name="products[' + idx + '][quantity]" class="form-control form-control-sm quantity-input" min="1" value="1" required>' +
