@@ -277,6 +277,22 @@
         -moz-appearance: textfield;
     }
 
+    .quick-add-card {
+        border: 1px dashed rgba(13,110,253,.25);
+        background: linear-gradient(180deg, rgba(13,110,253,.04), #fff);
+        border-radius: 14px;
+    }
+
+    .quick-add-table th,
+    .quick-add-table td {
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .quick-jump-btn {
+        min-width: 44px;
+    }
+
     @media (max-width: 767.98px) {
         .qty-btn {
             width: 40px;
@@ -413,6 +429,65 @@
             </div>
         </div>
 
+        <div class="card-soft p-3 mb-3 quick-add-card">
+            <div class="section-title mb-1">⚡ ثبت سریع کالا</div>
+            <div class="hint mb-2">با کد ۴ رقمی محصول مادر یا بارکد/پارت‌نامبر، کالا را سریع به سبد اضافه کنید.</div>
+
+            <div class="row g-2 align-items-end">
+                <div class="col-lg-7">
+                    <label class="compact-label">جستجوی سریع</label>
+                    <input type="text" class="form-control" id="quickAddInput" placeholder="کد ۴ رقمی، بارکد یا پارت‌نامبر را وارد کنید..." autocomplete="off">
+                </div>
+                <div class="col-lg-3">
+                    <button type="button" class="btn btn-primary w-100" id="quickAddSearchBtn">بررسی</button>
+                </div>
+                <div class="col-lg-2">
+                    <button type="button" class="btn btn-outline-secondary w-100" id="quickAddResetBtn">پاکسازی</button>
+                </div>
+            </div>
+
+            <div id="quickAddMessage" class="mt-2 small"></div>
+
+            <div id="quickParentState" class="mt-3 d-none">
+                <div class="mb-2">
+                    <span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">
+                        محصول مادر:
+                        <strong id="quickParentName">—</strong>
+                    </span>
+                </div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-lg-6">
+                        <label class="compact-label">مدل‌لیست</label>
+                        <select id="quickParentModelSelect" class="form-select">
+                            <option value="">انتخاب مدل‌لیست...</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-6">
+                        <button type="button" class="btn btn-outline-primary w-100" id="quickLoadVariantsBtn">نمایش تنوع‌ها</button>
+                    </div>
+                </div>
+
+                <div id="quickVariantsWrapper" class="table-responsive mt-3 d-none">
+                    <table class="table table-sm align-middle quick-add-table">
+                        <thead class="table-light">
+                        <tr>
+                            <th>پارت‌نامبر / بارکد</th>
+                            <th>طرح</th>
+                            <th>تنوع / رنگ</th>
+                            <th>موجودی قابل فروش</th>
+                            <th>قیمت</th>
+                            <th style="min-width: 170px;">تعداد</th>
+                            <th>افزایش سریع</th>
+                        </tr>
+                        </thead>
+                        <tbody id="quickVariantsBody"></tbody>
+                    </table>
+                </div>
+
+                <button type="button" id="quickAddSelectionsBtn" class="btn btn-success mt-2 d-none">افزودن انتخاب‌ها به سبد</button>
+            </div>
+        </div>
+
         <div class="card-soft mb-3">
             <div class="p-3 border-bottom">
                 <div class="section-title mb-1">🛍️ محصولات</div>
@@ -479,6 +554,9 @@
     const API = {
         products:  "{{ url('/preinvoice/api/products') }}",
         product:   "{{ url('/preinvoice/api/products') }}",
+        quickSearch: "{{ url('/preinvoice/api/quick-search') }}",
+        quickVariants: "{{ url('/preinvoice/api/quick-variants') }}",
+        quickAddItems: "{{ url('/preinvoice/api/quick-add-items') }}",
         area:      "{{ url('/preinvoice/api/area') }}",
         customers: "{{ url('/preinvoice/api/customers') }}",
         customer:  "{{ url('/preinvoice/api/customers') }}"
@@ -911,6 +989,198 @@ function refreshQtyButtons(row) {
 
     minusBtn.disabled = Number.isFinite(val) ? val <= min : false;
     plusBtn.disabled = (max > 0 && Number.isFinite(val)) ? val >= max : false;
+}
+
+const quickState = {
+    parentId: null,
+};
+
+function showQuickMessage(message, type) {
+    const el = document.getElementById('quickAddMessage');
+    if (!el) return;
+    if (!message) {
+        el.className = 'mt-2 small';
+        el.textContent = '';
+        return;
+    }
+    const map = {
+        success: 'text-success',
+        error: 'text-danger',
+        info: 'text-muted',
+    };
+    el.className = 'mt-2 small ' + (map[type] || 'text-muted');
+    el.textContent = message;
+}
+
+function resetQuickSection() {
+    quickState.parentId = null;
+    const input = document.getElementById('quickAddInput');
+    const parentState = document.getElementById('quickParentState');
+    const parentName = document.getElementById('quickParentName');
+    const modelSelect = document.getElementById('quickParentModelSelect');
+    const variantsWrapper = document.getElementById('quickVariantsWrapper');
+    const variantsBody = document.getElementById('quickVariantsBody');
+    const addBtn = document.getElementById('quickAddSelectionsBtn');
+
+    if (input) input.value = '';
+    if (parentState) parentState.classList.add('d-none');
+    if (parentName) parentName.textContent = '—';
+    if (modelSelect) modelSelect.innerHTML = '<option value="">انتخاب مدل‌لیست...</option>';
+    if (variantsWrapper) variantsWrapper.classList.add('d-none');
+    if (variantsBody) variantsBody.innerHTML = '';
+    if (addBtn) addBtn.classList.add('d-none');
+    showQuickMessage('', 'info');
+}
+
+function findVarietyRowByVariantId(variantId) {
+    const target = Number(variantId);
+    let found = null;
+    document.querySelectorAll('.selected-variety-id').forEach(function (input) {
+        if (found) return;
+        if (Number(input.value || 0) === target) {
+            found = input.closest('.variety-row');
+        }
+    });
+    return found;
+}
+
+async function ensureBlockForProduct(productId) {
+    const pid = String(productId || '');
+    let existing = Array.from(document.querySelectorAll('.product-block')).find(function (block) {
+        const selectEl = block.querySelector('.product-select');
+        return selectEl && String(selectEl.value || '') === pid;
+    });
+    if (existing) return existing;
+
+    const block = addProductBlock({});
+    const selectEl = block.querySelector('.product-select');
+    const product = await getProductDetails(pid);
+    const code = product && product.code ? product.code : '';
+    const title = productTitle(product);
+    const text = '[کد: ' + code + '] ' + title;
+    const opt = new Option(text, pid, true, true);
+    selectEl.appendChild(opt);
+    $(selectEl).trigger('change');
+    return block;
+}
+
+function increaseVarietyRowQty(row, quantityToAdd) {
+    const qtyInput = row.querySelector('.quantity-input');
+    const max = parseInt(qtyInput.max || '0', 10) || 0;
+    const current = parseInt(String(qtyInput.value || '0'), 10) || 0;
+    let next = current + (parseInt(quantityToAdd, 10) || 0);
+    if (max > 0 && next > max) next = max;
+    qtyInput.value = String(next);
+    refreshQtyButtons(row);
+}
+
+async function applyResolvedItemsToForm(items) {
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const variantId = Number(item.item_id || 0);
+        const quantity = Number(item.quantity || 0);
+        if (!variantId || quantity <= 0) continue;
+
+        const existingRow = findVarietyRowByVariantId(variantId);
+        if (existingRow) {
+            increaseVarietyRowQty(existingRow, quantity);
+            continue;
+        }
+
+        const block = await ensureBlockForProduct(item.product_id);
+        await addVarietyRow(block, item.product_id, {
+            variety_id: variantId,
+            quantity: quantity,
+            price: item.price
+        });
+    }
+
+    updateTotal();
+}
+
+async function postQuickAddItems(payloadItems) {
+    const customerId = parseInt(document.getElementById('customer_id').value || '0', 10);
+    if (!customerId) {
+        showQuickMessage('ابتدا مشتری را انتخاب کنید.', 'error');
+        return null;
+    }
+
+    const res = await fetch(API.quickAddItems, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            customer_id: customerId,
+            proforma_id: null,
+            items: payloadItems
+        })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        const msg = data && data.message ? data.message : 'ثبت سریع انجام نشد.';
+        throw new Error(msg);
+    }
+
+    return data;
+}
+
+function renderQuickVariants(variants) {
+    const wrapper = document.getElementById('quickVariantsWrapper');
+    const body = document.getElementById('quickVariantsBody');
+    const addBtn = document.getElementById('quickAddSelectionsBtn');
+
+    body.innerHTML = '';
+
+    if (!variants || !variants.length) {
+        wrapper.classList.add('d-none');
+        addBtn.classList.add('d-none');
+        showQuickMessage('برای این مدل‌لیست، تنوع موجودی‌دار یافت نشد.', 'error');
+        return;
+    }
+
+    variants.forEach(function (variant) {
+        const tr = createEl(
+            '<tr data-variant-id="' + variant.id + '">' +
+                '<td class="mono">' + (variant.part_number || variant.barcode || '—') + '</td>' +
+                '<td>' + (variant.pattern_name || '—') + '</td>' +
+                '<td>' + (variant.variant_name || '—') + '</td>' +
+                '<td>' + Number(variant.sellable_stock || 0).toLocaleString('fa-IR') + '</td>' +
+                '<td>' + Number(variant.price || 0).toLocaleString('fa-IR') + ' تومان</td>' +
+                '<td><input type="number" min="0" max="' + Number(variant.sellable_stock || 0) + '" value="0" class="form-control form-control-sm quick-qty-input"></td>' +
+                '<td>' +
+                    '<div class="btn-group btn-group-sm">' +
+                        '<button type="button" class="btn btn-outline-secondary quick-jump-btn" data-add="1">+1</button>' +
+                        '<button type="button" class="btn btn-outline-secondary quick-jump-btn" data-add="6">+6</button>' +
+                        '<button type="button" class="btn btn-outline-secondary quick-jump-btn" data-add="12">+12</button>' +
+                        '<button type="button" class="btn btn-outline-secondary quick-jump-btn" data-add="24">+24</button>' +
+                    '</div>' +
+                '</td>' +
+            '</tr>'
+        );
+
+        const qtyInput = tr.querySelector('.quick-qty-input');
+        tr.querySelectorAll('[data-add]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const step = parseInt(btn.getAttribute('data-add') || '0', 10) || 0;
+                const max = parseInt(qtyInput.max || '0', 10) || 0;
+                const cur = parseInt(String(qtyInput.value || '0'), 10) || 0;
+                qtyInput.value = String(Math.min(max, cur + step));
+            });
+        });
+
+        qtyInput.addEventListener('input', function () {
+            clampQtyInput(qtyInput, true);
+        });
+
+        body.appendChild(tr);
+    });
+
+    wrapper.classList.remove('d-none');
+    addBtn.classList.remove('d-none');
 }
 
 function updateBlockSummary(block) {
@@ -1507,6 +1777,14 @@ function initFromOldOrEdit() {
 document.addEventListener('DOMContentLoaded', async function () {
     const shippingSelect = document.getElementById('shipping_id');
     const provinceSelect = document.getElementById('province_id');
+    const quickAddInput = document.getElementById('quickAddInput');
+    const quickSearchBtn = document.getElementById('quickAddSearchBtn');
+    const quickResetBtn = document.getElementById('quickAddResetBtn');
+    const quickParentState = document.getElementById('quickParentState');
+    const quickParentName = document.getElementById('quickParentName');
+    const quickParentModelSelect = document.getElementById('quickParentModelSelect');
+    const quickLoadVariantsBtn = document.getElementById('quickLoadVariantsBtn');
+    const quickAddSelectionsBtn = document.getElementById('quickAddSelectionsBtn');
 
     initLocationSelect2(document.getElementById('province_id'), 'انتخاب استان...');
     initLocationSelect2(document.getElementById('city_id'), 'انتخاب شهر...');
@@ -1549,6 +1827,128 @@ document.addEventListener('DOMContentLoaded', async function () {
         addProductBlock({});
     });
 
+    async function runQuickSearch() {
+        const raw = String(quickAddInput.value || '').trim();
+        if (!raw) {
+            showQuickMessage('ورودی را وارد کنید.', 'error');
+            return;
+        }
+
+        showQuickMessage('در حال جستجو...', 'info');
+        document.getElementById('quickVariantsWrapper').classList.add('d-none');
+        document.getElementById('quickAddSelectionsBtn').classList.add('d-none');
+
+        try {
+            const res = await fetch(API.quickSearch + '/' + encodeURIComponent(raw), {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showQuickMessage(data && data.message ? data.message : 'نتیجه‌ای یافت نشد.', 'error');
+                return;
+            }
+
+            if (data.type === 'parent') {
+                quickState.parentId = Number(data.product_parent.id);
+                quickParentName.textContent = data.product_parent.name || '—';
+                quickParentModelSelect.innerHTML = '<option value="">انتخاب مدل‌لیست...</option>';
+                (data.model_lists || []).forEach(function (model) {
+                    const opt = document.createElement('option');
+                    opt.value = String(model.id);
+                    opt.textContent = model.name;
+                    quickParentModelSelect.appendChild(opt);
+                });
+                quickParentState.classList.remove('d-none');
+                showQuickMessage('محصول مادر پیدا شد. مدل‌لیست را انتخاب کنید.', 'success');
+                return;
+            }
+
+            if (data.type === 'exact_item' && data.item) {
+                const result = await postQuickAddItems([{ item_id: data.item.id, quantity: 1 }]);
+                if (!result) return;
+                await applyResolvedItemsToForm(result.items || []);
+                quickAddInput.value = '';
+                quickAddInput.focus();
+                showQuickMessage('کالا با تعداد ۱ به سبد اضافه شد.', 'success');
+                return;
+            }
+
+            showQuickMessage('نتیجه قابل استفاده‌ای دریافت نشد.', 'error');
+        } catch (error) {
+            showQuickMessage(error.message || 'خطا در ثبت سریع.', 'error');
+        }
+    }
+
+    quickSearchBtn.addEventListener('click', runQuickSearch);
+    quickResetBtn.addEventListener('click', function () {
+        resetQuickSection();
+        quickAddInput.focus();
+    });
+    quickAddInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            runQuickSearch();
+        }
+    });
+
+    quickLoadVariantsBtn.addEventListener('click', async function () {
+        if (!quickState.parentId) {
+            showQuickMessage('ابتدا کد ۴ رقمی معتبر وارد کنید.', 'error');
+            return;
+        }
+        const modelId = parseInt(quickParentModelSelect.value || '0', 10);
+        if (!modelId) {
+            showQuickMessage('مدل‌لیست را انتخاب کنید.', 'error');
+            return;
+        }
+
+        showQuickMessage('در حال بارگذاری تنوع‌ها...', 'info');
+
+        try {
+            const url = API.quickVariants + '?parent_id=' + quickState.parentId + '&model_list_id=' + modelId;
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                showQuickMessage('بارگذاری تنوع‌ها انجام نشد.', 'error');
+                return;
+            }
+            renderQuickVariants(data.variants || []);
+            showQuickMessage('تنوع‌ها بارگذاری شد. تعدادها را وارد کنید.', 'success');
+        } catch (error) {
+            showQuickMessage('خطا در دریافت تنوع‌ها.', 'error');
+        }
+    });
+
+    quickAddSelectionsBtn.addEventListener('click', async function () {
+        const payloadItems = [];
+        document.querySelectorAll('#quickVariantsBody tr').forEach(function (row) {
+            const variantId = parseInt(row.getAttribute('data-variant-id') || '0', 10);
+            const qtyInput = row.querySelector('.quick-qty-input');
+            const quantity = parseInt(String(qtyInput ? qtyInput.value : '0').trim(), 10) || 0;
+            if (variantId > 0 && quantity > 0) {
+                payloadItems.push({ item_id: variantId, quantity: quantity });
+            }
+        });
+
+        if (!payloadItems.length) {
+            showQuickMessage('حداقل یک تنوع با تعداد بیشتر از صفر وارد کنید.', 'error');
+            return;
+        }
+
+        try {
+            const result = await postQuickAddItems(payloadItems);
+            if (!result) return;
+            await applyResolvedItemsToForm(result.items || []);
+            resetQuickSection();
+            quickAddInput.focus();
+            showQuickMessage('انتخاب‌ها با موفقیت به سبد اضافه شدند.', 'success');
+        } catch (error) {
+            showQuickMessage(error.message || 'افزودن انتخاب‌ها انجام نشد.', 'error');
+        }
+    });
+
+    resetQuickSection();
     initFromOldOrEdit();
 
     const oldShippingId = @json(old('shipping_id', ''));
