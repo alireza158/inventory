@@ -210,6 +210,9 @@ Route::middleware('auth')->group(function () {
     Route::prefix('preinvoice/api')->group(function () {
         Route::get('/products', [PreinvoiceApiController::class, 'products']);
         Route::get('/products/{product}', [PreinvoiceApiController::class, 'product']);
+        Route::get('/quick-search/{input}', [PreinvoiceApiController::class, 'quickSearch']);
+        Route::get('/quick-variants', [PreinvoiceApiController::class, 'quickVariants']);
+        Route::post('/quick-add-items', [PreinvoiceApiController::class, 'quickAddItems']);
         Route::get('/area', [PreinvoiceApiController::class, 'area']);
         Route::get('/customers', [CustomerApiController::class, 'search'])->name('api.customers.search');
         Route::post('/customers', [CustomerApiController::class, 'store'])->name('api.customers.store');
