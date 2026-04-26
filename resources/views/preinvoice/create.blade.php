@@ -415,16 +415,48 @@
 
         <div class="card-soft mb-3">
             <div class="p-3 border-bottom">
-                <div class="section-title mb-1">🛍️ محصولات</div>
-                <div class="hint">برای هر محصول، تنوع‌ها را ثبت کن و بعد با ✓ آن را ببند تا لیست خلاصه شود.</div>
+                <div class="section-title mb-1">🧩 ثبت کالا به‌صورت گروهی</div>
+                <div class="hint">کد ۴ رقمی محصول مادر را وارد کنید و با «مشاهده و انتخاب» کالاهای نهایی را مشخص کنید.</div>
             </div>
-
+            <div class="p-3 border-bottom">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="compact-label">کد ۴ رقمی مادر</label>
+                        <input type="text" id="motherCodeInput" class="form-control form-control-sm" maxlength="4" placeholder="مثال: 0123">
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" id="findMotherBtn" class="btn btn-primary btn-sm w-100">نمایش محصول مادر</button>
+                    </div>
+                </div>
+                <div id="motherProductBox" class="mt-2 small text-muted"></div>
+                <div class="mt-2 d-none" id="openGroupPickerWrap">
+                    <button type="button" id="openGroupPickerBtn" class="btn btn-outline-primary btn-sm">مشاهده و انتخاب</button>
+                </div>
+            </div>
             <div class="p-3">
-                <div id="productBlocksContainer"></div>
+                <div class="section-title mb-2">خلاصه انتخاب‌های گروهی</div>
+                <div id="groupSummaryList" class="d-flex flex-column gap-2"></div>
+                <div id="groupProductsInputs"></div>
+            </div>
+        </div>
 
-                <button type="button" id="addProductBlockBtn" class="btn btn-outline-primary btn-sm w-100 py-2">
-                    ➕ افزودن محصول
-                </button>
+        <div class="accordion mb-3" id="legacyProductAccordion">
+            <div class="accordion-item card-soft">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#legacyProductCollapse">
+                        فرم قدیمی افزودن کالا (بدون حذف)
+                    </button>
+                </h2>
+                <div id="legacyProductCollapse" class="accordion-collapse collapse" data-bs-parent="#legacyProductAccordion">
+                    <div class="accordion-body">
+                        <div class="p-3 border rounded-3">
+                            <div id="productBlocksContainer"></div>
+                            <button type="button" id="addProductBlockBtn" class="btn btn-outline-primary btn-sm w-100 py-2 mt-2">
+                                ➕ افزودن محصول
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -475,6 +507,35 @@
     </form>
 </div>
 
+<div class="modal fade" id="groupPickerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">انتخاب کالاهای نهایی محصول مادر</h5>
+                <button type="button" class="btn-close m-0" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="groupPickerMeta" class="small text-muted mb-2"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                        <tr>
+                            <th>مدل لیست</th><th>طرح</th><th>تنوع</th><th>پارت‌نامبر</th><th>موجودی</th><th>قیمت</th><th>تعداد</th>
+                        </tr>
+                        </thead>
+                        <tbody id="groupPickerRows"></tbody>
+                    </table>
+                </div>
+                <div id="groupLiveSummary" class="alert alert-light border small mb-0"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">بستن</button>
+                <button type="button" id="saveGroupSelectionBtn" class="btn btn-primary btn-sm">اتمام و افزودن به سفارش</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const API = {
         products:  "{{ url('/preinvoice/api/products') }}",
@@ -489,6 +550,107 @@
     var OLD_CUSTOMER_ID = @json(old('customer_id', ''));
     var OLD_PROVINCE_ID = @json(old('province_id', ''));
     var OLD_CITY_ID = @json(old('city_id', ''));
+    var INIT_GROUP_ROWS = @json($initRows);
+</script>
+
+<script>
+let selectedMotherProduct = null;
+let groupedSelections = {};
+let activeEditingProductId = null;
+
+function renderGroupSummary() {
+    const wrap = document.getElementById('groupSummaryList');
+    const inputWrap = document.getElementById('groupProductsInputs');
+    if (!wrap || !inputWrap) return;
+    wrap.innerHTML = '';
+    inputWrap.innerHTML = '';
+    let idx = 0;
+    Object.values(groupedSelections).forEach(group => {
+        const qty = group.items.reduce((s, it) => s + Number(it.quantity || 0), 0);
+        const amount = group.items.reduce((s, it) => s + (Number(it.quantity || 0) * Number(it.price || 0)), 0);
+        const card = document.createElement('div');
+        card.className = 'border rounded-3 p-2 d-flex justify-content-between align-items-center';
+        card.innerHTML = '<div><strong>' + group.product.title + '</strong><div class="small text-muted">تعداد: ' + qty.toLocaleString('fa-IR') + ' | مبلغ: ' + amount.toLocaleString('fa-IR') + ' تومان</div></div><button type="button" class="btn btn-sm btn-outline-secondary">ویرایش</button>';
+        card.querySelector('button').addEventListener('click', () => openGroupPicker(group.product.id));
+        wrap.appendChild(card);
+        group.items.forEach(item => {
+            inputWrap.insertAdjacentHTML('beforeend', '<input type="hidden" name="products[' + idx + '][id]" value="' + group.product.id + '"><input type="hidden" name="products[' + idx + '][variety_id]" value="' + item.variant_id + '"><input type="hidden" name="products[' + idx + '][quantity]" value="' + item.quantity + '"><input type="hidden" name="products[' + idx + '][price]" value="' + item.price + '">');
+            idx++;
+        });
+    });
+}
+
+async function findMotherProductByCode() {
+    const code = String(document.getElementById('motherCodeInput').value || '').trim();
+    if (!code) return;
+    const res = await fetch(API.products + '?q=' + encodeURIComponent(code), { headers: { Accept: 'application/json' } });
+    const json = await res.json();
+    const rows = json?.data?.products?.data || [];
+    selectedMotherProduct = rows[0] || null;
+    const box = document.getElementById('motherProductBox');
+    const pickerWrap = document.getElementById('openGroupPickerWrap');
+    if (!selectedMotherProduct) {
+        box.textContent = 'محصول مادری با این کد پیدا نشد.';
+        pickerWrap.classList.add('d-none');
+        return;
+    }
+    box.textContent = 'محصول مادر: ' + selectedMotherProduct.title + ' | کد: ' + (selectedMotherProduct.sku || '');
+    pickerWrap.classList.remove('d-none');
+}
+
+async function openGroupPicker(productId = null) {
+    const targetId = productId || selectedMotherProduct?.id;
+    if (!targetId) return;
+    const data = await getProductDetails(targetId);
+    if (!data) return;
+    activeEditingProductId = targetId;
+    const current = groupedSelections[targetId]?.items || [];
+    const byVariant = {};
+    current.forEach(i => byVariant[i.variant_id] = Number(i.quantity || 0));
+    document.getElementById('groupPickerMeta').textContent = data.title;
+    const tbody = document.getElementById('groupPickerRows');
+    tbody.innerHTML = '';
+    (data.varieties || []).forEach(v => {
+        tbody.insertAdjacentHTML('beforeend', '<tr><td>' + (v.model_list_name || '—') + '</td><td>' + (v.variety_name || '—') + '</td><td>' + (v.variant_name || '—') + '</td><td>' + (v.barcode || v.variety_code || '—') + '</td><td>' + Number(v.quantity || 0).toLocaleString('fa-IR') + '</td><td>' + Number(v.price || 0).toLocaleString('fa-IR') + '</td><td><input type="number" min="0" max="' + Number(v.quantity || 0) + '" data-variant="' + v.id + '" data-price="' + Number(v.price || 0) + '" class="form-control form-control-sm group-qty-input" value="' + (byVariant[v.id] || 0) + '"></td></tr>');
+    });
+    updateModalLiveSummary();
+    new bootstrap.Modal(document.getElementById('groupPickerModal')).show();
+}
+
+function updateModalLiveSummary() {
+    let qty = 0, amount = 0;
+    document.querySelectorAll('.group-qty-input').forEach(i => {
+        const q = Math.max(0, Number(i.value || 0));
+        const p = Number(i.dataset.price || 0);
+        qty += q; amount += (q * p);
+    });
+    document.getElementById('groupLiveSummary').textContent = 'خلاصه لحظه‌ای: ' + qty.toLocaleString('fa-IR') + ' عدد | ' + amount.toLocaleString('fa-IR') + ' تومان';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('findMotherBtn')?.addEventListener('click', findMotherProductByCode);
+    document.getElementById('openGroupPickerBtn')?.addEventListener('click', () => openGroupPicker());
+    document.addEventListener('input', e => { if (e.target.classList.contains('group-qty-input')) updateModalLiveSummary(); });
+    document.getElementById('saveGroupSelectionBtn')?.addEventListener('click', function () {
+        if (!activeEditingProductId) return;
+        const product = (selectedMotherProduct && Number(selectedMotherProduct.id) === Number(activeEditingProductId)) ? selectedMotherProduct : (groupedSelections[activeEditingProductId]?.product || null);
+        const items = [];
+        document.querySelectorAll('.group-qty-input').forEach(i => {
+            const q = Number(i.value || 0);
+            if (q > 0) items.push({ variant_id: Number(i.dataset.variant), quantity: q, price: Number(i.dataset.price) });
+        });
+        if (product && items.length > 0) groupedSelections[activeEditingProductId] = { product, items };
+        renderGroupSummary();
+        bootstrap.Modal.getInstance(document.getElementById('groupPickerModal'))?.hide();
+        updateTotal();
+    });
+    INIT_GROUP_ROWS.forEach(r => {
+        const key = Number(r.id);
+        if (!groupedSelections[key]) groupedSelections[key] = { product: { id: r.id, title: r.name || ('محصول #' + r.id), sku: '' }, items: [] };
+        groupedSelections[key].items.push({ variant_id: r.variety_id, quantity: Number(r.quantity || 0), price: Number(r.price || 0) });
+    });
+    renderGroupSummary();
+});
 </script>
 
 <script>
@@ -1556,8 +1718,25 @@ document.addEventListener('DOMContentLoaded', async function () {
         shippingSelect.value = String(oldShippingId);
     }
 
-    shippingSelect.dispatchEvent(new Event('change'));
+shippingSelect.dispatchEvent(new Event('change'));
     updateTotal();
 });
+</script>
+<script>
+window.updateTotal = function () {
+    const shipping = Number(document.getElementById('shipping_price')?.value || 0);
+    const discount = Number(document.getElementById('discount')?.value || 0);
+    let subtotal = 0;
+    document.querySelectorAll('#groupProductsInputs input[name$=\"[quantity]\"]').forEach((qtyEl) => {
+        const i = qtyEl.name.match(/products\[(\d+)]/);
+        if (!i) return;
+        const idx = i[1];
+        const priceEl = document.querySelector('#groupProductsInputs input[name=\"products[' + idx + '][price]\"]');
+        subtotal += (Number(qtyEl.value || 0) * Number(priceEl?.value || 0));
+    });
+    const total = Math.max(0, subtotal + shipping - discount);
+    const totalEl = document.getElementById('total_price');
+    if (totalEl) totalEl.value = String(total);
+};
 </script>
 @endsection

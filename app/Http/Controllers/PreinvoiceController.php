@@ -197,6 +197,7 @@ class PreinvoiceController extends Controller
 
     public function saveDraft(Request $request)
     {
+        abort_unless(auth()->check(), 403);
         $validated = $this->validateDraftPayload($request);
 
         DB::transaction(function () use ($validated) {
@@ -244,6 +245,7 @@ class PreinvoiceController extends Controller
 
     public function updateDraft(string $uuid, Request $request)
     {
+        abort_unless(auth()->check(), 403);
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== PreinvoiceOrder::STATUS_SUBMITTED_FINANCE, 403);
 
@@ -325,7 +327,66 @@ class PreinvoiceController extends Controller
             }
         }
 
+        $this->validateDraftItemsBusinessRules($validated['products'] ?? []);
+
         return $validated;
+    }
+
+    private function validateDraftItemsBusinessRules(array $products): void
+    {
+        $variantIds = collect($products)->pluck('variety_id')->map(fn ($id) => (int) $id)->filter()->values();
+        if ($variantIds->isEmpty()) {
+            return;
+        }
+
+        $variants = ProductVariant::query()
+            ->whereIn('id', $variantIds)
+            ->get(['id', 'product_id', 'sell_price', 'stock', 'reserved', 'is_active'])
+            ->keyBy('id');
+
+        $qtyByVariant = [];
+        $seenProductVariant = [];
+
+        foreach ($products as $index => $row) {
+            $productId = (int) ($row['id'] ?? 0);
+            $variantId = (int) ($row['variety_id'] ?? 0);
+            $price = (int) ($row['price'] ?? 0);
+
+            $variant = $variants->get($variantId);
+            if (!$variant || (int) $variant->product_id !== $productId || !(bool) $variant->is_active) {
+                throw ValidationException::withMessages([
+                    "products.{$index}.variety_id" => 'تنوع انتخابی معتبر نیست.',
+                ]);
+            }
+
+            $pairKey = $productId . ':' . $variantId;
+            if (isset($seenProductVariant[$pairKey])) {
+                throw ValidationException::withMessages([
+                    "products.{$index}.variety_id" => 'هر تنوع باید فقط یک‌بار در هر محصول مادر ثبت شود.',
+                ]);
+            }
+            $seenProductVariant[$pairKey] = true;
+
+            $serverPrice = (int) ($variant->sell_price ?? 0);
+            if ($price !== $serverPrice) {
+                throw ValidationException::withMessages([
+                    "products.{$index}.price" => "قیمت ارسال‌شده معتبر نیست. قیمت فعلی تنوع: {$serverPrice}",
+                ]);
+            }
+
+            $qtyByVariant[$variantId] = ($qtyByVariant[$variantId] ?? 0) + (int) ($row['quantity'] ?? 0);
+        }
+
+        foreach ($qtyByVariant as $variantId => $requiredQty) {
+            $variant = $variants->get((int) $variantId);
+            $availableQty = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0));
+
+            if ($requiredQty > $availableQty) {
+                throw ValidationException::withMessages([
+                    'products' => "موجودی تنوع انتخابی کافی نیست. موجودی قابل فروش: {$availableQty} | درخواست: {$requiredQty}",
+                ]);
+            }
+        }
     }
 
     private function validateWarehouseReviewPayload(Request $request, bool $forApprove = false): array
