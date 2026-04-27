@@ -22,9 +22,7 @@ use Illuminate\Validation\ValidationException;
 
 class PreinvoiceController extends Controller
 {
-    public function __construct(private readonly PaymentRegistrationService $paymentService)
-    {
-    }
+    public function __construct(private readonly PaymentRegistrationService $paymentService) {}
 
     public function create()
     {
@@ -69,8 +67,8 @@ class PreinvoiceController extends Controller
 
         $products = Product::query()
             ->where('is_sellable', true)
-            ->whereHas('variants', fn ($q) => $q->where('is_active', true))
-            ->with(['variants' => fn ($q) => $q->where('is_active', true)->orderBy('variant_name')])
+            ->whereHas('variants', fn($q) => $q->where('is_active', true))
+            ->with(['variants' => fn($q) => $q->where('is_active', true)->orderBy('variant_name')])
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -300,7 +298,7 @@ class PreinvoiceController extends Controller
             'products.*.variety_id' => [
                 'required',
                 'integer',
-                Rule::exists('product_variants', 'id')->where(fn ($query) => $query->where('is_active', true)),
+                Rule::exists('product_variants', 'id')->where(fn($query) => $query->where('is_active', true)),
             ],
             'products.*.quantity' => 'required|integer|min:1',
             'products.*.price' => 'nullable|integer|min:0',
@@ -334,7 +332,7 @@ class PreinvoiceController extends Controller
 
     private function validateDraftItemsBusinessRules(array $products): void
     {
-        $variantIds = collect($products)->pluck('variety_id')->map(fn ($id) => (int) $id)->filter()->values();
+        $variantIds = collect($products)->pluck('variety_id')->map(fn($id) => (int) $id)->filter()->values();
         if ($variantIds->isEmpty()) {
             return;
         }
@@ -395,7 +393,7 @@ class PreinvoiceController extends Controller
             'warehouse_review_note' => $forApprove ? 'required|string|max:2000' : 'nullable|string|max:2000',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id,is_sellable,1',
-            'items.*.variant_id' => ['required', 'integer', Rule::exists('product_variants', 'id')->where(fn ($q) => $q->where('is_active', true))],
+            'items.*.variant_id' => ['required', 'integer', Rule::exists('product_variants', 'id')->where(fn($q) => $q->where('is_active', true))],
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|integer|min:0',
         ], [
@@ -439,7 +437,7 @@ class PreinvoiceController extends Controller
     {
         $order->loadMissing(['items.product:id,name', 'items.variant:id,variant_name']);
 
-        return $order->items->map(fn ($item) => [
+        return $order->items->map(fn($item) => [
             'product_id' => (int) $item->product_id,
             'product_name' => $item->product?->name,
             'variant_id' => (int) $item->variant_id,
@@ -463,7 +461,7 @@ class PreinvoiceController extends Controller
 
         $requiredByVariant = $order->items
             ->groupBy('variant_id')
-            ->map(fn ($rows) => (int) $rows->sum('quantity'));
+            ->map(fn($rows) => (int) $rows->sum('quantity'));
 
         $variants = ProductVariant::query()
             ->whereIn('id', $requiredByVariant->keys())
@@ -483,7 +481,7 @@ class PreinvoiceController extends Controller
 
         $requiredByProduct = $order->items
             ->groupBy('product_id')
-            ->map(fn ($rows) => (int) $rows->sum('quantity'));
+            ->map(fn($rows) => (int) $rows->sum('quantity'));
 
         $availableByProduct = WarehouseStock::query()
             ->where('warehouse_id', $centralWarehouseId)
@@ -733,7 +731,7 @@ class PreinvoiceController extends Controller
 
             $requiredByProduct = $order->items
                 ->groupBy('product_id')
-                ->map(fn ($rows) => (int) $rows->sum('quantity'));
+                ->map(fn($rows) => (int) $rows->sum('quantity'));
 
             $availableByProduct = WarehouseStock::query()
                 ->where('warehouse_id', $centralWarehouseId)
@@ -781,7 +779,7 @@ class PreinvoiceController extends Controller
                     'line_total' => (int) $it->price * (int) $it->quantity,
                 ]);
 
-                WarehouseStockService::change($centralWarehouseId, (int) $it->product_id, -((int) $it->quantity));
+                WarehouseStockService::change($centralWarehouseId, (int) $it->product_id, - ((int) $it->quantity));
 
                 $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
                 if ($product) {

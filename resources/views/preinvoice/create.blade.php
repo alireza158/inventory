@@ -6,17 +6,34 @@
     $customersPageUrl = $customersPageUrl ?? url('/customers');
 
     $initRows = old('products');
+
     if (!$initRows && $order) {
         $initRows = $order->items->map(function ($it) {
+            $product = $it->product ?? null;
+            $variant = $it->variant ?? null;
+
             return [
-                'id'         => (int) $it->product_id,
-                'variety_id' => (int) $it->variant_id,
-                'quantity'   => (int) $it->quantity,
-                'price'      => (int) $it->price,
+                'id'           => (int) $it->product_id,
+                'product_id'   => (int) $it->product_id,
+                'product_name' => $product->title ?? $product->name ?? null,
+                'product_code' => $product->code ?? $product->sku ?? null,
+
+                'variety_id'   => (int) $it->variant_id,
+                'variant_id'   => (int) $it->variant_id,
+                'variant_name' => $variant->variant_name ?? null,
+
+                'quantity'     => (int) $it->quantity,
+                'price'        => (int) $it->price,
             ];
         })->values();
     }
-    if (!$initRows) $initRows = [];
+
+    if (!$initRows) {
+        $initRows = [];
+    }
+
+    $oldCustomerTitle = trim((string) old('customer_name'));
+    $oldCustomerMobile = trim((string) old('customer_mobile'));
 @endphp
 
 <link rel="stylesheet" href="{{ asset('lib/select2.min.css') }}">
@@ -26,197 +43,445 @@
 <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
 
 <style>
+    :root {
+        --brand: #14B5CC;
+        --brand-dark: #0f8fa1;
+        --brand-soft: rgba(20, 181, 204, .08);
+        --brand-border: rgba(20, 181, 204, .24);
+
+        --bg: #f7f9fb;
+        --card: #ffffff;
+        --border: #e4e9ef;
+        --text: #111827;
+        --muted: #6b7280;
+        --soft: #f9fafb;
+        --danger: #dc2626;
+        --success: #16a34a;
+    }
+
     body {
-        background: linear-gradient(180deg, #f6f8fc 0%, #eef2f9 100%);
+        background: var(--bg);
         font-size: 14px;
+        color: var(--text);
     }
 
     .page-shell {
-        max-width: 1140px;
+        max-width: 960px;
     }
 
-    .card-soft {
-        background: #fff;
-        border: 1px solid rgba(13, 110, 253, .10);
-        border-radius: 16px;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, .05);
+    .soft-card,
+    .soft-card-lg {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: none;
+    }
+
+    .soft-card-lg {
+        border-color: var(--brand-border);
+    }
+
+    .compact-card {
+        padding: 12px;
+    }
+
+    .product-focus {
+        padding: 14px;
+    }
+
+    .page-title {
+        font-size: 1.12rem;
+        font-weight: 850;
+        margin: 0;
     }
 
     .section-title {
-        font-weight: 800;
-        letter-spacing: -.2px;
-        font-size: 1rem;
+        font-size: .98rem;
+        font-weight: 850;
+        margin: 0;
     }
 
     .hint {
-        color: #6c757d;
-        font-size: .83rem;
+        color: var(--muted);
+        font-size: .8rem;
     }
 
-    .topbar {
-        background: #fff;
-        border: 1px solid rgba(13,110,253,.10);
-        border-radius: 14px;
-        padding: .9rem 1rem;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, .05);
-    }
-
-    .sticky-submit {
-        position: sticky;
-        bottom: 10px;
-        z-index: 12;
-        background: rgba(246, 248, 252, .90);
-        backdrop-filter: blur(5px);
-        border-radius: 12px;
-        padding: .45rem;
-    }
-
-    .summary-input {
-        background-color: #f8f9fa !important;
-        border-color: #e9ecef;
-    }
-
-    .mono {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        letter-spacing: 1px;
-    }
-
-    .fs-7 {
-        font-size: .82rem;
-    }
-
-    .compact-label {
-        font-size: .82rem;
-        font-weight: 700;
-        margin-bottom: .32rem;
+    .label-sm {
+        font-size: .78rem;
+        font-weight: 750;
+        color: #374151;
+        margin-bottom: 5px;
     }
 
     .customer-box {
-        border: 1px dashed rgba(13,110,253,.22);
-        background: rgba(13,110,253,.03);
+        background: var(--soft);
+        border: 1px solid var(--border);
         border-radius: 12px;
         padding: 10px 12px;
     }
 
-    .chip {
+    .customer-box.is-selected {
+        background: var(--brand-soft);
+        border-color: var(--brand-border);
+    }
+
+    .product-hero {
+        background: #fff;
+        border: 1px solid var(--brand-border);
+        border-radius: 14px;
+        padding: 12px;
+    }
+
+    .quick-code {
+        height: 52px;
+        font-size: 1.45rem;
+        font-weight: 900;
+        text-align: center;
+        letter-spacing: 5px;
+        direction: ltr;
+        border-radius: 12px;
+        border-color: var(--brand-border);
+    }
+
+    .quick-code:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 .2rem rgba(20, 181, 204, .12);
+    }
+
+    .quick-btn {
+        height: 52px;
+        border-radius: 12px;
+        font-weight: 850;
+        background: var(--brand);
+        border-color: var(--brand);
+    }
+
+    .quick-btn:hover,
+    .quick-btn:focus,
+    .btn-primary:hover,
+    .btn-primary:focus {
+        background: var(--brand-dark);
+        border-color: var(--brand-dark);
+    }
+
+    .btn-primary {
+        background: var(--brand);
+        border-color: var(--brand);
+    }
+
+    .btn-outline-primary {
+        color: var(--brand-dark);
+        border-color: var(--brand);
+    }
+
+    .btn-outline-primary:hover,
+    .btn-outline-primary:focus {
+        background: var(--brand);
+        border-color: var(--brand);
+        color: #fff;
+    }
+
+    .found-product {
+        display: none;
+        background: var(--brand-soft);
+        border: 1px solid var(--brand-border);
+        border-radius: 13px;
+        padding: 11px;
+    }
+
+    .empty-state {
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        background: var(--soft);
+        color: var(--muted);
+        padding: 18px;
+        text-align: center;
+        font-weight: 750;
+    }
+
+    .badge-soft {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
+        background: #f3f6f8;
+        color: #374151;
+        border: 1px solid #e5eaf0;
         border-radius: 999px;
-        border: 1px solid #e2e8f0;
-        background: #fff;
-        font-size: .8rem;
-        white-space: nowrap;
+        padding: 4px 8px;
+        font-size: .72rem;
+        font-weight: 750;
     }
 
-    .product-block {
+    .badge-brand {
+        background: var(--brand-soft);
+        color: var(--brand-dark);
+        border-color: var(--brand-border);
+    }
+
+    .group-card {
+        border: 1px solid var(--border);
+        border-radius: 13px;
         background: #fff;
-        border: 1px solid #dbe3ef;
-        border-radius: 14px;
         overflow: hidden;
-        transition: all .2s ease;
-        margin-bottom: 12px;
     }
 
-    .product-header {
-        padding: 10px 12px;
-        background: linear-gradient(0deg, #fff, #f7f9ff);
-        border-bottom: 1px solid #e8edf5;
+    .group-main {
+        display: grid;
+        grid-template-columns: 1.5fr .7fr .7fr .9fr auto;
+        gap: 8px;
+        align-items: center;
+        padding: 11px;
     }
 
-    .product-body {
-        padding: 10px 12px;
+    .group-title {
+        font-weight: 850;
+        color: var(--text);
     }
 
-    .product-summary {
+    .group-meta {
+        color: var(--muted);
+        font-size: .78rem;
+        margin-top: 3px;
+    }
+
+    .stat-box {
+        background: var(--soft);
+        border: 1px solid #eef2f5;
+        border-radius: 10px;
+        padding: 7px 9px;
+    }
+
+    .stat-label {
+        font-size: .7rem;
+        color: var(--muted);
+        font-weight: 750;
+    }
+
+    .stat-value {
+        font-size: .88rem;
+        font-weight: 850;
+        margin-top: 2px;
+    }
+
+    .group-details {
         display: none;
+        border-top: 1px solid #eef2f5;
+        background: #fbfcfd;
         padding: 10px 12px;
-        background: #fafcff;
     }
 
-    .product-block.is-collapsed .product-body {
-        display: none;
-    }
-
-    .product-block.is-collapsed .product-summary {
+    .group-card.is-open .group-details {
         display: block;
     }
 
-    .varieties-wrapper {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
+    .details-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .detail-pill {
+        border: 1px solid #e5eaf0;
+        background: #fff;
+        border-radius: 10px;
+        padding: 8px;
+        font-size: .77rem;
+    }
+
+    .final-card {
+        padding: 14px;
+        margin-bottom: 24px;
+    }
+
+    .final-grid {
+        display: grid;
+        grid-template-columns: 1.15fr .9fr .9fr 1fr auto;
+        gap: 10px;
+        align-items: end;
+    }
+
+    .total-view {
+        font-weight: 900;
+        color: var(--text);
+        background: var(--soft) !important;
+    }
+
+    .discount-line {
+        color: #0f5560;
+        font-size: .78rem;
+        margin-top: 6px;
+    }
+
+    .discount-control {
+        display: grid;
+        grid-template-columns: 86px 1fr;
+        gap: 6px;
+    }
+
+    .discount-control select,
+    .discount-control input {
+        height: 36px;
+    }
+
+    .modal-dialog {
+        margin: .5rem auto;
+    }
+
+    .modal-xl {
+        max-width: 920px;
+        width: calc(100vw - 16px);
+    }
+
+    .modal-content {
+        border: 0;
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .picker-head {
+        background: #f8fafb;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .picker-toolbar {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) auto auto;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .picker-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .picker-stat {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 9px 10px;
+    }
+
+    .variant-list {
+        max-height: 56vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #fff;
+        padding: 8px;
+    }
+
+    .variant-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        border: 1px solid #e7edf3;
+        border-radius: 12px;
+        padding: 10px;
+        background: #fff;
+        margin-bottom: 8px;
+    }
+
+    .variant-card:last-child {
+        margin-bottom: 0;
+    }
+
+    .variant-card.row-selected {
+        background: rgba(20, 181, 204, .06);
+        border-color: var(--brand-border);
+    }
+
+    .variant-card.row-empty-stock {
+        opacity: .55;
+    }
+
+    .variant-title {
+        font-weight: 850;
+        color: var(--text);
+        line-height: 1.6;
+        word-break: break-word;
+    }
+
+    .variant-subtitle {
+        color: var(--muted);
+        font-size: .75rem;
+        margin-top: 2px;
+        direction: ltr;
+        text-align: right;
+        word-break: break-word;
+    }
+
+    .variant-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .qty-control {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        direction: ltr;
+    }
+
+    .qty-control button {
+        width: 34px;
+        height: 34px;
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        border-radius: 9px;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .qty-control input {
+        width: 58px;
+        height: 34px;
+        text-align: center;
+        font-weight: 850;
+        direction: ltr;
+    }
+
+    .quick-plus {
+        width: auto !important;
+        min-width: 38px;
+        height: 30px !important;
+        padding: 0 8px;
+        font-size: .75rem;
+        color: var(--brand-dark);
+        border-color: var(--brand-border) !important;
+        background: var(--brand-soft) !important;
+    }
+
+    .badge-stock {
+        background: rgba(22, 163, 74, .08);
+        color: #15803d;
+        border-color: rgba(22, 163, 74, .18);
+    }
+
+    .badge-no-stock {
+        background: rgba(220, 38, 38, .08);
+        color: #dc2626;
+        border-color: rgba(220, 38, 38, .18);
+    }
+
+    .modal-discount-box {
+        margin-top: 10px;
+        background: #fff;
+        border: 1px solid var(--border);
         border-radius: 12px;
         padding: 10px;
     }
 
-    .variety-row {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 8px;
-    }
-
-    .variety-row + .variety-row {
-        margin-top: 8px;
-    }
-
-    .row-tools {
-        border-top: 1px dashed #d9e2ef;
-        margin-top: 10px;
-        padding-top: 10px;
-    }
-
-    .icon-btn {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        border: 1px solid #dbe3ef;
-        background: #fff;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        line-height: 1;
-        cursor: pointer;
-        transition: all .15s ease;
-    }
-
-    .icon-btn:hover {
-        background: #f8fafc;
-        transform: translateY(-1px);
-    }
-
-    .icon-btn.ok {
-        color: #15803d;
-        border-color: #cce9d5;
-    }
-
-    .icon-btn.danger {
-        color: #dc2626;
-        border-color: #f5c9c9;
-    }
-
-    .icon-btn.muted {
-        color: #334155;
-    }
-
-    .block-subtotal-box {
-        border: 1px dashed rgba(13,110,253,.18);
-        background: rgba(13,110,253,.03);
-        border-radius: 10px;
-        padding: 8px 10px;
-    }
-
-    .summary-line {
-        font-size: .88rem;
-    }
-
     .select2-container .select2-selection--single {
-        height: 38px !important;
-        padding-top: 4px;
+        min-height: 38px !important;
         border-color: #dee2e6 !important;
-        border-radius: .5rem !important;
+        border-radius: .65rem !important;
+        padding-top: 4px;
     }
 
     .select2-container .select2-selection--single .select2-selection__rendered {
@@ -228,73 +493,137 @@
         height: 36px !important;
     }
 
-    .qty-box {
-        display: flex;
-        align-items: center;
-        gap: 6px;
+    @media (max-width: 991.98px) {
+        .page-shell {
+            max-width: 100%;
+        }
+
+        .group-main,
+        .final-grid,
+        .picker-toolbar,
+        .picker-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .details-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .quick-code,
+        .quick-btn {
+            height: 50px;
+        }
     }
 
-    .qty-btn {
-        width: 36px;
-        height: 36px;
-        border: 1px solid #dbe3ef;
-        background: #fff;
-        border-radius: 10px;
-        font-size: 18px;
-        line-height: 1;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all .15s ease;
-        flex: 0 0 36px;
-        user-select: none;
-    }
+    @media (max-width: 575.98px) {
+        body {
+            font-size: 13px;
+        }
 
-    .qty-btn:hover {
-        background: #f8fafc;
-        transform: translateY(-1px);
-    }
+        .container {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
 
-    .qty-btn:disabled {
-        opacity: .45;
-        cursor: not-allowed;
-        transform: none;
-    }
+        .page-title {
+            font-size: 1rem;
+        }
 
-    .qty-box .quantity-input {
-        text-align: center;
-        min-width: 0;
-    }
+        .section-title {
+            font-size: .92rem;
+        }
 
-    .qty-box .quantity-input::-webkit-outer-spin-button,
-    .qty-box .quantity-input::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
+        .compact-card,
+        .product-focus,
+        .final-card {
+            padding: 10px;
+            border-radius: 12px;
+        }
 
-    .qty-box .quantity-input[type=number] {
-        -moz-appearance: textfield;
-    }
+        .modal-dialog {
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+        }
 
-    @media (max-width: 767.98px) {
-        .qty-btn {
-            width: 40px;
-            height: 40px;
-            flex-basis: 40px;
-            font-size: 20px;
+        .modal-content {
+            min-height: 100vh;
+            border-radius: 0;
+        }
+
+        .modal-body {
+            padding: 10px;
+        }
+
+        .modal-header,
+        .modal-footer {
+            padding: 10px;
+        }
+
+        .variant-list {
+            max-height: 58vh;
+            padding: 6px;
+        }
+
+        .variant-card {
+            grid-template-columns: 1fr;
+            gap: 8px;
+            padding: 9px;
+        }
+
+        .variant-title {
+            font-size: .86rem;
+        }
+
+        .variant-subtitle {
+            font-size: .72rem;
+        }
+
+        .variant-meta {
+            gap: 5px;
+        }
+
+        .qty-control {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .qty-control button {
+            width: 38px;
+            height: 38px;
+        }
+
+        .qty-control input {
+            width: 64px;
+            height: 38px;
+        }
+
+        .quick-plus {
+            min-width: 42px;
+            height: 34px !important;
+        }
+
+        .discount-control {
+            grid-template-columns: 80px 1fr;
+        }
+
+        .final-grid .btn {
+            width: 100%;
         }
     }
 </style>
 
 <div class="container page-shell py-3">
 
-    <div class="topbar mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <div class="h5 mb-0 fw-bold">🧾 ثبت پیش‌فاکتور</div>
-            <div class="hint">نسخه جمع‌وجور برای ثبت خریدهای سنگین</div>
+            <h1 class="page-title">🧾 ثبت پیش‌فاکتور</h1>
+            <div class="hint mt-1">ثبت سریع کالا با کد مادر، انتخاب گروهی و تخفیف جمع‌وجور</div>
         </div>
-        <a class="btn btn-sm btn-outline-secondary" href="{{ route('preinvoice.warehouse.index') }}">صف تایید انبار</a>
+
+        <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">
+            صف تایید انبار
+        </a>
     </div>
 
     @if(session('success'))
@@ -318,141 +647,45 @@
         </div>
     @endif
 
-    <form action="{{ route('preinvoice.draft.save') }}" method="POST" id="orderForm">
+    <form action="{{ route('preinvoice.draft.save') }}" method="POST" id="orderForm" autocomplete="off">
         @csrf
 
-        <div class="card-soft p-3 mb-3">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                <div>
-                    <div class="section-title">👤 مشتری</div>
-                    <div class="hint">جستجو با نام یا شماره موبایل، مستقیم داخل فرم</div>
-                </div>
-                <a href="{{ $customersPageUrl }}" class="btn btn-sm btn-outline-success">➕ افزودن مشتری</a>
-            </div>
+        <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', '') }}">
+        <input type="hidden" name="customer_name" id="customer_name" value="{{ old('customer_name') }}">
+        <input type="hidden" name="customer_mobile" id="customer_mobile" value="{{ old('customer_mobile') }}">
+        <input type="hidden" name="payment_status" value="pending">
 
-            <div class="row g-2">
-                <div class="col-lg-6">
-                    <label class="compact-label">جستجو و انتخاب مشتری</label>
-                    <select id="customer_search_select" class="form-select"></select>
-                    <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', '') }}">
-                </div>
-
-                <div class="col-lg-6">
-                    <div class="customer-box h-100 d-flex flex-column justify-content-center">
-                        <div class="fw-bold" id="selectedCustomerTitle">هنوز مشتری انتخاب نشده است</div>
-                        <div class="hint mt-1" id="customer_balance_hint"></div>
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="compact-label">نام مشتری</label>
-                    <input
-                        type="text"
-                        name="customer_name"
-                        id="customer_name"
-                        class="form-control form-control-sm"
-                        value="{{ old('customer_name') }}"
-                        required
-                    >
-                </div>
-
-                <div class="col-md-6">
-                    <label class="compact-label">شماره موبایل</label>
-                    <input
-                        type="text"
-                        name="customer_mobile"
-                        id="customer_mobile"
-                        class="form-control form-control-sm"
-                        value="{{ old('customer_mobile') }}"
-                        required
-                    >
-                </div>
-            </div>
-        </div>
-
-        <div class="card-soft p-3 mb-3">
-            <div class="section-title mb-2">🚚 ارسال و مقصد</div>
-
+        <div class="soft-card compact-card mb-3">
             <div class="row g-2 align-items-end">
-                <div class="col-lg-6">
-                    <label class="compact-label">شیوه ارسال</label>
-                    <select id="shipping_id" name="shipping_id" class="form-select form-select-sm" required>
-                        <option value="">انتخاب روش ارسال...</option>
-                    </select>
-                    <div class="hint mt-1" id="shipping_label">هزینه ارسال</div>
-                    <input type="hidden" id="shipping_price" name="shipping_price" value="{{ old('shipping_price', 0) }}">
-                </div>
+                <div class="col-lg-5">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <h2 class="section-title">👤 مشتری</h2>
+                            <div class="hint">جستجو با نام یا موبایل</div>
+                        </div>
 
-                <div class="col-lg-6">
-                    <div class="customer-box">
-                        <div class="fw-bold fs-7">وضعیت</div>
-                        <div class="hint mt-1" id="shipping_mode_hint">با تغییر روش ارسال، جمع کل دوباره محاسبه می‌شود.</div>
+                        <a href="{{ $customersPageUrl }}" class="btn btn-sm btn-outline-success rounded-3">➕ افزودن</a>
                     </div>
-                </div>
-            </div>
 
-            <div id="locationWrapper" class="row g-2 mt-1">
-                <div class="col-md-6">
-                    <label class="compact-label">استان</label>
-                    <select id="province_id" name="province_id" class="form-select form-select-sm">
-                        <option value=""></option>
-                    </select>
+                    <select id="customer_search_select" class="form-select"></select>
                 </div>
 
-                <div class="col-md-6">
-                    <label class="compact-label">شهر</label>
-                    <select id="city_id" name="city_id" class="form-select form-select-sm">
-                        <option value=""></option>
-                    </select>
-                </div>
-            </div>
+                <div class="col-lg-7">
+                    <div id="customerSummaryBox" class="customer-box h-100 {{ old('customer_id') || $oldCustomerTitle ? 'is-selected' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <div>
+                                <div class="fw-bold" id="selectedCustomerTitle">
+                                    @if($oldCustomerTitle)
+                                        {{ $oldCustomerTitle }} @if($oldCustomerMobile) - {{ $oldCustomerMobile }} @endif
+                                    @else
+                                        هنوز مشتری انتخاب نشده است
+                                    @endif
+                                </div>
+                                <div class="hint mt-1" id="customer_balance_hint"></div>
+                            </div>
 
-            <div id="addressWrapper" class="mt-2">
-                <label class="compact-label">آدرس</label>
-                <textarea id="customer_address" name="customer_address" class="form-control form-control-sm" rows="2">{{ old('customer_address') }}</textarea>
-            </div>
-        </div>
-
-        <div class="card-soft mb-3">
-            <div class="p-3 border-bottom">
-                <div class="section-title mb-1">🧩 ثبت کالا به‌صورت گروهی</div>
-                <div class="hint">کد ۴ رقمی محصول مادر را وارد کنید و با «مشاهده و انتخاب» کالاهای نهایی را مشخص کنید.</div>
-            </div>
-            <div class="p-3 border-bottom">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-4">
-                        <label class="compact-label">کد ۴ رقمی مادر</label>
-                        <input type="text" id="motherCodeInput" class="form-control form-control-sm" maxlength="4" placeholder="مثال: 0123">
-                    </div>
-                    <div class="col-md-3">
-                        <button type="button" id="findMotherBtn" class="btn btn-primary btn-sm w-100">نمایش محصول مادر</button>
-                    </div>
-                </div>
-                <div id="motherProductBox" class="mt-2 small text-muted"></div>
-                <div class="mt-2 d-none" id="openGroupPickerWrap">
-                    <button type="button" id="openGroupPickerBtn" class="btn btn-outline-primary btn-sm">مشاهده و انتخاب</button>
-                </div>
-            </div>
-            <div class="p-3">
-                <div class="section-title mb-2">خلاصه انتخاب‌های گروهی</div>
-                <div id="groupSummaryList" class="d-flex flex-column gap-2"></div>
-                <div id="groupProductsInputs"></div>
-            </div>
-        </div>
-
-        <div class="accordion mb-3" id="legacyProductAccordion">
-            <div class="accordion-item card-soft">
-                <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#legacyProductCollapse">
-                        فرم قدیمی افزودن کالا (بدون حذف)
-                    </button>
-                </h2>
-                <div id="legacyProductCollapse" class="accordion-collapse collapse" data-bs-parent="#legacyProductAccordion">
-                    <div class="accordion-body">
-                        <div class="p-3 border rounded-3">
-                            <div id="productBlocksContainer"></div>
-                            <button type="button" id="addProductBlockBtn" class="btn btn-outline-primary btn-sm w-100 py-2 mt-2">
-                                ➕ افزودن محصول
+                            <button type="button" id="clearCustomerBtn" class="btn btn-sm btn-light border rounded-3">
+                                تغییر
                             </button>
                         </div>
                     </div>
@@ -460,49 +693,175 @@
             </div>
         </div>
 
-        <div class="card-soft p-3 mb-3">
-            <div class="section-title mb-2">💳 جمع‌بندی</div>
-
-            <div class="row g-2">
-                <div class="col-md-4">
-                    <label class="compact-label">تخفیف (تومان)</label>
-                    <input
-                        type="number"
-                        name="discount_amount"
-                        id="discount"
-                        class="form-control form-control-sm summary-input"
-                        value="{{ old('discount_amount', 0) }}"
-                    >
+        <div class="soft-card compact-card mb-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-lg-4">
+                    <h2 class="section-title mb-2">🚚 ارسال</h2>
+                    <label class="label-sm">شیوه ارسال</label>
+                    <select id="shipping_id" name="shipping_id" class="form-select form-select-sm" required>
+                        <option value="">انتخاب روش ارسال...</option>
+                    </select>
+                    <input type="hidden" id="shipping_price" name="shipping_price" value="{{ old('shipping_price', 0) }}">
                 </div>
 
-                <div class="col-md-4">
-                    <label class="compact-label">هزینه ارسال</label>
+                <div class="col-lg-4" id="provinceBox">
+                    <label class="label-sm">استان</label>
+                    <select id="province_id" name="province_id" class="form-select form-select-sm">
+                        <option value=""></option>
+                    </select>
+                </div>
+
+                <div class="col-lg-4" id="cityBox">
+                    <label class="label-sm">شهر</label>
+                    <select id="city_id" name="city_id" class="form-select form-select-sm">
+                        <option value=""></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="hint" id="shipping_mode_hint">روش ارسال را انتخاب کنید.</div>
+
+                <button class="btn btn-sm btn-light border rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#addressCollapse">
+                    آدرس / توضیحات
+                </button>
+            </div>
+
+            <div id="addressCollapse" class="collapse mt-2 {{ old('customer_address') ? 'show' : '' }}">
+                <textarea id="customer_address" name="customer_address" class="form-control form-control-sm" rows="2" placeholder="آدرس یا توضیحات ارسال...">{{ old('customer_address') }}</textarea>
+            </div>
+        </div>
+
+        <div class="soft-card-lg product-focus mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div>
+                    <h2 class="section-title">🧩 ثبت سریع کالا</h2>
+                    <div class="hint mt-1">کد مادر را بزن، تنوع‌ها را انتخاب کن، برو محصول بعدی.</div>
+                </div>
+
+                <span class="badge-soft badge-brand">ثبت گروهی محصول مادر</span>
+            </div>
+
+            <div class="product-hero mb-3">
+                <div class="row g-2 align-items-end">
+                    <div class="col-lg-3">
+                        <label class="label-sm">کد ۴ رقمی محصول مادر</label>
+                        <input
+                            type="text"
+                            id="motherCodeInput"
+                            class="form-control quick-code"
+                            maxlength="4"
+                            inputmode="numeric"
+                            placeholder="4450"
+                        >
+                    </div>
+
+                    <div class="col-lg-3">
+                        <button type="button" id="findMotherBtn" class="btn btn-primary w-100 quick-btn">
+                            نمایش محصول
+                        </button>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div id="motherSearchHint" class="customer-box h-100 d-flex align-items-center">
+                            <div>
+                                <div class="fw-bold">محصول مادر هنوز انتخاب نشده</div>
+                                <div class="hint mt-1">بعد از وارد کردن کد، دکمه مشاهده و انتخاب فعال می‌شود.</div>
+                            </div>
+                        </div>
+
+                        <div id="motherProductBox" class="found-product">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <div class="hint">محصول انتخاب‌شده</div>
+                                    <div class="fw-bold" id="motherProductTitle">—</div>
+                                    <div class="hint mt-1" id="motherProductCode">—</div>
+                                </div>
+
+                                <button type="button" id="openGroupPickerBtn" class="btn btn-outline-primary rounded-3 fw-bold">
+                                    مشاهده و انتخاب
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <h2 class="section-title">سبد پیش‌فاکتور</h2>
+                    <div class="hint" id="orderItemsCountHint">۰ گروه انتخاب شده</div>
+                </div>
+
+                <div id="groupSummaryList"></div>
+                <div id="groupProductsInputs"></div>
+            </div>
+        </div>
+
+        <div class="soft-card final-card">
+            <input type="hidden" name="discount_amount" id="discount" value="{{ old('discount_amount', 0) }}">
+
+            <div class="final-grid">
+                <div>
+                    <label class="label-sm">تخفیف کلی</label>
+                    <div class="discount-control">
+                        <select id="orderDiscountType" class="form-select form-select-sm">
+                            <option value="amount">تومان</option>
+                            <option value="percent">درصد</option>
+                        </select>
+                        <input
+                            type="number"
+                            id="orderDiscountValue"
+                            class="form-control form-control-sm"
+                            min="0"
+                            step="0.01"
+                            value="{{ old('discount_amount', 0) }}"
+                            placeholder="مقدار تخفیف"
+                        >
+                    </div>
+                    <div class="discount-line" id="orderDiscountPreview">تخفیف کلی: 0 تومان</div>
+                </div>
+
+                <div>
+                    <label class="label-sm">هزینه ارسال</label>
                     <input
                         type="text"
                         id="shipping_price_view"
-                        class="form-control form-control-sm summary-input"
+                        class="form-control form-control-sm bg-light"
                         readonly
                         value="0 تومان"
                     >
                 </div>
 
-                <div class="col-md-4">
-                    <label class="compact-label">جمع کل (تومان)</label>
+                <div>
+                    <label class="label-sm">مجموع تخفیف</label>
+                    <input
+                        type="text"
+                        id="totalDiscountView"
+                        class="form-control form-control-sm bg-light"
+                        readonly
+                        value="0 تومان"
+                    >
+                </div>
+
+                <div>
+                    <label class="label-sm">جمع کل</label>
                     <input
                         type="text"
                         name="total_price"
                         id="total_price"
-                        class="form-control form-control-sm fw-bold summary-input"
+                        class="form-control form-control-sm total-view"
                         readonly
+                        value="0"
                     >
                 </div>
+
+                <div>
+                    <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold" id="submitOrderBtn">
+                        ثبت پیش‌فاکتور
+                    </button>
+                </div>
             </div>
-
-            <input type="hidden" name="payment_status" value="pending">
-        </div>
-
-        <div class="sticky-submit">
-            <button class="btn btn-primary w-100 py-2 shadow-sm">✅ ثبت پیش‌فاکتور</button>
         </div>
     </form>
 </div>
@@ -510,27 +869,87 @@
 <div class="modal fade" id="groupPickerModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">انتخاب کالاهای نهایی محصول مادر</h5>
+            <div class="modal-header picker-head">
+                <div>
+                    <h5 class="modal-title fw-bold" id="pickerModalTitle">انتخاب کالا</h5>
+                    <div class="hint mt-1" id="pickerModalSubTitle">—</div>
+                </div>
+
                 <button type="button" class="btn-close m-0" data-bs-dismiss="modal"></button>
             </div>
+
             <div class="modal-body">
-                <div id="groupPickerMeta" class="small text-muted mb-2"></div>
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle">
-                        <thead>
-                        <tr>
-                            <th>مدل لیست</th><th>طرح</th><th>تنوع</th><th>پارت‌نامبر</th><th>موجودی</th><th>قیمت</th><th>تعداد</th>
-                        </tr>
-                        </thead>
-                        <tbody id="groupPickerRows"></tbody>
-                    </table>
+                <div class="picker-toolbar mb-2">
+                    <input
+                        type="text"
+                        id="pickerSearchInput"
+                        class="form-control"
+                        placeholder="جستجو در تنوع یا پارت‌نامبر..."
+                    >
+
+                    <label class="btn btn-light border rounded-3 mb-0">
+                        <input type="checkbox" id="onlyInStockFilter" class="form-check-input ms-1">
+                        فقط موجودها
+                    </label>
+
+                    <label class="btn btn-light border rounded-3 mb-0">
+                        <input type="checkbox" id="onlySelectedFilter" class="form-check-input ms-1">
+                        فقط انتخاب‌شده‌ها
+                    </label>
                 </div>
-                <div id="groupLiveSummary" class="alert alert-light border small mb-0"></div>
+
+                <div class="picker-stats mb-3">
+                    <div class="picker-stat">
+                        <div class="stat-label">ردیف انتخاب‌شده</div>
+                        <div class="stat-value" id="modalSelectedRows">0</div>
+                    </div>
+
+                    <div class="picker-stat">
+                        <div class="stat-label">جمع تعداد</div>
+                        <div class="stat-value" id="modalTotalQty">0</div>
+                    </div>
+
+                    <div class="picker-stat">
+                        <div class="stat-label">جمع بعد از تخفیف</div>
+                        <div class="stat-value" id="modalTotalAmount">0 تومان</div>
+                    </div>
+                </div>
+
+                <div id="pickerLoading" class="empty-state d-none">
+                    در حال دریافت کالاها...
+                </div>
+
+                <div class="variant-list" id="pickerTableWrap">
+                    <div id="groupPickerRows"></div>
+                </div>
+
+                <div class="modal-discount-box">
+                    <label class="label-sm">تخفیف این محصول</label>
+                    <div class="discount-control">
+                        <select id="modalGroupDiscountType" class="form-select form-select-sm">
+                            <option value="amount">تومان</option>
+                            <option value="percent">درصد</option>
+                        </select>
+                        <input type="number" id="modalGroupDiscountValue" class="form-control form-control-sm" min="0" step="0.01" value="0" placeholder="مقدار تخفیف">
+                    </div>
+                    <div class="discount-line">
+                        مبلغ تخفیف این محصول: <strong id="modalGroupDiscountPreview">0 تومان</strong>
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">بستن</button>
-                <button type="button" id="saveGroupSelectionBtn" class="btn btn-primary btn-sm">اتمام و افزودن به سفارش</button>
+
+            <div class="modal-footer picker-head">
+                <button type="button" class="btn btn-light border rounded-3" id="clearPickerQtyBtn">
+                    پاک کردن تعدادها
+                </button>
+
+                <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">
+                    لغو
+                </button>
+
+                <button type="button" id="saveGroupSelectionBtn" class="btn btn-primary rounded-3 fw-bold px-4">
+                    اتمام و افزودن
+                </button>
             </div>
         </div>
     </div>
@@ -545,1083 +964,34 @@
         customer:  "{{ url('/preinvoice/api/customers') }}"
     };
 
-    var INIT_ROWS = @json($initRows);
-    var INITIAL_SHIPPINGS = @json($shippingMethods);
-    var OLD_CUSTOMER_ID = @json(old('customer_id', ''));
-    var OLD_PROVINCE_ID = @json(old('province_id', ''));
-    var OLD_CITY_ID = @json(old('city_id', ''));
-    var INIT_GROUP_ROWS = @json($initRows);
+    const INIT_ROWS = @json($initRows);
+    const INITIAL_SHIPPINGS = @json($shippingMethods);
+    const OLD_CUSTOMER_ID = @json(old('customer_id', ''));
+    const OLD_PROVINCE_ID = @json(old('province_id', ''));
+    const OLD_CITY_ID = @json(old('city_id', ''));
+    const OLD_SHIPPING_ID = @json(old('shipping_id', ''));
 </script>
 
 <script>
-let selectedMotherProduct = null;
-let groupedSelections = {};
-let activeEditingProductId = null;
+    let shippings = INITIAL_SHIPPINGS || [];
+    let areaProvinces = [];
+    const productCache = new Map();
 
-function renderGroupSummary() {
-    const wrap = document.getElementById('groupSummaryList');
-    const inputWrap = document.getElementById('groupProductsInputs');
-    if (!wrap || !inputWrap) return;
-    wrap.innerHTML = '';
-    inputWrap.innerHTML = '';
-    let idx = 0;
-    Object.values(groupedSelections).forEach(group => {
-        const qty = group.items.reduce((s, it) => s + Number(it.quantity || 0), 0);
-        const amount = group.items.reduce((s, it) => s + (Number(it.quantity || 0) * Number(it.price || 0)), 0);
-        const card = document.createElement('div');
-        card.className = 'border rounded-3 p-2 d-flex justify-content-between align-items-center';
-        card.innerHTML = '<div><strong>' + group.product.title + '</strong><div class="small text-muted">تعداد: ' + qty.toLocaleString('fa-IR') + ' | مبلغ: ' + amount.toLocaleString('fa-IR') + ' تومان</div></div><button type="button" class="btn btn-sm btn-outline-secondary">ویرایش</button>';
-        card.querySelector('button').addEventListener('click', () => openGroupPicker(group.product.id));
-        wrap.appendChild(card);
-        group.items.forEach(item => {
-            inputWrap.insertAdjacentHTML('beforeend', '<input type="hidden" name="products[' + idx + '][id]" value="' + group.product.id + '"><input type="hidden" name="products[' + idx + '][variety_id]" value="' + item.variant_id + '"><input type="hidden" name="products[' + idx + '][quantity]" value="' + item.quantity + '"><input type="hidden" name="products[' + idx + '][price]" value="' + item.price + '">');
-            idx++;
-        });
-    });
-}
+    let selectedMotherProduct = null;
+    let activeProductId = null;
+    let activeProduct = null;
+    let activeModalItems = [];
+    let modalQuantities = new Map();
 
-async function findMotherProductByCode() {
-    const code = String(document.getElementById('motherCodeInput').value || '').trim();
-    if (!code) return;
-    const res = await fetch(API.products + '?q=' + encodeURIComponent(code), { headers: { Accept: 'application/json' } });
-    const json = await res.json();
-    const rows = json?.data?.products?.data || [];
-    selectedMotherProduct = rows[0] || null;
-    const box = document.getElementById('motherProductBox');
-    const pickerWrap = document.getElementById('openGroupPickerWrap');
-    if (!selectedMotherProduct) {
-        box.textContent = 'محصول مادری با این کد پیدا نشد.';
-        pickerWrap.classList.add('d-none');
-        return;
-    }
-    box.textContent = 'محصول مادر: ' + selectedMotherProduct.title + ' | کد: ' + (selectedMotherProduct.sku || '');
-    pickerWrap.classList.remove('d-none');
-}
+    let modalGroupDiscountType = 'amount';
+    let modalGroupDiscountValue = 0;
 
-async function openGroupPicker(productId = null) {
-    const targetId = productId || selectedMotherProduct?.id;
-    if (!targetId) return;
-    const data = await getProductDetails(targetId);
-    if (!data) return;
-    activeEditingProductId = targetId;
-    const current = groupedSelections[targetId]?.items || [];
-    const byVariant = {};
-    current.forEach(i => byVariant[i.variant_id] = Number(i.quantity || 0));
-    document.getElementById('groupPickerMeta').textContent = data.title;
-    const tbody = document.getElementById('groupPickerRows');
-    tbody.innerHTML = '';
-    (data.varieties || []).forEach(v => {
-        tbody.insertAdjacentHTML('beforeend', '<tr><td>' + (v.model_list_name || '—') + '</td><td>' + (v.variety_name || '—') + '</td><td>' + (v.variant_name || '—') + '</td><td>' + (v.barcode || v.variety_code || '—') + '</td><td>' + Number(v.quantity || 0).toLocaleString('fa-IR') + '</td><td>' + Number(v.price || 0).toLocaleString('fa-IR') + '</td><td><input type="number" min="0" max="' + Number(v.quantity || 0) + '" data-variant="' + v.id + '" data-price="' + Number(v.price || 0) + '" class="form-control form-control-sm group-qty-input" value="' + (byVariant[v.id] || 0) + '"></td></tr>');
-    });
-    updateModalLiveSummary();
-    new bootstrap.Modal(document.getElementById('groupPickerModal')).show();
-}
+    let groupedSelections = {};
 
-function updateModalLiveSummary() {
-    let qty = 0, amount = 0;
-    document.querySelectorAll('.group-qty-input').forEach(i => {
-        const q = Math.max(0, Number(i.value || 0));
-        const p = Number(i.dataset.price || 0);
-        qty += q; amount += (q * p);
-    });
-    document.getElementById('groupLiveSummary').textContent = 'خلاصه لحظه‌ای: ' + qty.toLocaleString('fa-IR') + ' عدد | ' + amount.toLocaleString('fa-IR') + ' تومان';
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('findMotherBtn')?.addEventListener('click', findMotherProductByCode);
-    document.getElementById('openGroupPickerBtn')?.addEventListener('click', () => openGroupPicker());
-    document.addEventListener('input', e => { if (e.target.classList.contains('group-qty-input')) updateModalLiveSummary(); });
-    document.getElementById('saveGroupSelectionBtn')?.addEventListener('click', function () {
-        if (!activeEditingProductId) return;
-        const product = (selectedMotherProduct && Number(selectedMotherProduct.id) === Number(activeEditingProductId)) ? selectedMotherProduct : (groupedSelections[activeEditingProductId]?.product || null);
-        const items = [];
-        document.querySelectorAll('.group-qty-input').forEach(i => {
-            const q = Number(i.value || 0);
-            if (q > 0) items.push({ variant_id: Number(i.dataset.variant), quantity: q, price: Number(i.dataset.price) });
-        });
-        if (product && items.length > 0) groupedSelections[activeEditingProductId] = { product, items };
-        renderGroupSummary();
-        bootstrap.Modal.getInstance(document.getElementById('groupPickerModal'))?.hide();
-        updateTotal();
-    });
-    INIT_GROUP_ROWS.forEach(r => {
-        const key = Number(r.id);
-        if (!groupedSelections[key]) groupedSelections[key] = { product: { id: r.id, title: r.name || ('محصول #' + r.id), sku: '' }, items: [] };
-        groupedSelections[key].items.push({ variant_id: r.variety_id, quantity: Number(r.quantity || 0), price: Number(r.price || 0) });
-    });
-    renderGroupSummary();
-});
-</script>
-
-<script>
-let shippings = INITIAL_SHIPPINGS || [];
-let areaProvinces = [];
-let globalRowIndex = 0;
-const productCache = new Map();
-
-function createEl(html) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html.trim();
-    return tmp.firstChild;
-}
-
-function formatPrice(val) {
-    const n = Number(val || 0);
-    return n.toLocaleString('fa-IR');
-}
-
-function normalizeText(val) {
-    return String(val || '').trim();
-}
-
-function shippingById(id) {
-    return shippings.find(function (x) {
-        return Number(x.id) === Number(id);
-    }) || null;
-}
-
-function isInPersonShipping(ship) {
-    if (!ship || !ship.name) return false;
-    const name = String(ship.name).trim();
-    return name.indexOf('حضوری') !== -1 || name.indexOf('مراجعه') !== -1;
-}
-
-function initLocationSelect2(selectEl, placeholder) {
-    if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
-    const $el = $(selectEl);
-
-    if ($el.hasClass('select2-hidden-accessible')) {
-        $el.off('select2:select select2:clear');
-        $el.select2('destroy');
-    }
-
-    $el.select2({
-        width: '100%',
-        dir: 'rtl',
-        placeholder: placeholder,
-        allowClear: true
-    });
-
-    $el.on('select2:select select2:clear', function () {
-        this.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-}
-
-function setSelectDisabled(selectEl, disabled) {
-    selectEl.disabled = disabled;
-    if (window.jQuery && $(selectEl).hasClass('select2-hidden-accessible')) {
-        $(selectEl).prop('disabled', disabled).trigger('change.select2');
-    }
-}
-
-async function loadArea() {
-    const res = await fetch(API.area, { headers: { 'Accept': 'application/json' } });
-    const data = await res.json();
-    areaProvinces = (data && data.data && data.data.provinces) ? data.data.provinces : [];
-}
-
-function fillProvincesSelect(provincesToShow) {
-    const provinceSelect = document.getElementById('province_id');
-    provinceSelect.innerHTML = '<option value=""></option>';
-
-    (provincesToShow || []).forEach(function (p) {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = (p.name || '').trim();
-        provinceSelect.appendChild(opt);
-    });
-
-    initLocationSelect2(provinceSelect, 'انتخاب استان...');
-}
-
-function fillCities(citiesToShow) {
-    const citySelect = document.getElementById('city_id');
-    citySelect.innerHTML = '<option value=""></option>';
-
-    (citiesToShow || []).forEach(function (c) {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = (c.name || '').trim();
-        citySelect.appendChild(opt);
-    });
-
-    setSelectDisabled(citySelect, (citiesToShow || []).length === 0);
-    initLocationSelect2(citySelect, 'انتخاب شهر...');
-}
-
-function fillCitiesByProvinceId(provinceId) {
-    const province = areaProvinces.find(function (p) {
-        return Number(p.id) === Number(provinceId);
-    });
-
-    fillCities(province && province.cities ? province.cities : []);
-}
-
-function fillShippingSelect() {
-    const shippingSelect = document.getElementById('shipping_id');
-    shippingSelect.innerHTML = '<option value="">انتخاب روش ارسال...</option>';
-
-    shippings.forEach(function (s) {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = s.name;
-        shippingSelect.appendChild(opt);
-    });
-}
-
-function toggleShippingFields() {
-    const shippingSelect = document.getElementById('shipping_id');
-    const ship = shippingById(shippingSelect.value);
-    const inPerson = isInPersonShipping(ship);
-
-    const locationWrapper = document.getElementById('locationWrapper');
-    const addressWrapper = document.getElementById('addressWrapper');
-    const provinceEl = document.getElementById('province_id');
-    const addressEl = document.getElementById('customer_address');
-    const hintEl = document.getElementById('shipping_mode_hint');
-
-    if (inPerson) {
-        locationWrapper.style.display = 'none';
-        addressWrapper.style.display = 'none';
-        provinceEl.required = false;
-        addressEl.required = false;
-        hintEl.textContent = 'برای مراجعه حضوری نیازی به ثبت آدرس، استان و شهر نیست.';
-    } else {
-        locationWrapper.style.display = '';
-        addressWrapper.style.display = '';
-        provinceEl.required = true;
-        addressEl.required = true;
-        hintEl.textContent = 'با تغییر روش ارسال، جمع کل دوباره محاسبه می‌شود.';
-    }
-}
-
-function setCustomerLocation(provinceId, cityId) {
-    const provinceSelect = document.getElementById('province_id');
-    const citySelect = document.getElementById('city_id');
-
-    if (provinceId) {
-        provinceSelect.value = String(provinceId);
-        if (window.jQuery) $(provinceSelect).trigger('change.select2');
-        fillCitiesByProvinceId(provinceId);
-    } else {
-        provinceSelect.value = '';
-        if (window.jQuery) $(provinceSelect).trigger('change.select2');
-        fillCities([]);
-    }
-
-    if (cityId) {
-        citySelect.value = String(cityId);
-        if (window.jQuery) $(citySelect).trigger('change.select2');
-    } else {
-        citySelect.value = '';
-        if (window.jQuery) $(citySelect).trigger('change.select2');
-    }
-}
-
-function customerFullName(c) {
-    if (!c) return '';
-    const full = (((c.first_name || '').trim() + ' ' + (c.last_name || '').trim()).trim());
-    if (full) return full;
-    return (c.customer_name || c.name || '').trim();
-}
-
-function applyCustomerToForm(c) {
-    if (!c) return;
-
-    document.getElementById('customer_id').value = c.id || '';
-    document.getElementById('customer_name').value = customerFullName(c);
-    document.getElementById('customer_mobile').value = c.mobile || '';
-    document.getElementById('customer_address').value = c.address || '';
-
-    setCustomerLocation(c.province_id || '', c.city_id || '');
-
-    document.getElementById('selectedCustomerTitle').textContent =
-        customerFullName(c) + (c.mobile ? ' - ' + c.mobile : '');
-
-    document.getElementById('customer_balance_hint').textContent =
-        'مانده حساب: ' + Number(c.balance || 0).toLocaleString('fa-IR') + ' تومان';
-}
-
-function preloadCustomerOption(selectEl, customer) {
-    if (!selectEl || !customer || !window.jQuery) return;
-
-    const text = customerFullName(customer) + (customer.mobile ? ' - ' + customer.mobile : '');
-    const exists = Array.from(selectEl.options).some(function (opt) {
-        return Number(opt.value) === Number(customer.id);
-    });
-
-    if (!exists) {
-        const option = new Option(text, customer.id, true, true);
-        selectEl.add(option);
-    }
-
-    $(selectEl).val(String(customer.id)).trigger('change');
-}
-
-function initInlineCustomerSearch() {
-    const selectEl = document.getElementById('customer_search_select');
-
-    if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) return;
-
-    $(selectEl).select2({
-        width: '100%',
-        dir: 'rtl',
-        placeholder: 'جستجو با نام یا شماره موبایل...',
-        allowClear: true,
-        minimumInputLength: 1,
-        ajax: {
-            url: API.customers,
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return { q: params.term || '' };
-            },
-            processResults: function (resp) {
-                const items = (resp && resp.data && resp.data.customers) ? resp.data.customers : [];
-                return {
-                    results: items.map(function (c) {
-                        return {
-                            id: c.id,
-                            text: customerFullName(c) + ' - ' + (c.mobile || '')
-                        };
-                    })
-                };
-            }
-        }
-    });
-
-    $(selectEl).on('select2:select', async function (e) {
-        const customerId = e && e.params && e.params.data ? e.params.data.id : null;
-        if (!customerId) return;
-
-        try {
-            const res = await fetch(API.customer + '/' + customerId, { headers: { 'Accept': 'application/json' } });
-            const json = await res.json();
-            const customer = json && json.data ? json.data.customer : null;
-            if (customer) applyCustomerToForm(customer);
-        } catch (error) {}
-    });
-
-    $(selectEl).on('select2:clear', function () {
-        document.getElementById('customer_id').value = '';
-        document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
-        document.getElementById('customer_balance_hint').textContent = '';
-    });
-}
-
-async function loadOldCustomer() {
-    const cid = document.getElementById('customer_id').value || OLD_CUSTOMER_ID || '';
-    if (!cid) return;
-
-    try {
-        const res = await fetch(API.customer + '/' + cid, { headers: { 'Accept': 'application/json' } });
-        const json = await res.json();
-        const customer = json && json.data ? json.data.customer : null;
-
-        if (customer) {
-            applyCustomerToForm(customer);
-            preloadCustomerOption(document.getElementById('customer_search_select'), customer);
-        }
-    } catch (e) {}
-}
-
-async function getProductDetails(productId) {
-    const id = String(productId || '');
-    if (productCache.has(id)) return productCache.get(id);
-
-    const res = await fetch(API.product + '/' + id, { headers: { 'Accept': 'application/json' } });
-    const data = await res.json();
-    const product = data && data.data ? data.data.product : null;
-
-    productCache.set(id, product);
-    return product;
-}
-
-function productTitle(product) {
-    return normalizeText(product && (product.title || product.name || ''));
-}
-
-function getProductVarieties(product) {
-    if (!product) return [];
-    if (Array.isArray(product.varieties)) return product.varieties;
-    if (Array.isArray(product.variants)) return product.variants;
-    return [];
-}
-
-function varietyModelLabel(v) {
-    return normalizeText(v && v.model_list_name) || '—';
-}
-
-function varietyDesignLabel(v) {
-    const designName = normalizeText(v && v.variety_name);
-    const designCode = normalizeText(v && v.variety_code);
-
-    if (designName && designCode) return designName + ' (' + designCode + ')';
-    if (designName) return designName;
-    if (designCode) return designCode;
-    return normalizeText(v && v.variant_name) || '—';
-}
-
-function productStockValue(product) {
-    if (!product) return 0;
-    if (product.quantity !== undefined && product.quantity !== null) return Number(product.quantity) || 0;
-    if (product.stock !== undefined && product.stock !== null) return Number(product.stock) || 0;
-    return 0;
-}
-
-function varietyStockValue(v) {
-    if (!v) return 0;
-    if (v.quantity !== undefined && v.quantity !== null) return Number(v.quantity) || 0;
-    if (v.stock !== undefined && v.stock !== null) return Number(v.stock) || 0;
-    return 0;
-}
-
-function setStockUI(row, stockQty) {
-    const qtyInput = row.querySelector('.quantity-input');
-    const badge = row.querySelector('.stock-badge');
-
-    const qty = Number.isFinite(Number(stockQty)) ? Number(stockQty) : 0;
-
-    if (qty > 0) {
-        qtyInput.disabled = false;
-        qtyInput.min = '1';
-        qtyInput.max = String(qty);
-
-        const cur = parseInt(String(qtyInput.value || '').trim(), 10);
-        if (Number.isFinite(cur)) {
-            if (cur < 1) qtyInput.value = '1';
-            if (cur > qty) qtyInput.value = String(qty);
-        } else if (String(qtyInput.value || '').trim() !== '') {
-            qtyInput.value = '1';
-        }
-
-        badge.className = 'badge bg-success stock-badge';
-        badge.textContent = 'موجودی: ' + qty;
-    } else {
-        qtyInput.value = '0';
-        qtyInput.min = '0';
-        qtyInput.max = '0';
-        qtyInput.disabled = true;
-
-        badge.className = 'badge bg-danger stock-badge';
-        badge.textContent = 'ناموجود';
-    }
-
-    refreshQtyButtons(row);
-}
-
-function clampQtyInput(input, allowEmpty = false) {
-    const raw = String(input.value || '').trim();
-
-    if (allowEmpty && raw === '') {
-        return;
-    }
-
-    const min = parseInt(input.min || '0', 10) || 0;
-    const max = parseInt(input.max || '0', 10) || 0;
-    let val = parseInt(raw, 10);
-
-    if (!Number.isFinite(val)) val = min;
-
-    if (max > 0 && val > max) val = max;
-    if (val < min) val = min;
-
-    input.value = String(val);
-}
-
-function changeQty(input, delta) {
-    if (!input || input.disabled) return;
-
-    const min = parseInt(input.min || '0', 10) || 0;
-    const max = parseInt(input.max || '0', 10) || 0;
-    const raw = String(input.value || '').trim();
-    let current = parseInt(raw, 10);
-
-    if (!Number.isFinite(current)) {
-        current = min > 0 ? min : 0;
-    }
-
-    current += delta;
-
-    if (max > 0 && current > max) current = max;
-    if (current < min) current = min;
-
-    input.value = String(current);
-    refreshQtyButtons(input.closest('.variety-row'));
-    updateTotal();
-}
-
-function refreshQtyButtons(row) {
-    if (!row) return;
-
-    const input = row.querySelector('.quantity-input');
-    const minusBtn = row.querySelector('.qty-minus');
-    const plusBtn = row.querySelector('.qty-plus');
-
-    if (!input || !minusBtn || !plusBtn) return;
-
-    const min = parseInt(input.min || '0', 10) || 0;
-    const max = parseInt(input.max || '0', 10) || 0;
-    const raw = String(input.value || '').trim();
-    const val = parseInt(raw, 10);
-
-    if (input.disabled) {
-        minusBtn.disabled = true;
-        plusBtn.disabled = true;
-        return;
-    }
-
-    minusBtn.disabled = Number.isFinite(val) ? val <= min : false;
-    plusBtn.disabled = (max > 0 && Number.isFinite(val)) ? val >= max : false;
-}
-
-function updateBlockSummary(block) {
-    const summaryTitle = block.querySelector('.summary-title');
-    const summarySubtotal = block.querySelector('.summary-subtotal');
-    const summaryRows = block.querySelector('.summary-rows');
-    const bodySubtotal = block.querySelector('.block-subtotal');
-    const productNameEl = block.querySelector('.product-name-label');
-
-    let subtotal = 0;
-    const rows = block.querySelectorAll('.variety-row');
-
-    rows.forEach(function (row) {
-        const price = parseFloat(row.querySelector('.price-raw') ? row.querySelector('.price-raw').value : 0) || 0;
-        const rawQty = row.querySelector('.quantity-input') ? row.querySelector('.quantity-input').value : 0;
-        const quantity = parseInt(String(rawQty || '').trim(), 10) || 0;
-        subtotal += price * quantity;
-    });
-
-    const name = productNameEl.textContent || 'محصول انتخاب نشده';
-    summaryTitle.textContent = name;
-    summarySubtotal.textContent = formatPrice(subtotal) + ' تومان';
-    summaryRows.textContent = rows.length + ' تنوع';
-    bodySubtotal.textContent = formatPrice(subtotal) + ' تومان';
-}
-
-function updateTotal() {
-    const discount = parseFloat(document.getElementById('discount') ? document.getElementById('discount').value : 0) || 0;
-    const shipping = parseFloat(document.getElementById('shipping_price') ? document.getElementById('shipping_price').value : 0) || 0;
-
-    let total = 0;
-
-    document.querySelectorAll('.product-block').forEach(function (block) {
-        updateBlockSummary(block);
-    });
-
-    document.querySelectorAll('.variety-row').forEach(function (row) {
-        const price = parseFloat(row.querySelector('.price-raw') ? row.querySelector('.price-raw').value : 0) || 0;
-        const rawQty = row.querySelector('.quantity-input') ? row.querySelector('.quantity-input').value : 0;
-        const quantity = parseInt(String(rawQty || '').trim(), 10) || 0;
-        total += price * quantity;
-        refreshQtyButtons(row);
-    });
-
-    const finalTotal = Math.max(total + shipping - discount, 0);
-    document.getElementById('total_price').value = finalTotal.toLocaleString('fa-IR');
-}
-
-function collapseBlock(block) {
-    const productId = block.querySelector('.product-select').value || '';
-    if (!productId) {
-        alert('اول محصول را انتخاب کن.');
-        return;
-    }
-
-    const hasValidRow = Array.from(block.querySelectorAll('.variety-row')).some(function (row) {
-        const varietyEl = row.querySelector('.selected-variety-id');
-        return !!(varietyEl && varietyEl.value);
-    });
-
-    if (!hasValidRow) {
-        alert('حداقل یک تنوع معتبر برای این محصول انتخاب کن.');
-        return;
-    }
-
-    updateBlockSummary(block);
-    block.classList.add('is-collapsed');
-}
-
-function expandBlock(block) {
-    block.classList.remove('is-collapsed');
-}
-
-function initProductSelect2(selectEl) {
-    $(selectEl).select2({
-        width: '100%',
-        dir: 'rtl',
-        placeholder: 'جستجوی نام یا کد 4 رقمی محصول...',
-        allowClear: true,
-        minimumInputLength: 1,
-        ajax: {
-            url: API.products,
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return { q: params.term || '', page: params.page || 1 };
-            },
-            processResults: function (resp, params) {
-                params.page = params.page || 1;
-
-                const list = (resp && resp.data && resp.data.products && resp.data.products.data) ? resp.data.products.data : [];
-                const more = !!(resp && resp.data && resp.data.products && resp.data.products.next_page_url);
-
-                return {
-                    results: list.map(function (p) {
-                        const code = p.code || '';
-                        const title = p.title || p.name || '';
-                        return {
-                            id: p.id,
-                            text: '[کد: ' + code + '] ' + title
-                        };
-                    }),
-                    pagination: { more: more }
-                };
-            }
-        }
-    });
-
-    $(selectEl).on('select2:select select2:clear', function () {
-        this.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-}
-
-function addProductBlock(prefill) {
-    prefill = prefill || {};
-    const container = document.getElementById('productBlocksContainer');
-    const blockIndex = container.children.length + 1;
-
-    const block = createEl(
-        '<div class="product-block">' +
-            '<div class="product-header">' +
-                '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">' +
-                    '<div>' +
-                        '<div class="fw-bold text-primary">محصول #' + blockIndex + '</div>' +
-                        '<div class="hint">محصول را انتخاب کن و تنوع‌ها را وارد کن</div>' +
-                    '</div>' +
-                    '<div class="d-flex gap-2 flex-wrap">' +
-                        '<span class="chip"><span class="text-muted">نام:</span><span class="fw-bold product-name-label">—</span></span>' +
-                        '<span class="chip"><span class="text-muted">کد:</span><span class="fw-bold product-code-label">—</span></span>' +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-
-            '<div class="product-body">' +
-                '<div class="mb-2">' +
-                    '<label class="compact-label">انتخاب کالا</label>' +
-                    '<select class="form-select form-select-sm product-select" required></select>' +
-                '</div>' +
-
-                '<div class="varieties-wrapper">' +
-                    '<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">' +
-                        '<div class="fw-semibold fs-7 text-secondary">تنوع‌های این محصول</div>' +
-                        '<button type="button" class="btn btn-outline-primary btn-sm add-variety-btn">➕ افزودن تنوع</button>' +
-                    '</div>' +
-
-                    '<div class="varieties-list-container"></div>' +
-
-                    '<div class="row-tools d-flex justify-content-between align-items-center flex-wrap gap-2">' +
-                        '<div class="block-subtotal-box d-flex justify-content-between align-items-center gap-3">' +
-                            '<span class="fw-bold fs-7">جمع این محصول</span>' +
-                            '<span class="fw-bold block-subtotal">0 تومان</span>' +
-                        '</div>' +
-                        '<div class="d-flex align-items-center gap-2">' +
-                            '<button type="button" class="icon-btn ok collapse-block-btn" title="تکمیل محصول">✓</button>' +
-                            '<button type="button" class="icon-btn danger remove-block-btn" title="حذف محصول">✕</button>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-
-            '<div class="product-summary">' +
-                '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">' +
-                    '<div class="summary-line">' +
-                        '<span class="fw-bold summary-title">—</span>' +
-                        '<span class="text-muted mx-2">|</span>' +
-                        '<span class="summary-rows text-muted">0 تنوع</span>' +
-                    '</div>' +
-                    '<div class="d-flex align-items-center gap-2 flex-wrap">' +
-                        '<span class="chip"><span class="text-muted">جمع:</span><span class="fw-bold summary-subtotal">0 تومان</span></span>' +
-                        '<button type="button" class="icon-btn muted edit-block-btn" title="باز کردن محصول">✎</button>' +
-                        '<button type="button" class="icon-btn danger remove-block-btn" title="حذف محصول">✕</button>' +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-        '</div>'
-    );
-
-    container.appendChild(block);
-
-    const productSelect = block.querySelector('.product-select');
-    initProductSelect2(productSelect);
-
-    block.querySelectorAll('.remove-block-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            block.remove();
-            updateTotal();
-        });
-    });
-
-    block.querySelector('.collapse-block-btn').addEventListener('click', function () {
-        collapseBlock(block);
-    });
-
-    block.querySelector('.edit-block-btn').addEventListener('click', function () {
-        expandBlock(block);
-    });
-
-    block.querySelector('.add-variety-btn').addEventListener('click', function () {
-        const pid = productSelect.value || '';
-        if (!pid) {
-            alert('اول محصول را انتخاب کن.');
-            return;
-        }
-        addVarietyRow(block, pid, null);
-    });
-
-    productSelect.addEventListener('change', async function () {
-        const pid = productSelect.value || '';
-        const list = block.querySelector('.varieties-list-container');
-
-        block.querySelector('.product-name-label').textContent = '—';
-        block.querySelector('.product-code-label').textContent = '—';
-        list.innerHTML = '';
-
-        if (!pid) {
-            updateTotal();
-            return;
-        }
-
-        const product = await getProductDetails(pid);
-        const name = productTitle(product) || '—';
-        const code = product && product.code ? product.code : '—';
-
-        block.querySelector('.product-name-label').textContent = name;
-        block.querySelector('.product-code-label').textContent = String(code);
-
-        expandBlock(block);
-        addVarietyRow(block, pid, null);
-        updateTotal();
-    });
-
-    if (prefill.product_id) {
-        (async function () {
-            const pid = String(prefill.product_id);
-            const product = await getProductDetails(pid);
-            const code = product && product.code ? product.code : '';
-            const title = productTitle(product);
-            const text = '[کد: ' + code + '] ' + title;
-
-            const opt = new Option(text, pid, true, true);
-            productSelect.appendChild(opt);
-            $(productSelect).trigger('change');
-
-            if (prefill.rows && prefill.rows.length) {
-                const list = block.querySelector('.varieties-list-container');
-                list.innerHTML = '';
-                for (let i = 0; i < prefill.rows.length; i++) {
-                    await addVarietyRow(block, pid, prefill.rows[i]);
-                }
-            }
-
-            updateTotal();
-        })();
-    }
-
-    return block;
-}
-
-async function addVarietyRow(block, productId, prefillRow) {
-    const list = block.querySelector('.varieties-list-container');
-    const idx = globalRowIndex++;
-
-    const row = createEl(
-        '<div class="variety-row row g-2 align-items-end">' +
-            '<input type="hidden" name="products[' + idx + '][id]" class="hidden-product-id" value="' + String(productId) + '">' +
-            '<input type="hidden" name="products[' + idx + '][variety_id]" class="selected-variety-id" value="">' +
-
-            '<div class="col-md-3">' +
-                '<label class="compact-label">مدل‌لیست</label>' +
-                '<select class="form-select form-select-sm model-select" required>' +
-                    '<option value="">در حال بارگذاری...</option>' +
-                '</select>' +
-                '<div class="mt-1 d-flex gap-2 flex-wrap">' +
-                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">مدل‌لیست: <span class="selected-model-label">—</span></span>' +
-                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">طرح‌بندی: <span class="selected-design-label">—</span></span>' +
-                '</div>' +
-            '</div>' +
-
-            '<div class="col-md-3">' +
-                '<label class="compact-label">طرح‌بندی</label>' +
-                '<select class="form-select form-select-sm design-select" required disabled>' +
-                    '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>' +
-                '</select>' +
-            '</div>' +
-
-            '<div class="col-md-2">' +
-                '<label class="compact-label">تعداد</label>' +
-                '<div class="qty-box">' +
-                    '<button type="button" class="qty-btn qty-plus" title="افزایش">+</button>' +
-                    '<input type="number" name="products[' + idx + '][quantity]" class="form-control form-control-sm quantity-input" min="1" value="1" inputmode="numeric" required>' +
-                    '<button type="button" class="qty-btn qty-minus" title="کاهش">−</button>' +
-                '</div>' +
-            '</div>' +
-
-            '<div class="col-md-3">' +
-                '<label class="compact-label">قیمت واحد</label>' +
-                '<input type="text" class="form-control form-control-sm price-view" readonly>' +
-                '<input type="hidden" name="products[' + idx + '][price]" class="price-raw" value="0">' +
-                '<div class="mt-1 d-flex gap-2 flex-wrap align-items-center">' +
-                    '<span class="badge bg-secondary stock-badge">—</span>' +
-                    '<span class="badge bg-light text-dark mono code11-badge" style="border:1px solid #e2e8f0;">—</span>' +
-                '</div>' +
-            '</div>' +
-
-            '<div class="col-md-1 text-center">' +
-                '<button type="button" class="icon-btn danger remove-variety-btn mt-4 mt-md-0" title="حذف تنوع">✕</button>' +
-            '</div>' +
-        '</div>'
-    );
-
-    list.appendChild(row);
-
-    const modelSelect = row.querySelector('.model-select');
-    const designSelect = row.querySelector('.design-select');
-    const varietyInput = row.querySelector('.selected-variety-id');
-    const qtyInput = row.querySelector('.quantity-input');
-    const priceRaw = row.querySelector('.price-raw');
-    const priceView = row.querySelector('.price-view');
-    const codeBadge = row.querySelector('.code11-badge');
-    const modelLabelEl = row.querySelector('.selected-model-label');
-    const designLabelEl = row.querySelector('.selected-design-label');
-    const plusBtn = row.querySelector('.qty-plus');
-    const minusBtn = row.querySelector('.qty-minus');
-
-    row.querySelector('.remove-variety-btn').addEventListener('click', function () {
-        if (list.children.length <= 1) {
-            alert('حداقل یک تنوع باید برای این محصول وجود داشته باشد.');
-            return;
-        }
-        row.remove();
-        updateTotal();
-    });
-
-    plusBtn.addEventListener('click', function () {
-        changeQty(qtyInput, 1);
-    });
-
-    minusBtn.addEventListener('click', function () {
-        changeQty(qtyInput, -1);
-    });
-
-    qtyInput.addEventListener('input', function () {
-        const raw = String(qtyInput.value || '');
-
-        if (raw !== '' && !/^\d+$/.test(raw)) {
-            qtyInput.value = raw.replace(/[^\d]/g, '');
-        }
-
-        refreshQtyButtons(row);
-        updateTotal();
-    });
-
-    qtyInput.addEventListener('blur', function () {
-        clampQtyInput(qtyInput, false);
-        refreshQtyButtons(row);
-        updateTotal();
-    });
-
-    qtyInput.addEventListener('keydown', function (e) {
-        if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            changeQty(qtyInput, 1);
-        } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            changeQty(qtyInput, -1);
-        }
-    });
-
-    const product = await getProductDetails(productId);
-    const varieties = getProductVarieties(product).filter(function (v) {
-        return varietyStockValue(v) > 0;
-    });
-
-    modelSelect.innerHTML = '<option value="">انتخاب مدل‌لیست...</option>';
-    designSelect.innerHTML = '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>';
-    designSelect.disabled = true;
-
-    if (!varieties.length) {
-        modelSelect.innerHTML = '<option value="">مدل موجودی‌دار ندارد</option>';
-        modelSelect.disabled = true;
-        designSelect.innerHTML = '<option value="">طرح موجودی‌دار ندارد</option>';
-
-        qtyInput.value = '0';
-        qtyInput.disabled = true;
-        priceRaw.value = '0';
-        priceView.value = '';
-        varietyInput.value = '';
-        setStockUI(row, 0);
-        codeBadge.textContent = '—';
-        modelLabelEl.textContent = '—';
-        designLabelEl.textContent = '—';
-        updateTotal();
-        return;
-    }
-
-    const modelGroups = new Map();
-    varieties.forEach(function (v) {
-        const key = varietyModelLabel(v);
-        if (!modelGroups.has(key)) modelGroups.set(key, []);
-        modelGroups.get(key).push(v);
-    });
-
-    Array.from(modelGroups.keys()).sort(function (a, b) {
-        return a.localeCompare(b, 'fa');
-    }).forEach(function (modelName) {
-        const opt = document.createElement('option');
-        opt.value = modelName;
-        opt.textContent = modelName;
-        modelSelect.appendChild(opt);
-    });
-
-    if (prefillRow) {
-        if (prefillRow.quantity !== undefined && prefillRow.quantity !== null) {
-            qtyInput.value = String(prefillRow.quantity);
-        }
-    }
-
-    function applySelectedVariety(v) {
-        if (!v) {
-            varietyInput.value = '';
-            priceRaw.value = '0';
-            priceView.value = '';
-            setStockUI(row, 0);
-            codeBadge.textContent = '—';
-            modelLabelEl.textContent = '—';
-            designLabelEl.textContent = '—';
-            refreshQtyButtons(row);
-            updateTotal();
-            return;
-        }
-
-        const price = Number(v.price || v.sell_price || product.price || 0);
-        const stock = varietyStockValue(v);
-        const code11 = (v.variant_code || v.code || v.barcode || '');
-
-        varietyInput.value = String(v.id);
-        priceRaw.value = String(price);
-        priceView.value = formatPrice(price) + ' تومان';
-        setStockUI(row, stock);
-        codeBadge.textContent = code11 ? String(code11) : ('VID-' + String(v.id));
-        modelLabelEl.textContent = varietyModelLabel(v);
-        designLabelEl.textContent = varietyDesignLabel(v);
-
-        clampQtyInput(qtyInput, false);
-
-        if (prefillRow && prefillRow.price !== undefined && prefillRow.price !== null) {
-            priceRaw.value = String(prefillRow.price);
-            priceView.value = formatPrice(prefillRow.price) + ' تومان';
-        }
-
-        refreshQtyButtons(row);
-        updateTotal();
-    }
-
-    function fillDesignsByModel(modelName) {
-        const designs = modelGroups.get(modelName) || [];
-        designSelect.innerHTML = '<option value="">انتخاب طرح‌بندی...</option>';
-        designSelect.disabled = designs.length === 0;
-
-        designs.forEach(function (v) {
-            const opt = document.createElement('option');
-            opt.value = String(v.id);
-            opt.textContent = varietyDesignLabel(v);
-            designSelect.appendChild(opt);
-        });
-    }
-
-    modelSelect.addEventListener('change', function () {
-        fillDesignsByModel(modelSelect.value);
-        applySelectedVariety(null);
-    });
-
-    designSelect.addEventListener('change', function () {
-        const vid = parseInt(designSelect.value || 0, 10);
-        const selected = varieties.find(function (v) {
-            return Number(v.id) === Number(vid);
-        }) || null;
-        applySelectedVariety(selected);
-    });
-
-    const prefillVariantId = parseInt(prefillRow && prefillRow.variety_id ? prefillRow.variety_id : 0, 10);
-    const prefillVariant = prefillVariantId
-        ? (varieties.find(function (v) { return Number(v.id) === Number(prefillVariantId); }) || null)
-        : null;
-
-    if (prefillVariant) {
-        const prefillModel = varietyModelLabel(prefillVariant);
-        modelSelect.value = prefillModel;
-        fillDesignsByModel(prefillModel);
-        designSelect.value = String(prefillVariant.id);
-        applySelectedVariety(prefillVariant);
-    } else {
-        modelSelect.value = modelSelect.options.length > 1 ? modelSelect.options[1].value : '';
-        if (modelSelect.value) {
-            fillDesignsByModel(modelSelect.value);
-            if (designSelect.options.length > 1) {
-                designSelect.value = designSelect.options[1].value;
-                const selected = varieties.find(function (v) {
-                    return Number(v.id) === Number(designSelect.value);
-                }) || null;
-                applySelectedVariety(selected);
-            } else {
-                applySelectedVariety(null);
-            }
-        } else {
-            applySelectedVariety(null);
-        }
-    }
-
-    refreshQtyButtons(row);
-}
-
-function initFromOldOrEdit() {
-    if (!INIT_ROWS || !INIT_ROWS.length) {
-        addProductBlock({});
-        return;
-    }
-
-    const grouped = {};
-
-    INIT_ROWS.forEach(function (r) {
-        const pid = parseInt(r.id || 0, 10);
-        if (!pid) return;
-
-        if (!grouped[pid]) grouped[pid] = [];
-        grouped[pid].push({
-            product_id: pid,
-            variety_id: parseInt(r.variety_id || 0, 10),
-            quantity: parseInt(r.quantity || 1, 10),
-            price: parseInt(r.price || 0, 10)
-        });
-    });
-
-    Object.keys(grouped).forEach(function (pidStr) {
-        const pid = parseInt(pidStr, 10);
-        addProductBlock({
-            product_id: pid,
-            rows: grouped[pid]
-        });
-    });
-
-    updateTotal();
-}
-
-(function () {
     function toEnglishDigits(str) {
         return String(str || '')
-            .replace(/[۰-۹]/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); })
-            .replace(/[٠-٩]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); });
+            .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+            .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
     function toInt(val) {
@@ -1629,114 +999,1071 @@ function initFromOldOrEdit() {
             .replaceAll(',', '')
             .replaceAll('٬', '')
             .replaceAll('،', '')
+            .replace(/[^\d.-]/g, '')
             .trim();
 
         const n = parseFloat(s);
         return Number.isFinite(n) ? Math.trunc(n) : 0;
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const form = document.getElementById('orderForm');
-        if (!form) return;
-
-        form.addEventListener('submit', function () {
-            const totalEl = document.getElementById('total_price');
-            if (totalEl) totalEl.value = String(toInt(totalEl.value));
-
-            const shipEl = document.getElementById('shipping_price');
-            if (shipEl) shipEl.value = String(toInt(shipEl.value));
-
-            const discEl = document.getElementById('discount');
-            if (discEl) discEl.value = String(toInt(discEl.value));
-
-            document.querySelectorAll('.price-raw').forEach(function (el) {
-                el.value = String(toInt(el.value));
-            });
-
-            document.querySelectorAll('.quantity-input').forEach(function (el) {
-                const raw = String(el.value || '').trim();
-                if (raw === '') {
-                    const min = parseInt(el.min || '0', 10) || 0;
-                    el.value = String(min > 0 ? min : 0);
-                } else {
-                    el.value = String(toInt(el.value));
-                }
-            });
-        }, { capture: true });
-    });
-})();
-
-document.addEventListener('DOMContentLoaded', async function () {
-    const shippingSelect = document.getElementById('shipping_id');
-    const provinceSelect = document.getElementById('province_id');
-
-    initLocationSelect2(document.getElementById('province_id'), 'انتخاب استان...');
-    initLocationSelect2(document.getElementById('city_id'), 'انتخاب شهر...');
-
-    await loadArea();
-    fillProvincesSelect(areaProvinces);
-
-    if (OLD_PROVINCE_ID) {
-        document.getElementById('province_id').value = String(OLD_PROVINCE_ID);
-        fillCitiesByProvinceId(OLD_PROVINCE_ID);
-    }
-    if (OLD_CITY_ID) {
-        document.getElementById('city_id').value = String(OLD_CITY_ID);
+    function formatMoney(val) {
+        return Number(val || 0).toLocaleString('fa-IR') + ' تومان';
     }
 
-    fillShippingSelect();
-    initInlineCustomerSearch();
-    await loadOldCustomer();
+    function formatNum(val) {
+        return Number(val || 0).toLocaleString('fa-IR');
+    }
 
-    provinceSelect.addEventListener('change', function () {
-        fillCitiesByProvinceId(provinceSelect.value);
-    });
+    function esc(val) {
+        return String(val ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
 
-    shippingSelect.addEventListener('change', function () {
-        const sid = parseInt(shippingSelect.value || 0, 10);
-        const ship = shippingById(sid) || null;
-        const price = ship ? parseInt(ship.price || 0, 10) : 0;
+    function normalize(val) {
+        return String(val || '').trim();
+    }
+
+    function safeDiscountValue(type, value) {
+        let n = Number(value || 0);
+        if (!Number.isFinite(n)) n = 0;
+        if (n < 0) n = 0;
+
+        if (type === 'percent' && n > 100) n = 100;
+
+        return n;
+    }
+
+    function calcDiscount(baseAmount, type, value) {
+        const base = Math.max(0, Number(baseAmount || 0));
+        const safeType = type === 'percent' ? 'percent' : 'amount';
+        const safeValue = safeDiscountValue(safeType, value);
+
+        if (safeType === 'percent') {
+            return Math.min(base, Math.floor(base * safeValue / 100));
+        }
+
+        return Math.min(base, Math.floor(safeValue));
+    }
+
+    function customerFullName(c) {
+        if (!c) return '';
+        const full = `${c.first_name || ''} ${c.last_name || ''}`.trim();
+        return full || normalize(c.customer_name || c.name);
+    }
+
+    function productTitle(product) {
+        return normalize(product?.title || product?.name) || 'بدون نام';
+    }
+
+    function productCode(product) {
+        return normalize(product?.code || product?.sku || product?.short_code);
+    }
+
+    function getProductVarieties(product) {
+        if (!product) return [];
+        if (Array.isArray(product.varieties)) return product.varieties;
+        if (Array.isArray(product.variants)) return product.variants;
+        return [];
+    }
+
+    function variantId(v) {
+        return Number(v?.id || 0);
+    }
+
+    function variantModel(v) {
+        return normalize(v?.model_list_name || v?.model_name || v?.model_list?.name) || '—';
+    }
+
+    function variantDesign(v) {
+        return normalize(v?.design_name || v?.pattern_name || v?.variety_name || v?.type_name) || '—';
+    }
+
+    function variantName(v) {
+        return normalize(v?.variant_name || v?.color_name || v?.color || v?.name) || '—';
+    }
+
+    function variantCode(v) {
+        return normalize(v?.part_number || v?.barcode || v?.variant_code || v?.variety_code || v?.code) || '—';
+    }
+
+    function variantPrice(v, product = null) {
+        return Number(v?.sell_price ?? v?.price ?? product?.sell_price ?? product?.price ?? 0);
+    }
+
+    function variantStock(v) {
+        if (v?.sellable_stock !== undefined && v?.sellable_stock !== null) {
+            return Number(v.sellable_stock) || 0;
+        }
+
+        const stock = Number(v?.stock ?? v?.quantity ?? 0) || 0;
+        const reserved = Number(v?.reserved ?? 0) || 0;
+
+        return Math.max(0, stock - reserved);
+    }
+
+    function groupRawSubtotal(group) {
+        if (!group || !Array.isArray(group.items)) return 0;
+
+        return group.items.reduce((sum, item) => {
+            return sum + Number(item.quantity || 0) * Number(item.price || 0);
+        }, 0);
+    }
+
+    function groupDiscountTotal(group) {
+        return calcDiscount(
+            groupRawSubtotal(group),
+            group.discount_type || 'amount',
+            group.discount_value || 0
+        );
+    }
+
+    function groupFinalAmount(group) {
+        return Math.max(0, groupRawSubtotal(group) - groupDiscountTotal(group));
+    }
+
+    async function getProductDetails(productId) {
+        const id = String(productId || '');
+        if (!id) return null;
+
+        if (productCache.has(id)) return productCache.get(id);
+
+        const res = await fetch(API.product + '/' + encodeURIComponent(id), {
+            headers: { 'Accept': 'application/json' }
+        });
+
+        const json = await res.json();
+        const product = json?.data?.product || null;
+
+        if (product) productCache.set(id, product);
+
+        return product;
+    }
+
+    function shippingById(id) {
+        return shippings.find(s => Number(s.id) === Number(id)) || null;
+    }
+
+    function isInPersonShipping(ship) {
+        const name = normalize(ship?.name);
+        return name.includes('حضوری') || name.includes('مراجعه');
+    }
+
+    function initSelect2Basic(selectEl, placeholder) {
+        if (!window.jQuery || !window.jQuery.fn?.select2 || !selectEl) return;
+
+        const $el = $(selectEl);
+
+        if ($el.hasClass('select2-hidden-accessible')) {
+            $el.off('select2:select select2:clear');
+            $el.select2('destroy');
+        }
+
+        $el.select2({
+            width: '100%',
+            dir: 'rtl',
+            placeholder,
+            allowClear: true
+        });
+
+        $el.on('select2:select select2:clear', function () {
+            this.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+
+    async function loadArea() {
+        try {
+            const res = await fetch(API.area, { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            areaProvinces = data?.data?.provinces || [];
+        } catch (e) {
+            areaProvinces = [];
+        }
+    }
+
+    function fillProvincesSelect() {
+        const provinceSelect = document.getElementById('province_id');
+        provinceSelect.innerHTML = '<option value=""></option>';
+
+        areaProvinces.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = normalize(p.name);
+            provinceSelect.appendChild(opt);
+        });
+
+        initSelect2Basic(provinceSelect, 'انتخاب استان...');
+    }
+
+    function fillCitiesByProvinceId(provinceId) {
+        const citySelect = document.getElementById('city_id');
+        citySelect.innerHTML = '<option value=""></option>';
+
+        const province = areaProvinces.find(p => Number(p.id) === Number(provinceId));
+        const cities = province?.cities || [];
+
+        cities.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = normalize(c.name);
+            citySelect.appendChild(opt);
+        });
+
+        citySelect.disabled = cities.length === 0;
+        initSelect2Basic(citySelect, 'انتخاب شهر...');
+    }
+
+    function fillShippingSelect() {
+        const shippingSelect = document.getElementById('shipping_id');
+        shippingSelect.innerHTML = '<option value="">انتخاب روش ارسال...</option>';
+
+        shippings.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name;
+            shippingSelect.appendChild(opt);
+        });
+    }
+
+    function updateShippingMode() {
+        const shippingSelect = document.getElementById('shipping_id');
+        const ship = shippingById(shippingSelect.value);
+        const inPerson = isInPersonShipping(ship);
+        const price = ship ? Number(ship.price || 0) : 0;
 
         document.getElementById('shipping_price').value = String(price);
-        document.getElementById('shipping_label').textContent = 'هزینه ارسال: ' + price.toLocaleString('fa-IR') + ' تومان';
-        document.getElementById('shipping_price_view').value = price.toLocaleString('fa-IR') + ' تومان';
+        document.getElementById('shipping_price_view').value = formatMoney(price);
 
-        toggleShippingFields();
+        const provinceBox = document.getElementById('provinceBox');
+        const cityBox = document.getElementById('cityBox');
+        const provinceEl = document.getElementById('province_id');
+        const cityEl = document.getElementById('city_id');
+        const addressEl = document.getElementById('customer_address');
+        const hintEl = document.getElementById('shipping_mode_hint');
+
+        if (inPerson) {
+            provinceBox.style.display = 'none';
+            cityBox.style.display = 'none';
+
+            provinceEl.value = '';
+            cityEl.value = '';
+            addressEl.value = '';
+
+            provinceEl.disabled = true;
+            cityEl.disabled = true;
+
+            hintEl.textContent = 'مراجعه حضوری انتخاب شده؛ آدرس لازم نیست.';
+        } else {
+            provinceBox.style.display = '';
+            cityBox.style.display = '';
+
+            provinceEl.disabled = false;
+            cityEl.disabled = false;
+
+            hintEl.textContent = price > 0
+                ? 'هزینه ارسال: ' + formatMoney(price)
+                : 'برای ارسال غیرحضوری، مقصد و آدرس را تکمیل کنید.';
+        }
+
         updateTotal();
-    });
-
-    document.getElementById('discount').addEventListener('input', updateTotal);
-
-    document.getElementById('addProductBlockBtn').addEventListener('click', function () {
-        addProductBlock({});
-    });
-
-    initFromOldOrEdit();
-
-    const oldShippingId = @json(old('shipping_id', ''));
-    if (oldShippingId) {
-        shippingSelect.value = String(oldShippingId);
     }
 
-shippingSelect.dispatchEvent(new Event('change'));
-    updateTotal();
-});
-</script>
-<script>
-window.updateTotal = function () {
-    const shipping = Number(document.getElementById('shipping_price')?.value || 0);
-    const discount = Number(document.getElementById('discount')?.value || 0);
-    let subtotal = 0;
-    document.querySelectorAll('#groupProductsInputs input[name$=\"[quantity]\"]').forEach((qtyEl) => {
-        const i = qtyEl.name.match(/products\[(\d+)]/);
-        if (!i) return;
-        const idx = i[1];
-        const priceEl = document.querySelector('#groupProductsInputs input[name=\"products[' + idx + '][price]\"]');
-        subtotal += (Number(qtyEl.value || 0) * Number(priceEl?.value || 0));
+    function applyCustomerToForm(c) {
+        if (!c) return;
+
+        const name = customerFullName(c);
+        const mobile = normalize(c.mobile);
+
+        document.getElementById('customer_id').value = c.id || '';
+        document.getElementById('customer_name').value = name;
+        document.getElementById('customer_mobile').value = mobile;
+        document.getElementById('customer_address').value = c.address || '';
+
+        document.getElementById('selectedCustomerTitle').textContent =
+            name + (mobile ? ' - ' + mobile : '');
+
+        document.getElementById('customer_balance_hint').textContent =
+            'مانده حساب: ' + formatMoney(c.balance || 0);
+
+        document.getElementById('customerSummaryBox').classList.add('is-selected');
+
+        if (c.province_id) {
+            document.getElementById('province_id').value = String(c.province_id);
+            if (window.jQuery) $('#province_id').trigger('change.select2');
+            fillCitiesByProvinceId(c.province_id);
+        }
+
+        if (c.city_id) {
+            document.getElementById('city_id').value = String(c.city_id);
+            if (window.jQuery) $('#city_id').trigger('change.select2');
+        }
+    }
+
+    function clearCustomer() {
+        document.getElementById('customer_id').value = '';
+        document.getElementById('customer_name').value = '';
+        document.getElementById('customer_mobile').value = '';
+        document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
+        document.getElementById('customer_balance_hint').textContent = '';
+        document.getElementById('customerSummaryBox').classList.remove('is-selected');
+
+        if (window.jQuery) {
+            $('#customer_search_select').val(null).trigger('change');
+        }
+    }
+
+    function preloadCustomerOption(selectEl, customer) {
+        if (!selectEl || !customer || !window.jQuery) return;
+
+        const text = customerFullName(customer) + (customer.mobile ? ' - ' + customer.mobile : '');
+        const option = new Option(text, customer.id, true, true);
+
+        selectEl.add(option);
+        $(selectEl).trigger('change');
+    }
+
+    function initCustomerSearch() {
+        const selectEl = document.getElementById('customer_search_select');
+
+        if (!window.jQuery || !window.jQuery.fn?.select2) return;
+
+        $(selectEl).select2({
+            width: '100%',
+            dir: 'rtl',
+            placeholder: 'نام یا شماره موبایل مشتری را وارد کنید...',
+            allowClear: true,
+            minimumInputLength: 1,
+            ajax: {
+                url: API.customers,
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ q: params.term || '' }),
+                processResults: resp => {
+                    const items = resp?.data?.customers || [];
+
+                    return {
+                        results: items.map(c => ({
+                            id: c.id,
+                            text: customerFullName(c) + ' - ' + (c.mobile || '')
+                        }))
+                    };
+                }
+            }
+        });
+
+        $(selectEl).on('select2:select', async function (e) {
+            const id = e?.params?.data?.id;
+            if (!id) return;
+
+            try {
+                const res = await fetch(API.customer + '/' + encodeURIComponent(id), {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                const json = await res.json();
+                const customer = json?.data?.customer || null;
+
+                if (customer) applyCustomerToForm(customer);
+            } catch (error) {}
+        });
+
+        $(selectEl).on('select2:clear', clearCustomer);
+    }
+
+    async function loadOldCustomer() {
+        const cid = document.getElementById('customer_id').value || OLD_CUSTOMER_ID || '';
+        if (!cid) return;
+
+        try {
+            const res = await fetch(API.customer + '/' + encodeURIComponent(cid), {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            const json = await res.json();
+            const customer = json?.data?.customer || null;
+
+            if (customer) {
+                applyCustomerToForm(customer);
+                preloadCustomerOption(document.getElementById('customer_search_select'), customer);
+            }
+        } catch (e) {}
+    }
+
+    async function findMotherProductByCode() {
+        const input = document.getElementById('motherCodeInput');
+        const code = toEnglishDigits(input.value).replace(/\D/g, '').slice(0, 4);
+        input.value = code;
+
+        if (code.length !== 4) {
+            alert('کد مادر باید ۴ رقم باشد.');
+            input.focus();
+            return;
+        }
+
+        const btn = document.getElementById('findMotherBtn');
+        const originalText = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = 'در حال جستجو...';
+
+        try {
+            const res = await fetch(API.products + '?q=' + encodeURIComponent(code), {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            const json = await res.json();
+            const rows = json?.data?.products?.data || [];
+
+            selectedMotherProduct =
+                rows.find(p => String(productCode(p)).trim() === code) ||
+                rows.find(p => String(p.code || '').trim() === code) ||
+                rows.find(p => String(p.sku || '').trim() === code) ||
+                rows[0] ||
+                null;
+
+            if (!selectedMotherProduct) {
+                document.getElementById('motherProductBox').style.display = 'none';
+                document.getElementById('motherSearchHint').style.display = '';
+                alert('محصول مادری با این کد پیدا نشد.');
+                input.select();
+                return;
+            }
+
+            document.getElementById('motherSearchHint').style.display = 'none';
+            document.getElementById('motherProductBox').style.display = 'block';
+            document.getElementById('motherProductTitle').textContent = productTitle(selectedMotherProduct);
+            document.getElementById('motherProductCode').textContent = 'کد مادر: ' + (productCode(selectedMotherProduct) || code);
+
+            setTimeout(() => document.getElementById('openGroupPickerBtn').focus(), 50);
+        } catch (e) {
+            alert('خطا در جستجوی محصول. دوباره تلاش کنید.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    }
+
+    async function openGroupPicker(productId = null) {
+        const targetId = productId || selectedMotherProduct?.id;
+        if (!targetId) return;
+
+        const modalEl = document.getElementById('groupPickerModal');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        activeProductId = Number(targetId);
+        activeProduct = groupedSelections[activeProductId]?.product || selectedMotherProduct || null;
+
+        document.getElementById('pickerLoading').classList.remove('d-none');
+        document.getElementById('pickerTableWrap').classList.add('d-none');
+        document.getElementById('groupPickerRows').innerHTML = '';
+        document.getElementById('pickerSearchInput').value = '';
+        document.getElementById('onlyInStockFilter').checked = false;
+        document.getElementById('onlySelectedFilter').checked = false;
+
+        modal.show();
+
+        try {
+            const product = await getProductDetails(activeProductId);
+
+            if (!product) {
+                alert('اطلاعات محصول دریافت نشد.');
+                modal.hide();
+                return;
+            }
+
+            activeProduct = product;
+            activeModalItems = getProductVarieties(product);
+            modalQuantities = new Map();
+
+            const oldItems = groupedSelections[activeProductId]?.items || [];
+            oldItems.forEach(item => {
+                modalQuantities.set(Number(item.variant_id), Number(item.quantity || 0));
+            });
+
+            modalGroupDiscountType = groupedSelections[activeProductId]?.discount_type || 'amount';
+            modalGroupDiscountValue = Number(groupedSelections[activeProductId]?.discount_value || 0);
+
+            document.getElementById('modalGroupDiscountType').value = modalGroupDiscountType;
+            document.getElementById('modalGroupDiscountValue').value = modalGroupDiscountValue;
+
+            document.getElementById('pickerModalTitle').textContent = productTitle(product);
+            document.getElementById('pickerModalSubTitle').textContent =
+                'کد مادر: ' + (productCode(product) || '—') + ' | تعداد ردیف‌ها: ' + formatNum(activeModalItems.length);
+
+            renderPickerRows();
+            updateModalSummary();
+
+            document.getElementById('pickerLoading').classList.add('d-none');
+            document.getElementById('pickerTableWrap').classList.remove('d-none');
+
+            setTimeout(() => document.getElementById('pickerSearchInput').focus(), 200);
+        } catch (e) {
+            alert('خطا در باز کردن لیست کالاها.');
+            modal.hide();
+        }
+    }
+
+    function filteredModalItems() {
+        const q = normalize(document.getElementById('pickerSearchInput').value).toLowerCase();
+        const onlyStock = document.getElementById('onlyInStockFilter').checked;
+        const onlySelected = document.getElementById('onlySelectedFilter').checked;
+
+        return activeModalItems.filter(v => {
+            const id = variantId(v);
+            const qty = Number(modalQuantities.get(id) || 0);
+            const stock = variantStock(v);
+
+            if (onlyStock && stock <= 0) return false;
+            if (onlySelected && qty <= 0) return false;
+
+            if (!q) return true;
+
+            const haystack = [
+                variantModel(v),
+                variantDesign(v),
+                variantName(v),
+                variantCode(v)
+            ].join(' ').toLowerCase();
+
+            return haystack.includes(q);
+        });
+    }
+
+    function modalMaxQty(v) {
+        const id = variantId(v);
+        const currentQty = Number(modalQuantities.get(id) || 0);
+
+        return Math.max(variantStock(v), currentQty);
+    }
+
+    function renderPickerRows() {
+        const wrap = document.getElementById('groupPickerRows');
+        const rows = filteredModalItems();
+
+        if (!rows.length) {
+            wrap.innerHTML = `
+                <div class="empty-state">
+                    موردی برای نمایش وجود ندارد.
+                </div>
+            `;
+            return;
+        }
+
+        wrap.innerHTML = rows.map(v => {
+            const id = variantId(v);
+            const stock = variantStock(v);
+            const max = modalMaxQty(v);
+            const qty = Number(modalQuantities.get(id) || 0);
+            const price = variantPrice(v, activeProduct);
+            const selectedClass = qty > 0 ? 'row-selected' : '';
+            const noStockClass = stock <= 0 && qty <= 0 ? 'row-empty-stock' : '';
+            const disabled = stock <= 0 && qty <= 0 ? 'disabled' : '';
+
+            const fullVariantTitle = [
+                variantModel(v),
+                variantDesign(v),
+                variantName(v)
+            ].filter(x => x && x !== '—').join(' / ') || '—';
+
+            return `
+                <div class="variant-card ${selectedClass} ${noStockClass}" data-row-variant="${id}">
+                    <div>
+                        <div class="variant-title">${esc(fullVariantTitle)}</div>
+                        <div class="variant-subtitle">${esc(variantCode(v))}</div>
+
+                        <div class="variant-meta">
+                            <span class="badge-soft ${stock > 0 ? 'badge-stock' : 'badge-no-stock'}">
+                                موجودی: ${stock > 0 ? formatNum(stock) : 'ناموجود'}
+                            </span>
+                            <span class="badge-soft">
+                                قیمت: ${formatMoney(price)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="qty-control">
+                        <button type="button" class="picker-minus" data-id="${id}" ${disabled}>−</button>
+                        <input
+                            type="number"
+                            class="form-control form-control-sm picker-qty"
+                            data-id="${id}"
+                            data-price="${price}"
+                            min="0"
+                            max="${max}"
+                            value="${qty}"
+                            inputmode="numeric"
+                            ${disabled}
+                        >
+                        <button type="button" class="picker-plus" data-id="${id}" data-step="1" ${disabled}>+</button>
+                        <button type="button" class="quick-plus picker-plus" data-id="${id}" data-step="6" ${disabled}>+6</button>
+                        <button type="button" class="quick-plus picker-plus" data-id="${id}" data-step="12" ${disabled}>+12</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function setModalQty(id, value) {
+        id = Number(id);
+
+        const item = activeModalItems.find(v => variantId(v) === id);
+        if (!item) return;
+
+        const max = modalMaxQty(item);
+        let qty = parseInt(toEnglishDigits(value), 10);
+
+        if (!Number.isFinite(qty)) qty = 0;
+        if (qty < 0) qty = 0;
+        if (qty > max) qty = max;
+
+        modalQuantities.set(id, qty);
+
+        const input = document.querySelector(`.picker-qty[data-id="${id}"]`);
+        if (input) input.value = String(qty);
+
+        const row = document.querySelector(`[data-row-variant="${id}"]`);
+        if (row) row.classList.toggle('row-selected', qty > 0);
+
+        updateModalSummary();
+    }
+
+    function changeModalQty(id, delta) {
+        const current = Number(modalQuantities.get(Number(id)) || 0);
+        setModalQty(id, current + Number(delta || 0));
+    }
+
+    function updateModalSummary() {
+        let selectedRows = 0;
+        let totalQty = 0;
+        let totalAmount = 0;
+
+        activeModalItems.forEach(v => {
+            const id = variantId(v);
+            const qty = Number(modalQuantities.get(id) || 0);
+            const price = variantPrice(v, activeProduct);
+
+            if (qty > 0) {
+                selectedRows++;
+                totalQty += qty;
+                totalAmount += qty * price;
+            }
+        });
+
+        modalGroupDiscountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
+        modalGroupDiscountValue = safeDiscountValue(
+            modalGroupDiscountType,
+            document.getElementById('modalGroupDiscountValue')?.value || 0
+        );
+
+        const discount = calcDiscount(totalAmount, modalGroupDiscountType, modalGroupDiscountValue);
+
+        document.getElementById('modalSelectedRows').textContent = formatNum(selectedRows);
+        document.getElementById('modalTotalQty').textContent = formatNum(totalQty);
+        document.getElementById('modalTotalAmount').textContent = formatMoney(Math.max(0, totalAmount - discount));
+
+        const preview = document.getElementById('modalGroupDiscountPreview');
+        if (preview) {
+            preview.textContent = formatMoney(discount);
+        }
+    }
+
+    function clearPickerQuantities() {
+        if (!confirm('همه تعدادهای انتخاب‌شده پاک شود؟')) return;
+
+        modalQuantities = new Map();
+        renderPickerRows();
+        updateModalSummary();
+    }
+
+    function saveGroupSelection() {
+        if (!activeProductId || !activeProduct) return;
+
+        const items = [];
+
+        activeModalItems.forEach(v => {
+            const id = variantId(v);
+            const qty = Number(modalQuantities.get(id) || 0);
+
+            if (qty > 0) {
+                items.push({
+                    variant_id: id,
+                    quantity: qty,
+                    price: variantPrice(v, activeProduct),
+                    model: variantModel(v),
+                    design: variantDesign(v),
+                    variant: variantName(v),
+                    code: variantCode(v),
+                });
+            }
+        });
+
+        if (!items.length) {
+            alert('حداقل یک کالا را انتخاب کنید.');
+            return;
+        }
+
+        const discountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
+        const discountValue = safeDiscountValue(
+            discountType,
+            document.getElementById('modalGroupDiscountValue')?.value || 0
+        );
+
+        groupedSelections[activeProductId] = {
+            product: {
+                id: activeProductId,
+                title: productTitle(activeProduct),
+                code: productCode(activeProduct),
+            },
+            items,
+            discount_type: discountType,
+            discount_value: discountValue,
+        };
+
+        renderGroupSummary();
+        updateTotal();
+
+        bootstrap.Modal.getInstance(document.getElementById('groupPickerModal'))?.hide();
+
+        document.getElementById('motherCodeInput').value = '';
+        document.getElementById('motherProductBox').style.display = 'none';
+        document.getElementById('motherSearchHint').style.display = '';
+        selectedMotherProduct = null;
+
+        setTimeout(() => document.getElementById('motherCodeInput').focus(), 100);
+    }
+
+    function deleteGroup(productId) {
+        const group = groupedSelections[productId];
+        if (!group) return;
+
+        if (!confirm(`محصول «${group.product.title}» از سفارش حذف شود؟`)) return;
+
+        delete groupedSelections[productId];
+        renderGroupSummary();
+        updateTotal();
+    }
+
+    function toggleGroupDetails(productId) {
+        const card = document.querySelector(`[data-group-card="${productId}"]`);
+        if (card) card.classList.toggle('is-open');
+    }
+
+    function renderGroupSummary() {
+        const wrap = document.getElementById('groupSummaryList');
+        const inputWrap = document.getElementById('groupProductsInputs');
+
+        wrap.innerHTML = '';
+        inputWrap.innerHTML = '';
+
+        const groups = Object.values(groupedSelections);
+        document.getElementById('orderItemsCountHint').textContent = formatNum(groups.length) + ' گروه انتخاب شده';
+
+        if (!groups.length) {
+            wrap.innerHTML = `
+                <div class="empty-state">
+                    هنوز کالایی به پیش‌فاکتور اضافه نشده است.
+                </div>
+            `;
+            return;
+        }
+
+        let idx = 0;
+
+        groups.forEach(group => {
+            const productId = Number(group.product.id);
+            const qty = group.items.reduce((s, it) => s + Number(it.quantity || 0), 0);
+            const rowsCount = group.items.length;
+            const subtotal = groupRawSubtotal(group);
+            const discount = groupDiscountTotal(group);
+            const finalAmount = groupFinalAmount(group);
+
+            const details = group.items.map(it => `
+                <div class="detail-pill">
+                    <div class="fw-bold">${esc(it.model)} / ${esc(it.design)} / ${esc(it.variant)}</div>
+                    <div class="text-muted mt-1">${esc(it.code)} | تعداد: ${formatNum(it.quantity)} | ${formatMoney(Number(it.quantity) * Number(it.price))}</div>
+                </div>
+            `).join('');
+
+            wrap.insertAdjacentHTML('beforeend', `
+                <div class="group-card mb-2" data-group-card="${productId}">
+                    <div class="group-main">
+                        <div>
+                            <div class="group-title">${esc(group.product.title)}</div>
+                            <div class="group-meta">
+                                کد مادر: ${esc(group.product.code || '—')}
+                                ${discount > 0 ? ' | تخفیف: ' + formatMoney(discount) : ''}
+                            </div>
+                        </div>
+
+                        <div class="stat-box">
+                            <div class="stat-label">ردیف</div>
+                            <div class="stat-value">${formatNum(rowsCount)}</div>
+                        </div>
+
+                        <div class="stat-box">
+                            <div class="stat-label">جمع تعداد</div>
+                            <div class="stat-value">${formatNum(qty)}</div>
+                        </div>
+
+                        <div class="stat-box">
+                            <div class="stat-label">مبلغ نهایی</div>
+                            <div class="stat-value">${formatMoney(finalAmount)}</div>
+                        </div>
+
+                        <div class="d-flex gap-1 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-3" onclick="openGroupPicker(${productId})">ویرایش</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3" onclick="toggleGroupDetails(${productId})">جزئیات</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteGroup(${productId})">حذف</button>
+                        </div>
+                    </div>
+
+                    <div class="group-details">
+                        <div class="mb-2 hint">
+                            مبلغ خام: ${formatMoney(subtotal)}
+                            ${discount > 0 ? ' | تخفیف محصول: ' + formatMoney(discount) : ''}
+                        </div>
+                        <div class="details-grid">
+                            ${details}
+                        </div>
+                    </div>
+                </div>
+            `);
+
+            group.items.forEach(item => {
+                inputWrap.insertAdjacentHTML('beforeend', `
+                    <input type="hidden" name="products[${idx}][id]" value="${productId}">
+                    <input type="hidden" name="products[${idx}][variety_id]" value="${Number(item.variant_id)}">
+                    <input type="hidden" name="products[${idx}][quantity]" value="${Number(item.quantity)}">
+                    <input type="hidden" name="products[${idx}][price]" value="${Number(item.price)}">
+                `);
+
+                idx++;
+            });
+        });
+    }
+
+    function updateTotal() {
+        const shipping = toInt(document.getElementById('shipping_price')?.value || 0);
+
+        let subtotal = 0;
+        let groupDiscounts = 0;
+
+        Object.values(groupedSelections).forEach(group => {
+            subtotal += groupRawSubtotal(group);
+            groupDiscounts += groupDiscountTotal(group);
+        });
+
+        const afterGroupDiscount = Math.max(0, subtotal - groupDiscounts);
+
+        const orderType = document.getElementById('orderDiscountType')?.value || 'amount';
+        const orderValue = safeDiscountValue(orderType, document.getElementById('orderDiscountValue')?.value || 0);
+        const orderDiscount = calcDiscount(afterGroupDiscount, orderType, orderValue);
+
+        const totalDiscount = Math.min(subtotal, groupDiscounts + orderDiscount);
+        const total = Math.max(0, subtotal + shipping - totalDiscount);
+
+        document.getElementById('discount').value = String(totalDiscount);
+        document.getElementById('totalDiscountView').value = formatMoney(totalDiscount);
+        document.getElementById('total_price').value = formatMoney(total);
+
+        const preview = document.getElementById('orderDiscountPreview');
+        if (preview) {
+            preview.textContent = 'تخفیف کلی: ' + formatMoney(orderDiscount);
+        }
+    }
+
+    async function hydrateInitialGroups() {
+        if (!INIT_ROWS || !INIT_ROWS.length) {
+            renderGroupSummary();
+            updateTotal();
+            return;
+        }
+
+        const grouped = {};
+
+        INIT_ROWS.forEach(row => {
+            const productId = Number(row.id || row.product_id || 0);
+            if (!productId) return;
+
+            if (!grouped[productId]) grouped[productId] = [];
+            grouped[productId].push(row);
+        });
+
+        for (const [productId, rows] of Object.entries(grouped)) {
+            let product = null;
+
+            try {
+                product = await getProductDetails(productId);
+            } catch (e) {}
+
+            const varieties = getProductVarieties(product);
+
+            const productName =
+                productTitle(product) ||
+                rows[0]?.product_name ||
+                ('محصول #' + productId);
+
+            const productShortCode =
+                productCode(product) ||
+                rows[0]?.product_code ||
+                '';
+
+            groupedSelections[Number(productId)] = {
+                product: {
+                    id: Number(productId),
+                    title: productName,
+                    code: productShortCode,
+                },
+                discount_type: 'amount',
+                discount_value: 0,
+                items: rows.map(row => {
+                    const vid = Number(row.variety_id || row.variant_id || 0);
+                    const v = varieties.find(item => variantId(item) === vid);
+
+                    return {
+                        variant_id: vid,
+                        quantity: Number(row.quantity || 0),
+                        price: Number(row.price || (v ? variantPrice(v, product) : 0)),
+                        model: v ? variantModel(v) : '—',
+                        design: v ? variantDesign(v) : '—',
+                        variant: v ? variantName(v) : (row.variant_name || '—'),
+                        code: v ? variantCode(v) : '—',
+                    };
+                }).filter(item => item.variant_id && item.quantity > 0)
+            };
+        }
+
+        renderGroupSummary();
+        updateTotal();
+    }
+
+    function submitGuard(e) {
+        const customerName = normalize(document.getElementById('customer_name').value);
+        const customerMobile = normalize(document.getElementById('customer_mobile').value);
+        const productInputs = document.querySelectorAll('#groupProductsInputs input[name$="[quantity]"]');
+
+        if (!customerName || !customerMobile) {
+            e.preventDefault();
+            alert('لطفا مشتری را انتخاب کنید.');
+            return false;
+        }
+
+        if (!productInputs.length) {
+            e.preventDefault();
+            alert('حداقل یک کالا باید به سفارش اضافه شود.');
+            return false;
+        }
+
+        const totalEl = document.getElementById('total_price');
+        if (totalEl) totalEl.value = String(toInt(totalEl.value));
+
+        const shipEl = document.getElementById('shipping_price');
+        if (shipEl) shipEl.value = String(toInt(shipEl.value));
+
+        const discEl = document.getElementById('discount');
+        if (discEl) discEl.value = String(toInt(discEl.value));
+
+        document.querySelectorAll('#groupProductsInputs input').forEach(input => {
+            input.value = String(toInt(input.value));
+        });
+
+        const btn = document.getElementById('submitOrderBtn');
+        btn.disabled = true;
+        btn.textContent = 'در حال ثبت...';
+
+        return true;
+    }
+
+    document.addEventListener('DOMContentLoaded', async function () {
+        initSelect2Basic(document.getElementById('province_id'), 'انتخاب استان...');
+        initSelect2Basic(document.getElementById('city_id'), 'انتخاب شهر...');
+
+        await loadArea();
+        fillProvincesSelect();
+
+        if (OLD_PROVINCE_ID) {
+            document.getElementById('province_id').value = String(OLD_PROVINCE_ID);
+            if (window.jQuery) $('#province_id').trigger('change.select2');
+            fillCitiesByProvinceId(OLD_PROVINCE_ID);
+        }
+
+        if (OLD_CITY_ID) {
+            document.getElementById('city_id').value = String(OLD_CITY_ID);
+            if (window.jQuery) $('#city_id').trigger('change.select2');
+        }
+
+        fillShippingSelect();
+
+        if (OLD_SHIPPING_ID) {
+            document.getElementById('shipping_id').value = String(OLD_SHIPPING_ID);
+        }
+
+        initCustomerSearch();
+        await loadOldCustomer();
+
+        document.getElementById('clearCustomerBtn')?.addEventListener('click', clearCustomer);
+
+        document.getElementById('province_id')?.addEventListener('change', function () {
+            fillCitiesByProvinceId(this.value);
+        });
+
+        document.getElementById('shipping_id')?.addEventListener('change', updateShippingMode);
+
+        document.getElementById('orderDiscountType')?.addEventListener('change', updateTotal);
+        document.getElementById('orderDiscountValue')?.addEventListener('input', updateTotal);
+
+        document.getElementById('modalGroupDiscountType')?.addEventListener('change', updateModalSummary);
+        document.getElementById('modalGroupDiscountValue')?.addEventListener('input', updateModalSummary);
+
+        document.getElementById('motherCodeInput')?.addEventListener('input', function () {
+            this.value = toEnglishDigits(this.value).replace(/\D/g, '').slice(0, 4);
+        });
+
+        document.getElementById('motherCodeInput')?.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                findMotherProductByCode();
+            }
+        });
+
+        document.getElementById('findMotherBtn')?.addEventListener('click', findMotherProductByCode);
+        document.getElementById('openGroupPickerBtn')?.addEventListener('click', () => openGroupPicker());
+
+        document.getElementById('pickerSearchInput')?.addEventListener('input', renderPickerRows);
+        document.getElementById('onlyInStockFilter')?.addEventListener('change', renderPickerRows);
+        document.getElementById('onlySelectedFilter')?.addEventListener('change', renderPickerRows);
+        document.getElementById('clearPickerQtyBtn')?.addEventListener('click', clearPickerQuantities);
+        document.getElementById('saveGroupSelectionBtn')?.addEventListener('click', saveGroupSelection);
+
+        document.getElementById('groupPickerRows')?.addEventListener('click', function (e) {
+            const plus = e.target.closest('.picker-plus');
+            const minus = e.target.closest('.picker-minus');
+
+            if (plus) {
+                changeModalQty(plus.dataset.id, Number(plus.dataset.step || 1));
+            }
+
+            if (minus) {
+                changeModalQty(minus.dataset.id, -1);
+            }
+        });
+
+        document.getElementById('groupPickerRows')?.addEventListener('input', function (e) {
+            if (e.target.classList.contains('picker-qty')) {
+                setModalQty(e.target.dataset.id, e.target.value);
+            }
+        });
+
+        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, { capture: true });
+
+        await hydrateInitialGroups();
+
+        updateShippingMode();
+
+        setTimeout(() => document.getElementById('motherCodeInput')?.focus(), 200);
     });
-    const total = Math.max(0, subtotal + shipping - discount);
-    const totalEl = document.getElementById('total_price');
-    if (totalEl) totalEl.value = String(total);
-};
 </script>
 @endsection
