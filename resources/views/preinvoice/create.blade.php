@@ -979,20 +979,31 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 </div>
 
 <script>
-    const API = {
-        products: "{{ url('/preinvoice/api/products') }}",
-        product: "{{ url('/preinvoice/api/products') }}",
-        area: "{{ url('/preinvoice/api/area') }}",
-        customers: "{{ url('/preinvoice/api/customers') }}",
-        customer: "{{ url('/preinvoice/api/customers') }}"
+    window.PREINVOICE_BOOT = {
+        api: {
+            products: @json(url('/preinvoice/api/products')),
+            product: @json(url('/preinvoice/api/products')),
+            area: @json(url('/preinvoice/api/area')),
+            customers: @json(url('/preinvoice/api/customers')),
+            customer: @json(url('/preinvoice/api/customers'))
+        },
+
+        initRows: @json($safeInitRows),
+        shippings: @json($safeShippingMethods),
+
+        oldCustomerId: @json(old('customer_id', '')),
+        oldProvinceId: @json(old('province_id', '')),
+        oldCityId: @json(old('city_id', '')),
+        oldShippingId: @json(old('shipping_id', ''))
     };
 
-    const INIT_ROWS = @json($initRows);
-    const INITIAL_SHIPPINGS = @json($shippingMethods);
-    const OLD_CUSTOMER_ID = @json(old('customer_id', ''));
-    const OLD_PROVINCE_ID = @json(old('province_id', ''));
-    const OLD_CITY_ID = @json(old('city_id', ''));
-    const OLD_SHIPPING_ID = @json(old('shipping_id', ''));
+    const API = window.PREINVOICE_BOOT.api;
+    const INIT_ROWS = window.PREINVOICE_BOOT.initRows;
+    const INITIAL_SHIPPINGS = window.PREINVOICE_BOOT.shippings;
+    const OLD_CUSTOMER_ID = window.PREINVOICE_BOOT.oldCustomerId;
+    const OLD_PROVINCE_ID = window.PREINVOICE_BOOT.oldProvinceId;
+    const OLD_CITY_ID = window.PREINVOICE_BOOT.oldCityId;
+    const OLD_SHIPPING_ID = window.PREINVOICE_BOOT.oldShippingId;
 </script>
 
 <script>
