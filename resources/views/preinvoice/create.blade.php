@@ -2,42 +2,43 @@
 
 @section('content')
 @php
-    $order = $order ?? null;
-    $customersPageUrl = $customersPageUrl ?? url('/customers');
+$order = $order ?? null;
+$customersPageUrl = $customersPageUrl ?? url('/customers');
 
-    $initRows = old('products');
+$initRows = old('products');
 
-    if (!$initRows && $order) {
-        $initRows = $order->items->map(function ($it) {
-            $product = $it->product ?? null;
-            $variant = $it->variant ?? null;
+if (!$initRows && $order) {
+$initRows = $order->items->map(function ($it) {
+$product = $it->product ?? null;
+$variant = $it->variant ?? null;
 
-            return [
-                'id'           => (int) $it->product_id,
-                'product_id'   => (int) $it->product_id,
-                'product_name' => $product->title ?? $product->name ?? null,
-                'product_code' => $product->code ?? $product->sku ?? null,
+return [
+'id' => (int) $it->product_id,
+'product_id' => (int) $it->product_id,
+'product_name' => $product->title ?? $product->name ?? null,
+'product_code' => $product->code ?? $product->sku ?? null,
 
-                'variety_id'   => (int) $it->variant_id,
-                'variant_id'   => (int) $it->variant_id,
-                'variant_name' => $variant->variant_name ?? null,
+'variety_id' => (int) $it->variant_id,
+'variant_id' => (int) $it->variant_id,
+'variant_name' => $variant->variant_name ?? null,
 
-                'quantity'     => (int) $it->quantity,
-                'price'        => (int) $it->price,
-            ];
-        })->values();
-    }
+'quantity' => (int) $it->quantity,
+'price' => (int) $it->price,
+];
+})->values();
+}
 
-    if (!$initRows) {
-        $initRows = [];
-    }
+if (!$initRows) {
+$initRows = [];
+}
 
-    $oldCustomerTitle = trim((string) old('customer_name'));
-    $oldCustomerMobile = trim((string) old('customer_mobile'));
+$oldCustomerTitle = trim((string) old('customer_name'));
+$oldCustomerMobile = trim((string) old('customer_mobile'));
 @endphp
 
 <link rel="stylesheet" href="{{ asset('lib/select2.min.css') }}">
 <link rel="stylesheet" href="{{ asset('lib/bootstrap.rtl.min.css') }}">
+
 <script src="{{ asset('lib/jquery.min.js') }}"></script>
 <script src="{{ asset('lib/select2.min.js') }}"></script>
 <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
@@ -57,6 +58,12 @@
         --soft: #f9fafb;
         --danger: #dc2626;
         --success: #16a34a;
+    }
+
+    html,
+    body {
+        max-width: 100%;
+        overflow-x: hidden;
     }
 
     body {
@@ -91,13 +98,13 @@
 
     .page-title {
         font-size: 1.12rem;
-        font-weight: 850;
+        font-weight: 800;
         margin: 0;
     }
 
     .section-title {
         font-size: .98rem;
-        font-weight: 850;
+        font-weight: 800;
         margin: 0;
     }
 
@@ -108,7 +115,7 @@
 
     .label-sm {
         font-size: .78rem;
-        font-weight: 750;
+        font-weight: 700;
         color: #374151;
         margin-bottom: 5px;
     }
@@ -151,7 +158,7 @@
     .quick-btn {
         height: 52px;
         border-radius: 12px;
-        font-weight: 850;
+        font-weight: 800;
         background: var(--brand);
         border-color: var(--brand);
     }
@@ -196,7 +203,7 @@
         color: var(--muted);
         padding: 18px;
         text-align: center;
-        font-weight: 750;
+        font-weight: 700;
     }
 
     .badge-soft {
@@ -208,7 +215,8 @@
         border-radius: 999px;
         padding: 4px 8px;
         font-size: .72rem;
-        font-weight: 750;
+        font-weight: 700;
+        line-height: 1.6;
     }
 
     .badge-brand {
@@ -233,7 +241,7 @@
     }
 
     .group-title {
-        font-weight: 850;
+        font-weight: 800;
         color: var(--text);
     }
 
@@ -253,12 +261,12 @@
     .stat-label {
         font-size: .7rem;
         color: var(--muted);
-        font-weight: 750;
+        font-weight: 700;
     }
 
     .stat-value {
         font-size: .88rem;
-        font-weight: 850;
+        font-weight: 800;
         margin-top: 2px;
     }
 
@@ -399,7 +407,7 @@
     }
 
     .variant-title {
-        font-weight: 850;
+        font-weight: 800;
         color: var(--text);
         line-height: 1.6;
         word-break: break-word;
@@ -442,7 +450,7 @@
         width: 58px;
         height: 34px;
         text-align: center;
-        font-weight: 850;
+        font-weight: 800;
         direction: ltr;
     }
 
@@ -475,6 +483,10 @@
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 10px;
+    }
+
+    .select2-container {
+        max-width: 100% !important;
     }
 
     .select2-container .select2-selection--single {
@@ -560,8 +572,15 @@
             padding: 10px;
         }
 
+        .modal-footer {
+            position: sticky;
+            bottom: 0;
+            z-index: 20;
+        }
+
         .variant-list {
-            max-height: 58vh;
+            max-height: calc(100vh - 350px);
+            min-height: 220px;
             padding: 6px;
         }
 
@@ -627,24 +646,24 @@
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm rounded-4 fw-bold py-2">✅ {{ session('success') }}</div>
+    <div class="alert alert-success border-0 shadow-sm rounded-4 fw-bold py-2">✅ {{ session('success') }}</div>
     @endif
 
     @if(session('error'))
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 fw-bold py-2" style="white-space: pre-wrap">
-            {!! session('error') !!}
-        </div>
+    <div class="alert alert-danger border-0 shadow-sm rounded-4 fw-bold py-2" style="white-space: pre-wrap">
+        {!! session('error') !!}
+    </div>
     @endif
 
     @if ($errors->any())
-        <div class="alert alert-danger border-0 shadow-sm rounded-4 py-2">
-            <div class="fw-bold mb-1">⚠️ خطا:</div>
-            <ul class="mb-0">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
+    <div class="alert alert-danger border-0 shadow-sm rounded-4 py-2">
+        <div class="fw-bold mb-1">⚠️ خطا:</div>
+        <ul class="mb-0">
+            @foreach ($errors->all() as $error)
+            <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
     @endif
 
     <form action="{{ route('preinvoice.draft.save') }}" method="POST" id="orderForm" autocomplete="off">
@@ -676,9 +695,9 @@
                             <div>
                                 <div class="fw-bold" id="selectedCustomerTitle">
                                     @if($oldCustomerTitle)
-                                        {{ $oldCustomerTitle }} @if($oldCustomerMobile) - {{ $oldCustomerMobile }} @endif
+                                    {{ $oldCustomerTitle }} @if($oldCustomerMobile) - {{ $oldCustomerMobile }} @endif
                                     @else
-                                        هنوز مشتری انتخاب نشده است
+                                    هنوز مشتری انتخاب نشده است
                                     @endif
                                 </div>
                                 <div class="hint mt-1" id="customer_balance_hint"></div>
@@ -752,8 +771,7 @@
                             class="form-control quick-code"
                             maxlength="4"
                             inputmode="numeric"
-                            placeholder="4450"
-                        >
+                            placeholder="4450">
                     </div>
 
                     <div class="col-lg-3">
@@ -815,9 +833,9 @@
                             class="form-control form-control-sm"
                             min="0"
                             step="0.01"
+                            inputmode="decimal"
                             value="{{ old('discount_amount', 0) }}"
-                            placeholder="مقدار تخفیف"
-                        >
+                            placeholder="مقدار تخفیف">
                     </div>
                     <div class="discount-line" id="orderDiscountPreview">تخفیف کلی: 0 تومان</div>
                 </div>
@@ -829,8 +847,7 @@
                         id="shipping_price_view"
                         class="form-control form-control-sm bg-light"
                         readonly
-                        value="0 تومان"
-                    >
+                        value="0 تومان">
                 </div>
 
                 <div>
@@ -840,8 +857,7 @@
                         id="totalDiscountView"
                         class="form-control form-control-sm bg-light"
                         readonly
-                        value="0 تومان"
-                    >
+                        value="0 تومان">
                 </div>
 
                 <div>
@@ -852,8 +868,7 @@
                         id="total_price"
                         class="form-control form-control-sm total-view"
                         readonly
-                        value="0"
-                    >
+                        value="0">
                 </div>
 
                 <div>
@@ -884,8 +899,7 @@
                         type="text"
                         id="pickerSearchInput"
                         class="form-control"
-                        placeholder="جستجو در تنوع یا پارت‌نامبر..."
-                    >
+                        placeholder="جستجو در تنوع یا پارت‌نامبر...">
 
                     <label class="btn btn-light border rounded-3 mb-0">
                         <input type="checkbox" id="onlyInStockFilter" class="form-check-input ms-1">
@@ -930,10 +944,19 @@
                             <option value="amount">تومان</option>
                             <option value="percent">درصد</option>
                         </select>
-                        <input type="number" id="modalGroupDiscountValue" class="form-control form-control-sm" min="0" step="0.01" value="0" placeholder="مقدار تخفیف">
+                        <input
+                            type="number"
+                            id="modalGroupDiscountValue"
+                            class="form-control form-control-sm"
+                            min="0"
+                            step="0.01"
+                            inputmode="decimal"
+                            value="0"
+                            placeholder="مقدار تخفیف">
                     </div>
                     <div class="discount-line">
-                        مبلغ تخفیف این محصول: <strong id="modalGroupDiscountPreview">0 تومان</strong>
+                        مبلغ تخفیف این محصول:
+                        <strong id="modalGroupDiscountPreview">0 تومان</strong>
                     </div>
                 </div>
             </div>
@@ -957,11 +980,11 @@
 
 <script>
     const API = {
-        products:  "{{ url('/preinvoice/api/products') }}",
-        product:   "{{ url('/preinvoice/api/products') }}",
-        area:      "{{ url('/preinvoice/api/area') }}",
+        products: "{{ url('/preinvoice/api/products') }}",
+        product: "{{ url('/preinvoice/api/products') }}",
+        area: "{{ url('/preinvoice/api/area') }}",
         customers: "{{ url('/preinvoice/api/customers') }}",
-        customer:  "{{ url('/preinvoice/api/customers') }}"
+        customer: "{{ url('/preinvoice/api/customers') }}"
     };
 
     const INIT_ROWS = @json($initRows);
@@ -1029,10 +1052,13 @@
 
     function safeDiscountValue(type, value) {
         let n = Number(value || 0);
+
         if (!Number.isFinite(n)) n = 0;
         if (n < 0) n = 0;
 
-        if (type === 'percent' && n > 100) n = 100;
+        if (type === 'percent' && n > 100) {
+            n = 100;
+        }
 
         return n;
     }
@@ -1051,7 +1077,9 @@
 
     function customerFullName(c) {
         if (!c) return '';
+
         const full = `${c.first_name || ''} ${c.last_name || ''}`.trim();
+
         return full || normalize(c.customer_name || c.name);
     }
 
@@ -1067,6 +1095,7 @@
         if (!product) return [];
         if (Array.isArray(product.varieties)) return product.varieties;
         if (Array.isArray(product.variants)) return product.variants;
+
         return [];
     }
 
@@ -1127,18 +1156,25 @@
 
     async function getProductDetails(productId) {
         const id = String(productId || '');
+
         if (!id) return null;
 
-        if (productCache.has(id)) return productCache.get(id);
+        if (productCache.has(id)) {
+            return productCache.get(id);
+        }
 
         const res = await fetch(API.product + '/' + encodeURIComponent(id), {
-            headers: { 'Accept': 'application/json' }
+            headers: {
+                'Accept': 'application/json'
+            }
         });
 
         const json = await res.json();
         const product = json?.data?.product || null;
 
-        if (product) productCache.set(id, product);
+        if (product) {
+            productCache.set(id, product);
+        }
 
         return product;
     }
@@ -1149,6 +1185,7 @@
 
     function isInPersonShipping(ship) {
         const name = normalize(ship?.name);
+
         return name.includes('حضوری') || name.includes('مراجعه');
     }
 
@@ -1169,15 +1206,23 @@
             allowClear: true
         });
 
-        $el.on('select2:select select2:clear', function () {
-            this.dispatchEvent(new Event('change', { bubbles: true }));
+        $el.on('select2:select select2:clear', function() {
+            this.dispatchEvent(new Event('change', {
+                bubbles: true
+            }));
         });
     }
 
     async function loadArea() {
         try {
-            const res = await fetch(API.area, { headers: { 'Accept': 'application/json' } });
+            const res = await fetch(API.area, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
             const data = await res.json();
+
             areaProvinces = data?.data?.provinces || [];
         } catch (e) {
             areaProvinces = [];
@@ -1186,12 +1231,15 @@
 
     function fillProvincesSelect() {
         const provinceSelect = document.getElementById('province_id');
+
         provinceSelect.innerHTML = '<option value=""></option>';
 
         areaProvinces.forEach(p => {
             const opt = document.createElement('option');
+
             opt.value = p.id;
             opt.textContent = normalize(p.name);
+
             provinceSelect.appendChild(opt);
         });
 
@@ -1200,6 +1248,7 @@
 
     function fillCitiesByProvinceId(provinceId) {
         const citySelect = document.getElementById('city_id');
+
         citySelect.innerHTML = '<option value=""></option>';
 
         const province = areaProvinces.find(p => Number(p.id) === Number(provinceId));
@@ -1207,23 +1256,29 @@
 
         cities.forEach(c => {
             const opt = document.createElement('option');
+
             opt.value = c.id;
             opt.textContent = normalize(c.name);
+
             citySelect.appendChild(opt);
         });
 
         citySelect.disabled = cities.length === 0;
+
         initSelect2Basic(citySelect, 'انتخاب شهر...');
     }
 
     function fillShippingSelect() {
         const shippingSelect = document.getElementById('shipping_id');
+
         shippingSelect.innerHTML = '<option value="">انتخاب روش ارسال...</option>';
 
         shippings.forEach(s => {
             const opt = document.createElement('option');
+
             opt.value = s.id;
             opt.textContent = s.name;
+
             shippingSelect.appendChild(opt);
         });
     }
@@ -1263,9 +1318,9 @@
             provinceEl.disabled = false;
             cityEl.disabled = false;
 
-            hintEl.textContent = price > 0
-                ? 'هزینه ارسال: ' + formatMoney(price)
-                : 'برای ارسال غیرحضوری، مقصد و آدرس را تکمیل کنید.';
+            hintEl.textContent = price > 0 ?
+                'هزینه ارسال: ' + formatMoney(price) :
+                'برای ارسال غیرحضوری، مقصد و آدرس را تکمیل کنید.';
         }
 
         updateTotal();
@@ -1292,13 +1347,20 @@
 
         if (c.province_id) {
             document.getElementById('province_id').value = String(c.province_id);
-            if (window.jQuery) $('#province_id').trigger('change.select2');
+
+            if (window.jQuery) {
+                $('#province_id').trigger('change.select2');
+            }
+
             fillCitiesByProvinceId(c.province_id);
         }
 
         if (c.city_id) {
             document.getElementById('city_id').value = String(c.city_id);
-            if (window.jQuery) $('#city_id').trigger('change.select2');
+
+            if (window.jQuery) {
+                $('#city_id').trigger('change.select2');
+            }
         }
     }
 
@@ -1322,6 +1384,7 @@
         const option = new Option(text, customer.id, true, true);
 
         selectEl.add(option);
+
         $(selectEl).trigger('change');
     }
 
@@ -1340,7 +1403,9 @@
                 url: API.customers,
                 dataType: 'json',
                 delay: 250,
-                data: params => ({ q: params.term || '' }),
+                data: params => ({
+                    q: params.term || ''
+                }),
                 processResults: resp => {
                     const items = resp?.data?.customers || [];
 
@@ -1354,19 +1419,24 @@
             }
         });
 
-        $(selectEl).on('select2:select', async function (e) {
+        $(selectEl).on('select2:select', async function(e) {
             const id = e?.params?.data?.id;
+
             if (!id) return;
 
             try {
                 const res = await fetch(API.customer + '/' + encodeURIComponent(id), {
-                    headers: { 'Accept': 'application/json' }
+                    headers: {
+                        'Accept': 'application/json'
+                    }
                 });
 
                 const json = await res.json();
                 const customer = json?.data?.customer || null;
 
-                if (customer) applyCustomerToForm(customer);
+                if (customer) {
+                    applyCustomerToForm(customer);
+                }
             } catch (error) {}
         });
 
@@ -1375,11 +1445,14 @@
 
     async function loadOldCustomer() {
         const cid = document.getElementById('customer_id').value || OLD_CUSTOMER_ID || '';
+
         if (!cid) return;
 
         try {
             const res = await fetch(API.customer + '/' + encodeURIComponent(cid), {
-                headers: { 'Accept': 'application/json' }
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
 
             const json = await res.json();
@@ -1395,6 +1468,7 @@
     async function findMotherProductByCode() {
         const input = document.getElementById('motherCodeInput');
         const code = toEnglishDigits(input.value).replace(/\D/g, '').slice(0, 4);
+
         input.value = code;
 
         if (code.length !== 4) {
@@ -1411,7 +1485,9 @@
 
         try {
             const res = await fetch(API.products + '?q=' + encodeURIComponent(code), {
-                headers: { 'Accept': 'application/json' }
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
 
             const json = await res.json();
@@ -1427,7 +1503,9 @@
             if (!selectedMotherProduct) {
                 document.getElementById('motherProductBox').style.display = 'none';
                 document.getElementById('motherSearchHint').style.display = '';
+
                 alert('محصول مادری با این کد پیدا نشد.');
+
                 input.select();
                 return;
             }
@@ -1448,6 +1526,7 @@
 
     async function openGroupPicker(productId = null) {
         const targetId = productId || selectedMotherProduct?.id;
+
         if (!targetId) return;
 
         const modalEl = document.getElementById('groupPickerModal');
@@ -1479,6 +1558,7 @@
             modalQuantities = new Map();
 
             const oldItems = groupedSelections[activeProductId]?.items || [];
+
             oldItems.forEach(item => {
                 modalQuantities.set(Number(item.variant_id), Number(item.quantity || 0));
             });
@@ -1610,6 +1690,7 @@
         id = Number(id);
 
         const item = activeModalItems.find(v => variantId(v) === id);
+
         if (!item) return;
 
         const max = modalMaxQty(item);
@@ -1622,16 +1703,23 @@
         modalQuantities.set(id, qty);
 
         const input = document.querySelector(`.picker-qty[data-id="${id}"]`);
-        if (input) input.value = String(qty);
+
+        if (input) {
+            input.value = String(qty);
+        }
 
         const row = document.querySelector(`[data-row-variant="${id}"]`);
-        if (row) row.classList.toggle('row-selected', qty > 0);
+
+        if (row) {
+            row.classList.toggle('row-selected', qty > 0);
+        }
 
         updateModalSummary();
     }
 
     function changeModalQty(id, delta) {
         const current = Number(modalQuantities.get(Number(id)) || 0);
+
         setModalQty(id, current + Number(delta || 0));
     }
 
@@ -1665,6 +1753,7 @@
         document.getElementById('modalTotalAmount').textContent = formatMoney(Math.max(0, totalAmount - discount));
 
         const preview = document.getElementById('modalGroupDiscountPreview');
+
         if (preview) {
             preview.textContent = formatMoney(discount);
         }
@@ -1674,6 +1763,7 @@
         if (!confirm('همه تعدادهای انتخاب‌شده پاک شود؟')) return;
 
         modalQuantities = new Map();
+
         renderPickerRows();
         updateModalSummary();
     }
@@ -1730,6 +1820,7 @@
         document.getElementById('motherCodeInput').value = '';
         document.getElementById('motherProductBox').style.display = 'none';
         document.getElementById('motherSearchHint').style.display = '';
+
         selectedMotherProduct = null;
 
         setTimeout(() => document.getElementById('motherCodeInput').focus(), 100);
@@ -1737,18 +1828,23 @@
 
     function deleteGroup(productId) {
         const group = groupedSelections[productId];
+
         if (!group) return;
 
         if (!confirm(`محصول «${group.product.title}» از سفارش حذف شود؟`)) return;
 
         delete groupedSelections[productId];
+
         renderGroupSummary();
         updateTotal();
     }
 
     function toggleGroupDetails(productId) {
         const card = document.querySelector(`[data-group-card="${productId}"]`);
-        if (card) card.classList.toggle('is-open');
+
+        if (card) {
+            card.classList.toggle('is-open');
+        }
     }
 
     function renderGroupSummary() {
@@ -1759,6 +1855,7 @@
         inputWrap.innerHTML = '';
 
         const groups = Object.values(groupedSelections);
+
         document.getElementById('orderItemsCountHint').textContent = formatNum(groups.length) + ' گروه انتخاب شده';
 
         if (!groups.length) {
@@ -1859,9 +1956,12 @@
         const afterGroupDiscount = Math.max(0, subtotal - groupDiscounts);
 
         const orderType = document.getElementById('orderDiscountType')?.value || 'amount';
-        const orderValue = safeDiscountValue(orderType, document.getElementById('orderDiscountValue')?.value || 0);
-        const orderDiscount = calcDiscount(afterGroupDiscount, orderType, orderValue);
+        const orderValue = safeDiscountValue(
+            orderType,
+            document.getElementById('orderDiscountValue')?.value || 0
+        );
 
+        const orderDiscount = calcDiscount(afterGroupDiscount, orderType, orderValue);
         const totalDiscount = Math.min(subtotal, groupDiscounts + orderDiscount);
         const total = Math.max(0, subtotal + shipping - totalDiscount);
 
@@ -1870,6 +1970,7 @@
         document.getElementById('total_price').value = formatMoney(total);
 
         const preview = document.getElementById('orderDiscountPreview');
+
         if (preview) {
             preview.textContent = 'تخفیف کلی: ' + formatMoney(orderDiscount);
         }
@@ -1886,9 +1987,13 @@
 
         INIT_ROWS.forEach(row => {
             const productId = Number(row.id || row.product_id || 0);
+
             if (!productId) return;
 
-            if (!grouped[productId]) grouped[productId] = [];
+            if (!grouped[productId]) {
+                grouped[productId] = [];
+            }
+
             grouped[productId].push(row);
         });
 
@@ -1958,41 +2063,59 @@
         }
 
         const totalEl = document.getElementById('total_price');
-        if (totalEl) totalEl.value = String(toInt(totalEl.value));
+
+        if (totalEl) {
+            totalEl.value = String(toInt(totalEl.value));
+        }
 
         const shipEl = document.getElementById('shipping_price');
-        if (shipEl) shipEl.value = String(toInt(shipEl.value));
+
+        if (shipEl) {
+            shipEl.value = String(toInt(shipEl.value));
+        }
 
         const discEl = document.getElementById('discount');
-        if (discEl) discEl.value = String(toInt(discEl.value));
+
+        if (discEl) {
+            discEl.value = String(toInt(discEl.value));
+        }
 
         document.querySelectorAll('#groupProductsInputs input').forEach(input => {
             input.value = String(toInt(input.value));
         });
 
         const btn = document.getElementById('submitOrderBtn');
+
         btn.disabled = true;
         btn.textContent = 'در حال ثبت...';
 
         return true;
     }
 
-    document.addEventListener('DOMContentLoaded', async function () {
+    document.addEventListener('DOMContentLoaded', async function() {
         initSelect2Basic(document.getElementById('province_id'), 'انتخاب استان...');
         initSelect2Basic(document.getElementById('city_id'), 'انتخاب شهر...');
 
         await loadArea();
+
         fillProvincesSelect();
 
         if (OLD_PROVINCE_ID) {
             document.getElementById('province_id').value = String(OLD_PROVINCE_ID);
-            if (window.jQuery) $('#province_id').trigger('change.select2');
+
+            if (window.jQuery) {
+                $('#province_id').trigger('change.select2');
+            }
+
             fillCitiesByProvinceId(OLD_PROVINCE_ID);
         }
 
         if (OLD_CITY_ID) {
             document.getElementById('city_id').value = String(OLD_CITY_ID);
-            if (window.jQuery) $('#city_id').trigger('change.select2');
+
+            if (window.jQuery) {
+                $('#city_id').trigger('change.select2');
+            }
         }
 
         fillShippingSelect();
@@ -2002,11 +2125,12 @@
         }
 
         initCustomerSearch();
+
         await loadOldCustomer();
 
         document.getElementById('clearCustomerBtn')?.addEventListener('click', clearCustomer);
 
-        document.getElementById('province_id')?.addEventListener('change', function () {
+        document.getElementById('province_id')?.addEventListener('change', function() {
             fillCitiesByProvinceId(this.value);
         });
 
@@ -2018,11 +2142,11 @@
         document.getElementById('modalGroupDiscountType')?.addEventListener('change', updateModalSummary);
         document.getElementById('modalGroupDiscountValue')?.addEventListener('input', updateModalSummary);
 
-        document.getElementById('motherCodeInput')?.addEventListener('input', function () {
+        document.getElementById('motherCodeInput')?.addEventListener('input', function() {
             this.value = toEnglishDigits(this.value).replace(/\D/g, '').slice(0, 4);
         });
 
-        document.getElementById('motherCodeInput')?.addEventListener('keydown', function (e) {
+        document.getElementById('motherCodeInput')?.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 findMotherProductByCode();
@@ -2038,7 +2162,7 @@
         document.getElementById('clearPickerQtyBtn')?.addEventListener('click', clearPickerQuantities);
         document.getElementById('saveGroupSelectionBtn')?.addEventListener('click', saveGroupSelection);
 
-        document.getElementById('groupPickerRows')?.addEventListener('click', function (e) {
+        document.getElementById('groupPickerRows')?.addEventListener('click', function(e) {
             const plus = e.target.closest('.picker-plus');
             const minus = e.target.closest('.picker-minus');
 
@@ -2051,13 +2175,15 @@
             }
         });
 
-        document.getElementById('groupPickerRows')?.addEventListener('input', function (e) {
+        document.getElementById('groupPickerRows')?.addEventListener('input', function(e) {
             if (e.target.classList.contains('picker-qty')) {
                 setModalQty(e.target.dataset.id, e.target.value);
             }
         });
 
-        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, { capture: true });
+        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, {
+            capture: true
+        });
 
         await hydrateInitialGroups();
 
