@@ -251,5 +251,7 @@ Route::post('/customers/import', [CustomerController::class, 'import'])->name('c
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
 });
+Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])
+    ->name('model-lists.import-phone-catalog');
 
 require __DIR__ . '/auth.php';
