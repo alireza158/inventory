@@ -988,8 +988,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             customer: @json(url('/preinvoice/api/customers'))
         },
 
-        initRows: @json($safeInitRows),
-        shippings: @json($safeShippingMethods),
+        initRows: @json($initRows),
+        shippings: @json($shippingMethods ?? []),
 
         oldCustomerId: @json(old('customer_id', '')),
         oldProvinceId: @json(old('province_id', '')),
@@ -998,8 +998,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     };
 
     const API = window.PREINVOICE_BOOT.api;
-    const INIT_ROWS = window.PREINVOICE_BOOT.initRows;
-    const INITIAL_SHIPPINGS = window.PREINVOICE_BOOT.shippings;
+    const INIT_ROWS = window.PREINVOICE_BOOT.initRows || [];
+    const INITIAL_SHIPPINGS = window.PREINVOICE_BOOT.shippings || [];
     const OLD_CUSTOMER_ID = window.PREINVOICE_BOOT.oldCustomerId;
     const OLD_PROVINCE_ID = window.PREINVOICE_BOOT.oldProvinceId;
     const OLD_CITY_ID = window.PREINVOICE_BOOT.oldCityId;

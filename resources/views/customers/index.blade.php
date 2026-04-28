@@ -1,40 +1,364 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container">
+<style>
+  :root {
+    --brand: #0d6efd;
+    --bg: #f6f8fb;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --soft: #f9fafb;
+    --danger: #dc3545;
+    --success: #198754;
+    --warning: #f59e0b;
+  }
 
-  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <div>
-      <div class="h5 fw-bold mb-0">👥 مشتریان</div>
-      <div class="text-muted small">لیست مشتری‌ها + مانده حساب + ایمپورت اکسل</div>
-    </div>
+  body {
+    background: var(--bg);
+  }
 
-    <div class="d-flex gap-2 flex-wrap">
-      <form class="d-flex gap-2" method="GET" action="{{ route('customers.index') }}">
-        <input class="form-control" name="q" value="{{ $q ?? '' }}" placeholder="جستجو نام / موبایل / آدرس / توضیحات">
-        <button class="btn btn-primary">جستجو</button>
-      </form>
+  .customers-page {
+    max-width: 1280px;
+  }
 
-      <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importCustomerModal">
-        📥 ایمپورت اشخاص
-      </button>
+  .page-head {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
 
-      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createCustomerModal">
-        ➕ ساخت مشتری
-      </button>
+  .page-title {
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .page-subtitle {
+    color: var(--muted);
+    font-size: .82rem;
+    margin-top: 5px;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .search-form {
+    display: flex;
+    gap: 8px;
+    min-width: 360px;
+  }
+
+  .search-form .form-control {
+    min-width: 260px;
+  }
+
+  .soft-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  .desktop-table th {
+    font-size: .78rem;
+    color: #374151;
+    white-space: nowrap;
+  }
+
+  .desktop-table td {
+    font-size: .86rem;
+    vertical-align: middle;
+  }
+
+  .customer-mobile-list {
+    display: none;
+  }
+
+  .customer-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 13px;
+    margin-bottom: 10px;
+  }
+
+  .customer-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .customer-name {
+    font-weight: 900;
+    color: var(--text);
+    font-size: .98rem;
+    line-height: 1.8;
+  }
+
+  .customer-id-badge {
+    background: var(--soft);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: .75rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .customer-info-line {
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+    color: #374151;
+    font-size: .84rem;
+    margin-top: 6px;
+    line-height: 1.8;
+  }
+
+  .customer-info-line .label {
+    color: var(--muted);
+    min-width: 58px;
+    font-weight: 700;
+  }
+
+  .balance-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .balance-box {
+    background: var(--soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px;
+    text-align: center;
+  }
+
+  .balance-box .small-label {
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .balance-box .value {
+    font-size: .82rem;
+    font-weight: 900;
+    color: var(--text);
+    direction: ltr;
+  }
+
+  .card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .pagination-wrap {
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .modal-content {
+    border: 0;
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-footer {
+    background: #f8fafc;
+    border-top: 1px solid var(--border);
+  }
+
+  .form-label {
+    font-size: .82rem;
+    font-weight: 800;
+    color: #374151;
+  }
+
+  .select2-container {
+    width: 100% !important;
+  }
+
+  .select2-container .select2-selection--single {
+    min-height: 38px !important;
+    border-color: #dee2e6 !important;
+    border-radius: .5rem !important;
+    padding-top: 4px;
+  }
+
+  .select2-container .select2-selection--single .select2-selection__rendered {
+    line-height: 28px !important;
+    padding-right: 12px !important;
+  }
+
+  .select2-container .select2-selection--single .select2-selection__arrow {
+    height: 36px !important;
+  }
+
+  @media (max-width: 991.98px) {
+    .page-head {
+      padding: 13px;
+      border-radius: 15px;
+    }
+
+    .page-head-main {
+      width: 100%;
+    }
+
+    .toolbar {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .search-form {
+      grid-column: 1 / -1;
+      min-width: 0;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .search-form .form-control {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .toolbar > .btn {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .container {
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .desktop-customers {
+      display: none;
+    }
+
+    .customer-mobile-list {
+      display: block;
+    }
+
+    .page-title {
+      font-size: 1rem;
+    }
+
+    .page-subtitle {
+      font-size: .76rem;
+    }
+
+    .toolbar {
+      grid-template-columns: 1fr;
+    }
+
+    .search-form {
+      grid-template-columns: 1fr;
+    }
+
+    .search-form button {
+      width: 100%;
+    }
+
+    .balance-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .card-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .modal-dialog {
+      margin: 0;
+    }
+
+    .modal-content {
+      min-height: 100vh;
+      border-radius: 0;
+    }
+
+    .modal-body {
+      padding: 12px;
+    }
+
+    .modal-footer {
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+    }
+
+    .modal-footer .btn {
+      width: 100%;
+    }
+  }
+</style>
+
+<div class="container customers-page py-3">
+
+  <div class="page-head">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div class="page-head-main">
+        <h1 class="page-title">👥 مشتریان</h1>
+        <div class="page-subtitle">لیست مشتری‌ها + مانده حساب + ایمپورت اکسل</div>
+      </div>
+
+      <div class="toolbar">
+        <form class="search-form" method="GET" action="{{ route('customers.index') }}">
+          <input
+            class="form-control"
+            name="q"
+            value="{{ $q ?? '' }}"
+            placeholder="جستجو نام / موبایل / آدرس / توضیحات">
+          <button class="btn btn-primary">جستجو</button>
+        </form>
+
+        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importCustomerModal">
+          📥 ایمپورت اشخاص
+        </button>
+
+        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createCustomerModal">
+          ➕ ساخت مشتری
+        </button>
+      </div>
     </div>
   </div>
 
   @if(session('success'))
-    <div class="alert alert-success">{{ session('success') }}</div>
+    <div class="alert alert-success rounded-4">{{ session('success') }}</div>
   @endif
 
   @if(session('error'))
-    <div class="alert alert-danger">{{ session('error') }}</div>
+    <div class="alert alert-danger rounded-4">{{ session('error') }}</div>
   @endif
 
   @if ($errors->any())
-    <div class="alert alert-danger">
+    <div class="alert alert-danger rounded-4">
       <ul class="mb-0">
         @foreach ($errors->all() as $error)
           <li>{{ $error }}</li>
@@ -43,9 +367,9 @@
     </div>
   @endif
 
-  <div class="card">
+  <div class="soft-card desktop-customers">
     <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
+      <table class="table table-hover align-middle mb-0 desktop-table">
         <thead class="table-light">
           <tr>
             <th>#</th>
@@ -58,15 +382,34 @@
             <th class="text-nowrap">عملیات</th>
           </tr>
         </thead>
+
         <tbody>
           @forelse($customers as $c)
+            @php
+              $customerPayload = [
+                'id' => $c->id,
+                'name' => $c->display_name,
+                'mobile' => $c->mobile,
+                'address' => $c->address,
+                'postal_code' => $c->postal_code,
+                'extra_description' => $c->extra_description,
+                'province_id' => $c->province_id,
+                'city_id' => $c->city_id,
+                'opening_balance' => $c->opening_balance,
+                'update_url' => route('customers.update', $c),
+              ];
+            @endphp
+
             <tr>
               <td>{{ $c->id }}</td>
 
               <td>
                 <div class="fw-semibold">{{ $c->display_name ?: '—' }}</div>
+
                 @if((int)$c->opening_balance !== 0)
-                  <div class="small text-muted">مانده اولیه: {{ number_format((int)$c->opening_balance) }}</div>
+                  <div class="small text-muted">
+                    مانده اولیه: {{ number_format((int)$c->opening_balance) }}
+                  </div>
                 @endif
               </td>
 
@@ -76,11 +419,15 @@
                 <div>{{ $c->address ?: '—' }}</div>
 
                 @if($c->postal_code)
-                  <div class="small text-muted mt-1">کدپستی: {{ $c->postal_code }}</div>
+                  <div class="small text-muted mt-1">
+                    کدپستی: {{ $c->postal_code }}
+                  </div>
                 @endif
 
                 @if($c->extra_description)
-                  <div class="small text-muted mt-1" style="white-space: pre-line;">{{ $c->extra_description }}</div>
+                  <div class="small text-muted mt-1" style="white-space: pre-line;">
+                    {{ $c->extra_description }}
+                  </div>
                 @endif
               </td>
 
@@ -88,56 +435,142 @@
               <td class="text-nowrap">{{ number_format((int)($c->credit ?? 0)) }}</td>
               <td class="text-nowrap fw-bold">{{ number_format((int)($c->balance ?? 0)) }}</td>
 
-             <td class="text-nowrap">
-  @php
-    $customerPayload = [
-      'id' => $c->id,
-      'name' => $c->display_name,
-      'mobile' => $c->mobile,
-      'address' => $c->address,
-      'postal_code' => $c->postal_code,
-      'extra_description' => $c->extra_description,
-      'province_id' => $c->province_id,
-      'city_id' => $c->city_id,
-      'opening_balance' => $c->opening_balance,
-      'update_url' => route('customers.update', $c),
-    ];
-  @endphp
+              <td class="text-nowrap">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-warning"
+                  data-bs-toggle="modal"
+                  data-bs-target="#editCustomerModal"
+                  data-customer='@json($customerPayload, JSON_HEX_APOS | JSON_HEX_QUOT)'
+                >
+                  ویرایش
+                </button>
 
-  <button
-    type="button"
-    class="btn btn-sm btn-outline-warning"
-    data-bs-toggle="modal"
-    data-bs-target="#editCustomerModal"
-    data-customer='@json($customerPayload)'
-  >
-    ویرایش
-  </button>
-
-  <form method="POST" action="{{ route('customers.destroy', $c) }}" class="d-inline"
-        onsubmit="return confirm('مشتری حذف شود؟')">
-    @csrf
-    @method('DELETE')
-    <button class="btn btn-sm btn-outline-danger">حذف</button>
-  </form>
-</td>
+                <form method="POST" action="{{ route('customers.destroy', $c) }}" class="d-inline"
+                      onsubmit="return confirm('مشتری حذف شود؟')">
+                  @csrf
+                  @method('DELETE')
+                  <button class="btn btn-sm btn-outline-danger">حذف</button>
+                </form>
+              </td>
             </tr>
           @empty
-            <tr><td colspan="8" class="text-center text-muted py-4">مشتری یافت نشد</td></tr>
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4">مشتری یافت نشد</td>
+            </tr>
           @endforelse
         </tbody>
       </table>
     </div>
   </div>
 
-  <div class="mt-3">
+  <div class="customer-mobile-list">
+    @forelse($customers as $c)
+      @php
+        $customerPayload = [
+          'id' => $c->id,
+          'name' => $c->display_name,
+          'mobile' => $c->mobile,
+          'address' => $c->address,
+          'postal_code' => $c->postal_code,
+          'extra_description' => $c->extra_description,
+          'province_id' => $c->province_id,
+          'city_id' => $c->city_id,
+          'opening_balance' => $c->opening_balance,
+          'update_url' => route('customers.update', $c),
+        ];
+      @endphp
+
+      <div class="customer-card">
+        <div class="customer-card-head">
+          <div>
+            <div class="customer-name">{{ $c->display_name ?: '—' }}</div>
+
+            @if((int)$c->opening_balance !== 0)
+              <div class="small text-muted">
+                مانده اولیه: {{ number_format((int)$c->opening_balance) }}
+              </div>
+            @endif
+          </div>
+
+          <div class="customer-id-badge">#{{ $c->id }}</div>
+        </div>
+
+        <div class="customer-info-line">
+          <div class="label">موبایل</div>
+          <div>{{ $c->mobile ?: '—' }}</div>
+        </div>
+
+        <div class="customer-info-line">
+          <div class="label">آدرس</div>
+          <div>{{ $c->address ?: '—' }}</div>
+        </div>
+
+        @if($c->postal_code)
+          <div class="customer-info-line">
+            <div class="label">کدپستی</div>
+            <div>{{ $c->postal_code }}</div>
+          </div>
+        @endif
+
+        @if($c->extra_description)
+          <div class="customer-info-line">
+            <div class="label">توضیحات</div>
+            <div style="white-space: pre-line;">{{ $c->extra_description }}</div>
+          </div>
+        @endif
+
+        <div class="balance-grid">
+          <div class="balance-box">
+            <div class="small-label">بدهکار</div>
+            <div class="value">{{ number_format((int)($c->debt ?? 0)) }}</div>
+          </div>
+
+          <div class="balance-box">
+            <div class="small-label">بستانکار</div>
+            <div class="value">{{ number_format((int)($c->credit ?? 0)) }}</div>
+          </div>
+
+          <div class="balance-box">
+            <div class="small-label">مانده</div>
+            <div class="value">{{ number_format((int)($c->balance ?? 0)) }}</div>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button
+            type="button"
+            class="btn btn-outline-warning"
+            data-bs-toggle="modal"
+            data-bs-target="#editCustomerModal"
+            data-customer='@json($customerPayload, JSON_HEX_APOS | JSON_HEX_QUOT)'
+          >
+            ویرایش
+          </button>
+
+          <form method="POST" action="{{ route('customers.destroy', $c) }}"
+                onsubmit="return confirm('مشتری حذف شود؟')">
+            @csrf
+            @method('DELETE')
+            <button class="btn btn-outline-danger w-100">حذف</button>
+          </form>
+        </div>
+      </div>
+    @empty
+      <div class="customer-card text-center text-muted py-4">
+        مشتری یافت نشد
+      </div>
+    @endforelse
+  </div>
+
+  <div class="mt-3 pagination-wrap">
     {{ $customers->links() }}
   </div>
 
 </div>
 
 <div class="modal fade" id="importCustomerModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
     <form class="modal-content" method="POST" action="{{ route('customers.import') }}" enctype="multipart/form-data">
       @csrf
 
@@ -149,6 +582,7 @@
       <div class="modal-body">
         <label class="form-label">فایل اکسل</label>
         <input type="file" name="file" accept=".xlsx,.xls" class="form-control" required>
+
         <div class="form-text mt-2">
           ردیف‌های بدون موبایل رد می‌شوند و شماره‌های تکراری داخل دیتابیس آپدیت می‌شوند.
         </div>
@@ -162,7 +596,7 @@
 </div>
 
 <div class="modal fade" id="editCustomerModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
     <form class="modal-content" method="POST" id="editCustomerForm" action="#">
       @csrf
       @method('PUT')
@@ -174,43 +608,47 @@
 
       <div class="modal-body">
         <div class="row g-2">
-          <div class="col-md-12">
+          <div class="col-12">
             <label class="form-label">نام مشتری *</label>
             <input class="form-control" name="customer_name" id="edit_customer_name" required>
           </div>
 
-          <div class="col-md-12">
+          <div class="col-12">
             <label class="form-label">موبایل *</label>
             <input class="form-control" name="mobile" id="edit_mobile" required>
           </div>
 
-          <div class="col-md-12">
+          <div class="col-12">
             <label class="form-label">مانده اولیه</label>
             <input class="form-control" type="number" name="opening_balance" id="edit_opening_balance" value="0">
           </div>
 
           <div class="col-md-6">
-            <label class="form-label">استان (اختیاری)</label>
-            <select class="form-select" name="province_id" id="edit_province_id"><option value=""></option></select>
+            <label class="form-label">استان</label>
+            <select class="form-select" name="province_id" id="edit_province_id">
+              <option value=""></option>
+            </select>
           </div>
 
           <div class="col-md-6">
-            <label class="form-label">شهر (اختیاری)</label>
-            <select class="form-select" name="city_id" id="edit_city_id"><option value=""></option></select>
+            <label class="form-label">شهر</label>
+            <select class="form-select" name="city_id" id="edit_city_id">
+              <option value=""></option>
+            </select>
           </div>
 
-          <div class="col-md-12">
-            <label class="form-label">آدرس (اختیاری)</label>
+          <div class="col-12">
+            <label class="form-label">آدرس</label>
             <textarea class="form-control" name="address" id="edit_address" rows="2"></textarea>
           </div>
 
-          <div class="col-md-12">
-            <label class="form-label">کد پستی (اختیاری)</label>
+          <div class="col-12">
+            <label class="form-label">کد پستی</label>
             <input class="form-control" name="postal_code" id="edit_postal_code">
           </div>
 
-          <div class="col-md-12">
-            <label class="form-label">توضیحات اضافی (اختیاری)</label>
+          <div class="col-12">
+            <label class="form-label">توضیحات اضافی</label>
             <textarea class="form-control" name="extra_description" id="edit_extra_description" rows="3"></textarea>
           </div>
         </div>
@@ -224,7 +662,7 @@
 </div>
 
 <div class="modal fade" id="createCustomerModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
     <form class="modal-content" method="POST" action="{{ route('customers.store') }}">
       @csrf
 
@@ -235,43 +673,47 @@
 
       <div class="modal-body">
         <div class="row g-2">
-          <div class="col-md-12">
+          <div class="col-12">
             <label class="form-label">نام مشتری *</label>
             <input class="form-control" name="customer_name" value="{{ old('customer_name') }}" required>
           </div>
 
-          <div class="col-md-12">
+          <div class="col-12">
             <label class="form-label">موبایل *</label>
             <input class="form-control" name="mobile" value="{{ old('mobile') }}" required>
           </div>
 
-          <div class="col-md-12">
+          <div class="col-12">
             <label class="form-label">مانده اولیه</label>
             <input class="form-control" type="number" name="opening_balance" value="{{ old('opening_balance', 0) }}">
           </div>
 
           <div class="col-md-6">
-            <label class="form-label">استان (اختیاری)</label>
-            <select class="form-select" name="province_id" id="create_province_id"><option value=""></option></select>
+            <label class="form-label">استان</label>
+            <select class="form-select" name="province_id" id="create_province_id">
+              <option value=""></option>
+            </select>
           </div>
 
           <div class="col-md-6">
-            <label class="form-label">شهر (اختیاری)</label>
-            <select class="form-select" name="city_id" id="create_city_id"><option value=""></option></select>
+            <label class="form-label">شهر</label>
+            <select class="form-select" name="city_id" id="create_city_id">
+              <option value=""></option>
+            </select>
           </div>
 
-          <div class="col-md-12">
-            <label class="form-label">آدرس (اختیاری)</label>
+          <div class="col-12">
+            <label class="form-label">آدرس</label>
             <textarea class="form-control" name="address" rows="2">{{ old('address') }}</textarea>
           </div>
 
-          <div class="col-md-12">
-            <label class="form-label">کد پستی (اختیاری)</label>
+          <div class="col-12">
+            <label class="form-label">کد پستی</label>
             <input class="form-control" name="postal_code" value="{{ old('postal_code') }}">
           </div>
 
-          <div class="col-md-12">
-            <label class="form-label">توضیحات اضافی (اختیاری)</label>
+          <div class="col-12">
+            <label class="form-label">توضیحات اضافی</label>
             <textarea class="form-control" name="extra_description" rows="3">{{ old('extra_description') }}</textarea>
           </div>
         </div>
@@ -292,6 +734,7 @@ let provinces = [];
 
 function initSelect2(selectEl, placeholder) {
   if (!window.jQuery || !window.jQuery.fn?.select2 || !selectEl) return;
+
   const $el = $(selectEl);
 
   if ($el.hasClass('select2-hidden-accessible')) {
@@ -299,16 +742,18 @@ function initSelect2(selectEl, placeholder) {
     $el.select2('destroy');
   }
 
+  const modalParent = $el.closest('.modal');
+
   $el.select2({
-    width:'100%',
-    dir:'rtl',
-    placeholder,
-    allowClear:true,
-    dropdownParent: $el.closest('.modal')
+    width: '100%',
+    dir: 'rtl',
+    placeholder: placeholder,
+    allowClear: true,
+    dropdownParent: modalParent.length ? modalParent : $(document.body)
   });
 
-  $el.on('select2:select select2:clear', function(){
-    this.dispatchEvent(new Event('change',{bubbles:true}));
+  $el.on('select2:select select2:clear', function () {
+    this.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
 
@@ -326,6 +771,7 @@ function setProvinceOptions(selectEl) {
   if (!selectEl) return;
 
   selectEl.innerHTML = '<option value=""></option>';
+
   provinces.forEach((p) => {
     const opt = document.createElement('option');
     opt.value = p.id;
@@ -346,24 +792,45 @@ function setCityOptions(selectEl, provinceId, selectedCityId = null) {
     const opt = document.createElement('option');
     opt.value = c.id;
     opt.textContent = c.name;
-    if (selectedCityId && Number(selectedCityId) === Number(c.id)) opt.selected = true;
+
+    if (selectedCityId && Number(selectedCityId) === Number(c.id)) {
+      opt.selected = true;
+    }
+
     selectEl.appendChild(opt);
   });
 
   setSelectDisabled(selectEl, cities.length === 0);
 
-  if (window.jQuery) $(selectEl).trigger('change.select2');
+  if (window.jQuery) {
+    $(selectEl).trigger('change.select2');
+  }
+}
+
+function safeJsonParse(value) {
+  try {
+    return JSON.parse(value || '{}');
+  } catch (e) {
+    return {};
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
   const editModal = document.getElementById('editCustomerModal');
+
   const createProvince = document.getElementById('create_province_id');
   const createCity = document.getElementById('create_city_id');
+
   const editProvince = document.getElementById('edit_province_id');
   const editCity = document.getElementById('edit_city_id');
 
   try {
-    const res = await fetch(AREA_API, { headers: { 'Accept': 'application/json' } });
+    const res = await fetch(AREA_API, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
     const json = await res.json();
     provinces = json?.data?.provinces ?? [];
   } catch (e) {
@@ -372,6 +839,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   setProvinceOptions(createProvince);
   setProvinceOptions(editProvince);
+
   setCityOptions(createCity, null, null);
   setCityOptions(editCity, null, null);
 
@@ -392,10 +860,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     const button = event.relatedTarget;
     if (!button) return;
 
-    const raw = button.getAttribute('data-customer');
-    if (!raw) return;
-
-    const customer = JSON.parse(raw);
+    const customer = safeJsonParse(button.getAttribute('data-customer'));
 
     const form = document.getElementById('editCustomerForm');
     form.action = customer.update_url || '#';
@@ -409,7 +874,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('edit_extra_description').value = customer.extra_description ?? '';
 
     editProvince.value = customer.province_id ?? '';
-    if (window.jQuery) $(editProvince).trigger('change.select2');
+
+    if (window.jQuery) {
+      $(editProvince).trigger('change.select2');
+    }
 
     setCityOptions(editCity, customer.province_id, customer.city_id);
   });
