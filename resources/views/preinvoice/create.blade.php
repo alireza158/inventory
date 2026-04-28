@@ -45,19 +45,37 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
 <style>
     :root {
-        --brand: #14B5CC;
-        --brand-dark: #0f8fa1;
-        --brand-soft: rgba(20, 181, 204, .08);
-        --brand-border: rgba(20, 181, 204, .24);
+        --brand: #33c7c0;
+        /* فیروزه‌ای اصلی */
+        --brand-dark: #0c5367;
+        /* آبی نفتی */
+        --brand-darker: #083d50;
+        /* آبی نفتی تیره */
+        --accent: #f1ab27;
+        /* خردلی */
+        --accent-dark: #dd991b;
+        --accent-soft: rgba(241, 171, 39, .14);
 
-        --bg: #f7f9fb;
-        --card: #ffffff;
-        --border: #e4e9ef;
-        --text: #111827;
-        --muted: #6b7280;
-        --soft: #f9fafb;
-        --danger: #dc2626;
-        --success: #16a34a;
+        --bg: #f7f3eb;
+        /* کرم روشن */
+        --bg-alt: #fdfaf5;
+        --card: #fffdf9;
+        --card-strong: #ffffff;
+        --border: #dde6e3;
+        --border-strong: rgba(12, 83, 103, .16);
+
+        --text: #173543;
+        --text-soft: #2e4f5d;
+        --muted: #6d8087;
+        --soft: #f4efe6;
+        --soft-2: #f0f7f6;
+
+        --success: #178c63;
+        --danger: #d14d4d;
+        --danger-soft: rgba(209, 77, 77, .08);
+
+        --shadow-sm: 0 4px 14px rgba(8, 61, 80, .05);
+        --shadow-md: 0 8px 26px rgba(8, 61, 80, .08);
     }
 
     html,
@@ -67,237 +85,424 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     body {
-        background: var(--bg);
+        background:
+            radial-gradient(circle at top right, rgba(51, 199, 192, .07), transparent 24%),
+            radial-gradient(circle at top left, rgba(241, 171, 39, .05), transparent 18%),
+            linear-gradient(180deg, #f8f5ee 0%, #f5efe6 100%);
         font-size: 14px;
         color: var(--text);
     }
 
     .page-shell {
-        max-width: 960px;
+        max-width: 980px;
     }
 
     .soft-card,
     .soft-card-lg {
         background: var(--card);
         border: 1px solid var(--border);
-        border-radius: 14px;
-        box-shadow: none;
+        border-radius: 18px;
+        box-shadow: var(--shadow-sm);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .soft-card::before,
+    .soft-card-lg::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto auto 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(90deg, var(--brand-dark), var(--brand), var(--accent));
+        opacity: .9;
     }
 
     .soft-card-lg {
-        border-color: var(--brand-border);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(253, 250, 245, 0.98));
+        border-color: rgba(51, 199, 192, .22);
+        box-shadow: var(--shadow-md);
     }
 
     .compact-card {
-        padding: 12px;
-    }
-
-    .product-focus {
         padding: 14px;
     }
 
+    .product-focus {
+        padding: 16px;
+    }
+
     .page-title {
-        font-size: 1.12rem;
-        font-weight: 800;
+        font-size: 1.2rem;
+        font-weight: 900;
         margin: 0;
+        color: var(--brand-darker);
     }
 
     .section-title {
-        font-size: .98rem;
-        font-weight: 800;
+        font-size: 1rem;
+        font-weight: 900;
         margin: 0;
+        color: var(--brand-darker);
+    }
+
+    .fs-7 {
+        font-size: .82rem;
     }
 
     .hint {
         color: var(--muted);
-        font-size: .8rem;
+        font-size: .81rem;
+        line-height: 1.75;
     }
 
     .label-sm {
         font-size: .78rem;
-        font-weight: 700;
-        color: #374151;
-        margin-bottom: 5px;
+        font-weight: 800;
+        color: var(--text-soft);
+        margin-bottom: 6px;
     }
 
     .customer-box {
-        background: var(--soft);
+        background: linear-gradient(180deg, #faf7f1, #f7f1e7);
         border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 10px 12px;
+        border-radius: 14px;
+        padding: 12px 14px;
+        min-height: 74px;
     }
 
     .customer-box.is-selected {
-        background: var(--brand-soft);
-        border-color: var(--brand-border);
+        background: linear-gradient(180deg, rgba(51, 199, 192, .10), rgba(51, 199, 192, .05));
+        border-color: rgba(51, 199, 192, .35);
+        box-shadow: inset 0 0 0 1px rgba(51, 199, 192, .08);
     }
 
     .product-hero {
-        background: #fff;
-        border: 1px solid var(--brand-border);
-        border-radius: 14px;
-        padding: 12px;
+        background: linear-gradient(180deg, #fffefb, #fbf6ee);
+        border: 1px solid rgba(12, 83, 103, .14);
+        border-radius: 16px;
+        padding: 14px;
     }
 
     .quick-code {
-        height: 52px;
-        font-size: 1.45rem;
+        height: 58px;
+        font-size: 1.6rem;
         font-weight: 900;
         text-align: center;
-        letter-spacing: 5px;
+        letter-spacing: 7px;
         direction: ltr;
-        border-radius: 12px;
-        border-color: var(--brand-border);
+        border-radius: 14px;
+        border: 1px solid rgba(12, 83, 103, .15);
+        background: #fff;
+        color: var(--brand-darker);
     }
 
     .quick-code:focus {
         border-color: var(--brand);
-        box-shadow: 0 0 0 .2rem rgba(20, 181, 204, .12);
+        box-shadow: 0 0 0 .2rem rgba(51, 199, 192, .14);
     }
 
     .quick-btn {
-        height: 52px;
-        border-radius: 12px;
-        font-weight: 800;
-        background: var(--brand);
+        height: 58px;
+        border-radius: 14px;
+        font-weight: 900;
+        background: linear-gradient(135deg, var(--brand), #26b8c3);
         border-color: var(--brand);
+        color: #fff;
+        box-shadow: 0 8px 18px rgba(51, 199, 192, .18);
     }
 
     .quick-btn:hover,
     .quick-btn:focus,
     .btn-primary:hover,
     .btn-primary:focus {
-        background: var(--brand-dark);
+        background: linear-gradient(135deg, #26bac7, var(--brand-dark));
         border-color: var(--brand-dark);
+        color: #fff;
     }
 
     .btn-primary {
-        background: var(--brand);
+        background: linear-gradient(135deg, var(--brand), #24b8c4);
         border-color: var(--brand);
+        color: #fff;
+        font-weight: 800;
     }
 
     .btn-outline-primary {
         color: var(--brand-dark);
-        border-color: var(--brand);
+        border-color: rgba(12, 83, 103, .24);
+        background: #fff;
     }
 
     .btn-outline-primary:hover,
     .btn-outline-primary:focus {
-        background: var(--brand);
-        border-color: var(--brand);
+        background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+        border-color: var(--brand-dark);
         color: #fff;
+    }
+
+    .btn-outline-secondary {
+        color: var(--brand-dark);
+        border-color: rgba(12, 83, 103, .2);
+        background: #fff;
+    }
+
+    .btn-outline-secondary:hover,
+    .btn-outline-secondary:focus {
+        background: rgba(12, 83, 103, .07);
+        border-color: rgba(12, 83, 103, .28);
+        color: var(--brand-dark);
+    }
+
+    .btn-outline-success {
+        color: var(--success);
+        border-color: rgba(23, 140, 99, .28);
+        background: #fff;
+    }
+
+    .btn-outline-success:hover,
+    .btn-outline-success:focus {
+        background: rgba(23, 140, 99, .08);
+        border-color: rgba(23, 140, 99, .36);
+        color: var(--success);
+    }
+
+    .btn-light.border {
+        background: #fff;
+        border-color: rgba(12, 83, 103, .14) !important;
     }
 
     .found-product {
         display: none;
-        background: var(--brand-soft);
-        border: 1px solid var(--brand-border);
-        border-radius: 13px;
-        padding: 11px;
+        background: linear-gradient(180deg, rgba(51, 199, 192, .10), rgba(51, 199, 192, .05));
+        border: 1px solid rgba(51, 199, 192, .30);
+        border-radius: 14px;
+        padding: 12px;
     }
 
     .empty-state {
-        border: 1px dashed #cbd5e1;
-        border-radius: 12px;
-        background: var(--soft);
+        border: 1px dashed rgba(12, 83, 103, .18);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #fbf8f2, #f7f2e9);
         color: var(--muted);
         padding: 18px;
         text-align: center;
-        font-weight: 700;
+        font-weight: 800;
     }
 
     .badge-soft {
         display: inline-flex;
         align-items: center;
-        background: #f3f6f8;
-        color: #374151;
-        border: 1px solid #e5eaf0;
+        background: #f7f5ef;
+        color: var(--text-soft);
+        border: 1px solid rgba(12, 83, 103, .10);
         border-radius: 999px;
-        padding: 4px 8px;
+        padding: 4px 9px;
         font-size: .72rem;
-        font-weight: 700;
+        font-weight: 800;
         line-height: 1.6;
     }
 
     .badge-brand {
-        background: var(--brand-soft);
+        background: rgba(51, 199, 192, .12);
         color: var(--brand-dark);
-        border-color: var(--brand-border);
+        border-color: rgba(51, 199, 192, .25);
+    }
+
+    .recent-wrap {
+        display: none;
+        margin-top: 12px;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .recent-chip {
+        border: 1px solid rgba(12, 83, 103, .12);
+        background: #fff;
+        color: var(--brand-dark);
+        border-radius: 999px;
+        padding: 6px 11px;
+        font-size: .75rem;
+        font-weight: 800;
+        cursor: pointer;
+        max-width: 100%;
+        transition: all .15s ease;
+    }
+
+    .recent-chip:hover {
+        background: rgba(51, 199, 192, .08);
+        border-color: rgba(51, 199, 192, .32);
+    }
+
+    .step-chip-group {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .step-chip {
+        border: 1px solid rgba(12, 83, 103, .12);
+        background: #fff;
+        color: var(--text-soft);
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: .77rem;
+        font-weight: 900;
+        cursor: pointer;
+        user-select: none;
+        transition: all .15s ease;
+    }
+
+    .step-chip.active {
+        color: #fff;
+        border-color: var(--brand-dark);
+        background: linear-gradient(135deg, var(--brand-dark), var(--brand));
+        box-shadow: 0 6px 14px rgba(12, 83, 103, .12);
+    }
+
+    #groupSummaryList {
+        max-height: 320px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 2px 2px 2px 4px;
+        scrollbar-width: thin;
+    }
+
+    #groupSummaryList .empty-state {
+        margin-bottom: 0;
     }
 
     .group-card {
-        border: 1px solid var(--border);
-        border-radius: 13px;
+        border: 1px solid rgba(12, 83, 103, .11);
+        border-radius: 14px;
         background: #fff;
         overflow: hidden;
+        margin-bottom: 8px;
+        box-shadow: 0 3px 10px rgba(8, 61, 80, .03);
     }
 
     .group-main {
+        width: 100%;
+        border: 0;
+        background: linear-gradient(180deg, #fffefb, #fbf8f2);
         display: grid;
-        grid-template-columns: 1.5fr .7fr .7fr .9fr auto;
+        grid-template-columns: minmax(0, 1fr) auto 28px;
         gap: 8px;
         align-items: center;
-        padding: 11px;
+        padding: 11px 12px;
+        cursor: pointer;
+        text-align: right;
+        transition: background .15s ease;
+    }
+
+    .group-main:hover {
+        background: linear-gradient(180deg, #fdfaf5, #f6f1e8);
     }
 
     .group-title {
-        font-weight: 800;
-        color: var(--text);
+        font-weight: 900;
+        color: var(--brand-darker);
+        font-size: .92rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
-    .group-meta {
-        color: var(--muted);
-        font-size: .78rem;
-        margin-top: 3px;
-    }
-
-    .stat-box {
-        background: var(--soft);
-        border: 1px solid #eef2f5;
-        border-radius: 10px;
-        padding: 7px 9px;
-    }
-
-    .stat-label {
-        font-size: .7rem;
-        color: var(--muted);
-        font-weight: 700;
-    }
-
-    .stat-value {
+    .group-amount {
+        font-weight: 900;
+        color: var(--accent-dark);
         font-size: .88rem;
-        font-weight: 800;
-        margin-top: 2px;
+        white-space: nowrap;
+    }
+
+    .group-arrow {
+        width: 26px;
+        height: 26px;
+        border-radius: 9px;
+        border: 1px solid rgba(12, 83, 103, .12);
+        color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform .15s ease, all .15s ease;
+        font-size: .78rem;
+        background: #fff;
+    }
+
+    .group-card.is-open .group-arrow {
+        transform: rotate(180deg);
+        color: #fff;
+        border-color: var(--brand);
+        background: linear-gradient(135deg, var(--brand-dark), var(--brand));
     }
 
     .group-details {
         display: none;
-        border-top: 1px solid #eef2f5;
-        background: #fbfcfd;
-        padding: 10px 12px;
+        border-top: 1px solid rgba(12, 83, 103, .08);
+        background: linear-gradient(180deg, #fcfaf6, #f8f4ed);
+        padding: 10px;
+        max-height: 230px;
+        overflow-y: auto;
     }
 
     .group-card.is-open .group-details {
         display: block;
     }
 
+    .group-mini-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 9px;
+    }
+
+    .group-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 9px;
+    }
+
     .details-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
     }
 
     .detail-pill {
-        border: 1px solid #e5eaf0;
+        border: 1px solid rgba(12, 83, 103, .08);
         background: #fff;
-        border-radius: 10px;
-        padding: 8px;
-        font-size: .77rem;
+        border-radius: 12px;
+        padding: 8px 9px;
+        font-size: .76rem;
+    }
+
+    .stat-box {
+        background: linear-gradient(180deg, #f8f6ef, #f4efe7);
+        border: 1px solid rgba(12, 83, 103, .08);
+        border-radius: 12px;
+        padding: 8px 10px;
+    }
+
+    .stat-label {
+        font-size: .7rem;
+        color: var(--muted);
+        font-weight: 800;
+    }
+
+    .stat-value {
+        font-size: .90rem;
+        font-weight: 900;
+        margin-top: 2px;
+        color: var(--brand-darker);
     }
 
     .final-card {
-        padding: 14px;
+        padding: 15px;
         margin-bottom: 24px;
+        background: linear-gradient(180deg, #fffefb, #fbf7ef);
     }
 
     .final-grid {
@@ -309,14 +514,16 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     .total-view {
         font-weight: 900;
-        color: var(--text);
-        background: var(--soft) !important;
+        color: var(--brand-darker);
+        background: linear-gradient(180deg, #f8f7f1, #f1ede4) !important;
+        border-color: rgba(12, 83, 103, .12);
     }
 
     .discount-line {
-        color: #0f5560;
+        color: var(--brand-dark);
         font-size: .78rem;
         margin-top: 6px;
+        font-weight: 700;
     }
 
     .discount-control {
@@ -327,7 +534,15 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     .discount-control select,
     .discount-control input {
-        height: 36px;
+        height: 38px;
+    }
+
+    .submit-disabled-hint {
+        font-size: .75rem;
+        color: var(--muted);
+        margin-top: 6px;
+        text-align: center;
+        font-weight: 700;
     }
 
     .modal-dialog {
@@ -341,13 +556,25 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     .modal-content {
         border: 0;
-        border-radius: 16px;
+        border-radius: 18px;
         overflow: hidden;
+        box-shadow: 0 18px 40px rgba(8, 61, 80, .14);
     }
 
     .picker-head {
-        background: #f8fafb;
-        border-bottom: 1px solid var(--border);
+        background: linear-gradient(135deg, rgba(12, 83, 103, .96), rgba(51, 199, 192, .95));
+        color: #fff;
+        border-bottom: 0;
+    }
+
+    .picker-head .modal-title,
+    .picker-head .hint {
+        color: #fff !important;
+    }
+
+    .picker-head .btn-close {
+        filter: invert(1);
+        opacity: .95;
     }
 
     .picker-toolbar {
@@ -365,19 +592,46 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     .picker-stat {
-        background: #fff;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 9px 10px;
+        background: linear-gradient(180deg, #fffefb, #f8f4ec);
+        border: 1px solid rgba(12, 83, 103, .08);
+        border-radius: 14px;
+        padding: 10px 11px;
+        box-shadow: 0 3px 10px rgba(8, 61, 80, .03);
+    }
+
+    .picker-mode-row {
+        border: 1px solid rgba(12, 83, 103, .09);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #fffefb, #f9f4eb);
+        padding: 9px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .model-filter-row {
+        display: none;
+        border: 1px solid rgba(12, 83, 103, .09);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #fffefb, #f9f4eb);
+        padding: 9px;
+        margin-bottom: 10px;
+    }
+
+    .model-filter-row.is-visible {
+        display: block;
     }
 
     .variant-list {
         max-height: 56vh;
         overflow-y: auto;
         overflow-x: hidden;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        background: #fff;
+        border: 1px solid rgba(12, 83, 103, .08);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #fffefc, #faf6ef);
         padding: 8px;
     }
 
@@ -386,11 +640,18 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 10px;
         align-items: center;
-        border: 1px solid #e7edf3;
-        border-radius: 12px;
+        border: 1px solid rgba(12, 83, 103, .08);
+        border-radius: 14px;
         padding: 10px;
         background: #fff;
         margin-bottom: 8px;
+        cursor: pointer;
+        transition: all .15s ease;
+    }
+
+    .variant-card:hover {
+        border-color: rgba(51, 199, 192, .30);
+        box-shadow: 0 5px 16px rgba(51, 199, 192, .08);
     }
 
     .variant-card:last-child {
@@ -398,18 +659,20 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     .variant-card.row-selected {
-        background: rgba(20, 181, 204, .06);
-        border-color: var(--brand-border);
+        background: linear-gradient(180deg, rgba(51, 199, 192, .10), rgba(51, 199, 192, .05));
+        border-color: rgba(51, 199, 192, .32);
     }
 
     .variant-card.row-empty-stock {
-        opacity: .55;
+        opacity: .58;
+        cursor: not-allowed;
+        background: #fcfaf7;
     }
 
     .variant-title {
-        font-weight: 800;
-        color: var(--text);
-        line-height: 1.6;
+        font-weight: 900;
+        color: var(--brand-darker);
+        line-height: 1.7;
         word-break: break-word;
     }
 
@@ -417,7 +680,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: var(--muted);
         font-size: .75rem;
         margin-top: 2px;
-        direction: ltr;
         text-align: right;
         word-break: break-word;
     }
@@ -439,19 +701,21 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     .qty-control button {
         width: 34px;
         height: 34px;
-        border: 1px solid #cbd5e1;
+        border: 1px solid rgba(12, 83, 103, .14);
         background: #fff;
-        border-radius: 9px;
+        border-radius: 10px;
         font-weight: 900;
         line-height: 1;
+        color: var(--brand-dark);
     }
 
     .qty-control input {
         width: 58px;
         height: 34px;
         text-align: center;
-        font-weight: 800;
+        font-weight: 900;
         direction: ltr;
+        border-radius: 10px;
     }
 
     .quick-plus {
@@ -461,28 +725,42 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         padding: 0 8px;
         font-size: .75rem;
         color: var(--brand-dark);
-        border-color: var(--brand-border) !important;
-        background: var(--brand-soft) !important;
+        border-color: rgba(51, 199, 192, .25) !important;
+        background: rgba(51, 199, 192, .10) !important;
     }
 
     .badge-stock {
-        background: rgba(22, 163, 74, .08);
-        color: #15803d;
-        border-color: rgba(22, 163, 74, .18);
+        background: rgba(23, 140, 99, .09);
+        color: var(--success);
+        border-color: rgba(23, 140, 99, .18);
     }
 
     .badge-no-stock {
-        background: rgba(220, 38, 38, .08);
-        color: #dc2626;
-        border-color: rgba(220, 38, 38, .18);
+        background: var(--danger-soft);
+        color: var(--danger);
+        border-color: rgba(209, 77, 77, .18);
     }
 
     .modal-discount-box {
         margin-top: 10px;
-        background: #fff;
-        border: 1px solid var(--border);
+        background: linear-gradient(180deg, #fffefb, #f9f5ee);
+        border: 1px solid rgba(12, 83, 103, .08);
+        border-radius: 14px;
+        padding: 11px;
+    }
+
+    .form-control,
+    .form-select {
         border-radius: 12px;
-        padding: 10px;
+        border-color: rgba(12, 83, 103, .13);
+        color: var(--text);
+        background-color: #fff;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 .2rem rgba(51, 199, 192, .12);
     }
 
     .select2-container {
@@ -490,19 +768,31 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     .select2-container .select2-selection--single {
-        min-height: 38px !important;
-        border-color: #dee2e6 !important;
-        border-radius: .65rem !important;
-        padding-top: 4px;
+        min-height: 40px !important;
+        border-color: rgba(12, 83, 103, .13) !important;
+        border-radius: .8rem !important;
+        padding-top: 5px;
+        background: #fff !important;
     }
 
     .select2-container .select2-selection--single .select2-selection__rendered {
         line-height: 28px !important;
         padding-right: 12px !important;
+        color: var(--text) !important;
     }
 
     .select2-container .select2-selection--single .select2-selection__arrow {
-        height: 36px !important;
+        height: 38px !important;
+    }
+
+    .alert-success {
+        background: linear-gradient(180deg, rgba(23, 140, 99, .10), rgba(23, 140, 99, .05));
+        color: #146948;
+    }
+
+    .alert-danger {
+        background: linear-gradient(180deg, rgba(209, 77, 77, .10), rgba(209, 77, 77, .05));
+        color: #9d3434;
     }
 
     @media (max-width: 991.98px) {
@@ -510,7 +800,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             max-width: 100%;
         }
 
-        .group-main,
         .final-grid,
         .picker-toolbar,
         .picker-stats {
@@ -523,7 +812,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         .quick-code,
         .quick-btn {
-            height: 50px;
+            height: 52px;
         }
     }
 
@@ -538,18 +827,43 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         .page-title {
-            font-size: 1rem;
+            font-size: 1.04rem;
         }
 
         .section-title {
-            font-size: .92rem;
+            font-size: .93rem;
         }
 
         .compact-card,
         .product-focus,
         .final-card {
             padding: 10px;
-            border-radius: 12px;
+            border-radius: 14px;
+        }
+
+        #groupSummaryList {
+            max-height: 245px;
+        }
+
+        .group-main {
+            grid-template-columns: minmax(0, 1fr) auto 24px;
+            padding: 9px 10px;
+        }
+
+        .group-title {
+            font-size: .86rem;
+        }
+
+        .group-amount {
+            font-size: .82rem;
+        }
+
+        .group-details {
+            max-height: 210px;
+        }
+
+        .details-grid {
+            grid-template-columns: 1fr;
         }
 
         .modal-dialog {
@@ -579,7 +893,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         .variant-list {
-            max-height: calc(100vh - 350px);
+            max-height: calc(100vh - 430px);
             min-height: 220px;
             padding: 6px;
         }
@@ -637,7 +951,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
             <h1 class="page-title">🧾 ثبت پیش‌فاکتور</h1>
-            <div class="hint mt-1">ثبت سریع کالا با کد مادر، انتخاب گروهی و تخفیف جمع‌وجور</div>
+            <div class="hint mt-1">ثبت سریع کالا با کد ۴ رقمی محصول مادر و انتخاب مدل‌لیست / طرح / تنوع</div>
         </div>
 
         <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">
@@ -673,6 +987,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         <input type="hidden" name="customer_name" id="customer_name" value="{{ old('customer_name') }}">
         <input type="hidden" name="customer_mobile" id="customer_mobile" value="{{ old('customer_mobile') }}">
         <input type="hidden" name="payment_status" value="pending">
+        <input type="hidden" name="discount_breakdown" id="discount_breakdown" value="">
 
         <div class="soft-card compact-card mb-3">
             <div class="row g-2 align-items-end">
@@ -755,15 +1070,15 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                 <div>
                     <h2 class="section-title">🧩 ثبت سریع کالا</h2>
-                    <div class="hint mt-1">کد مادر را بزن، تنوع‌ها را انتخاب کن، برو محصول بعدی.</div>
+                    <div class="hint mt-1">کد ۴ رقمی محصول مادر را وارد کنید تا مدل‌لیست، طرح‌بندی و تنوع‌ها برای انتخاب باز شود.</div>
                 </div>
 
-                <span class="badge-soft badge-brand">ثبت گروهی محصول مادر</span>
+                <span class="badge-soft badge-brand">فروش سالن آریا</span>
             </div>
 
             <div class="product-hero mb-3">
                 <div class="row g-2 align-items-end">
-                    <div class="col-lg-3">
+                    <div class="col-lg-4">
                         <label class="label-sm">کد ۴ رقمی محصول مادر</label>
                         <input
                             type="text"
@@ -776,15 +1091,15 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
                     <div class="col-lg-3">
                         <button type="button" id="findMotherBtn" class="btn btn-primary w-100 quick-btn">
-                            نمایش محصول
+                            مشاهده و انتخاب
                         </button>
                     </div>
 
-                    <div class="col-lg-6">
+                    <div class="col-lg-5">
                         <div id="motherSearchHint" class="customer-box h-100 d-flex align-items-center">
                             <div>
-                                <div class="fw-bold">محصول مادر هنوز انتخاب نشده</div>
-                                <div class="hint mt-1">بعد از وارد کردن کد، دکمه مشاهده و انتخاب فعال می‌شود.</div>
+                                <div class="fw-bold">آماده ثبت سریع</div>
+                                <div class="hint mt-1">با تکمیل کد ۴ رقمی، پنجره انتخاب محصول خودکار باز می‌شود.</div>
                             </div>
                         </div>
 
@@ -797,11 +1112,16 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                                 </div>
 
                                 <button type="button" id="openGroupPickerBtn" class="btn btn-outline-primary rounded-3 fw-bold">
-                                    مشاهده و انتخاب
+                                    باز کردن انتخاب
                                 </button>
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="recent-wrap" id="recentProductsWrap">
+                    <span class="hint">آخرین محصولات:</span>
+                    <div class="step-chip-group" id="recentProductsList"></div>
                 </div>
             </div>
 
@@ -872,9 +1192,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 </div>
 
                 <div>
-                    <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold" id="submitOrderBtn">
+                    <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold" id="submitOrderBtn" disabled>
                         ثبت پیش‌فاکتور
                     </button>
+                    <div class="submit-disabled-hint" id="submitHint">برای ثبت، مشتری و حداقل یک کالا لازم است.</div>
                 </div>
             </div>
         </div>
@@ -899,17 +1220,42 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                         type="text"
                         id="pickerSearchInput"
                         class="form-control"
-                        placeholder="جستجو در تنوع یا پارت‌نامبر...">
+                        placeholder="جستجو در مدل‌لیست، طرح یا تنوع...">
 
                     <label class="btn btn-light border rounded-3 mb-0">
                         <input type="checkbox" id="onlyInStockFilter" class="form-check-input ms-1">
                         فقط موجودها
                     </label>
 
-                    <label class="btn btn-light border rounded-3 mb-0">
-                        <input type="checkbox" id="onlySelectedFilter" class="form-check-input ms-1">
-                        فقط انتخاب‌شده‌ها
-                    </label>
+                    <button type="button" id="reviewSelectedBtn" class="btn btn-outline-primary rounded-3">
+                        مرور انتخاب‌ها
+                    </button>
+
+                    <input type="checkbox" id="onlySelectedFilter" class="d-none">
+                </div>
+
+                <div class="model-filter-row" id="modalModelFilterWrap">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <div>
+                            <div class="fw-bold fs-7">مدل‌لیست</div>
+                            <div class="hint">برای گارد و گلس، اول مدل‌لیست را محدود کنید تا انتخاب سریع‌تر شود.</div>
+                        </div>
+                    </div>
+                    <div class="step-chip-group" id="modalModelFilterChips"></div>
+                </div>
+
+                <div class="picker-mode-row">
+                    <div>
+                        <div class="fw-bold fs-7">تعداد سریع با لمس کارت</div>
+                        <div class="hint">روی کارت تنوع بزنید تا به اندازه تعداد سریع اضافه شود.</div>
+                    </div>
+
+                    <div class="step-chip-group" id="modalStepChips">
+                        <button type="button" class="step-chip active" data-step="1">+1</button>
+                        <button type="button" class="step-chip" data-step="6">+6</button>
+                        <button type="button" class="step-chip" data-step="12">+12</button>
+                        <button type="button" class="step-chip" data-step="24">+24</button>
+                    </div>
                 </div>
 
                 <div class="picker-stats mb-3">
@@ -961,7 +1307,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 </div>
             </div>
 
-            <div class="modal-footer picker-head">
+            <div class="modal-footer" style="background: linear-gradient(180deg, #f9f6ee, #f3eee5); border-top: 1px solid rgba(12,83,103,.08);">
                 <button type="button" class="btn btn-light border rounded-3" id="clearPickerQtyBtn">
                     پاک کردن تعدادها
                 </button>
@@ -1016,11 +1362,18 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     let activeProduct = null;
     let activeModalItems = [];
     let modalQuantities = new Map();
+    let modalQuickStep = 1;
+    let activeModalModelFilter = '__all__';
 
     let modalGroupDiscountType = 'amount';
     let modalGroupDiscountValue = 0;
 
     let groupedSelections = {};
+    let motherAutoTimer = null;
+    let lastMotherAutoCode = '';
+    let isSubmittingProgrammatically = false;
+
+    const RECENT_PRODUCTS_KEY = 'aria_preinvoice_recent_mothers_v3';
 
     function toEnglishDigits(str) {
         return String(str || '')
@@ -1059,6 +1412,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function normalize(val) {
         return String(val || '').trim();
+    }
+
+    function isEmptyLabel(value) {
+        const v = normalize(value);
+        return !v || v === '—' || v === '-' || v === 'بدون مدل' || v === 'عمومی';
     }
 
     function safeDiscountValue(type, value) {
@@ -1126,10 +1484,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return normalize(v?.variant_name || v?.color_name || v?.color || v?.name) || '—';
     }
 
-    function variantCode(v) {
-        return normalize(v?.part_number || v?.barcode || v?.variant_code || v?.variety_code || v?.code) || '—';
-    }
-
     function variantPrice(v, product = null) {
         return Number(v?.sell_price ?? v?.price ?? product?.sell_price ?? product?.price ?? 0);
     }
@@ -1143,6 +1497,38 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         const reserved = Number(v?.reserved ?? 0) || 0;
 
         return Math.max(0, stock - reserved);
+    }
+
+    function buildVariantTitle(v) {
+        const model = variantModel(v);
+        const design = variantDesign(v);
+        const name = variantName(v);
+
+        const parts = [];
+
+        if (!isEmptyLabel(model)) parts.push(model);
+        if (!isEmptyLabel(design)) parts.push(design);
+        if (!isEmptyLabel(name)) parts.push(name);
+
+        if (parts.length) return parts.join(' / ');
+
+        return 'تنوع پیش‌فرض';
+    }
+
+    function buildVariantSubtitle(v) {
+        const model = variantModel(v);
+        const design = variantDesign(v);
+        const name = variantName(v);
+
+        const meta = [];
+
+        if (!isEmptyLabel(model)) meta.push('مدل‌لیست: ' + model);
+        if (!isEmptyLabel(design)) meta.push('طرح: ' + design);
+        if (!isEmptyLabel(name)) meta.push('تنوع: ' + name);
+
+        if (meta.length) return meta.join(' | ');
+
+        return 'این محصول فقط یک تنوع برای ثبت تعداد دارد.';
     }
 
     function groupRawSubtotal(group) {
@@ -1165,16 +1551,18 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return Math.max(0, groupRawSubtotal(group) - groupDiscountTotal(group));
     }
 
-    async function getProductDetails(productId) {
+    async function getProductDetails(productId, fresh = false) {
         const id = String(productId || '');
 
         if (!id) return null;
 
-        if (productCache.has(id)) {
+        if (!fresh && productCache.has(id)) {
             return productCache.get(id);
         }
 
-        const res = await fetch(API.product + '/' + encodeURIComponent(id), {
+        const url = API.product + '/' + encodeURIComponent(id) + (fresh ? '?_=' + Date.now() : '');
+
+        const res = await fetch(url, {
             headers: {
                 'Accept': 'application/json'
             }
@@ -1188,6 +1576,18 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         return product;
+    }
+
+    async function searchProducts(query) {
+        const res = await fetch(API.products + '?q=' + encodeURIComponent(query), {
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        const json = await res.json();
+
+        return json?.data?.products?.data || [];
     }
 
     function shippingById(id) {
@@ -1373,6 +1773,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 $('#city_id').trigger('change.select2');
             }
         }
+
+        updateSubmitState();
     }
 
     function clearCustomer() {
@@ -1386,6 +1788,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (window.jQuery) {
             $('#customer_search_select').val(null).trigger('change');
         }
+
+        updateSubmitState();
     }
 
     function preloadCustomerOption(selectEl, customer) {
@@ -1476,15 +1880,79 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         } catch (e) {}
     }
 
-    async function findMotherProductByCode() {
+    function getRecentProducts() {
+        try {
+            const raw = localStorage.getItem(RECENT_PRODUCTS_KEY);
+            const rows = JSON.parse(raw || '[]');
+
+            return Array.isArray(rows) ? rows : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveRecentProduct(product) {
+        if (!product) return;
+
+        const id = Number(product.id || 0);
+        if (!id) return;
+
+        const row = {
+            id,
+            title: productTitle(product),
+            code: productCode(product),
+        };
+
+        const rows = getRecentProducts()
+            .filter(item => Number(item.id) !== id);
+
+        rows.unshift(row);
+
+        localStorage.setItem(RECENT_PRODUCTS_KEY, JSON.stringify(rows.slice(0, 6)));
+
+        renderRecentProducts();
+    }
+
+    function renderRecentProducts() {
+        const wrap = document.getElementById('recentProductsWrap');
+        const list = document.getElementById('recentProductsList');
+        const rows = getRecentProducts();
+
+        list.innerHTML = '';
+
+        if (!rows.length) {
+            wrap.style.display = 'none';
+            return;
+        }
+
+        rows.forEach(item => {
+            const btn = document.createElement('button');
+
+            btn.type = 'button';
+            btn.className = 'recent-chip';
+            btn.textContent = `${item.code || '—'} - ${item.title || 'محصول'}`;
+            btn.addEventListener('click', async function() {
+                selectedMotherProduct = item;
+                await openGroupPicker(item.id);
+            });
+
+            list.appendChild(btn);
+        });
+
+        wrap.style.display = 'flex';
+    }
+
+    async function findMotherProductByCode(autoOpen = false) {
         const input = document.getElementById('motherCodeInput');
         const code = toEnglishDigits(input.value).replace(/\D/g, '').slice(0, 4);
 
         input.value = code;
 
         if (code.length !== 4) {
-            alert('کد مادر باید ۴ رقم باشد.');
-            input.focus();
+            if (!autoOpen) {
+                alert('کد مادر باید ۴ رقم باشد.');
+                input.focus();
+            }
             return;
         }
 
@@ -1495,14 +1963,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         btn.textContent = 'در حال جستجو...';
 
         try {
-            const res = await fetch(API.products + '?q=' + encodeURIComponent(code), {
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-
-            const json = await res.json();
-            const rows = json?.data?.products?.data || [];
+            const rows = await searchProducts(code);
 
             selectedMotherProduct =
                 rows.find(p => String(productCode(p)).trim() === code) ||
@@ -1515,9 +1976,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 document.getElementById('motherProductBox').style.display = 'none';
                 document.getElementById('motherSearchHint').style.display = '';
 
-                alert('محصول مادری با این کد پیدا نشد.');
+                if (!autoOpen) {
+                    alert('محصول مادری با این کد پیدا نشد.');
+                    input.select();
+                }
 
-                input.select();
                 return;
             }
 
@@ -1526,9 +1989,17 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             document.getElementById('motherProductTitle').textContent = productTitle(selectedMotherProduct);
             document.getElementById('motherProductCode').textContent = 'کد مادر: ' + (productCode(selectedMotherProduct) || code);
 
-            setTimeout(() => document.getElementById('openGroupPickerBtn').focus(), 50);
+            saveRecentProduct(selectedMotherProduct);
+
+            if (autoOpen) {
+                await openGroupPicker(selectedMotherProduct.id);
+            } else {
+                setTimeout(() => document.getElementById('openGroupPickerBtn').focus(), 50);
+            }
         } catch (e) {
-            alert('خطا در جستجوی محصول. دوباره تلاش کنید.');
+            if (!autoOpen) {
+                alert('خطا در جستجوی محصول. دوباره تلاش کنید.');
+            }
         } finally {
             btn.disabled = false;
             btn.textContent = originalText;
@@ -1545,6 +2016,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         activeProductId = Number(targetId);
         activeProduct = groupedSelections[activeProductId]?.product || selectedMotherProduct || null;
+        activeModalModelFilter = '__all__';
 
         document.getElementById('pickerLoading').classList.remove('d-none');
         document.getElementById('pickerTableWrap').classList.add('d-none');
@@ -1552,6 +2024,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.getElementById('pickerSearchInput').value = '';
         document.getElementById('onlyInStockFilter').checked = false;
         document.getElementById('onlySelectedFilter').checked = false;
+        document.getElementById('reviewSelectedBtn').classList.remove('btn-primary');
+        document.getElementById('reviewSelectedBtn').classList.add('btn-outline-primary');
+        document.getElementById('reviewSelectedBtn').textContent = 'مرور انتخاب‌ها';
 
         modal.show();
 
@@ -1582,8 +2057,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
             document.getElementById('pickerModalTitle').textContent = productTitle(product);
             document.getElementById('pickerModalSubTitle').textContent =
-                'کد مادر: ' + (productCode(product) || '—') + ' | تعداد ردیف‌ها: ' + formatNum(activeModalItems.length);
+                'کد مادر: ' + (productCode(product) || '—') + ' | تعداد تنوع‌ها: ' + formatNum(activeModalItems.length);
 
+            saveRecentProduct(product);
+            renderModalModelFilters();
             renderPickerRows();
             updateModalSummary();
 
@@ -1595,6 +2072,65 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             alert('خطا در باز کردن لیست کالاها.');
             modal.hide();
         }
+    }
+
+    function getModelFilterGroups() {
+        const groups = new Map();
+
+        activeModalItems.forEach(v => {
+            const model = variantModel(v);
+
+            if (isEmptyLabel(model)) return;
+
+            groups.set(model, (groups.get(model) || 0) + 1);
+        });
+
+        return Array.from(groups.entries())
+            .sort((a, b) => a[0].localeCompare(b[0], 'fa'));
+    }
+
+    function renderModalModelFilters() {
+        const wrap = document.getElementById('modalModelFilterWrap');
+        const chips = document.getElementById('modalModelFilterChips');
+        const groups = getModelFilterGroups();
+
+        chips.innerHTML = '';
+
+        if (!groups.length) {
+            wrap.classList.remove('is-visible');
+            return;
+        }
+
+        wrap.classList.add('is-visible');
+
+        const allBtn = document.createElement('button');
+        allBtn.type = 'button';
+        allBtn.className = 'step-chip active';
+        allBtn.textContent = 'همه مدل‌ها';
+        allBtn.dataset.model = '__all__';
+        chips.appendChild(allBtn);
+
+        groups.forEach(([model, count]) => {
+            const btn = document.createElement('button');
+
+            btn.type = 'button';
+            btn.className = 'step-chip';
+            btn.textContent = `${model} (${formatNum(count)})`;
+            btn.dataset.model = model;
+
+            chips.appendChild(btn);
+        });
+
+        chips.querySelectorAll('.step-chip').forEach(btn => {
+            btn.addEventListener('click', function() {
+                activeModalModelFilter = this.dataset.model || '__all__';
+
+                chips.querySelectorAll('.step-chip').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                renderPickerRows();
+            });
+        });
     }
 
     function filteredModalItems() {
@@ -1610,13 +2146,16 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             if (onlyStock && stock <= 0) return false;
             if (onlySelected && qty <= 0) return false;
 
+            if (activeModalModelFilter !== '__all__' && variantModel(v) !== activeModalModelFilter) {
+                return false;
+            }
+
             if (!q) return true;
 
             const haystack = [
                 variantModel(v),
                 variantDesign(v),
-                variantName(v),
-                variantCode(v)
+                variantName(v)
             ].join(' ').toLowerCase();
 
             return haystack.includes(q);
@@ -1653,17 +2192,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const noStockClass = stock <= 0 && qty <= 0 ? 'row-empty-stock' : '';
             const disabled = stock <= 0 && qty <= 0 ? 'disabled' : '';
 
-            const fullVariantTitle = [
-                variantModel(v),
-                variantDesign(v),
-                variantName(v)
-            ].filter(x => x && x !== '—').join(' / ') || '—';
-
             return `
-                <div class="variant-card ${selectedClass} ${noStockClass}" data-row-variant="${id}">
+                <div class="variant-card ${selectedClass} ${noStockClass}" data-row-variant="${id}" data-card-clickable="${disabled ? '0' : '1'}">
                     <div>
-                        <div class="variant-title">${esc(fullVariantTitle)}</div>
-                        <div class="variant-subtitle">${esc(variantCode(v))}</div>
+                        <div class="variant-title">${esc(buildVariantTitle(v))}</div>
+                        <div class="variant-subtitle">${esc(buildVariantSubtitle(v))}</div>
 
                         <div class="variant-meta">
                             <span class="badge-soft ${stock > 0 ? 'badge-stock' : 'badge-no-stock'}">
@@ -1672,6 +2205,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                             <span class="badge-soft">
                                 قیمت: ${formatMoney(price)}
                             </span>
+                            ${qty > 0 ? `<span class="badge-soft badge-brand">انتخاب: ${formatNum(qty)}</span>` : ''}
                         </div>
                     </div>
 
@@ -1713,19 +2247,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         modalQuantities.set(id, qty);
 
-        const input = document.querySelector(`.picker-qty[data-id="${id}"]`);
-
-        if (input) {
-            input.value = String(qty);
-        }
-
-        const row = document.querySelector(`[data-row-variant="${id}"]`);
-
-        if (row) {
-            row.classList.toggle('row-selected', qty > 0);
-        }
-
         updateModalSummary();
+        renderPickerRows();
     }
 
     function changeModalQty(id, delta) {
@@ -1796,7 +2319,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                     model: variantModel(v),
                     design: variantDesign(v),
                     variant: variantName(v),
-                    code: variantCode(v),
+                    label: buildVariantTitle(v),
                 });
             }
         });
@@ -1833,6 +2356,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.getElementById('motherSearchHint').style.display = '';
 
         selectedMotherProduct = null;
+        lastMotherAutoCode = '';
 
         setTimeout(() => document.getElementById('motherCodeInput').focus(), 100);
     }
@@ -1853,8 +2377,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     function toggleGroupDetails(productId) {
         const card = document.querySelector(`[data-group-card="${productId}"]`);
 
-        if (card) {
-            card.classList.toggle('is-open');
+        if (!card) return;
+
+        const isOpen = card.classList.toggle('is-open');
+        const btn = card.querySelector('.group-main');
+
+        if (btn) {
+            btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         }
     }
 
@@ -1875,6 +2404,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                     هنوز کالایی به پیش‌فاکتور اضافه نشده است.
                 </div>
             `;
+
+            updateSubmitState();
             return;
         }
 
@@ -1890,49 +2421,54 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
             const details = group.items.map(it => `
                 <div class="detail-pill">
-                    <div class="fw-bold">${esc(it.model)} / ${esc(it.design)} / ${esc(it.variant)}</div>
-                    <div class="text-muted mt-1">${esc(it.code)} | تعداد: ${formatNum(it.quantity)} | ${formatMoney(Number(it.quantity) * Number(it.price))}</div>
+                    <div class="fw-bold">
+                        ${esc(it.label || [it.model, it.design, it.variant].filter(x => x && x !== '—').join(' / ') || 'تنوع پیش‌فرض')}
+                    </div>
+                    <div class="text-muted mt-1">
+                        تعداد: ${formatNum(it.quantity)} | مبلغ: ${formatMoney(Number(it.quantity) * Number(it.price))}
+                    </div>
                 </div>
             `).join('');
 
             wrap.insertAdjacentHTML('beforeend', `
-                <div class="group-card mb-2" data-group-card="${productId}">
-                    <div class="group-main">
-                        <div>
-                            <div class="group-title">${esc(group.product.title)}</div>
-                            <div class="group-meta">
-                                کد مادر: ${esc(group.product.code || '—')}
-                                ${discount > 0 ? ' | تخفیف: ' + formatMoney(discount) : ''}
-                            </div>
+                <div class="group-card" data-group-card="${productId}">
+                    <button type="button" class="group-main" onclick="toggleGroupDetails(${productId})" aria-expanded="false">
+                        <div class="group-title" title="${esc(group.product.title)}">
+                            ${esc(group.product.title)}
                         </div>
 
-                        <div class="stat-box">
-                            <div class="stat-label">ردیف</div>
-                            <div class="stat-value">${formatNum(rowsCount)}</div>
+                        <div class="group-amount">
+                            ${formatMoney(finalAmount)}
                         </div>
 
-                        <div class="stat-box">
-                            <div class="stat-label">جمع تعداد</div>
-                            <div class="stat-value">${formatNum(qty)}</div>
+                        <div class="group-arrow">
+                            ▼
                         </div>
-
-                        <div class="stat-box">
-                            <div class="stat-label">مبلغ نهایی</div>
-                            <div class="stat-value">${formatMoney(finalAmount)}</div>
-                        </div>
-
-                        <div class="d-flex gap-1 flex-wrap">
-                            <button type="button" class="btn btn-sm btn-outline-primary rounded-3" onclick="openGroupPicker(${productId})">ویرایش</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3" onclick="toggleGroupDetails(${productId})">جزئیات</button>
-                            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteGroup(${productId})">حذف</button>
-                        </div>
-                    </div>
+                    </button>
 
                     <div class="group-details">
+                        <div class="group-mini-meta">
+                            <span class="badge-soft">کد مادر: ${esc(group.product.code || '—')}</span>
+                            <span class="badge-soft">ردیف: ${formatNum(rowsCount)}</span>
+                            <span class="badge-soft">تعداد: ${formatNum(qty)}</span>
+                            ${discount > 0 ? `<span class="badge-soft badge-brand">تخفیف: ${formatMoney(discount)}</span>` : ''}
+                        </div>
+
+                        <div class="group-actions">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-3" onclick="openGroupPicker(${productId})">
+                                ویرایش
+                            </button>
+
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteGroup(${productId})">
+                                حذف
+                            </button>
+                        </div>
+
                         <div class="mb-2 hint">
                             مبلغ خام: ${formatMoney(subtotal)}
                             ${discount > 0 ? ' | تخفیف محصول: ' + formatMoney(discount) : ''}
                         </div>
+
                         <div class="details-grid">
                             ${details}
                         </div>
@@ -1951,6 +2487,30 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 idx++;
             });
         });
+
+        updateSubmitState();
+    }
+
+    function buildDiscountBreakdown(subtotal, groupDiscounts, orderDiscount, totalDiscount) {
+        const groups = Object.values(groupedSelections).map(group => ({
+            product_id: Number(group.product.id),
+            product_title: group.product.title,
+            discount_type: group.discount_type || 'amount',
+            discount_value: Number(group.discount_value || 0),
+            discount_amount: groupDiscountTotal(group),
+            raw_subtotal: groupRawSubtotal(group),
+            final_amount: groupFinalAmount(group),
+        }));
+
+        return {
+            subtotal,
+            group_discount_amount: groupDiscounts,
+            order_discount_type: document.getElementById('orderDiscountType')?.value || 'amount',
+            order_discount_value: Number(document.getElementById('orderDiscountValue')?.value || 0),
+            order_discount_amount: orderDiscount,
+            total_discount_amount: totalDiscount,
+            groups,
+        };
     }
 
     function updateTotal() {
@@ -1985,6 +2545,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (preview) {
             preview.textContent = 'تخفیف کلی: ' + formatMoney(orderDiscount);
         }
+
+        const breakdown = buildDiscountBreakdown(subtotal, groupDiscounts, orderDiscount, totalDiscount);
+        document.getElementById('discount_breakdown').value = JSON.stringify(breakdown);
+
+        updateSubmitState();
     }
 
     async function hydrateInitialGroups() {
@@ -2046,7 +2611,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                         model: v ? variantModel(v) : '—',
                         design: v ? variantDesign(v) : '—',
                         variant: v ? variantName(v) : (row.variant_name || '—'),
-                        code: v ? variantCode(v) : '—',
+                        label: v ? buildVariantTitle(v) : (row.variant_name || 'تنوع پیش‌فرض'),
                     };
                 }).filter(item => item.variant_id && item.quantity > 0)
             };
@@ -2056,23 +2621,60 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         updateTotal();
     }
 
-    function submitGuard(e) {
-        const customerName = normalize(document.getElementById('customer_name').value);
-        const customerMobile = normalize(document.getElementById('customer_mobile').value);
-        const productInputs = document.querySelectorAll('#groupProductsInputs input[name$="[quantity]"]');
+    function updateSubmitState() {
+        const btn = document.getElementById('submitOrderBtn');
+        const hint = document.getElementById('submitHint');
+        const customerName = normalize(document.getElementById('customer_name')?.value);
+        const customerMobile = normalize(document.getElementById('customer_mobile')?.value);
+        const hasProducts = document.querySelectorAll('#groupProductsInputs input[name$="[quantity]"]').length > 0;
+        const shippingId = normalize(document.getElementById('shipping_id')?.value);
 
-        if (!customerName || !customerMobile) {
-            e.preventDefault();
-            alert('لطفا مشتری را انتخاب کنید.');
+        const ok = !!customerName && !!customerMobile && hasProducts && !!shippingId;
+
+        btn.disabled = !ok;
+
+        if (ok) {
+            hint.textContent = 'آماده ثبت و ارسال به تایید انبار.';
+            hint.style.color = '#178c63';
+        } else {
+            hint.textContent = 'برای ثبت، مشتری، روش ارسال و حداقل یک کالا لازم است.';
+            hint.style.color = '';
+        }
+    }
+
+    async function validateSelectedStockBeforeSubmit() {
+        const errors = [];
+
+        for (const group of Object.values(groupedSelections)) {
+            const product = await getProductDetails(group.product.id, true);
+            const varieties = getProductVarieties(product);
+
+            for (const item of group.items) {
+                const v = varieties.find(row => Number(variantId(row)) === Number(item.variant_id));
+
+                if (!v) {
+                    errors.push(`${group.product.title}: تنوع ${item.variant_id} پیدا نشد یا غیرفعال است.`);
+                    continue;
+                }
+
+                const stock = variantStock(v);
+                const requested = Number(item.quantity || 0);
+
+                if (requested > stock) {
+                    errors.push(`${group.product.title} / ${buildVariantTitle(v)}: موجودی قابل فروش ${stock} عدد، درخواست ${requested} عدد.`);
+                }
+            }
+        }
+
+        if (errors.length) {
+            alert('قبل از ثبت، موجودی بعضی کالاها تغییر کرده است:\n\n' + errors.slice(0, 8).join('\n'));
             return false;
         }
 
-        if (!productInputs.length) {
-            e.preventDefault();
-            alert('حداقل یک کالا باید به سفارش اضافه شود.');
-            return false;
-        }
+        return true;
+    }
 
+    function normalizeBeforeSubmit() {
         const totalEl = document.getElementById('total_price');
 
         if (totalEl) {
@@ -2094,11 +2696,54 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.querySelectorAll('#groupProductsInputs input').forEach(input => {
             input.value = String(toInt(input.value));
         });
+    }
+
+    async function submitGuard(e) {
+        if (isSubmittingProgrammatically) {
+            return true;
+        }
+
+        e.preventDefault();
+
+        const customerName = normalize(document.getElementById('customer_name').value);
+        const customerMobile = normalize(document.getElementById('customer_mobile').value);
+        const productInputs = document.querySelectorAll('#groupProductsInputs input[name$="[quantity]"]');
+
+        if (!customerName || !customerMobile) {
+            alert('لطفا مشتری را انتخاب کنید.');
+            return false;
+        }
+
+        if (!document.getElementById('shipping_id').value) {
+            alert('لطفا روش ارسال را انتخاب کنید.');
+            return false;
+        }
+
+        if (!productInputs.length) {
+            alert('حداقل یک کالا باید به سفارش اضافه شود.');
+            return false;
+        }
 
         const btn = document.getElementById('submitOrderBtn');
+        const oldText = btn.textContent;
 
         btn.disabled = true;
+        btn.textContent = 'کنترل موجودی...';
+
+        const stockOk = await validateSelectedStockBeforeSubmit();
+
+        if (!stockOk) {
+            btn.disabled = false;
+            btn.textContent = oldText;
+            return false;
+        }
+
+        normalizeBeforeSubmit();
+
         btn.textContent = 'در حال ثبت...';
+        isSubmittingProgrammatically = true;
+
+        document.getElementById('orderForm').submit();
 
         return true;
     }
@@ -2139,6 +2784,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         await loadOldCustomer();
 
+        renderRecentProducts();
+
         document.getElementById('clearCustomerBtn')?.addEventListener('click', clearCustomer);
 
         document.getElementById('province_id')?.addEventListener('change', function() {
@@ -2155,34 +2802,92 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         document.getElementById('motherCodeInput')?.addEventListener('input', function() {
             this.value = toEnglishDigits(this.value).replace(/\D/g, '').slice(0, 4);
+
+            clearTimeout(motherAutoTimer);
+
+            const code = this.value;
+
+            if (code.length === 4 && code !== lastMotherAutoCode) {
+                lastMotherAutoCode = code;
+
+                motherAutoTimer = setTimeout(() => {
+                    findMotherProductByCode(true);
+                }, 350);
+            }
         });
 
         document.getElementById('motherCodeInput')?.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                findMotherProductByCode();
+                lastMotherAutoCode = '';
+                findMotherProductByCode(true);
             }
         });
 
-        document.getElementById('findMotherBtn')?.addEventListener('click', findMotherProductByCode);
+        document.getElementById('findMotherBtn')?.addEventListener('click', function() {
+            lastMotherAutoCode = '';
+            findMotherProductByCode(true);
+        });
+
         document.getElementById('openGroupPickerBtn')?.addEventListener('click', () => openGroupPicker());
 
         document.getElementById('pickerSearchInput')?.addEventListener('input', renderPickerRows);
         document.getElementById('onlyInStockFilter')?.addEventListener('change', renderPickerRows);
-        document.getElementById('onlySelectedFilter')?.addEventListener('change', renderPickerRows);
+
+        document.getElementById('reviewSelectedBtn')?.addEventListener('click', function() {
+            const filter = document.getElementById('onlySelectedFilter');
+            filter.checked = !filter.checked;
+
+            if (filter.checked) {
+                this.classList.remove('btn-outline-primary');
+                this.classList.add('btn-primary');
+                this.textContent = 'نمایش همه';
+            } else {
+                this.classList.remove('btn-primary');
+                this.classList.add('btn-outline-primary');
+                this.textContent = 'مرور انتخاب‌ها';
+            }
+
+            renderPickerRows();
+        });
+
+        document.querySelectorAll('#modalStepChips .step-chip').forEach(btn => {
+            btn.addEventListener('click', function() {
+                modalQuickStep = Number(this.dataset.step || 1);
+
+                document.querySelectorAll('#modalStepChips .step-chip').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
         document.getElementById('clearPickerQtyBtn')?.addEventListener('click', clearPickerQuantities);
         document.getElementById('saveGroupSelectionBtn')?.addEventListener('click', saveGroupSelection);
 
         document.getElementById('groupPickerRows')?.addEventListener('click', function(e) {
             const plus = e.target.closest('.picker-plus');
             const minus = e.target.closest('.picker-minus');
+            const input = e.target.closest('.picker-qty');
 
             if (plus) {
+                e.stopPropagation();
                 changeModalQty(plus.dataset.id, Number(plus.dataset.step || 1));
+                return;
             }
 
             if (minus) {
+                e.stopPropagation();
                 changeModalQty(minus.dataset.id, -1);
+                return;
+            }
+
+            if (input) {
+                e.stopPropagation();
+                return;
+            }
+
+            const card = e.target.closest('.variant-card');
+            if (card && card.dataset.cardClickable === '1') {
+                changeModalQty(card.dataset.rowVariant, modalQuickStep);
             }
         });
 
@@ -2199,6 +2904,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         await hydrateInitialGroups();
 
         updateShippingMode();
+        updateSubmitState();
 
         setTimeout(() => document.getElementById('motherCodeInput')?.focus(), 200);
     });
