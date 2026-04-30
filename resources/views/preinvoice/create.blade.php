@@ -8,21 +8,21 @@ $customersPageUrl = $customersPageUrl ?? url('/customers');
 $initRows = old('products');
 
 if (!$initRows && $order) {
-$initRows = $order->items->map(function ($it) {
-$product = $it->product ?? null;
-$variant = $it->variant ?? null;
-return [
-'id' => (int) $it->product_id,
-'product_id' => (int) $it->product_id,
-'product_name' => $product->title ?? $product->name ?? null,
-'product_code' => $product->code ?? $product->sku ?? null,
-'variety_id' => (int) $it->variant_id,
-'variant_id' => (int) $it->variant_id,
-'variant_name' => $variant->variant_name ?? null,
-'quantity' => (int) $it->quantity,
-'price' => (int) $it->price,
-];
-})->values();
+    $initRows = $order->items->map(function ($it) {
+        $product = $it->product ?? null;
+        $variant = $it->variant ?? null;
+        return [
+            'id' => (int) $it->product_id,
+            'product_id' => (int) $it->product_id,
+            'product_name' => $product->title ?? $product->name ?? null,
+            'product_code' => $product->code ?? $product->sku ?? null,
+            'variety_id' => (int) $it->variant_id,
+            'variant_id' => (int) $it->variant_id,
+            'variant_name' => $variant->variant_name ?? null,
+            'quantity' => (int) $it->quantity,
+            'price' => (int) $it->price,
+        ];
+    })->values();
 }
 
 if (!$initRows) { $initRows = []; }
@@ -69,11 +69,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: var(--text);
     }
 
-    .page-shell {
-        max-width: 960px;
-    }
+    .page-shell { max-width: 960px; }
 
-    /* Cards */
     .soft-card,
     .soft-card-lg {
         background: var(--card);
@@ -100,21 +97,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         box-shadow: var(--shadow-md);
     }
 
-    .compact-card {
-        padding: 14px;
-    }
-
-    .product-focus {
-        padding: 16px;
-    }
-
+    .compact-card { padding: 14px; }
+    .product-focus { padding: 16px; }
     .final-card {
         padding: 15px;
         margin-bottom: 24px;
         background: linear-gradient(180deg, #fffefb, #fbf7ef);
     }
 
-    /* Typography */
     .page-title {
         font-size: 1.15rem;
         font-weight: 900;
@@ -143,7 +133,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         display: block;
     }
 
-    /* Customer box */
     .customer-box {
         background: linear-gradient(180deg, #faf7f1, #f7f1e7);
         border: 1px solid var(--border);
@@ -157,7 +146,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(51, 199, 192, .35);
     }
 
-    /* Quick search area */
     .quick-area {
         background: linear-gradient(180deg, #fffefb, #fbf6ee);
         border: 1px solid rgba(12, 83, 103, .12);
@@ -197,11 +185,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         white-space: nowrap;
     }
 
-    .find-btn:hover {
-        background: linear-gradient(135deg, #26bac7, var(--brand-dark));
-    }
+    .find-btn:hover { background: linear-gradient(135deg, #26bac7, var(--brand-dark)); }
 
-    /* Badges */
     .badge-soft {
         display: inline-flex;
         align-items: center;
@@ -233,7 +218,37 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(209, 77, 77, .18);
     }
 
-    /* Recent chips */
+    .local-draft-banner {
+        display: none;
+        border: 1px solid rgba(241, 171, 39, .30);
+        background: linear-gradient(180deg, rgba(241, 171, 39, .14), rgba(241, 171, 39, .06));
+        border-radius: 15px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .local-draft-banner.is-visible { display: block; }
+
+    .autosave-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border-radius: 999px;
+        padding: 4px 9px;
+        font-size: .72rem;
+        font-weight: 900;
+        border: 1px solid rgba(12, 83, 103, .10);
+        background: #fff;
+        color: var(--muted);
+    }
+
+    .autosave-pill.is-saved {
+        color: var(--success);
+        border-color: rgba(23, 140, 99, .18);
+        background: rgba(23, 140, 99, .06);
+    }
+
     .recent-wrap {
         display: none;
         margin-top: 10px;
@@ -259,7 +274,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(51, 199, 192, .32);
     }
 
-    /* Group summary */
     #groupSummaryList {
         max-height: 320px;
         overflow-y: auto;
@@ -290,9 +304,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         transition: background .15s;
     }
 
-    .group-main:hover {
-        background: linear-gradient(180deg, #fdfaf5, #f6f1e8);
-    }
+    .group-main:hover { background: linear-gradient(180deg, #fdfaf5, #f6f1e8); }
 
     .group-title {
         font-weight: 900;
@@ -338,9 +350,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         padding: 10px;
     }
 
-    .group-card.is-open .group-details {
-        display: block;
-    }
+    .group-card.is-open .group-details { display: block; }
 
     .group-actions {
         display: flex;
@@ -363,7 +373,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         font-size: .75rem;
     }
 
-    /* Empty state */
     .empty-state {
         border: 1px dashed rgba(12, 83, 103, .18);
         border-radius: 12px;
@@ -374,7 +383,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         font-weight: 800;
     }
 
-    /* Final grid */
     .final-grid {
         display: grid;
         grid-template-columns: 1.1fr .85fr .85fr 1fr auto;
@@ -403,7 +411,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         font-weight: 700;
     }
 
-    /* Buttons */
     .btn-primary {
         background: linear-gradient(135deg, var(--brand), #24b8c4);
         border-color: var(--brand);
@@ -468,7 +475,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(12, 83, 103, .13) !important;
     }
 
-    /* Forms */
     .form-control,
     .form-select {
         border-radius: 10px;
@@ -483,9 +489,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         box-shadow: 0 0 0 .18rem rgba(51, 199, 192, .12);
     }
 
-    .select2-container {
-        max-width: 100% !important;
-    }
+    .select2-container { max-width: 100% !important; }
 
     .select2-container .select2-selection--single {
         min-height: 38px !important;
@@ -501,11 +505,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: var(--text) !important;
     }
 
-    .select2-container .select2-selection--single .select2-selection__arrow {
-        height: 36px !important;
-    }
+    .select2-container .select2-selection--single .select2-selection__arrow { height: 36px !important; }
 
-    /* Alerts */
     .alert-success {
         background: linear-gradient(180deg, rgba(23, 140, 99, .10), rgba(23, 140, 99, .05));
         color: #146948;
@@ -516,10 +517,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: #9d3434;
     }
 
-    /* Modal */
-    .modal-dialog {
-        margin: .5rem auto;
-    }
+    .modal-dialog { margin: .5rem auto; }
 
     .modal-xl {
         max-width: 860px;
@@ -541,16 +539,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     .picker-head .modal-title,
-    .picker-head .hint {
-        color: #fff !important;
-    }
+    .picker-head .hint { color: #fff !important; }
 
     .picker-head .btn-close {
         filter: invert(1);
         opacity: .9;
     }
 
-    /* Variant list inside modal */
     .variant-list {
         max-height: 52vh;
         overflow-y: auto;
@@ -574,9 +569,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         transition: border-color .12s;
     }
 
-    .variant-row:last-child {
-        margin-bottom: 0;
-    }
+    .variant-row:last-child { margin-bottom: 0; }
 
     .variant-row.row-selected {
         background: linear-gradient(180deg, rgba(51, 199, 192, .09), rgba(51, 199, 192, .04));
@@ -603,7 +596,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         margin-top: 5px;
     }
 
-    /* Qty control */
     .qty-control {
         display: inline-flex;
         align-items: center;
@@ -650,7 +642,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         outline: none;
     }
 
-    /* Modal footer summary */
     .modal-summary-bar {
         background: linear-gradient(180deg, #f4f9f8, #edf6f5);
         border: 1px solid rgba(51, 199, 192, .18);
@@ -663,9 +654,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         gap: 8px;
     }
 
-    .summary-stat {
-        text-align: center;
-    }
+    .summary-stat { text-align: center; }
 
     .summary-stat .s-label {
         font-size: .7rem;
@@ -695,7 +684,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         font-weight: 700;
     }
 
-    /* Search inside modal */
     .picker-search {
         border: 1px solid rgba(12, 83, 103, .13);
         border-radius: 10px;
@@ -712,7 +700,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         outline: none;
     }
 
-    /* Model filter chips */
     .model-filter-row {
         display: none;
         border: 1px solid rgba(12, 83, 103, .08);
@@ -722,9 +709,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         margin-bottom: 8px;
     }
 
-    .model-filter-row.is-visible {
-        display: block;
-    }
+    .model-filter-row.is-visible { display: block; }
 
     .step-chip-group {
         display: flex;
@@ -753,105 +738,70 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         box-shadow: 0 4px 12px rgba(12, 83, 103, .12);
     }
 
-    /* Responsive */
     @media (max-width: 991.98px) {
-        .page-shell {
-            max-width: 100%;
-        }
-
-        .final-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .details-grid {
-            grid-template-columns: 1fr;
-        }
+        .page-shell { max-width: 100%; }
+        .final-grid { grid-template-columns: 1fr; }
+        .details-grid { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 575.98px) {
-        body {
-            font-size: 13px;
-        }
-
+        body { font-size: 13px; }
         .container {
             padding-left: 9px;
             padding-right: 9px;
         }
-
         .compact-card,
         .product-focus,
         .final-card {
             padding: 10px;
             border-radius: 12px;
         }
-
-        #groupSummaryList {
-            max-height: 240px;
-        }
-
+        #groupSummaryList { max-height: 240px; }
         .modal-dialog {
             width: 100%;
             max-width: 100%;
             margin: 0;
         }
-
         .modal-content {
             min-height: 100vh;
             border-radius: 0;
         }
-
-        .modal-body {
-            padding: 9px;
-        }
-
+        .modal-body { padding: 9px; }
         .modal-header,
-        .modal-footer {
-            padding: 10px;
-        }
-
+        .modal-footer { padding: 10px; }
         .modal-footer {
             position: sticky;
             bottom: 0;
             z-index: 20;
             background: linear-gradient(180deg, #f9f6ee, #f3eee5) !important;
         }
-
         .variant-list {
             max-height: calc(100vh - 380px);
             min-height: 200px;
             padding: 5px;
         }
-
         .variant-row {
             grid-template-columns: 1fr;
             gap: 7px;
             padding: 8px 9px;
         }
-
         .qty-control {
             width: 100%;
             justify-content: space-between;
         }
-
         .qty-btn {
             width: 36px;
             height: 36px;
         }
-
         .qty-input {
             width: 60px;
             height: 36px;
         }
-
-        .details-grid {
-            grid-template-columns: 1fr;
-        }
-
+        .details-grid { grid-template-columns: 1fr; }
         .modal-summary-bar {
             flex-direction: column;
             gap: 10px;
         }
-
         .summary-stat {
             width: 100%;
             display: flex;
@@ -859,14 +809,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             align-items: center;
             text-align: right;
         }
-
-        .summary-stat .s-label {
-            font-size: .75rem;
-        }
-
-        .summary-stat .s-val {
-            font-size: 1rem;
-        }
+        .summary-stat .s-label { font-size: .75rem; }
+        .summary-stat .s-val { font-size: 1rem; }
     }
 </style>
 
@@ -877,7 +821,24 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             <h1 class="page-title">🧾 ثبت پیش‌فاکتور</h1>
             <div class="hint mt-1">ثبت سریع کالا با کد ۴ رقمی محصول مادر</div>
         </div>
-        <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">صف تایید انبار</a>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="autosave-pill" id="localDraftStatus">ذخیره خودکار فعال</span>
+            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" id="clearLocalDraftTopBtn">پاک‌کردن پیش‌نویس</button>
+            <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">صف تایید انبار</a>
+        </div>
+    </div>
+
+    <div class="local-draft-banner" id="localDraftBanner">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <div>
+                <div class="fw-bold" style="color:var(--brand-darker)">پیش‌نویس ذخیره‌شده پیدا شد</div>
+                <div class="hint mt-1" id="localDraftBannerText">می‌توانید ادامه ثبت پیش‌فاکتور قبلی را لود کنید.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-primary rounded-3" id="loadLocalDraftBtn">لود پیش‌نویس</button>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-3" id="discardLocalDraftBtn">حذف پیش‌نویس</button>
+            </div>
+        </div>
     </div>
 
     @if(session('success'))
@@ -902,7 +863,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         <input type="hidden" name="payment_status" value="pending">
         <input type="hidden" name="discount_breakdown" id="discount_breakdown" value="">
 
-        {{-- Customer --}}
         <div class="soft-card compact-card mb-3">
             <div class="row g-2 align-items-end">
                 <div class="col-lg-5">
@@ -933,7 +893,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             </div>
         </div>
 
-        {{-- Shipping --}}
         <div class="soft-card compact-card mb-3">
             <div class="row g-2 align-items-end">
                 <div class="col-lg-4">
@@ -966,7 +925,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             </div>
         </div>
 
-        {{-- Product entry --}}
         <div class="soft-card-lg product-focus mb-3">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                 <div>
@@ -1011,7 +969,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 </div>
             </div>
 
-            {{-- Basket --}}
             <div>
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                     <h2 class="section-title">سبد پیش‌فاکتور</h2>
@@ -1022,7 +979,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             </div>
         </div>
 
-        {{-- Totals --}}
         <div class="soft-card final-card">
             <input type="hidden" name="discount_amount" id="discount" value="{{ old('discount_amount', 0) }}">
             <div class="final-grid">
@@ -1058,7 +1014,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     </form>
 </div>
 
-{{-- Modal --}}
 <div class="modal fade" id="groupPickerModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -1071,26 +1026,21 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             </div>
 
             <div class="modal-body">
-                {{-- Search --}}
                 <div class="mb-2">
                     <input type="text" id="pickerSearchInput" class="picker-search" placeholder="جستجو در تنوع‌ها...">
                 </div>
 
-                {{-- Model filter --}}
                 <div class="model-filter-row" id="modalModelFilterWrap">
                     <div class="hint mb-2 fw-bold" style="color:var(--text-soft)">فیلتر مدل‌لیست</div>
                     <div class="step-chip-group" id="modalModelFilterChips"></div>
                 </div>
 
-                {{-- Loading --}}
                 <div id="pickerLoading" class="empty-state d-none">در حال دریافت کالاها...</div>
 
-                {{-- Variant list --}}
                 <div class="variant-list" id="pickerTableWrap">
                     <div id="groupPickerRows"></div>
                 </div>
 
-                {{-- Discount for this product --}}
                 <div class="modal-discount-box">
                     <label class="label-sm">تخفیف این محصول</label>
                     <div class="discount-control">
@@ -1103,7 +1053,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                     <div class="discount-line">مبلغ تخفیف: <strong id="modalGroupDiscountPreview">0 تومان</strong></div>
                 </div>
 
-                {{-- Summary bar --}}
                 <div class="modal-summary-bar mt-2">
                     <div class="summary-stat">
                         <div class="s-label">ردیف انتخاب‌شده</div>
@@ -1145,18 +1094,26 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         initRows: @json($initRows),
         shippings: @json($shippingMethods ?? []),
         oldCustomerId: @json(old('customer_id', '')),
+        oldCustomerName: @json(old('customer_name', '')),
+        oldCustomerMobile: @json(old('customer_mobile', '')),
+        oldCustomerAddress: @json(old('customer_address', '')),
         oldProvinceId: @json(old('province_id', '')),
         oldCityId: @json(old('city_id', '')),
-        oldShippingId: @json(old('shipping_id', ''))
+        oldShippingId: @json(old('shipping_id', '')),
+        oldDiscountAmount: @json(old('discount_amount', 0))
     };
 
     const API = window.PREINVOICE_BOOT.api;
     const INIT_ROWS = window.PREINVOICE_BOOT.initRows || [];
     const INITIAL_SHIPPINGS = window.PREINVOICE_BOOT.shippings || [];
     const OLD_CUSTOMER_ID = window.PREINVOICE_BOOT.oldCustomerId;
+    const OLD_CUSTOMER_NAME = window.PREINVOICE_BOOT.oldCustomerName;
+    const OLD_CUSTOMER_MOBILE = window.PREINVOICE_BOOT.oldCustomerMobile;
+    const OLD_CUSTOMER_ADDRESS = window.PREINVOICE_BOOT.oldCustomerAddress;
     const OLD_PROVINCE_ID = window.PREINVOICE_BOOT.oldProvinceId;
     const OLD_CITY_ID = window.PREINVOICE_BOOT.oldCityId;
     const OLD_SHIPPING_ID = window.PREINVOICE_BOOT.oldShippingId;
+    const OLD_DISCOUNT_AMOUNT = window.PREINVOICE_BOOT.oldDiscountAmount;
 
     let shippings = INITIAL_SHIPPINGS || [];
     let areaProvinces = [];
@@ -1175,8 +1132,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     let motherAutoTimer = null;
     let lastMotherAutoCode = '';
     let isSubmittingProgrammatically = false;
+    let isHydratingLocalDraft = false;
+    let isBootingPage = true;
+    let localDraftSaveTimer = null;
 
     const RECENT_PRODUCTS_KEY = 'aria_preinvoice_recent_mothers_v3';
+    const LOCAL_DRAFT_VERSION = 1;
+    const LOCAL_DRAFT_KEY = 'aria_preinvoice_local_draft_create_v1';
 
     function toEnglishDigits(str) {
         return String(str || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
@@ -1188,21 +1150,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return Number.isFinite(n) ? Math.trunc(n) : 0;
     }
 
-    function formatMoney(val) {
-        return Number(val || 0).toLocaleString('fa-IR') + ' تومان';
-    }
-
-    function formatNum(val) {
-        return Number(val || 0).toLocaleString('fa-IR');
-    }
+    function formatMoney(val) { return Number(val || 0).toLocaleString('fa-IR') + ' تومان'; }
+    function formatNum(val) { return Number(val || 0).toLocaleString('fa-IR'); }
 
     function esc(val) {
         return String(val ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
     }
 
-    function normalize(val) {
-        return String(val || '').trim();
-    }
+    function normalize(val) { return String(val || '').trim(); }
 
     function isEmptyLabel(value) {
         const v = normalize(value);
@@ -1227,17 +1182,12 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function customerFullName(c) {
         if (!c) return '';
-        const full = `${c.first_name||''} ${c.last_name||''}`.trim();
+        const full = `${c.first_name || ''} ${c.last_name || ''}`.trim();
         return full || normalize(c.customer_name || c.name);
     }
 
-    function productTitle(product) {
-        return normalize(product?.title || product?.name) || 'بدون نام';
-    }
-
-    function productCode(product) {
-        return normalize(product?.code || product?.sku || product?.short_code);
-    }
+    function productTitle(product) { return normalize(product?.title || product?.name) || 'بدون نام'; }
+    function productCode(product) { return normalize(product?.code || product?.sku || product?.short_code); }
 
     function getProductVarieties(product) {
         if (!product) return [];
@@ -1246,25 +1196,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return [];
     }
 
-    function variantId(v) {
-        return Number(v?.id || 0);
-    }
-
-    function variantModel(v) {
-        return normalize(v?.model_list_name || v?.model_name || v?.model_list?.name) || '—';
-    }
-
-    function variantDesign(v) {
-        return normalize(v?.design_name || v?.pattern_name || v?.variety_name || v?.type_name) || '—';
-    }
-
-    function variantName(v) {
-        return normalize(v?.variant_name || v?.color_name || v?.color || v?.name) || '—';
-    }
-
-    function variantPrice(v, product = null) {
-        return Number(v?.sell_price ?? v?.price ?? product?.sell_price ?? product?.price ?? 0);
-    }
+    function variantId(v) { return Number(v?.id || 0); }
+    function variantModel(v) { return normalize(v?.model_list_name || v?.model_name || v?.model_list?.name) || '—'; }
+    function variantDesign(v) { return normalize(v?.design_name || v?.pattern_name || v?.variety_name || v?.type_name) || '—'; }
+    function variantName(v) { return normalize(v?.variant_name || v?.color_name || v?.color || v?.name) || '—'; }
+    function variantPrice(v, product = null) { return Number(v?.sell_price ?? v?.price ?? product?.sell_price ?? product?.price ?? 0); }
 
     function variantStock(v) {
         if (v?.sellable_stock !== undefined && v?.sellable_stock !== null) return Number(v.sellable_stock) || 0;
@@ -1285,17 +1221,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return 'تنوع پیش‌فرض';
     }
 
-    function buildVariantSubtitle(v) {
-        const parts = [];
-        const model = variantModel(v);
-        const design = variantDesign(v);
-        const name = variantName(v);
-        if (!isEmptyLabel(model)) parts.push('مدل: ' + model);
-        if (!isEmptyLabel(design)) parts.push('طرح: ' + design);
-        if (!isEmptyLabel(name)) parts.push('تنوع: ' + name);
-        return parts.join(' | ') || 'تنوع پیش‌فرض';
-    }
-
     function groupRawSubtotal(group) {
         if (!group || !Array.isArray(group.items)) return 0;
         return group.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0), 0);
@@ -1305,8 +1230,240 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return calcDiscount(groupRawSubtotal(group), group.discount_type || 'amount', group.discount_value || 0);
     }
 
-    function groupFinalAmount(group) {
-        return Math.max(0, groupRawSubtotal(group) - groupDiscountTotal(group));
+    function groupFinalAmount(group) { return Math.max(0, groupRawSubtotal(group) - groupDiscountTotal(group)); }
+
+    function hasAnyFormData() {
+        return !!(
+            normalize(document.getElementById('customer_id')?.value) ||
+            normalize(document.getElementById('customer_name')?.value) ||
+            normalize(document.getElementById('customer_mobile')?.value) ||
+            normalize(document.getElementById('customer_address')?.value) ||
+            normalize(document.getElementById('shipping_id')?.value) ||
+            Object.keys(groupedSelections || {}).length ||
+            toInt(document.getElementById('orderDiscountValue')?.value || 0) > 0
+        );
+    }
+
+    function localDraftExists() {
+        try {
+            const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
+            if (!raw) return false;
+            const data = JSON.parse(raw);
+            return data && data.version === LOCAL_DRAFT_VERSION;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function getLocalDraft() {
+        try {
+            const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (!data || data.version !== LOCAL_DRAFT_VERSION) return null;
+            return data;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function removeLocalDraft(showMessage = true) {
+        localStorage.removeItem(LOCAL_DRAFT_KEY);
+        hideLocalDraftBanner();
+        if (showMessage) updateLocalDraftStatus('پیش‌نویس پاک شد', false);
+    }
+
+    function updateLocalDraftStatus(text, saved = false) {
+        const el = document.getElementById('localDraftStatus');
+        if (!el) return;
+        el.textContent = text;
+        el.classList.toggle('is-saved', !!saved);
+    }
+
+    function showLocalDraftBanner() {
+        const draft = getLocalDraft();
+        if (!draft) return;
+        const banner = document.getElementById('localDraftBanner');
+        const text = document.getElementById('localDraftBannerText');
+        const savedAt = draft.saved_at ? new Date(draft.saved_at) : null;
+        const savedText = savedAt && !Number.isNaN(savedAt.getTime()) ? savedAt.toLocaleString('fa-IR') : 'زمان نامشخص';
+        const groups = draft.groupedSelections ? Object.keys(draft.groupedSelections).length : 0;
+        text.textContent = `آخرین ذخیره: ${savedText} | تعداد محصول: ${formatNum(groups)}`;
+        banner.classList.add('is-visible');
+    }
+
+    function hideLocalDraftBanner() {
+        document.getElementById('localDraftBanner')?.classList.remove('is-visible');
+    }
+
+    function collectLocalDraftPayload() {
+        return {
+            version: LOCAL_DRAFT_VERSION,
+            saved_at: new Date().toISOString(),
+            customer: {
+                id: document.getElementById('customer_id')?.value || '',
+                name: document.getElementById('customer_name')?.value || '',
+                mobile: document.getElementById('customer_mobile')?.value || '',
+                title: document.getElementById('selectedCustomerTitle')?.textContent || '',
+                balance_hint: document.getElementById('customer_balance_hint')?.textContent || ''
+            },
+            shipping: {
+                shipping_id: document.getElementById('shipping_id')?.value || '',
+                shipping_price: toInt(document.getElementById('shipping_price')?.value || 0),
+                province_id: document.getElementById('province_id')?.value || '',
+                city_id: document.getElementById('city_id')?.value || '',
+                address: document.getElementById('customer_address')?.value || ''
+            },
+            discount: {
+                type: document.getElementById('orderDiscountType')?.value || 'amount',
+                value: document.getElementById('orderDiscountValue')?.value || 0
+            },
+            groupedSelections: groupedSelections || {}
+        };
+    }
+
+    function saveLocalDraftNow() {
+        if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
+
+        if (!hasAnyFormData()) {
+            localStorage.removeItem(LOCAL_DRAFT_KEY);
+            updateLocalDraftStatus('ذخیره خودکار فعال', false);
+            return;
+        }
+
+        try {
+            localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(collectLocalDraftPayload()));
+            updateLocalDraftStatus('ذخیره شد', true);
+            setTimeout(() => updateLocalDraftStatus('ذخیره خودکار فعال', false), 1600);
+        } catch (e) {
+            updateLocalDraftStatus('خطا در ذخیره محلی', false);
+        }
+    }
+
+    function scheduleLocalDraftSave() {
+        if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
+        clearTimeout(localDraftSaveTimer);
+        localDraftSaveTimer = setTimeout(saveLocalDraftNow, 350);
+    }
+
+    function clearVisibleFormOnly() {
+        document.getElementById('customer_id').value = '';
+        document.getElementById('customer_name').value = '';
+        document.getElementById('customer_mobile').value = '';
+        document.getElementById('customer_address').value = '';
+        document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
+        document.getElementById('customer_balance_hint').textContent = '';
+        document.getElementById('customerSummaryBox').classList.remove('is-selected');
+        if (window.jQuery) $('#customer_search_select').val(null).trigger('change');
+
+        document.getElementById('shipping_id').value = '';
+        document.getElementById('province_id').value = '';
+        document.getElementById('city_id').value = '';
+        if (window.jQuery) {
+            $('#province_id').trigger('change.select2');
+            $('#city_id').trigger('change.select2');
+        }
+
+        document.getElementById('orderDiscountType').value = 'amount';
+        document.getElementById('orderDiscountValue').value = 0;
+        groupedSelections = {};
+        selectedMotherProduct = null;
+        document.getElementById('motherCodeInput').value = '';
+        document.getElementById('motherProductBox').style.display = 'none';
+        document.getElementById('motherSearchHint').style.display = '';
+    }
+
+    async function applyLocalDraft(draft) {
+        if (!draft) return;
+        isHydratingLocalDraft = true;
+
+        clearVisibleFormOnly();
+
+        document.getElementById('customer_id').value = draft.customer?.id || '';
+        document.getElementById('customer_name').value = draft.customer?.name || '';
+        document.getElementById('customer_mobile').value = draft.customer?.mobile || '';
+
+        const displayTitle = normalize(draft.customer?.title) || [draft.customer?.name, draft.customer?.mobile].filter(Boolean).join(' - ');
+        if (displayTitle) {
+            document.getElementById('selectedCustomerTitle').textContent = displayTitle;
+            document.getElementById('customerSummaryBox').classList.add('is-selected');
+        }
+        document.getElementById('customer_balance_hint').textContent = draft.customer?.balance_hint || '';
+
+        if (draft.customer?.id && window.jQuery) {
+            const optionText = displayTitle || draft.customer.id;
+            const selectEl = document.getElementById('customer_search_select');
+            selectEl.add(new Option(optionText, draft.customer.id, true, true));
+            $('#customer_search_select').trigger('change');
+        }
+
+        document.getElementById('shipping_id').value = draft.shipping?.shipping_id || '';
+        document.getElementById('customer_address').value = draft.shipping?.address || '';
+        document.getElementById('orderDiscountType').value = draft.discount?.type || 'amount';
+        document.getElementById('orderDiscountValue').value = draft.discount?.value || 0;
+
+        updateShippingMode();
+
+        if (draft.shipping?.province_id) {
+            document.getElementById('province_id').value = String(draft.shipping.province_id);
+            if (window.jQuery) $('#province_id').trigger('change.select2');
+            fillCitiesByProvinceId(draft.shipping.province_id);
+        }
+
+        if (draft.shipping?.city_id) {
+            document.getElementById('city_id').value = String(draft.shipping.city_id);
+            if (window.jQuery) $('#city_id').trigger('change.select2');
+        }
+
+        groupedSelections = draft.groupedSelections || {};
+        renderGroupSummary();
+        updateTotal();
+        updateSubmitState();
+        hideLocalDraftBanner();
+        updateLocalDraftStatus('پیش‌نویس لود شد', true);
+
+        isHydratingLocalDraft = false;
+        scheduleLocalDraftSave();
+    }
+
+    function bindLocalDraftEvents() {
+        document.getElementById('loadLocalDraftBtn')?.addEventListener('click', function () {
+            const draft = getLocalDraft();
+            if (!draft) {
+                alert('پیش‌نویسی برای لود شدن پیدا نشد.');
+                hideLocalDraftBanner();
+                return;
+            }
+            applyLocalDraft(draft);
+        });
+
+        document.getElementById('discardLocalDraftBtn')?.addEventListener('click', function () {
+            if (!confirm('پیش‌نویس ذخیره‌شده حذف شود؟')) return;
+            removeLocalDraft(true);
+        });
+
+        document.getElementById('clearLocalDraftTopBtn')?.addEventListener('click', function () {
+            if (!confirm('پیش‌نویس محلی و فرم فعلی پاک شود؟')) return;
+            isHydratingLocalDraft = true;
+            clearVisibleFormOnly();
+            renderGroupSummary();
+            updateShippingMode();
+            updateTotal();
+            updateSubmitState();
+            isHydratingLocalDraft = false;
+            removeLocalDraft(true);
+        });
+
+        ['customer_address', 'shipping_id', 'province_id', 'city_id', 'orderDiscountType', 'orderDiscountValue'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', scheduleLocalDraftSave);
+            el.addEventListener('input', scheduleLocalDraftSave);
+        });
+
+        window.addEventListener('beforeunload', function () {
+            saveLocalDraftNow();
+        });
     }
 
     async function getProductDetails(productId, fresh = false) {
@@ -1314,29 +1471,20 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (!id) return null;
         if (!fresh && productCache.has(id)) return productCache.get(id);
         const url = API.product + '/' + encodeURIComponent(id) + (fresh ? '?_=' + Date.now() : '');
-        const res = await fetch(url, {
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
         const json = await res.json();
         const product = json?.data?.product || null;
         if (product) productCache.set(id, product);
         return product;
     }
+
     async function searchProducts(query) {
-        const res = await fetch(API.products + '?q=' + encodeURIComponent(query), {
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
+        const res = await fetch(API.products + '?q=' + encodeURIComponent(query), { headers: { 'Accept': 'application/json' } });
         const json = await res.json();
         return json?.data?.products?.data || [];
     }
 
-    function shippingById(id) {
-        return shippings.find(s => Number(s.id) === Number(id)) || null;
-    }
+    function shippingById(id) { return shippings.find(s => Number(s.id) === Number(id)) || null; }
 
     function isInPersonShipping(ship) {
         const name = normalize(ship?.name);
@@ -1350,31 +1498,18 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             $el.off('select2:select select2:clear');
             $el.select2('destroy');
         }
-        $el.select2({
-            width: '100%',
-            dir: 'rtl',
-            placeholder,
-            allowClear: true
-        });
+        $el.select2({ width: '100%', dir: 'rtl', placeholder, allowClear: true });
         $el.on('select2:select select2:clear', function() {
-            this.dispatchEvent(new Event('change', {
-                bubbles: true
-            }));
+            this.dispatchEvent(new Event('change', { bubbles: true }));
         });
     }
 
     async function loadArea() {
         try {
-            const res = await fetch(API.area, {
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
+            const res = await fetch(API.area, { headers: { 'Accept': 'application/json' } });
             const data = await res.json();
             areaProvinces = data?.data?.provinces || [];
-        } catch (e) {
-            areaProvinces = [];
-        }
+        } catch (e) { areaProvinces = []; }
     }
 
     function fillProvincesSelect() {
@@ -1445,6 +1580,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             hintEl.textContent = price > 0 ? 'هزینه ارسال: ' + formatMoney(price) : 'مقصد و آدرس را تکمیل کنید.';
         }
         updateTotal();
+        scheduleLocalDraftSave();
     }
 
     function applyCustomerToForm(c) {
@@ -1468,6 +1604,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             if (window.jQuery) $('#city_id').trigger('change.select2');
         }
         updateSubmitState();
+        scheduleLocalDraftSave();
     }
 
     function clearCustomer() {
@@ -1479,6 +1616,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.getElementById('customerSummaryBox').classList.remove('is-selected');
         if (window.jQuery) $('#customer_search_select').val(null).trigger('change');
         updateSubmitState();
+        scheduleLocalDraftSave();
     }
 
     function preloadCustomerOption(selectEl, customer) {
@@ -1501,17 +1639,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 url: API.customers,
                 dataType: 'json',
                 delay: 250,
-                data: params => ({
-                    q: params.term || ''
-                }),
+                data: params => ({ q: params.term || '' }),
                 processResults: resp => {
                     const items = resp?.data?.customers || [];
-                    return {
-                        results: items.map(c => ({
-                            id: c.id,
-                            text: customerFullName(c) + ' - ' + (c.mobile || '')
-                        }))
-                    };
+                    return { results: items.map(c => ({ id: c.id, text: customerFullName(c) + ' - ' + (c.mobile || '') })) };
                 }
             }
         });
@@ -1519,11 +1650,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const id = e?.params?.data?.id;
             if (!id) return;
             try {
-                const res = await fetch(API.customer + '/' + encodeURIComponent(id), {
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
+                const res = await fetch(API.customer + '/' + encodeURIComponent(id), { headers: { 'Accept': 'application/json' } });
                 const json = await res.json();
                 const customer = json?.data?.customer || null;
                 if (customer) applyCustomerToForm(customer);
@@ -1531,15 +1658,12 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         });
         $(selectEl).on('select2:clear', clearCustomer);
     }
+
     async function loadOldCustomer() {
         const cid = document.getElementById('customer_id').value || OLD_CUSTOMER_ID || '';
         if (!cid) return;
         try {
-            const res = await fetch(API.customer + '/' + encodeURIComponent(cid), {
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
+            const res = await fetch(API.customer + '/' + encodeURIComponent(cid), { headers: { 'Accept': 'application/json' } });
             const json = await res.json();
             const customer = json?.data?.customer || null;
             if (customer) {
@@ -1554,20 +1678,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const raw = localStorage.getItem(RECENT_PRODUCTS_KEY);
             const rows = JSON.parse(raw || '[]');
             return Array.isArray(rows) ? rows : [];
-        } catch (e) {
-            return [];
-        }
+        } catch (e) { return []; }
     }
 
     function saveRecentProduct(product) {
         if (!product) return;
         const id = Number(product.id || 0);
         if (!id) return;
-        const row = {
-            id,
-            title: productTitle(product),
-            code: productCode(product)
-        };
+        const row = { id, title: productTitle(product), code: productCode(product) };
         const rows = getRecentProducts().filter(item => Number(item.id) !== id);
         rows.unshift(row);
         localStorage.setItem(RECENT_PRODUCTS_KEY, JSON.stringify(rows.slice(0, 6)));
@@ -1587,7 +1705,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'recent-chip';
-            btn.textContent = `${item.code||'—'} - ${item.title||'محصول'}`;
+            btn.textContent = `${item.code || '—'} - ${item.title || 'محصول'}`;
             btn.addEventListener('click', async function() {
                 selectedMotherProduct = item;
                 await openGroupPicker(item.id);
@@ -1767,11 +1885,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             <div>
                 <div class="variant-title">${esc(buildVariantTitle(v))}</div>
                 <div class="variant-meta">
-                    <span class="badge-soft ${stock>0?'badge-stock':'badge-no-stock'}">
-                        موجودی: ${stock>0?formatNum(stock):'ناموجود'}
+                    <span class="badge-soft ${stock > 0 ? 'badge-stock' : 'badge-no-stock'}">
+                        موجودی: ${stock > 0 ? formatNum(stock) : 'ناموجود'}
                     </span>
                     <span class="badge-soft">قیمت: ${formatMoney(price)}</span>
-                    ${qty>0?`<span class="badge-soft badge-brand">انتخاب: ${formatNum(qty)}</span>`:''}
+                    ${qty > 0 ? `<span class="badge-soft badge-brand">انتخاب: ${formatNum(qty)}</span>` : ''}
                 </div>
             </div>
             <div class="qty-control">
@@ -1803,9 +1921,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     function updateModalSummary() {
-        let selectedRows = 0,
-            totalQty = 0,
-            totalAmount = 0;
+        let selectedRows = 0, totalQty = 0, totalAmount = 0;
         activeModalItems.forEach(v => {
             const id = variantId(v);
             const qty = Number(modalQuantities.get(id) || 0);
@@ -1868,6 +1984,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         };
         renderGroupSummary();
         updateTotal();
+        scheduleLocalDraftSave();
         bootstrap.Modal.getInstance(document.getElementById('groupPickerModal'))?.hide();
         document.getElementById('motherCodeInput').value = '';
         document.getElementById('motherProductBox').style.display = 'none';
@@ -1884,6 +2001,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         delete groupedSelections[productId];
         renderGroupSummary();
         updateTotal();
+        scheduleLocalDraftSave();
     }
 
     function toggleGroupDetails(productId) {
@@ -1917,8 +2035,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const finalAmount = groupFinalAmount(group);
             const details = group.items.map(it => `
             <div class="detail-pill">
-                <div class="fw-bold">${esc(it.label||'تنوع پیش‌فرض')}</div>
-                <div class="text-muted mt-1">تعداد: ${formatNum(it.quantity)} | مبلغ: ${formatMoney(Number(it.quantity)*Number(it.price))}</div>
+                <div class="fw-bold">${esc(it.label || 'تنوع پیش‌فرض')}</div>
+                <div class="text-muted mt-1">تعداد: ${formatNum(it.quantity)} | مبلغ: ${formatMoney(Number(it.quantity) * Number(it.price))}</div>
             </div>`).join('');
             wrap.insertAdjacentHTML('beforeend', `
         <div class="group-card" data-group-card="${productId}">
@@ -1929,16 +2047,16 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             </button>
             <div class="group-details">
                 <div class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge-soft">کد: ${esc(group.product.code||'—')}</span>
+                    <span class="badge-soft">کد: ${esc(group.product.code || '—')}</span>
                     <span class="badge-soft">ردیف: ${formatNum(rowsCount)}</span>
                     <span class="badge-soft">تعداد: ${formatNum(qty)}</span>
-                    ${discount>0?`<span class="badge-soft badge-brand">تخفیف: ${formatMoney(discount)}</span>`:''}
+                    ${discount > 0 ? `<span class="badge-soft badge-brand">تخفیف: ${formatMoney(discount)}</span>` : ''}
                 </div>
                 <div class="group-actions">
                     <button type="button" class="btn btn-sm btn-outline-primary rounded-3" onclick="openGroupPicker(${productId})">ویرایش</button>
                     <button type="button" class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteGroup(${productId})">حذف</button>
                 </div>
-                <div class="mb-2 hint">خام: ${formatMoney(subtotal)}${discount>0?' | تخفیف: '+formatMoney(discount):''}</div>
+                <div class="mb-2 hint">خام: ${formatMoney(subtotal)}${discount > 0 ? ' | تخفیف: ' + formatMoney(discount) : ''}</div>
                 <div class="details-grid">${details}</div>
             </div>
         </div>`);
@@ -1977,8 +2095,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function updateTotal() {
         const shipping = toInt(document.getElementById('shipping_price')?.value || 0);
-        let subtotal = 0,
-            groupDiscounts = 0;
+        let subtotal = 0, groupDiscounts = 0;
         Object.values(groupedSelections).forEach(group => {
             subtotal += groupRawSubtotal(group);
             groupDiscounts += groupDiscountTotal(group);
@@ -1996,6 +2113,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (preview) preview.textContent = 'تخفیف کلی: ' + formatMoney(orderDiscount);
         document.getElementById('discount_breakdown').value = JSON.stringify(buildDiscountBreakdown(subtotal, groupDiscounts, orderDiscount, totalDiscount));
         updateSubmitState();
+        scheduleLocalDraftSave();
     }
 
     async function hydrateInitialGroups() {
@@ -2013,9 +2131,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         });
         for (const [productId, rows] of Object.entries(grouped)) {
             let product = null;
-            try {
-                product = await getProductDetails(productId);
-            } catch (e) {}
+            try { product = await getProductDetails(productId); } catch (e) {}
             const varieties = getProductVarieties(product);
             groupedSelections[Number(productId)] = {
                 product: {
@@ -2092,10 +2208,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (shipEl) shipEl.value = String(toInt(shipEl.value));
         const discEl = document.getElementById('discount');
         if (discEl) discEl.value = String(toInt(discEl.value));
-        document.querySelectorAll('#groupProductsInputs input').forEach(input => {
-            input.value = String(toInt(input.value));
-        });
+        document.querySelectorAll('#groupProductsInputs input').forEach(input => { input.value = String(toInt(input.value)); });
     }
+
     async function submitGuard(e) {
         if (isSubmittingProgrammatically) return true;
         e.preventDefault();
@@ -2127,15 +2242,20 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         normalizeBeforeSubmit();
         btn.textContent = 'در حال ثبت...';
         isSubmittingProgrammatically = true;
+        removeLocalDraft(false);
         document.getElementById('orderForm').submit();
         return true;
     }
 
     document.addEventListener('DOMContentLoaded', async function() {
+        bindLocalDraftEvents();
+
         initSelect2Basic(document.getElementById('province_id'), 'انتخاب استان...');
         initSelect2Basic(document.getElementById('city_id'), 'انتخاب شهر...');
+
         await loadArea();
         fillProvincesSelect();
+
         if (OLD_PROVINCE_ID) {
             document.getElementById('province_id').value = String(OLD_PROVINCE_ID);
             if (window.jQuery) $('#province_id').trigger('change.select2');
@@ -2145,8 +2265,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             document.getElementById('city_id').value = String(OLD_CITY_ID);
             if (window.jQuery) $('#city_id').trigger('change.select2');
         }
+
         fillShippingSelect();
         if (OLD_SHIPPING_ID) document.getElementById('shipping_id').value = String(OLD_SHIPPING_ID);
+
         initCustomerSearch();
         await loadOldCustomer();
         renderRecentProducts();
@@ -2154,6 +2276,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.getElementById('clearCustomerBtn')?.addEventListener('click', clearCustomer);
         document.getElementById('province_id')?.addEventListener('change', function() {
             fillCitiesByProvinceId(this.value);
+            scheduleLocalDraftSave();
         });
         document.getElementById('shipping_id')?.addEventListener('change', updateShippingMode);
         document.getElementById('orderDiscountType')?.addEventListener('change', updateTotal);
@@ -2209,13 +2332,20 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.getElementById('groupPickerRows')?.addEventListener('input', function(e) {
             if (e.target.classList.contains('picker-qty')) setModalQty(e.target.dataset.id, e.target.value);
         });
-        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, {
-            capture: true
-        });
+        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, { capture: true });
 
         await hydrateInitialGroups();
         updateShippingMode();
         updateSubmitState();
+
+        isBootingPage = false;
+
+        if (!OLD_CUSTOMER_ID && !INIT_ROWS.length && localDraftExists()) {
+            showLocalDraftBanner();
+        } else {
+            scheduleLocalDraftSave();
+        }
+
         setTimeout(() => document.getElementById('motherCodeInput')?.focus(), 200);
     });
 </script>
