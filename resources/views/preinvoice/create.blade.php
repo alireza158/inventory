@@ -1322,23 +1322,29 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         };
     }
 
-    function saveLocalDraftNow() {
-        if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
+ function saveLocalDraftNow() {
+    if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
 
-        if (!hasAnyFormData()) {
-            localStorage.removeItem(LOCAL_DRAFT_KEY);
+    // خیلی مهم:
+    // اگر فرم خالی بود، پیش‌نویس قبلی را پاک نمی‌کنیم.
+    // فقط ذخیره انجام نمی‌دهیم.
+    // حذف پیش‌نویس فقط با دکمه حذف یا بعد از ثبت موفق انجام می‌شود.
+   if (!hasAnyFormData()) {
+    updateLocalDraftStatus('ذخیره خودکار فعال', false);
+    return;
+}
+
+    try {
+        localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(collectLocalDraftPayload()));
+        updateLocalDraftStatus('ذخیره شد', true);
+
+        setTimeout(() => {
             updateLocalDraftStatus('ذخیره خودکار فعال', false);
-            return;
-        }
-
-        try {
-            localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(collectLocalDraftPayload()));
-            updateLocalDraftStatus('ذخیره شد', true);
-            setTimeout(() => updateLocalDraftStatus('ذخیره خودکار فعال', false), 1600);
-        } catch (e) {
-            updateLocalDraftStatus('خطا در ذخیره محلی', false);
-        }
+        }, 1600);
+    } catch (e) {
+        updateLocalDraftStatus('خطا در ذخیره محلی', false);
     }
+}
 
     function scheduleLocalDraftSave() {
         if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
