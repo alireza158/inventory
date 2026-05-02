@@ -137,27 +137,6 @@
         </div>
     </form>
 
-    <form method="POST"
-          action="{{ route('preinvoice.warehouse.reject', $order->uuid) }}"
-          class="card border-danger shadow-sm">
-        @csrf
-
-        <div class="card-body">
-            <h6 class="text-danger">رد / برگشت به ثبت‌کننده</h6>
-
-            <textarea class="form-control mb-2"
-                      name="warehouse_reject_reason"
-                      rows="2"
-                      placeholder="دلیل رد/برگشت را بنویسید">{{ old('warehouse_reject_reason', $order->warehouse_reject_reason) }}</textarea>
-
-            <button type="submit"
-                    class="btn btn-outline-danger"
-                    onclick="return confirm('پیش‌فاکتور رد شود؟')">
-                ثبت رد پیش‌فاکتور
-            </button>
-        </div>
-    </form>
-
     <div class="card shadow-sm border-0 mt-3">
         <div class="card-header bg-white">
             <h6 class="mb-0">سوابق بازبینی انبار</h6>
