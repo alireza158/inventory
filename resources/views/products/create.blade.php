@@ -361,6 +361,9 @@
         <form method="POST" action="{{ route('products.store') }}" id="productCreateForm" class="row g-3">
             @csrf
 
+            {{-- hidden inputs برای model_list_ids - اینجا توسط JS مدیریت می‌شن --}}
+            <div id="modelHiddenInputsContainer"></div>
+
             {{-- اطلاعات پایه --}}
             <div class="col-12">
                 <div class="card-soft">
@@ -616,58 +619,64 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    let categories = @json($categoriesJs);
-    let modelLists = @json($modelListsJs);
-    const previewSeq4 = @json($previewSeq4);
-    const oldCategoryId = @json($oldCategoryId);
-    const oldModelIds = @json($oldModelIds);
-    const oldDesignNotes = @json($oldDesignNotes);
-    const csrfToken = @json(csrf_token());
+    var categories = @json($categoriesJs);
+    var modelLists = @json($modelListsJs);
+    var previewSeq4 = @json($previewSeq4);
+    var oldCategoryId = @json($oldCategoryId);
+    var oldModelIds = @json($oldModelIds);
+    var oldDesignNotes = @json($oldDesignNotes);
+    var csrfToken = @json(csrf_token());
 
-    const categoryIdEl = document.getElementById('categoryId');
-    const useModelsEl = document.getElementById('useModels');
-    const useDesignsEl = document.getElementById('useDesigns');
+    var categoryIdEl = document.getElementById('categoryId');
+    var useModelsEl = document.getElementById('useModels');
+    var useDesignsEl = document.getElementById('useDesigns');
 
-    const modelsSection = document.getElementById('modelsSection');
-    const designsSection = document.getElementById('designsSection');
+    var modelsSection = document.getElementById('modelsSection');
+    var designsSection = document.getElementById('designsSection');
 
-    const modelBrandGroupEl = document.getElementById('modelBrandGroup');
-    const selectedModelsCountEl = document.getElementById('selectedModelsCount');
+    var modelBrandGroupEl = document.getElementById('modelBrandGroup');
+    var selectedModelsCountEl = document.getElementById('selectedModelsCount');
 
-    const designCountEl = document.getElementById('designCount');
-    const designNotesWrap = document.getElementById('designNotesWrap');
+    var designCountEl = document.getElementById('designCount');
+    var designNotesWrap = document.getElementById('designNotesWrap');
 
-    const productCodePreviewEl = document.getElementById('productCodePreview');
-    const variantPatternPreviewEl = document.getElementById('variantPatternPreview');
-    const variantsCountPreviewEl = document.getElementById('variantsCountPreview');
-    const variantExamplesEl = document.getElementById('variantExamples');
+    var productCodePreviewEl = document.getElementById('productCodePreview');
+    var variantPatternPreviewEl = document.getElementById('variantPatternPreview');
+    var variantsCountPreviewEl = document.getElementById('variantsCountPreview');
+    var variantExamplesEl = document.getElementById('variantExamples');
 
-    const categoryLevelsEl = document.getElementById('categoryLevels');
-    const categoryBreadcrumbEl = document.getElementById('categoryBreadcrumb');
-    const categorySelectedTitleEl = document.getElementById('categorySelectedTitle');
-    const openCategoryQuickAddEl = document.getElementById('openCategoryQuickAdd');
-    const categoryQuickAddBoxEl = document.getElementById('categoryQuickAddBox');
-    const categoryQuickNameEl = document.getElementById('categoryQuickName');
-    const submitCategoryQuickAddEl = document.getElementById('submitCategoryQuickAdd');
-    const cancelCategoryQuickAddEl = document.getElementById('cancelCategoryQuickAdd');
-    const categoryQuickFeedbackEl = document.getElementById('categoryQuickFeedback');
+    var categoryLevelsEl = document.getElementById('categoryLevels');
+    var categoryBreadcrumbEl = document.getElementById('categoryBreadcrumb');
+    var categorySelectedTitleEl = document.getElementById('categorySelectedTitle');
+    var openCategoryQuickAddEl = document.getElementById('openCategoryQuickAdd');
+    var categoryQuickAddBoxEl = document.getElementById('categoryQuickAddBox');
+    var categoryQuickNameEl = document.getElementById('categoryQuickName');
+    var submitCategoryQuickAddEl = document.getElementById('submitCategoryQuickAdd');
+    var cancelCategoryQuickAddEl = document.getElementById('cancelCategoryQuickAdd');
+    var categoryQuickFeedbackEl = document.getElementById('categoryQuickFeedback');
 
-    const modelPickerEl = document.getElementById('modelPicker');
-    const modelPickerButton = document.getElementById('modelPickerButton');
-    const modelPickerButtonText = document.getElementById('modelPickerButtonText');
-    const modelPickerPanel = document.getElementById('modelPickerPanel');
-    const modelPickerList = document.getElementById('modelPickerList');
-    const modelSearchInput = document.getElementById('modelSearchInput');
-    const modelSelectedTags = document.getElementById('modelSelectedTags');
-    const openModelQuickAddEl = document.getElementById('openModelQuickAdd');
-    const modelQuickAddBoxEl = document.getElementById('modelQuickAddBox');
-    const modelQuickNameEl = document.getElementById('modelQuickName');
-    const submitModelQuickAddEl = document.getElementById('submitModelQuickAdd');
-    const cancelModelQuickAddEl = document.getElementById('cancelModelQuickAdd');
-    const modelQuickFeedbackEl = document.getElementById('modelQuickFeedback');
+    var modelPickerEl = document.getElementById('modelPicker');
+    var modelPickerButton = document.getElementById('modelPickerButton');
+    var modelPickerButtonText = document.getElementById('modelPickerButtonText');
+    var modelPickerPanel = document.getElementById('modelPickerPanel');
+    var modelPickerList = document.getElementById('modelPickerList');
+    var modelSearchInput = document.getElementById('modelSearchInput');
+    var modelSelectedTags = document.getElementById('modelSelectedTags');
+    var openModelQuickAddEl = document.getElementById('openModelQuickAdd');
+    var modelQuickAddBoxEl = document.getElementById('modelQuickAddBox');
+    var modelQuickNameEl = document.getElementById('modelQuickName');
+    var submitModelQuickAddEl = document.getElementById('submitModelQuickAdd');
+    var cancelModelQuickAddEl = document.getElementById('cancelModelQuickAdd');
+    var modelQuickFeedbackEl = document.getElementById('modelQuickFeedback');
 
-    let selectedModelIds = new Set(oldModelIds.map(function (x) { return parseInt(x, 10); }));
-    let categoryPathIds = [];
+    var modelHiddenInputsContainer = document.getElementById('modelHiddenInputsContainer');
+
+    // مجموعه آیدی‌های انتخاب‌شده - منبع اصلی داده
+    var selectedModelIds = new Set(oldModelIds.map(function (x) { return parseInt(x, 10); }));
+
+    var categoryPathIds = [];
+
+    // ─── ابزارهای کمکی ───────────────────────────────────────────
 
     function onlyDigits(s) {
         return String(s || '').replace(/\D+/g, '');
@@ -690,8 +699,16 @@ document.addEventListener('DOMContentLoaded', function () {
         setFeedback(el, '', '');
     }
 
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     async function postJson(url, payload) {
-        const response = await fetch(url, {
+        var response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -701,12 +718,10 @@ document.addEventListener('DOMContentLoaded', function () {
             body: JSON.stringify(payload || {}),
         });
 
-        const json = await response.json().catch(function () {
-            return {};
-        });
+        var json = await response.json().catch(function () { return {}; });
 
         if (!response.ok) {
-            const err = new Error(json.message || 'خطا در ثبت اطلاعات.');
+            var err = new Error(json.message || 'خطا در ثبت اطلاعات.');
             err.payload = json;
             throw err;
         }
@@ -714,15 +729,37 @@ document.addEventListener('DOMContentLoaded', function () {
         return json;
     }
 
+    // ─── کمک‌کننده‌های کد ─────────────────────────────────────────
+
     function normalizeCategory2(code) {
-        const d = onlyDigits(code).substring(0, 2);
+        var d = onlyDigits(code).substring(0, 2);
         return d.length === 2 ? d : '--';
     }
 
     function normalizeModel3(code) {
-        const d = onlyDigits(code).substring(0, 3);
+        var d = onlyDigits(code).substring(0, 3);
         return padLeft(d, 3, '0');
     }
+
+    // ─── مدیریت hidden input های model_list_ids ──────────────────
+    // این تابع همیشه پس از هر تغییر در selectedModelIds صدا زده می‌شود
+    // تا مقادیر واقعی در فرم وجود داشته باشند
+
+    function syncHiddenModelInputs() {
+        // پاک کردن همه hidden input های قبلی
+        modelHiddenInputsContainer.innerHTML = '';
+
+        // ساخت یک hidden input به ازای هر آیدی انتخاب‌شده
+        selectedModelIds.forEach(function (id) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'model_list_ids[]';
+            input.value = String(id);
+            modelHiddenInputsContainer.appendChild(input);
+        });
+    }
+
+    // ─── دسته‌بندی ────────────────────────────────────────────────
 
     function categoryById(id) {
         id = parseInt(id || '0', 10);
@@ -734,8 +771,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function childrenOf(parentId) {
         return categories
             .filter(function (c) {
-                const pid = c.parent_id === null ? null : parseInt(c.parent_id, 10);
-                const target = parentId === null ? null : parseInt(parentId, 10);
+                var pid = c.parent_id === null ? null : parseInt(c.parent_id, 10);
+                var target = parentId === null ? null : parseInt(parentId, 10);
                 return pid === target;
             })
             .sort(function (a, b) {
@@ -744,8 +781,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function getCategoryPath(id) {
-        const path = [];
-        let current = categoryById(id);
+        var path = [];
+        var current = categoryById(id);
 
         while (current) {
             path.unshift(parseInt(current.id, 10));
@@ -760,13 +797,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function currentCategoryParentIdForQuickAdd() {
-        const selected = selectedCategory();
+        var selected = selectedCategory();
         return selected ? parseInt(selected.id, 10) : null;
     }
 
     function updateCategoryPreview() {
-        const cat = selectedCategory();
-        const cat2 = cat ? normalizeCategory2(cat.code) : '--';
+        var cat = selectedCategory();
+        var cat2 = cat ? normalizeCategory2(cat.code) : '--';
 
         productCodePreviewEl.textContent = cat2 + previewSeq4;
         variantPatternPreviewEl.textContent = cat2 + previewSeq4 + 'MMMDD';
@@ -777,7 +814,7 @@ document.addEventListener('DOMContentLoaded', function () {
         categoryBreadcrumbEl.innerHTML = '';
 
         if (!categoryPathIds.length) {
-            const span = document.createElement('div');
+            var span = document.createElement('div');
             span.className = 'muted';
             span.textContent = 'هنوز مسیر دسته‌بندی انتخاب نشده است.';
             categoryBreadcrumbEl.appendChild(span);
@@ -785,10 +822,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         categoryPathIds.forEach(function (id) {
-            const cat = categoryById(id);
+            var cat = categoryById(id);
             if (!cat) return;
 
-            const crumb = document.createElement('span');
+            var crumb = document.createElement('span');
             crumb.className = 'crumb';
             crumb.textContent = cat.name;
             categoryBreadcrumbEl.appendChild(crumb);
@@ -799,35 +836,35 @@ document.addEventListener('DOMContentLoaded', function () {
         categoryLevelsEl.innerHTML = '';
         categoryPathIds = pathIds.slice();
 
-        let parentId = null;
-        let level = 0;
-        let lastSelected = '';
+        var parentId = null;
+        var level = 0;
+        var lastSelected = '';
 
         while (true) {
-            const children = childrenOf(parentId);
+            var children = childrenOf(parentId);
             if (!children.length) break;
 
-            const col = document.createElement('div');
+            var col = document.createElement('div');
             col.className = 'col-md-4';
 
-            const wrapper = document.createElement('div');
+            var wrapper = document.createElement('div');
             wrapper.className = 'tree-level';
 
-            const label = document.createElement('div');
+            var label = document.createElement('div');
             label.className = 'soft-label';
             label.textContent = level === 0 ? 'دسته اصلی' : ('زیر دسته ' + level);
 
-            const select = document.createElement('select');
+            var select = document.createElement('select');
             select.className = 'form-select';
             select.dataset.level = String(level);
 
-            const emptyOpt = document.createElement('option');
+            var emptyOpt = document.createElement('option');
             emptyOpt.value = '';
             emptyOpt.textContent = level === 0 ? 'انتخاب دسته اصلی...' : 'انتخاب زیر دسته...';
             select.appendChild(emptyOpt);
 
             children.forEach(function (cat) {
-                const opt = document.createElement('option');
+                var opt = document.createElement('option');
                 opt.value = String(cat.id);
                 opt.textContent = cat.name + (cat.code ? ' (' + cat.code + ')' : '');
                 select.appendChild(opt);
@@ -839,12 +876,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             select.addEventListener('change', function () {
-                const currentLevel = parseInt(this.dataset.level, 10);
-                const newPath = [];
+                var currentLevel = parseInt(this.dataset.level, 10);
+                var newPath = [];
 
-                const selects = categoryLevelsEl.querySelectorAll('select');
+                var selects = categoryLevelsEl.querySelectorAll('select');
                 selects.forEach(function (sel) {
-                    const lv = parseInt(sel.dataset.level, 10);
+                    var lv = parseInt(sel.dataset.level, 10);
                     if (lv < currentLevel && sel.value) newPath.push(parseInt(sel.value, 10));
                 });
 
@@ -872,9 +909,11 @@ document.addEventListener('DOMContentLoaded', function () {
         updateCategoryPreview();
     }
 
+    // ─── مدل‌لیست ─────────────────────────────────────────────────
+
     function syncSections() {
-        const modelsOn = useModelsEl.checked;
-        const designsOn = useDesignsEl.checked;
+        var modelsOn = useModelsEl.checked;
+        var designsOn = useDesignsEl.checked;
 
         modelsSection.style.display = modelsOn ? '' : 'none';
         designsSection.style.display = designsOn ? '' : 'none';
@@ -884,6 +923,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!modelsOn) {
             selectedModelIds = new Set();
+            syncHiddenModelInputs();
             renderModelPicker();
         }
 
@@ -897,10 +937,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function filteredModels() {
-        const brand = modelBrandGroupEl.value || '';
-        const keyword = String(modelSearchInput.value || '').trim().toLowerCase();
+        var brand = modelBrandGroupEl.value || '';
+        var keyword = String(modelSearchInput.value || '').trim().toLowerCase();
 
-        let list = modelLists.filter(function (m) {
+        var list = modelLists.filter(function (m) {
             return brand ? String(m.brand || '') === brand : false;
         });
 
@@ -915,7 +955,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function selectedModelsData() {
-        const ids = Array.from(selectedModelIds).map(function (x) { return parseInt(x, 10); });
+        var ids = Array.from(selectedModelIds).map(function (x) { return parseInt(x, 10); });
         return modelLists.filter(function (m) {
             return ids.indexOf(parseInt(m.id, 10)) !== -1;
         });
@@ -934,15 +974,14 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderSelectedModelTags() {
         modelSelectedTags.innerHTML = '';
 
-        const items = selectedModelsData()
-            .sort(function (a, b) {
-                return String(a.model_name).localeCompare(String(b.model_name), 'fa');
-            });
+        var items = selectedModelsData().sort(function (a, b) {
+            return String(a.model_name).localeCompare(String(b.model_name), 'fa');
+        });
 
         if (!items.length) return;
 
         items.forEach(function (m) {
-            const tag = document.createElement('span');
+            var tag = document.createElement('span');
             tag.className = 'picker-tag';
             tag.textContent = m.model_name + (m.code ? ' (' + m.code + ')' : '');
             modelSelectedTags.appendChild(tag);
@@ -952,11 +991,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderModelPicker() {
         modelPickerList.innerHTML = '';
 
-        const brand = modelBrandGroupEl.value || '';
-        const items = filteredModels();
+        var brand = modelBrandGroupEl.value || '';
+        var items = filteredModels();
 
         if (!brand) {
-            const empty = document.createElement('div');
+            var empty = document.createElement('div');
             empty.className = 'muted p-2';
             empty.textContent = 'اول گروه برند را انتخاب کن.';
             modelPickerList.appendChild(empty);
@@ -967,10 +1006,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (!items.length) {
-            const empty = document.createElement('div');
-            empty.className = 'muted p-2';
-            empty.textContent = 'مدلی برای این برند پیدا نشد.';
-            modelPickerList.appendChild(empty);
+            var empty2 = document.createElement('div');
+            empty2.className = 'muted p-2';
+            empty2.textContent = 'مدلی برای این برند پیدا نشد.';
+            modelPickerList.appendChild(empty2);
             updateSelectedModelsCount();
             renderSelectedModelTags();
             renderVariantPreview();
@@ -978,17 +1017,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         items.forEach(function (m) {
-            const label = document.createElement('label');
-            label.className = 'picker-item';
+            var lbl = document.createElement('label');
+            lbl.className = 'picker-item';
 
-            const check = document.createElement('input');
+            var check = document.createElement('input');
             check.type = 'checkbox';
-            check.name = 'model_list_ids[]';
+            // توجه: name را اینجا نمی‌گذاریم چون hidden inputها کار ارسال را انجام می‌دهند
             check.value = String(m.id);
             check.checked = selectedModelIds.has(parseInt(m.id, 10));
 
             check.addEventListener('change', function () {
-                const id = parseInt(this.value, 10);
+                var id = parseInt(this.value, 10);
 
                 if (this.checked) {
                     selectedModelIds.add(id);
@@ -996,24 +1035,26 @@ document.addEventListener('DOMContentLoaded', function () {
                     selectedModelIds.delete(id);
                 }
 
+                // همیشه پس از تغییر، hidden inputها را به‌روز کن
+                syncHiddenModelInputs();
                 updateSelectedModelsCount();
                 renderSelectedModelTags();
                 renderVariantPreview();
             });
 
-            const textWrap = document.createElement('div');
-            const title = document.createElement('div');
+            var textWrap = document.createElement('div');
+            var title = document.createElement('div');
             title.textContent = m.model_name || '—';
 
-            const small = document.createElement('small');
+            var small = document.createElement('small');
             small.textContent = 'کد مدل: ' + (m.code || '---');
 
             textWrap.appendChild(title);
             textWrap.appendChild(small);
 
-            label.appendChild(check);
-            label.appendChild(textWrap);
-            modelPickerList.appendChild(label);
+            lbl.appendChild(check);
+            lbl.appendChild(textWrap);
+            modelPickerList.appendChild(lbl);
         });
 
         updateSelectedModelsCount();
@@ -1021,10 +1062,12 @@ document.addEventListener('DOMContentLoaded', function () {
         renderVariantPreview();
     }
 
+    // ─── طرح‌بندی ─────────────────────────────────────────────────
+
     function getDesignCount() {
         if (!useDesignsEl.checked) return 0;
 
-        let count = parseInt(designCountEl.value || '0', 10);
+        var count = parseInt(designCountEl.value || '0', 10);
         if (isNaN(count) || count < 1) count = 1;
         if (count > 99) count = 99;
 
@@ -1037,29 +1080,21 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function escapeHtml(str) {
-        return String(str || '')
-            .replace(/&/g, '&amp;')
-            .replace(/"/g, '&quot;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-    }
-
     function renderDesignNotes() {
         if (!useDesignsEl.checked) {
             designNotesWrap.innerHTML = '';
             return;
         }
 
-        const count = getDesignCount();
-        const existing = currentDesignNotesValues();
+        var count = getDesignCount();
+        var existing = currentDesignNotesValues();
 
         designNotesWrap.innerHTML = '';
 
-        for (let i = 0; i < count; i++) {
-            const val = existing[i] !== undefined ? existing[i] : (oldDesignNotes[i] || '');
+        for (var i = 0; i < count; i++) {
+            var val = existing[i] !== undefined ? existing[i] : (oldDesignNotes[i] || '');
 
-            const box = document.createElement('div');
+            var box = document.createElement('div');
             box.className = 'design-note-item mb-2';
 
             box.innerHTML =
@@ -1070,12 +1105,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function calcVariantsCount() {
-        const modelsOn = useModelsEl.checked;
-        const designsOn = useDesignsEl.checked;
+    // ─── پیش‌نمایش تنوع‌ها ────────────────────────────────────────
 
-        const modelCount = selectedModelsData().length;
-        const designCount = getDesignCount();
+    function calcVariantsCount() {
+        var modelsOn = useModelsEl.checked;
+        var designsOn = useDesignsEl.checked;
+        var modelCount = selectedModelsData().length;
+        var designCount = getDesignCount();
 
         if (!modelsOn && !designsOn) return 1;
         if (modelsOn && !designsOn) return modelCount;
@@ -1084,24 +1120,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function addExampleCode(text) {
-        const item = document.createElement('span');
+        var item = document.createElement('span');
         item.className = 'example-code';
         item.textContent = text;
         variantExamplesEl.appendChild(item);
     }
 
     function renderVariantPreview() {
-        const cat = selectedCategory();
-        const productCode6 = (cat ? normalizeCategory2(cat.code) : '--') + previewSeq4;
-        const modelsOn = useModelsEl.checked;
-        const designsOn = useDesignsEl.checked;
-        const models = selectedModelsData();
-        const designCount = getDesignCount();
+        var cat = selectedCategory();
+        var productCode6 = (cat ? normalizeCategory2(cat.code) : '--') + previewSeq4;
+        var modelsOn = useModelsEl.checked;
+        var designsOn = useDesignsEl.checked;
+        var models = selectedModelsData();
+        var designCount = getDesignCount();
 
         variantsCountPreviewEl.textContent = String(calcVariantsCount());
         variantExamplesEl.innerHTML = '';
 
-        const examples = [];
+        var examples = [];
 
         if (!modelsOn && !designsOn) {
             examples.push(productCode6 + '00000');
@@ -1114,15 +1150,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (!modelsOn && designsOn) {
-            for (let i = 1; i <= designCount; i++) {
+            for (var i = 1; i <= designCount; i++) {
                 examples.push(productCode6 + '000' + padLeft(i, 2, '0'));
             }
         }
 
         if (modelsOn && designsOn) {
             models.forEach(function (m) {
-                for (let i = 1; i <= designCount; i++) {
-                    examples.push(productCode6 + normalizeModel3(m.code) + padLeft(i, 2, '0'));
+                for (var j = 1; j <= designCount; j++) {
+                    examples.push(productCode6 + normalizeModel3(m.code) + padLeft(j, 2, '0'));
                 }
             });
         }
@@ -1141,19 +1177,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ─── Quick Add دسته‌بندی ──────────────────────────────────────
+
     function toggleCategoryQuickAdd(open) {
         categoryQuickAddBoxEl.hidden = !open;
         if (open) {
             clearFeedback(categoryQuickFeedbackEl);
-            setTimeout(function () {
-                categoryQuickNameEl.focus();
-            }, 20);
+            setTimeout(function () { categoryQuickNameEl.focus(); }, 20);
         }
     }
 
     async function quickAddCategory() {
-        const rawName = String(categoryQuickNameEl.value || '');
-        const name = rawName.trim();
+        var name = String(categoryQuickNameEl.value || '').trim();
 
         if (!name) {
             setFeedback(categoryQuickFeedbackEl, 'نام دسته‌بندی نمی‌تواند خالی باشد.', 'error');
@@ -1164,13 +1199,13 @@ document.addEventListener('DOMContentLoaded', function () {
         setFeedback(categoryQuickFeedbackEl, 'در حال ثبت...', '');
 
         try {
-            const parentId = currentCategoryParentIdForQuickAdd();
-            const data = await postJson(@json(route('categories.quickStore')), {
+            var parentId = currentCategoryParentIdForQuickAdd();
+            var data = await postJson(@json(route('categories.quickStore')), {
                 name: name,
                 parent_id: parentId,
             });
 
-            const exists = categories.some(function (c) { return parseInt(c.id, 10) === parseInt(data.id, 10); });
+            var exists = categories.some(function (c) { return parseInt(c.id, 10) === parseInt(data.id, 10); });
             if (!exists) {
                 categories.push({
                     id: parseInt(data.id, 10),
@@ -1185,9 +1220,7 @@ document.addEventListener('DOMContentLoaded', function () {
             setFeedback(categoryQuickFeedbackEl, data.message || 'با موفقیت ثبت شد.', 'success');
             renderCategoryLevels(getCategoryPath(data.id));
             renderVariantPreview();
-            setTimeout(function () {
-                toggleCategoryQuickAdd(false);
-            }, 500);
+            setTimeout(function () { toggleCategoryQuickAdd(false); }, 500);
         } catch (error) {
             setFeedback(categoryQuickFeedbackEl, error.message || 'ثبت دسته‌بندی انجام نشد.', 'error');
         } finally {
@@ -1195,19 +1228,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ─── Quick Add مدل ────────────────────────────────────────────
+
     function toggleModelQuickAdd(open) {
         modelQuickAddBoxEl.hidden = !open;
         if (open) {
             clearFeedback(modelQuickFeedbackEl);
-            setTimeout(function () {
-                modelQuickNameEl.focus();
-            }, 20);
+            setTimeout(function () { modelQuickNameEl.focus(); }, 20);
         }
     }
 
     async function quickAddModel() {
-        const brand = String(modelBrandGroupEl.value || '').trim();
-        const name = String(modelQuickNameEl.value || '').trim();
+        var brand = String(modelBrandGroupEl.value || '').trim();
+        var name = String(modelQuickNameEl.value || '').trim();
 
         if (!brand) {
             setFeedback(modelQuickFeedbackEl, 'ابتدا گروه برند را انتخاب کنید.', 'error');
@@ -1222,16 +1255,16 @@ document.addEventListener('DOMContentLoaded', function () {
         setFeedback(modelQuickFeedbackEl, 'در حال ثبت...', '');
 
         try {
-            const data = await postJson(@json(route('model-lists.quick-store')), {
+            var data = await postJson(@json(route('model-lists.quick-store')), {
                 brand: brand,
                 model_name: name,
             });
 
-            const idx = modelLists.findIndex(function (m) {
+            var idx = modelLists.findIndex(function (m) {
                 return parseInt(m.id, 10) === parseInt(data.id, 10);
             });
 
-            const row = {
+            var row = {
                 id: parseInt(data.id, 10),
                 brand: String(data.brand || ''),
                 model_name: String(data.model_name || ''),
@@ -1245,12 +1278,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             selectedModelIds.add(parseInt(data.id, 10));
+            syncHiddenModelInputs(); // به‌روزرسانی hidden inputها
             modelQuickNameEl.value = '';
             setFeedback(modelQuickFeedbackEl, data.message || 'مدل ثبت شد.', 'success');
             renderModelPicker();
-            setTimeout(function () {
-                toggleModelQuickAdd(false);
-            }, 500);
+            setTimeout(function () { toggleModelQuickAdd(false); }, 500);
         } catch (error) {
             setFeedback(modelQuickFeedbackEl, error.message || 'ثبت مدل انجام نشد.', 'error');
         } finally {
@@ -1258,15 +1290,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ─── رویدادها ─────────────────────────────────────────────────
+
     modelPickerButton.addEventListener('click', function () {
         if (modelBrandGroupEl.disabled) return;
 
         modelPickerPanel.classList.toggle('open');
 
         if (modelPickerPanel.classList.contains('open')) {
-            setTimeout(function () {
-                modelSearchInput.focus();
-            }, 50);
+            setTimeout(function () { modelSearchInput.focus(); }, 50);
         }
     });
 
@@ -1277,14 +1309,18 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     modelSearchInput.addEventListener('input', renderModelPicker);
+
     openModelQuickAddEl.addEventListener('click', function () {
         if (modelBrandGroupEl.disabled) return;
         toggleModelQuickAdd(modelQuickAddBoxEl.hidden);
     });
+
     cancelModelQuickAddEl.addEventListener('click', function () {
         toggleModelQuickAdd(false);
     });
+
     submitModelQuickAddEl.addEventListener('click', quickAddModel);
+
     modelQuickNameEl.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -1295,10 +1331,13 @@ document.addEventListener('DOMContentLoaded', function () {
     openCategoryQuickAddEl.addEventListener('click', function () {
         toggleCategoryQuickAdd(categoryQuickAddBoxEl.hidden);
     });
+
     cancelCategoryQuickAddEl.addEventListener('click', function () {
         toggleCategoryQuickAdd(false);
     });
+
     submitCategoryQuickAddEl.addEventListener('click', quickAddCategory);
+
     categoryQuickNameEl.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -1310,7 +1349,9 @@ document.addEventListener('DOMContentLoaded', function () {
     useDesignsEl.addEventListener('change', syncSections);
 
     modelBrandGroupEl.addEventListener('change', function () {
+        // وقتی برند عوض می‌شه، انتخاب‌های قبلی پاک می‌شن
         selectedModelIds = new Set();
+        syncHiddenModelInputs();
         modelSearchInput.value = '';
         toggleModelQuickAdd(false);
         clearFeedback(modelQuickFeedbackEl);
@@ -1322,6 +1363,8 @@ document.addEventListener('DOMContentLoaded', function () {
         renderVariantPreview();
     });
 
+    // ─── راه‌اندازی اولیه ─────────────────────────────────────────
+
     if (oldCategoryId) {
         renderCategoryLevels(getCategoryPath(oldCategoryId));
     } else {
@@ -1332,6 +1375,9 @@ document.addEventListener('DOMContentLoaded', function () {
     renderModelPicker();
     renderDesignNotes();
     syncSections();
+
+    // اگر از old() مدل‌هایی برگشته، hidden inputها را از همان ابتدا بساز
+    syncHiddenModelInputs();
 });
 </script>
 @endsection

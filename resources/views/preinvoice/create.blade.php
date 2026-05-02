@@ -8,21 +8,21 @@ $customersPageUrl = $customersPageUrl ?? url('/customers');
 $initRows = old('products');
 
 if (!$initRows && $order) {
-    $initRows = $order->items->map(function ($it) {
-        $product = $it->product ?? null;
-        $variant = $it->variant ?? null;
-        return [
-            'id' => (int) $it->product_id,
-            'product_id' => (int) $it->product_id,
-            'product_name' => $product->title ?? $product->name ?? null,
-            'product_code' => $product->code ?? $product->sku ?? null,
-            'variety_id' => (int) $it->variant_id,
-            'variant_id' => (int) $it->variant_id,
-            'variant_name' => $variant->variant_name ?? null,
-            'quantity' => (int) $it->quantity,
-            'price' => (int) $it->price,
-        ];
-    })->values();
+$initRows = $order->items->map(function ($it) {
+$product = $it->product ?? null;
+$variant = $it->variant ?? null;
+return [
+'id' => (int) $it->product_id,
+'product_id' => (int) $it->product_id,
+'product_name' => $product->title ?? $product->name ?? null,
+'product_code' => $product->code ?? $product->sku ?? null,
+'variety_id' => (int) $it->variant_id,
+'variant_id' => (int) $it->variant_id,
+'variant_name' => $variant->variant_name ?? null,
+'quantity' => (int) $it->quantity,
+'price' => (int) $it->price,
+];
+})->values();
 }
 
 if (!$initRows) { $initRows = []; }
@@ -69,7 +69,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: var(--text);
     }
 
-    .page-shell { max-width: 960px; }
+    .page-shell {
+        max-width: 960px;
+    }
 
     .soft-card,
     .soft-card-lg {
@@ -97,8 +99,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         box-shadow: var(--shadow-md);
     }
 
-    .compact-card { padding: 14px; }
-    .product-focus { padding: 16px; }
+    .compact-card {
+        padding: 14px;
+    }
+
+    .product-focus {
+        padding: 16px;
+    }
+
     .final-card {
         padding: 15px;
         margin-bottom: 24px;
@@ -185,7 +193,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         white-space: nowrap;
     }
 
-    .find-btn:hover { background: linear-gradient(135deg, #26bac7, var(--brand-dark)); }
+    .find-btn:hover {
+        background: linear-gradient(135deg, #26bac7, var(--brand-dark));
+    }
 
     .badge-soft {
         display: inline-flex;
@@ -228,7 +238,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         box-shadow: var(--shadow-sm);
     }
 
-    .local-draft-banner.is-visible { display: block; }
+    .local-draft-banner.is-visible {
+        display: block;
+    }
 
     .autosave-pill {
         display: inline-flex;
@@ -304,7 +316,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         transition: background .15s;
     }
 
-    .group-main:hover { background: linear-gradient(180deg, #fdfaf5, #f6f1e8); }
+    .group-main:hover {
+        background: linear-gradient(180deg, #fdfaf5, #f6f1e8);
+    }
 
     .group-title {
         font-weight: 900;
@@ -350,7 +364,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         padding: 10px;
     }
 
-    .group-card.is-open .group-details { display: block; }
+    .group-card.is-open .group-details {
+        display: block;
+    }
 
     .group-actions {
         display: flex;
@@ -489,7 +505,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         box-shadow: 0 0 0 .18rem rgba(51, 199, 192, .12);
     }
 
-    .select2-container { max-width: 100% !important; }
+    .select2-container {
+        max-width: 100% !important;
+    }
 
     .select2-container .select2-selection--single {
         min-height: 38px !important;
@@ -505,7 +523,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: var(--text) !important;
     }
 
-    .select2-container .select2-selection--single .select2-selection__arrow { height: 36px !important; }
+    .select2-container .select2-selection--single .select2-selection__arrow {
+        height: 36px !important;
+    }
 
     .alert-success {
         background: linear-gradient(180deg, rgba(23, 140, 99, .10), rgba(23, 140, 99, .05));
@@ -517,7 +537,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: #9d3434;
     }
 
-    .modal-dialog { margin: .5rem auto; }
+    .modal-dialog {
+        margin: .5rem auto;
+    }
 
     .modal-xl {
         max-width: 860px;
@@ -539,7 +561,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     .picker-head .modal-title,
-    .picker-head .hint { color: #fff !important; }
+    .picker-head .hint {
+        color: #fff !important;
+    }
 
     .picker-head .btn-close {
         filter: invert(1);
@@ -569,7 +593,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         transition: border-color .12s;
     }
 
-    .variant-row:last-child { margin-bottom: 0; }
+    .variant-row:last-child {
+        margin-bottom: 0;
+    }
 
     .variant-row.row-selected {
         background: linear-gradient(180deg, rgba(51, 199, 192, .09), rgba(51, 199, 192, .04));
@@ -654,7 +680,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         gap: 8px;
     }
 
-    .summary-stat { text-align: center; }
+    .summary-stat {
+        text-align: center;
+    }
 
     .summary-stat .s-label {
         font-size: .7rem;
@@ -709,7 +737,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         margin-bottom: 8px;
     }
 
-    .model-filter-row.is-visible { display: block; }
+    .model-filter-row.is-visible {
+        display: block;
+    }
 
     .step-chip-group {
         display: flex;
@@ -739,69 +769,103 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     @media (max-width: 991.98px) {
-        .page-shell { max-width: 100%; }
-        .final-grid { grid-template-columns: 1fr; }
-        .details-grid { grid-template-columns: 1fr; }
+        .page-shell {
+            max-width: 100%;
+        }
+
+        .final-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .details-grid {
+            grid-template-columns: 1fr;
+        }
     }
 
     @media (max-width: 575.98px) {
-        body { font-size: 13px; }
+        body {
+            font-size: 13px;
+        }
+
         .container {
             padding-left: 9px;
             padding-right: 9px;
         }
+
         .compact-card,
         .product-focus,
         .final-card {
             padding: 10px;
             border-radius: 12px;
         }
-        #groupSummaryList { max-height: 240px; }
+
+        #groupSummaryList {
+            max-height: 240px;
+        }
+
         .modal-dialog {
             width: 100%;
             max-width: 100%;
             margin: 0;
         }
+
         .modal-content {
             min-height: 100vh;
             border-radius: 0;
         }
-        .modal-body { padding: 9px; }
+
+        .modal-body {
+            padding: 9px;
+        }
+
         .modal-header,
-        .modal-footer { padding: 10px; }
+        .modal-footer {
+            padding: 10px;
+        }
+
         .modal-footer {
             position: sticky;
             bottom: 0;
             z-index: 20;
             background: linear-gradient(180deg, #f9f6ee, #f3eee5) !important;
         }
+
         .variant-list {
             max-height: calc(100vh - 380px);
             min-height: 200px;
             padding: 5px;
         }
+
         .variant-row {
             grid-template-columns: 1fr;
             gap: 7px;
             padding: 8px 9px;
         }
+
         .qty-control {
             width: 100%;
             justify-content: space-between;
         }
+
         .qty-btn {
             width: 36px;
             height: 36px;
         }
+
         .qty-input {
             width: 60px;
             height: 36px;
         }
-        .details-grid { grid-template-columns: 1fr; }
+
+        .details-grid {
+            grid-template-columns: 1fr;
+        }
+
         .modal-summary-bar {
             flex-direction: column;
             gap: 10px;
         }
+
         .summary-stat {
             width: 100%;
             display: flex;
@@ -809,8 +873,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             align-items: center;
             text-align: right;
         }
-        .summary-stat .s-label { font-size: .75rem; }
-        .summary-stat .s-val { font-size: 1rem; }
+
+        .summary-stat .s-label {
+            font-size: .75rem;
+        }
+
+        .summary-stat .s-val {
+            font-size: 1rem;
+        }
     }
 </style>
 
@@ -1150,14 +1220,21 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return Number.isFinite(n) ? Math.trunc(n) : 0;
     }
 
-    function formatMoney(val) { return Number(val || 0).toLocaleString('fa-IR') + ' تومان'; }
-    function formatNum(val) { return Number(val || 0).toLocaleString('fa-IR'); }
+    function formatMoney(val) {
+        return Number(val || 0).toLocaleString('fa-IR') + ' تومان';
+    }
+
+    function formatNum(val) {
+        return Number(val || 0).toLocaleString('fa-IR');
+    }
 
     function esc(val) {
         return String(val ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
     }
 
-    function normalize(val) { return String(val || '').trim(); }
+    function normalize(val) {
+        return String(val || '').trim();
+    }
 
     function isEmptyLabel(value) {
         const v = normalize(value);
@@ -1186,8 +1263,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return full || normalize(c.customer_name || c.name);
     }
 
-    function productTitle(product) { return normalize(product?.title || product?.name) || 'بدون نام'; }
-    function productCode(product) { return normalize(product?.code || product?.sku || product?.short_code); }
+    function productTitle(product) {
+        return normalize(product?.title || product?.name) || 'بدون نام';
+    }
+
+    function productCode(product) {
+        return normalize(product?.code || product?.sku || product?.short_code);
+    }
 
     function getProductVarieties(product) {
         if (!product) return [];
@@ -1196,11 +1278,25 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return [];
     }
 
-    function variantId(v) { return Number(v?.id || 0); }
-    function variantModel(v) { return normalize(v?.model_list_name || v?.model_name || v?.model_list?.name) || '—'; }
-    function variantDesign(v) { return normalize(v?.design_name || v?.pattern_name || v?.variety_name || v?.type_name) || '—'; }
-    function variantName(v) { return normalize(v?.variant_name || v?.color_name || v?.color || v?.name) || '—'; }
-    function variantPrice(v, product = null) { return Number(v?.sell_price ?? v?.price ?? product?.sell_price ?? product?.price ?? 0); }
+    function variantId(v) {
+        return Number(v?.id || 0);
+    }
+
+    function variantModel(v) {
+        return normalize(v?.model_list_name || v?.model_name || v?.model_list?.name) || '—';
+    }
+
+    function variantDesign(v) {
+        return normalize(v?.design_name || v?.pattern_name || v?.variety_name || v?.type_name) || '—';
+    }
+
+    function variantName(v) {
+        return normalize(v?.variant_name || v?.color_name || v?.color || v?.name) || '—';
+    }
+
+    function variantPrice(v, product = null) {
+        return Number(v?.sell_price ?? v?.price ?? product?.sell_price ?? product?.price ?? 0);
+    }
 
     function variantStock(v) {
         if (v?.sellable_stock !== undefined && v?.sellable_stock !== null) return Number(v.sellable_stock) || 0;
@@ -1230,7 +1326,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return calcDiscount(groupRawSubtotal(group), group.discount_type || 'amount', group.discount_value || 0);
     }
 
-    function groupFinalAmount(group) { return Math.max(0, groupRawSubtotal(group) - groupDiscountTotal(group)); }
+    function groupFinalAmount(group) {
+        return Math.max(0, groupRawSubtotal(group) - groupDiscountTotal(group));
+    }
 
     function hasAnyFormData() {
         return !!(
@@ -1322,29 +1420,29 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         };
     }
 
- function saveLocalDraftNow() {
-    if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
+    function saveLocalDraftNow() {
+        if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
 
-    // خیلی مهم:
-    // اگر فرم خالی بود، پیش‌نویس قبلی را پاک نمی‌کنیم.
-    // فقط ذخیره انجام نمی‌دهیم.
-    // حذف پیش‌نویس فقط با دکمه حذف یا بعد از ثبت موفق انجام می‌شود.
-   if (!hasAnyFormData()) {
-    updateLocalDraftStatus('ذخیره خودکار فعال', false);
-    return;
-}
-
-    try {
-        localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(collectLocalDraftPayload()));
-        updateLocalDraftStatus('ذخیره شد', true);
-
-        setTimeout(() => {
+        // خیلی مهم:
+        // اگر فرم خالی بود، پیش‌نویس قبلی را پاک نمی‌کنیم.
+        // فقط ذخیره انجام نمی‌دهیم.
+        // حذف پیش‌نویس فقط با دکمه حذف یا بعد از ثبت موفق انجام می‌شود.
+        if (!hasAnyFormData()) {
             updateLocalDraftStatus('ذخیره خودکار فعال', false);
-        }, 1600);
-    } catch (e) {
-        updateLocalDraftStatus('خطا در ذخیره محلی', false);
+            return;
+        }
+
+        try {
+            localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(collectLocalDraftPayload()));
+            updateLocalDraftStatus('ذخیره شد', true);
+
+            setTimeout(() => {
+                updateLocalDraftStatus('ذخیره خودکار فعال', false);
+            }, 1600);
+        } catch (e) {
+            updateLocalDraftStatus('خطا در ذخیره محلی', false);
+        }
     }
-}
 
     function scheduleLocalDraftSave() {
         if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
@@ -1433,7 +1531,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     function bindLocalDraftEvents() {
-        document.getElementById('loadLocalDraftBtn')?.addEventListener('click', function () {
+        document.getElementById('loadLocalDraftBtn')?.addEventListener('click', function() {
             const draft = getLocalDraft();
             if (!draft) {
                 alert('پیش‌نویسی برای لود شدن پیدا نشد.');
@@ -1443,12 +1541,12 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             applyLocalDraft(draft);
         });
 
-        document.getElementById('discardLocalDraftBtn')?.addEventListener('click', function () {
+        document.getElementById('discardLocalDraftBtn')?.addEventListener('click', function() {
             if (!confirm('پیش‌نویس ذخیره‌شده حذف شود؟')) return;
             removeLocalDraft(true);
         });
 
-        document.getElementById('clearLocalDraftTopBtn')?.addEventListener('click', function () {
+        document.getElementById('clearLocalDraftTopBtn')?.addEventListener('click', function() {
             if (!confirm('پیش‌نویس محلی و فرم فعلی پاک شود؟')) return;
             isHydratingLocalDraft = true;
             clearVisibleFormOnly();
@@ -1467,7 +1565,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             el.addEventListener('input', scheduleLocalDraftSave);
         });
 
-        window.addEventListener('beforeunload', function () {
+        window.addEventListener('beforeunload', function() {
             saveLocalDraftNow();
         });
     }
@@ -1477,7 +1575,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (!id) return null;
         if (!fresh && productCache.has(id)) return productCache.get(id);
         const url = API.product + '/' + encodeURIComponent(id) + (fresh ? '?_=' + Date.now() : '');
-        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        const res = await fetch(url, {
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
         const json = await res.json();
         const product = json?.data?.product || null;
         if (product) productCache.set(id, product);
@@ -1485,12 +1587,18 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     async function searchProducts(query) {
-        const res = await fetch(API.products + '?q=' + encodeURIComponent(query), { headers: { 'Accept': 'application/json' } });
+        const res = await fetch(API.products + '?q=' + encodeURIComponent(query), {
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
         const json = await res.json();
         return json?.data?.products?.data || [];
     }
 
-    function shippingById(id) { return shippings.find(s => Number(s.id) === Number(id)) || null; }
+    function shippingById(id) {
+        return shippings.find(s => Number(s.id) === Number(id)) || null;
+    }
 
     function isInPersonShipping(ship) {
         const name = normalize(ship?.name);
@@ -1504,18 +1612,31 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             $el.off('select2:select select2:clear');
             $el.select2('destroy');
         }
-        $el.select2({ width: '100%', dir: 'rtl', placeholder, allowClear: true });
+        $el.select2({
+            width: '100%',
+            dir: 'rtl',
+            placeholder,
+            allowClear: true
+        });
         $el.on('select2:select select2:clear', function() {
-            this.dispatchEvent(new Event('change', { bubbles: true }));
+            this.dispatchEvent(new Event('change', {
+                bubbles: true
+            }));
         });
     }
 
     async function loadArea() {
         try {
-            const res = await fetch(API.area, { headers: { 'Accept': 'application/json' } });
+            const res = await fetch(API.area, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
             const data = await res.json();
             areaProvinces = data?.data?.provinces || [];
-        } catch (e) { areaProvinces = []; }
+        } catch (e) {
+            areaProvinces = [];
+        }
     }
 
     function fillProvincesSelect() {
@@ -1645,10 +1766,17 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 url: API.customers,
                 dataType: 'json',
                 delay: 250,
-                data: params => ({ q: params.term || '' }),
+                data: params => ({
+                    q: params.term || ''
+                }),
                 processResults: resp => {
                     const items = resp?.data?.customers || [];
-                    return { results: items.map(c => ({ id: c.id, text: customerFullName(c) + ' - ' + (c.mobile || '') })) };
+                    return {
+                        results: items.map(c => ({
+                            id: c.id,
+                            text: customerFullName(c) + ' - ' + (c.mobile || '')
+                        }))
+                    };
                 }
             }
         });
@@ -1656,7 +1784,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const id = e?.params?.data?.id;
             if (!id) return;
             try {
-                const res = await fetch(API.customer + '/' + encodeURIComponent(id), { headers: { 'Accept': 'application/json' } });
+                const res = await fetch(API.customer + '/' + encodeURIComponent(id), {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
                 const json = await res.json();
                 const customer = json?.data?.customer || null;
                 if (customer) applyCustomerToForm(customer);
@@ -1669,7 +1801,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         const cid = document.getElementById('customer_id').value || OLD_CUSTOMER_ID || '';
         if (!cid) return;
         try {
-            const res = await fetch(API.customer + '/' + encodeURIComponent(cid), { headers: { 'Accept': 'application/json' } });
+            const res = await fetch(API.customer + '/' + encodeURIComponent(cid), {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
             const json = await res.json();
             const customer = json?.data?.customer || null;
             if (customer) {
@@ -1684,14 +1820,20 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const raw = localStorage.getItem(RECENT_PRODUCTS_KEY);
             const rows = JSON.parse(raw || '[]');
             return Array.isArray(rows) ? rows : [];
-        } catch (e) { return []; }
+        } catch (e) {
+            return [];
+        }
     }
 
     function saveRecentProduct(product) {
         if (!product) return;
         const id = Number(product.id || 0);
         if (!id) return;
-        const row = { id, title: productTitle(product), code: productCode(product) };
+        const row = {
+            id,
+            title: productTitle(product),
+            code: productCode(product)
+        };
         const rows = getRecentProducts().filter(item => Number(item.id) !== id);
         rows.unshift(row);
         localStorage.setItem(RECENT_PRODUCTS_KEY, JSON.stringify(rows.slice(0, 6)));
@@ -1927,7 +2069,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     function updateModalSummary() {
-        let selectedRows = 0, totalQty = 0, totalAmount = 0;
+        let selectedRows = 0,
+            totalQty = 0,
+            totalAmount = 0;
         activeModalItems.forEach(v => {
             const id = variantId(v);
             const qty = Number(modalQuantities.get(id) || 0);
@@ -2101,7 +2245,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function updateTotal() {
         const shipping = toInt(document.getElementById('shipping_price')?.value || 0);
-        let subtotal = 0, groupDiscounts = 0;
+        let subtotal = 0,
+            groupDiscounts = 0;
         Object.values(groupedSelections).forEach(group => {
             subtotal += groupRawSubtotal(group);
             groupDiscounts += groupDiscountTotal(group);
@@ -2137,7 +2282,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         });
         for (const [productId, rows] of Object.entries(grouped)) {
             let product = null;
-            try { product = await getProductDetails(productId); } catch (e) {}
+            try {
+                product = await getProductDetails(productId);
+            } catch (e) {}
             const varieties = getProductVarieties(product);
             groupedSelections[Number(productId)] = {
                 product: {
@@ -2214,7 +2361,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (shipEl) shipEl.value = String(toInt(shipEl.value));
         const discEl = document.getElementById('discount');
         if (discEl) discEl.value = String(toInt(discEl.value));
-        document.querySelectorAll('#groupProductsInputs input').forEach(input => { input.value = String(toInt(input.value)); });
+        document.querySelectorAll('#groupProductsInputs input').forEach(input => {
+            input.value = String(toInt(input.value));
+        });
     }
 
     async function submitGuard(e) {
@@ -2338,7 +2487,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.getElementById('groupPickerRows')?.addEventListener('input', function(e) {
             if (e.target.classList.contains('picker-qty')) setModalQty(e.target.dataset.id, e.target.value);
         });
-        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, { capture: true });
+        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, {
+            capture: true
+        });
 
         await hydrateInitialGroups();
         updateShippingMode();
