@@ -95,6 +95,7 @@
           class="card shadow-sm border-0 mb-3">
         @csrf
         @method('PUT')
+        <input type="hidden" name="_mode" id="warehouseFormMode" value="save">
 
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0">اقلام پیش‌فاکتور</h6>
@@ -313,6 +314,14 @@
     }
 
     document.getElementById('warehouseForm').addEventListener('submit', function () {
+        const methodInput = this.querySelector('input[name="_method"]');
+        const modeInput = document.getElementById('warehouseFormMode');
+
+        if (methodInput && modeInput && modeInput.value === 'save') {
+            methodInput.value = 'PUT';
+            methodInput.disabled = false;
+        }
+
         attachHiddenInputs(this);
     });
 
@@ -322,6 +331,18 @@
 
         form.action = "{{ route('preinvoice.warehouse.approve', $order->uuid) }}";
         form.method = 'POST';
+
+        const methodInput = form.querySelector('input[name="_method"]');
+        const modeInput = document.getElementById('warehouseFormMode');
+
+        if (methodInput) {
+            methodInput.disabled = true;
+        }
+
+        if (modeInput) {
+            modeInput.value = 'approve';
+        }
+
         form.submit();
     });
 </script>
