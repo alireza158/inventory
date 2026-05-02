@@ -232,6 +232,64 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(209, 77, 77, .18);
     }
 
+    .local-draft-banner {
+        display: none;
+        border: 1px solid rgba(241, 171, 39, .30);
+        background: linear-gradient(180deg, rgba(241, 171, 39, .14), rgba(241, 171, 39, .06));
+        border-radius: 15px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .local-draft-banner.is-visible {
+        display: block;
+    }
+
+    .autosave-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border-radius: 999px;
+        padding: 4px 9px;
+        font-size: .72rem;
+        font-weight: 900;
+        border: 1px solid rgba(12, 83, 103, .10);
+        background: #fff;
+        color: var(--muted);
+    }
+
+    .autosave-pill.is-saved {
+        color: var(--success);
+        border-color: rgba(23, 140, 99, .18);
+        background: rgba(23, 140, 99, .06);
+    }
+
+    .recent-wrap {
+        display: none;
+        margin-top: 10px;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .recent-chip {
+        border: 1px solid rgba(12, 83, 103, .12);
+        background: #fff;
+        color: var(--brand-dark);
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: .74rem;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all .15s;
+    }
+
+    .recent-chip:hover {
+        background: rgba(51, 199, 192, .08);
+        border-color: rgba(51, 199, 192, .32);
+    }
+
     #groupSummaryList {
         max-height: 320px;
         overflow-y: auto;
@@ -528,17 +586,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         opacity: .9;
     }
 
-    .modal-body {
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-    }
-
-    .modal-footer {
-        flex: 0 0 auto;
-    }
-
     .variant-list {
         flex: 1 1 auto;
         min-height: 220px;
@@ -649,16 +696,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         outline: none;
     }
 
-    .qty-input::-webkit-outer-spin-button,
-    .qty-input::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-
-    .qty-input[type=number] {
-        -moz-appearance: textfield;
-    }
-
     .modal-summary-bar {
         background: linear-gradient(180deg, #f4f9f8, #edf6f5);
         border: 1px solid rgba(51, 199, 192, .18);
@@ -696,6 +733,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-radius: 12px;
         padding: 10px 12px;
         flex: 0 0 auto;
+    }
+
+    .discount-line {
+        color: var(--brand-dark);
+        font-size: .78rem;
+        margin-top: 5px;
+        font-weight: 700;
     }
 
     .picker-search {
@@ -879,10 +923,24 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             <h1 class="page-title">🧾 ثبت پیش‌فاکتور</h1>
             <div class="hint mt-1">ثبت سریع کالا با کد ۴ رقمی محصول مادر</div>
         </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="autosave-pill" id="localDraftStatus">ذخیره خودکار فعال</span>
+            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" id="clearLocalDraftTopBtn">پاک‌کردن پیش‌نویس</button>
+            <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">صف تایید انبار</a>
+        </div>
+    </div>
 
-        <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">
-            صف تایید انبار
-        </a>
+    <div class="local-draft-banner" id="localDraftBanner">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <div>
+                <div class="fw-bold" style="color:var(--brand-darker)">پیش‌نویس ذخیره‌شده پیدا شد</div>
+                <div class="hint mt-1" id="localDraftBannerText">می‌توانید ادامه ثبت پیش‌فاکتور قبلی را لود کنید.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-primary rounded-3" id="loadLocalDraftBtn">لود پیش‌نویس</button>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-3" id="discardLocalDraftBtn">حذف پیش‌نویس</button>
+            </div>
+        </div>
     </div>
 
     @if(session('success'))
@@ -1103,7 +1161,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             </div>
 
             <div class="modal-body">
-                <div class="mb-2 flex-shrink-0">
+                <div class="mb-2">
                     <input type="text" id="pickerSearchInput" class="picker-search" placeholder="جستجو در تنوع‌ها...">
                 </div>
 
@@ -1177,18 +1235,26 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         initRows: @json($initRows),
         shippings: @json($shippingMethods ?? []),
         oldCustomerId: @json(old('customer_id', '')),
+        oldCustomerName: @json(old('customer_name', '')),
+        oldCustomerMobile: @json(old('customer_mobile', '')),
+        oldCustomerAddress: @json(old('customer_address', '')),
         oldProvinceId: @json(old('province_id', '')),
         oldCityId: @json(old('city_id', '')),
-        oldShippingId: @json(old('shipping_id', ''))
+        oldShippingId: @json(old('shipping_id', '')),
+        oldDiscountAmount: @json(old('discount_amount', 0))
     };
 
     const API = window.PREINVOICE_BOOT.api;
     const INIT_ROWS = window.PREINVOICE_BOOT.initRows || [];
     const INITIAL_SHIPPINGS = window.PREINVOICE_BOOT.shippings || [];
     const OLD_CUSTOMER_ID = window.PREINVOICE_BOOT.oldCustomerId;
+    const OLD_CUSTOMER_NAME = window.PREINVOICE_BOOT.oldCustomerName;
+    const OLD_CUSTOMER_MOBILE = window.PREINVOICE_BOOT.oldCustomerMobile;
+    const OLD_CUSTOMER_ADDRESS = window.PREINVOICE_BOOT.oldCustomerAddress;
     const OLD_PROVINCE_ID = window.PREINVOICE_BOOT.oldProvinceId;
     const OLD_CITY_ID = window.PREINVOICE_BOOT.oldCityId;
     const OLD_SHIPPING_ID = window.PREINVOICE_BOOT.oldShippingId;
+    const OLD_DISCOUNT_AMOUNT = window.PREINVOICE_BOOT.oldDiscountAmount;
 
     let shippings = INITIAL_SHIPPINGS || [];
     let areaProvinces = [];
@@ -1207,6 +1273,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     let motherAutoTimer = null;
     let lastMotherAutoCode = '';
     let isSubmittingProgrammatically = false;
+    let isHydratingLocalDraft = false;
+    let isBootingPage = true;
+    let localDraftSaveTimer = null;
+
+    const RECENT_PRODUCTS_KEY = 'aria_preinvoice_recent_mothers_v3';
+    const LOCAL_DRAFT_VERSION = 1;
+    const LOCAL_DRAFT_KEY = 'aria_preinvoice_local_draft_create_v1';
 
     function toEnglishDigits(str) {
         return String(str || '')
@@ -1292,9 +1365,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function customerFullName(c) {
         if (!c) return '';
-
         const full = `${c.first_name || ''} ${c.last_name || ''}`.trim();
-
         return full || normalize(c.customer_name || c.name);
     }
 
@@ -1383,11 +1454,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (!isEmptyLabel(design)) parts.push(design);
         if (!isEmptyLabel(name)) parts.push(name);
 
-        if (parts.length) return parts.join(' / ');
-
-        return 'تنوع پیش‌فرض';
-    }
-
     function groupRawSubtotal(group) {
         if (!group || !Array.isArray(group.items)) return 0;
 
@@ -1406,6 +1472,246 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function groupFinalAmount(group) {
         return Math.max(0, groupRawSubtotal(group) - groupDiscountTotal(group));
+    }
+
+    function hasAnyFormData() {
+        return !!(
+            normalize(document.getElementById('customer_id')?.value) ||
+            normalize(document.getElementById('customer_name')?.value) ||
+            normalize(document.getElementById('customer_mobile')?.value) ||
+            normalize(document.getElementById('customer_address')?.value) ||
+            normalize(document.getElementById('shipping_id')?.value) ||
+            Object.keys(groupedSelections || {}).length ||
+            toInt(document.getElementById('orderDiscountValue')?.value || 0) > 0
+        );
+    }
+
+    function localDraftExists() {
+        try {
+            const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
+            if (!raw) return false;
+            const data = JSON.parse(raw);
+            return data && data.version === LOCAL_DRAFT_VERSION;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function getLocalDraft() {
+        try {
+            const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (!data || data.version !== LOCAL_DRAFT_VERSION) return null;
+            return data;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function removeLocalDraft(showMessage = true) {
+        localStorage.removeItem(LOCAL_DRAFT_KEY);
+        hideLocalDraftBanner();
+        if (showMessage) updateLocalDraftStatus('پیش‌نویس پاک شد', false);
+    }
+
+    function updateLocalDraftStatus(text, saved = false) {
+        const el = document.getElementById('localDraftStatus');
+        if (!el) return;
+        el.textContent = text;
+        el.classList.toggle('is-saved', !!saved);
+    }
+
+    function showLocalDraftBanner() {
+        const draft = getLocalDraft();
+        if (!draft) return;
+        const banner = document.getElementById('localDraftBanner');
+        const text = document.getElementById('localDraftBannerText');
+        const savedAt = draft.saved_at ? new Date(draft.saved_at) : null;
+        const savedText = savedAt && !Number.isNaN(savedAt.getTime()) ? savedAt.toLocaleString('fa-IR') : 'زمان نامشخص';
+        const groups = draft.groupedSelections ? Object.keys(draft.groupedSelections).length : 0;
+        text.textContent = `آخرین ذخیره: ${savedText} | تعداد محصول: ${formatNum(groups)}`;
+        banner.classList.add('is-visible');
+    }
+
+    function hideLocalDraftBanner() {
+        document.getElementById('localDraftBanner')?.classList.remove('is-visible');
+    }
+
+    function collectLocalDraftPayload() {
+        return {
+            version: LOCAL_DRAFT_VERSION,
+            saved_at: new Date().toISOString(),
+            customer: {
+                id: document.getElementById('customer_id')?.value || '',
+                name: document.getElementById('customer_name')?.value || '',
+                mobile: document.getElementById('customer_mobile')?.value || '',
+                title: document.getElementById('selectedCustomerTitle')?.textContent || '',
+                balance_hint: document.getElementById('customer_balance_hint')?.textContent || ''
+            },
+            shipping: {
+                shipping_id: document.getElementById('shipping_id')?.value || '',
+                shipping_price: toInt(document.getElementById('shipping_price')?.value || 0),
+                province_id: document.getElementById('province_id')?.value || '',
+                city_id: document.getElementById('city_id')?.value || '',
+                address: document.getElementById('customer_address')?.value || ''
+            },
+            discount: {
+                type: document.getElementById('orderDiscountType')?.value || 'amount',
+                value: document.getElementById('orderDiscountValue')?.value || 0
+            },
+            groupedSelections: groupedSelections || {}
+        };
+    }
+
+    function saveLocalDraftNow() {
+        if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
+
+        // خیلی مهم:
+        // اگر فرم خالی بود، پیش‌نویس قبلی را پاک نمی‌کنیم.
+        // فقط ذخیره انجام نمی‌دهیم.
+        // حذف پیش‌نویس فقط با دکمه حذف یا بعد از ثبت موفق انجام می‌شود.
+        if (!hasAnyFormData()) {
+            updateLocalDraftStatus('ذخیره خودکار فعال', false);
+            return;
+        }
+
+        try {
+            localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(collectLocalDraftPayload()));
+            updateLocalDraftStatus('ذخیره شد', true);
+
+            setTimeout(() => {
+                updateLocalDraftStatus('ذخیره خودکار فعال', false);
+            }, 1600);
+        } catch (e) {
+            updateLocalDraftStatus('خطا در ذخیره محلی', false);
+        }
+    }
+
+    function scheduleLocalDraftSave() {
+        if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
+        clearTimeout(localDraftSaveTimer);
+        localDraftSaveTimer = setTimeout(saveLocalDraftNow, 350);
+    }
+
+    function clearVisibleFormOnly() {
+        document.getElementById('customer_id').value = '';
+        document.getElementById('customer_name').value = '';
+        document.getElementById('customer_mobile').value = '';
+        document.getElementById('customer_address').value = '';
+        document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
+        document.getElementById('customer_balance_hint').textContent = '';
+        document.getElementById('customerSummaryBox').classList.remove('is-selected');
+        if (window.jQuery) $('#customer_search_select').val(null).trigger('change');
+
+        document.getElementById('shipping_id').value = '';
+        document.getElementById('province_id').value = '';
+        document.getElementById('city_id').value = '';
+        if (window.jQuery) {
+            $('#province_id').trigger('change.select2');
+            $('#city_id').trigger('change.select2');
+        }
+
+        document.getElementById('orderDiscountType').value = 'amount';
+        document.getElementById('orderDiscountValue').value = 0;
+        groupedSelections = {};
+        selectedMotherProduct = null;
+        document.getElementById('motherCodeInput').value = '';
+        document.getElementById('motherProductBox').style.display = 'none';
+        document.getElementById('motherSearchHint').style.display = '';
+    }
+
+    async function applyLocalDraft(draft) {
+        if (!draft) return;
+        isHydratingLocalDraft = true;
+
+        clearVisibleFormOnly();
+
+        document.getElementById('customer_id').value = draft.customer?.id || '';
+        document.getElementById('customer_name').value = draft.customer?.name || '';
+        document.getElementById('customer_mobile').value = draft.customer?.mobile || '';
+
+        const displayTitle = normalize(draft.customer?.title) || [draft.customer?.name, draft.customer?.mobile].filter(Boolean).join(' - ');
+        if (displayTitle) {
+            document.getElementById('selectedCustomerTitle').textContent = displayTitle;
+            document.getElementById('customerSummaryBox').classList.add('is-selected');
+        }
+        document.getElementById('customer_balance_hint').textContent = draft.customer?.balance_hint || '';
+
+        if (draft.customer?.id && window.jQuery) {
+            const optionText = displayTitle || draft.customer.id;
+            const selectEl = document.getElementById('customer_search_select');
+            selectEl.add(new Option(optionText, draft.customer.id, true, true));
+            $('#customer_search_select').trigger('change');
+        }
+
+        document.getElementById('shipping_id').value = draft.shipping?.shipping_id || '';
+        document.getElementById('customer_address').value = draft.shipping?.address || '';
+        document.getElementById('orderDiscountType').value = draft.discount?.type || 'amount';
+        document.getElementById('orderDiscountValue').value = draft.discount?.value || 0;
+
+        updateShippingMode();
+
+        if (draft.shipping?.province_id) {
+            document.getElementById('province_id').value = String(draft.shipping.province_id);
+            if (window.jQuery) $('#province_id').trigger('change.select2');
+            fillCitiesByProvinceId(draft.shipping.province_id);
+        }
+
+        if (draft.shipping?.city_id) {
+            document.getElementById('city_id').value = String(draft.shipping.city_id);
+            if (window.jQuery) $('#city_id').trigger('change.select2');
+        }
+
+        groupedSelections = draft.groupedSelections || {};
+        renderGroupSummary();
+        updateTotal();
+        updateSubmitState();
+        hideLocalDraftBanner();
+        updateLocalDraftStatus('پیش‌نویس لود شد', true);
+
+        isHydratingLocalDraft = false;
+        scheduleLocalDraftSave();
+    }
+
+    function bindLocalDraftEvents() {
+        document.getElementById('loadLocalDraftBtn')?.addEventListener('click', function() {
+            const draft = getLocalDraft();
+            if (!draft) {
+                alert('پیش‌نویسی برای لود شدن پیدا نشد.');
+                hideLocalDraftBanner();
+                return;
+            }
+            applyLocalDraft(draft);
+        });
+
+        document.getElementById('discardLocalDraftBtn')?.addEventListener('click', function() {
+            if (!confirm('پیش‌نویس ذخیره‌شده حذف شود؟')) return;
+            removeLocalDraft(true);
+        });
+
+        document.getElementById('clearLocalDraftTopBtn')?.addEventListener('click', function() {
+            if (!confirm('پیش‌نویس محلی و فرم فعلی پاک شود؟')) return;
+            isHydratingLocalDraft = true;
+            clearVisibleFormOnly();
+            renderGroupSummary();
+            updateShippingMode();
+            updateTotal();
+            updateSubmitState();
+            isHydratingLocalDraft = false;
+            removeLocalDraft(true);
+        });
+
+        ['customer_address', 'shipping_id', 'province_id', 'city_id', 'orderDiscountType', 'orderDiscountValue'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', scheduleLocalDraftSave);
+            el.addEventListener('input', scheduleLocalDraftSave);
+        });
+
+        window.addEventListener('beforeunload', function() {
+            saveLocalDraftNow();
+        });
     }
 
     async function getProductDetails(productId, fresh = false) {
@@ -1596,7 +1902,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         updateTotal();
-        updateSubmitState();
+        scheduleLocalDraftSave();
     }
 
     function applyCustomerToForm(c) {
@@ -1642,6 +1948,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         updateSubmitState();
+        scheduleLocalDraftSave();
     }
 
     function clearCustomer() {
@@ -1657,6 +1964,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         updateSubmitState();
+        scheduleLocalDraftSave();
     }
 
     function preloadCustomerOption(selectEl, customer) {
@@ -1736,6 +2044,54 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 preloadCustomerOption(document.getElementById('customer_search_select'), customer);
             }
         } catch (e) {}
+    }
+
+    function getRecentProducts() {
+        try {
+            const raw = localStorage.getItem(RECENT_PRODUCTS_KEY);
+            const rows = JSON.parse(raw || '[]');
+            return Array.isArray(rows) ? rows : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveRecentProduct(product) {
+        if (!product) return;
+        const id = Number(product.id || 0);
+        if (!id) return;
+        const row = {
+            id,
+            title: productTitle(product),
+            code: productCode(product)
+        };
+        const rows = getRecentProducts().filter(item => Number(item.id) !== id);
+        rows.unshift(row);
+        localStorage.setItem(RECENT_PRODUCTS_KEY, JSON.stringify(rows.slice(0, 6)));
+        renderRecentProducts();
+    }
+
+    function renderRecentProducts() {
+        const wrap = document.getElementById('recentProductsWrap');
+        const list = document.getElementById('recentProductsList');
+        const rows = getRecentProducts();
+        list.innerHTML = '';
+        if (!rows.length) {
+            wrap.style.display = 'none';
+            return;
+        }
+        rows.forEach(item => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'recent-chip';
+            btn.textContent = `${item.code || '—'} - ${item.title || 'محصول'}`;
+            btn.addEventListener('click', async function() {
+                selectedMotherProduct = item;
+                await openGroupPicker(item.id);
+            });
+            list.appendChild(btn);
+        });
+        wrap.style.display = 'flex';
     }
 
     async function findMotherProductByCode(autoOpen = false) {
@@ -1958,41 +2314,15 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const disabled = stock <= 0 && qty <= 0 ? 'disabled' : '';
 
             return `
-                <div class="variant-row ${selectedClass} ${noStockClass}" data-row-variant="${id}">
-                    <div>
-                        <div class="variant-title">${esc(buildVariantTitle(v))}</div>
-                        <div class="variant-meta">
-                            <span class="badge-soft ${stock > 0 ? 'badge-stock' : 'badge-no-stock'}">
-                                موجودی: ${stock > 0 ? formatNum(stock) : 'ناموجود'}
-                            </span>
-                            <span class="badge-soft">قیمت: ${formatMoney(price)}</span>
-                            <span class="badge-soft badge-brand selected-qty-badge" style="${qty > 0 ? '' : 'display:none'}">
-                                انتخاب: <span class="selected-qty-value">${formatNum(qty)}</span>
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="qty-control">
-                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="-10" ${disabled}>-10</button>
-                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="-5" ${disabled}>-5</button>
-                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="-1" ${disabled}>−</button>
-
-                        <input
-                            type="number"
-                            class="qty-input picker-qty"
-                            data-id="${id}"
-                            data-price="${price}"
-                            min="0"
-                            max="${max}"
-                            value="${qty}"
-                            inputmode="numeric"
-                            ${disabled}
-                        >
-
-                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="1" ${disabled}>+</button>
-                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="5" ${disabled}>+5</button>
-                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="10" ${disabled}>+10</button>
-                    </div>
+        <div class="variant-row ${selectedClass} ${noStockClass}" data-row-variant="${id}">
+            <div>
+                <div class="variant-title">${esc(buildVariantTitle(v))}</div>
+                <div class="variant-meta">
+                    <span class="badge-soft ${stock > 0 ? 'badge-stock' : 'badge-no-stock'}">
+                        موجودی: ${stock > 0 ? formatNum(stock) : 'ناموجود'}
+                    </span>
+                    <span class="badge-soft">قیمت: ${formatMoney(price)}</span>
+                    ${qty > 0 ? `<span class="badge-soft badge-brand">انتخاب: ${formatNum(qty)}</span>` : ''}
                 </div>
             `;
         }).join('');
@@ -2150,7 +2480,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         renderGroupSummary();
         updateTotal();
-
+        scheduleLocalDraftSave();
         bootstrap.Modal.getInstance(document.getElementById('groupPickerModal'))?.hide();
 
         document.getElementById('motherCodeInput').value = '';
@@ -2174,6 +2504,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         renderGroupSummary();
         updateTotal();
+        scheduleLocalDraftSave();
     }
 
     function toggleGroupDetails(productId) {
@@ -2219,39 +2550,32 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const finalAmount = groupFinalAmount(group);
 
             const details = group.items.map(it => `
-                <div class="detail-pill">
-                    <div class="fw-bold">${esc(it.label || 'تنوع پیش‌فرض')}</div>
-                    <div class="text-muted mt-1">تعداد: ${formatNum(it.quantity)} | مبلغ: ${formatMoney(Number(it.quantity) * Number(it.price))}</div>
-                </div>
-            `).join('');
-
+            <div class="detail-pill">
+                <div class="fw-bold">${esc(it.label || 'تنوع پیش‌فرض')}</div>
+                <div class="text-muted mt-1">تعداد: ${formatNum(it.quantity)} | مبلغ: ${formatMoney(Number(it.quantity) * Number(it.price))}</div>
+            </div>`).join('');
             wrap.insertAdjacentHTML('beforeend', `
-                <div class="group-card" data-group-card="${productId}">
-                    <button type="button" class="group-main" onclick="toggleGroupDetails(${productId})" aria-expanded="false">
-                        <div class="group-title" title="${esc(group.product.title)}">${esc(group.product.title)}</div>
-                        <div class="group-amount">${formatMoney(finalAmount)}</div>
-                        <div class="group-arrow">▼</div>
-                    </button>
-
-                    <div class="group-details">
-                        <div class="d-flex flex-wrap gap-2 mb-2">
-                            <span class="badge-soft">کد: ${esc(group.product.code || '—')}</span>
-                            <span class="badge-soft">ردیف: ${formatNum(rowsCount)}</span>
-                            <span class="badge-soft">تعداد: ${formatNum(qty)}</span>
-                            ${discount > 0 ? `<span class="badge-soft badge-brand">تخفیف: ${formatMoney(discount)}</span>` : ''}
-                        </div>
-
-                        <div class="group-actions">
-                            <button type="button" class="btn btn-sm btn-outline-primary rounded-3" onclick="openGroupPicker(${productId})">ویرایش</button>
-                            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteGroup(${productId})">حذف</button>
-                        </div>
-
-                        <div class="mb-2 hint">خام: ${formatMoney(subtotal)}${discount > 0 ? ' | تخفیف: ' + formatMoney(discount) : ''}</div>
-                        <div class="details-grid">${details}</div>
-                    </div>
+        <div class="group-card" data-group-card="${productId}">
+            <button type="button" class="group-main" onclick="toggleGroupDetails(${productId})" aria-expanded="false">
+                <div class="group-title" title="${esc(group.product.title)}">${esc(group.product.title)}</div>
+                <div class="group-amount">${formatMoney(finalAmount)}</div>
+                <div class="group-arrow">▼</div>
+            </button>
+            <div class="group-details">
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <span class="badge-soft">کد: ${esc(group.product.code || '—')}</span>
+                    <span class="badge-soft">ردیف: ${formatNum(rowsCount)}</span>
+                    <span class="badge-soft">تعداد: ${formatNum(qty)}</span>
+                    ${discount > 0 ? `<span class="badge-soft badge-brand">تخفیف: ${formatMoney(discount)}</span>` : ''}
                 </div>
-            `);
-
+                <div class="group-actions">
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-3" onclick="openGroupPicker(${productId})">ویرایش</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteGroup(${productId})">حذف</button>
+                </div>
+                <div class="mb-2 hint">خام: ${formatMoney(subtotal)}${discount > 0 ? ' | تخفیف: ' + formatMoney(discount) : ''}</div>
+                <div class="details-grid">${details}</div>
+            </div>
+        </div>`);
             group.items.forEach(item => {
                 inputWrap.insertAdjacentHTML('beforeend', `
                     <input type="hidden" name="products[${idx}][id]" value="${productId}">
@@ -2323,6 +2647,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             JSON.stringify(buildDiscountBreakdown(subtotal, groupDiscounts, orderDiscount, totalDiscount));
 
         updateSubmitState();
+        scheduleLocalDraftSave();
     }
 
     async function hydrateInitialGroups() {
@@ -2492,13 +2817,15 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         btn.textContent = 'در حال ثبت...';
         isSubmittingProgrammatically = true;
-
+        removeLocalDraft(false);
         document.getElementById('orderForm').submit();
 
         return true;
     }
 
-    document.addEventListener('DOMContentLoaded', async function () {
+    document.addEventListener('DOMContentLoaded', async function() {
+        bindLocalDraftEvents();
+
         initSelect2Basic(document.getElementById('province_id'), 'انتخاب استان...');
         initSelect2Basic(document.getElementById('city_id'), 'انتخاب شهر...');
 
@@ -2515,10 +2842,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         fillShippingSelect();
-
-        if (OLD_SHIPPING_ID) {
-            document.getElementById('shipping_id').value = String(OLD_SHIPPING_ID);
-        }
+        if (OLD_SHIPPING_ID) document.getElementById('shipping_id').value = String(OLD_SHIPPING_ID);
 
         initCustomerSearch();
         await loadOldCustomer();
@@ -2527,6 +2851,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         document.getElementById('province_id')?.addEventListener('change', function () {
             fillCitiesByProvinceId(this.value);
+            scheduleLocalDraftSave();
         });
 
         document.getElementById('shipping_id')?.addEventListener('change', updateShippingMode);
@@ -2623,6 +2948,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         updateShippingMode();
         updateSubmitState();
+
+        isBootingPage = false;
+
+        if (!OLD_CUSTOMER_ID && !INIT_ROWS.length && localDraftExists()) {
+            showLocalDraftBanner();
+        } else {
+            scheduleLocalDraftSave();
+        }
 
         setTimeout(() => document.getElementById('motherCodeInput')?.focus(), 200);
     });

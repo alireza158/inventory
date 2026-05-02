@@ -197,7 +197,7 @@
 
         <div class="voucher-scroll">
             <div class="voucher-row">
-                <a class="voucher-card" href="{{ route('vouchers.sales.index') }}">
+                <a class="voucher-card" href="{{ route('vouchers.section.index', 'sale') }}">
                     <div class="voucher-icon">🧾</div>
                     <div class="voucher-title">حواله فروش</div>
                     <div class="voucher-desc">

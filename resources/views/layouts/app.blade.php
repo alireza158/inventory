@@ -17,11 +17,11 @@
     <link rel="stylesheet" href="{{ asset('lib/select2.min.css') }}"/>
     <link rel="stylesheet" href="{{ asset('lib/jalalidatepicker.min.css') }}">
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}"/>
-    <link rel="stylesheet" href="{{ asset('css/instrument-sans.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/Vazirmatn.css') }}">
 
     <style>
         body, button, input, select, textarea {
-  font-family: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif !important;
+  font-family: "Vazirmatn", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif !important;
         }
     </style>
 </head>

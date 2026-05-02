@@ -95,6 +95,7 @@
           class="card shadow-sm border-0 mb-3">
         @csrf
         @method('PUT')
+        <input type="hidden" name="_mode" id="warehouseFormMode" value="save">
 
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0">اقلام پیش‌فاکتور</h6>
@@ -133,27 +134,6 @@
                 <button class="btn btn-primary" type="submit">ذخیره تغییرات</button>
                 <button class="btn btn-success" type="button" id="approveBtn">تایید و ارسال به صف مالی</button>
             </div>
-        </div>
-    </form>
-
-    <form method="POST"
-          action="{{ route('preinvoice.warehouse.reject', $order->uuid) }}"
-          class="card border-danger shadow-sm">
-        @csrf
-
-        <div class="card-body">
-            <h6 class="text-danger">رد / برگشت به ثبت‌کننده</h6>
-
-            <textarea class="form-control mb-2"
-                      name="warehouse_reject_reason"
-                      rows="2"
-                      placeholder="دلیل رد/برگشت را بنویسید">{{ old('warehouse_reject_reason', $order->warehouse_reject_reason) }}</textarea>
-
-            <button type="submit"
-                    class="btn btn-outline-danger"
-                    onclick="return confirm('پیش‌فاکتور رد شود؟')">
-                ثبت رد پیش‌فاکتور
-            </button>
         </div>
     </form>
 
@@ -313,6 +293,14 @@
     }
 
     document.getElementById('warehouseForm').addEventListener('submit', function () {
+        const methodInput = this.querySelector('input[name="_method"]');
+        const modeInput = document.getElementById('warehouseFormMode');
+
+        if (methodInput && modeInput && modeInput.value === 'save') {
+            methodInput.value = 'PUT';
+            methodInput.disabled = false;
+        }
+
         attachHiddenInputs(this);
     });
 
@@ -322,6 +310,18 @@
 
         form.action = "{{ route('preinvoice.warehouse.approve', $order->uuid) }}";
         form.method = 'POST';
+
+        const methodInput = form.querySelector('input[name="_method"]');
+        const modeInput = document.getElementById('warehouseFormMode');
+
+        if (methodInput) {
+            methodInput.disabled = true;
+        }
+
+        if (modeInput) {
+            modeInput.value = 'approve';
+        }
+
         form.submit();
     });
 </script>
