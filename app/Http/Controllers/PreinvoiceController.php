@@ -184,10 +184,11 @@ class PreinvoiceController extends Controller
                 'shipping_id' => $shippingId,
                 'shipping_price' => (int) $this->resolveShippingPrice($shippingId),
                 'discount_amount' => (int) ($validated['discount_amount'] ?? 0),
-                'total_price' => (int) $validated['total_price'],
+                'total_price' => 0,
             ]);
 
             $this->syncItems($order, $validated['products']);
+            $order->update(['total_price' => $this->calculateOrderTotal($order)]);
         });
 
         return redirect()->route('preinvoice.warehouse.index')
@@ -231,11 +232,12 @@ class PreinvoiceController extends Controller
                 'shipping_id' => $shippingId,
                 'shipping_price' => (int) $this->resolveShippingPrice($shippingId),
                 'discount_amount' => (int) ($validated['discount_amount'] ?? 0),
-                'total_price' => (int) $validated['total_price'],
+                'total_price' => 0,
             ]);
 
             $order->items()->delete();
             $this->syncItems($order, $validated['products']);
+            $order->update(['total_price' => $this->calculateOrderTotal($order)]);
         });
 
         return back()->with('success', '✅ پیش‌فاکتور بروزرسانی شد.');
@@ -429,10 +431,11 @@ class PreinvoiceController extends Controller
             ->groupBy('product_id')
             ->map(fn($rows) => (int) $rows->sum('quantity'));
 
-        $availableByProduct = WarehouseStock::query()
-            ->where('warehouse_id', $centralWarehouseId)
-            ->whereIn('product_id', $requiredByProduct->keys())
-            ->pluck('quantity', 'product_id');
+            $availableByProduct = WarehouseStock::query()
+                ->where('warehouse_id', $centralWarehouseId)
+                ->whereIn('product_id', $requiredByProduct->keys())
+                ->lockForUpdate()
+                ->pluck('quantity', 'product_id');
 
         foreach ($requiredByProduct as $productId => $requiredQty) {
             $availableQty = (int) ($availableByProduct[(int) $productId] ?? 0);
@@ -575,16 +578,7 @@ class PreinvoiceController extends Controller
             return false;
         }
 
-        if ($user->hasAnyRole(['admin', 'warehouse', 'finance']) || $user->can('warehouse.approve')) {
-            return true;
-        }
-
-        // در برخی محیط‌ها هنوز نقش/دسترسی برای کاربران تعریف نشده است.
-        // برای جلوگیری از 403 روی مسیر جدید، کاربر احراز هویت‌شده‌ی بدون نقش/دسترسی را مجاز می‌کنیم.
-        $hasNoRole = method_exists($user, 'roles') ? !$user->roles()->exists() : true;
-        $hasNoPermission = method_exists($user, 'getAllPermissions') ? $user->getAllPermissions()->isEmpty() : true;
-
-        return $hasNoRole && $hasNoPermission;
+        return $user->hasAnyRole(['admin', 'warehouse', 'finance']) || $user->can('warehouse.approve');
     }
 
     public function finance(string $uuid)
