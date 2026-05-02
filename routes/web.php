@@ -199,7 +199,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseReview'])->name('preinvoice.warehouse.review');
     Route::put('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseSave'])->name('preinvoice.warehouse.save');
     Route::post('/preinvoice/warehouse/{uuid}/approve', [PreinvoiceController::class, 'warehouseApprove'])->name('preinvoice.warehouse.approve');
-    Route::post('/preinvoice/warehouse/{uuid}/reject', [PreinvoiceController::class, 'warehouseReject'])->name('preinvoice.warehouse.reject');
     Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->name('preinvoice.draft.index');
     Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->name('preinvoice.draft.edit');
     Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->name('preinvoice.draft.update');

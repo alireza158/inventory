@@ -95,6 +95,25 @@ class SalesHavalehStatusService
         }
     }
 
+    public function allowedTransitions(Invoice $invoice, ?User $user): array
+    {
+        if ($this->isAdmin($user)) {
+            return $this->all();
+        }
+
+        $allowedNext = [
+            self::PENDING_WAREHOUSE_APPROVAL => [self::PENDING_WAREHOUSE_APPROVAL, self::COLLECTING],
+            self::COLLECTING => [self::COLLECTING, self::CHECKING_DISCREPANCY],
+            self::CHECKING_DISCREPANCY => [self::CHECKING_DISCREPANCY, self::FINAL_CHECK],
+            self::FINAL_CHECK => [self::FINAL_CHECK, self::PACKING],
+            self::PACKING => [self::PACKING, self::SHIPPED, self::NOT_SHIPPED],
+            self::SHIPPED => [self::SHIPPED],
+            self::NOT_SHIPPED => [self::NOT_SHIPPED],
+        ];
+
+        return $allowedNext[(string) $invoice->status] ?? [(string) $invoice->status];
+    }
+
     private function isAdmin(?User $user): bool
     {
         if (!$user) {
