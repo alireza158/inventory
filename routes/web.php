@@ -96,13 +96,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/vouchers/section/{type}', [VoucherController::class, 'sectionStore'])->name('vouchers.section.store');
     Route::get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
     Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
-    Route::get('/vouchers/{voucher}', [VoucherController::class, 'show'])->name('vouchers.show');
-    Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
     Route::get('/vouchers/invoice/{uuid}/products', [VoucherController::class, 'invoiceProducts'])->name('vouchers.invoice.products');
     Route::get('/vouchers/sale-delivery', [VoucherController::class, 'saleDeliveryIndex'])->name('vouchers.sale-delivery.index');
     Route::get('/vouchers/sale-delivery/{uuid}/edit', [VoucherController::class, 'saleDeliveryEdit'])->name('vouchers.sale-delivery.edit');
     Route::put('/vouchers/sale-delivery/{uuid}', [VoucherController::class, 'saleDeliveryUpdate'])->name('vouchers.sale-delivery.update');
     Route::get('/vouchers/return/customers/{customer}/invoices', [VoucherController::class, 'customerInvoices'])->name('vouchers.return.customer.invoices');
+    Route::get('/vouchers/{voucher}', [VoucherController::class, 'show'])->name('vouchers.show');
+    Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
     Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
     Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
 
