@@ -8,24 +8,27 @@ $customersPageUrl = $customersPageUrl ?? url('/customers');
 $initRows = old('products');
 
 if (!$initRows && $order) {
-$initRows = $order->items->map(function ($it) {
-$product = $it->product ?? null;
-$variant = $it->variant ?? null;
-return [
-'id' => (int) $it->product_id,
-'product_id' => (int) $it->product_id,
-'product_name' => $product->title ?? $product->name ?? null,
-'product_code' => $product->code ?? $product->sku ?? null,
-'variety_id' => (int) $it->variant_id,
-'variant_id' => (int) $it->variant_id,
-'variant_name' => $variant->variant_name ?? null,
-'quantity' => (int) $it->quantity,
-'price' => (int) $it->price,
-];
-})->values();
+    $initRows = $order->items->map(function ($it) {
+        $product = $it->product ?? null;
+        $variant = $it->variant ?? null;
+
+        return [
+            'id' => (int) $it->product_id,
+            'product_id' => (int) $it->product_id,
+            'product_name' => $product->title ?? $product->name ?? null,
+            'product_code' => $product->code ?? $product->sku ?? null,
+            'variety_id' => (int) $it->variant_id,
+            'variant_id' => (int) $it->variant_id,
+            'variant_name' => $variant->variant_name ?? null,
+            'quantity' => (int) $it->quantity,
+            'price' => (int) $it->price,
+        ];
+    })->values();
 }
 
-if (!$initRows) { $initRows = []; }
+if (!$initRows) {
+    $initRows = [];
+}
 
 $oldCustomerTitle = trim((string) old('customer_name'));
 $oldCustomerMobile = trim((string) old('customer_mobile'));
@@ -33,6 +36,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
 <link rel="stylesheet" href="{{ asset('lib/select2.min.css') }}">
 <link rel="stylesheet" href="{{ asset('lib/bootstrap.rtl.min.css') }}">
+
 <script src="{{ asset('lib/jquery.min.js') }}"></script>
 <script src="{{ asset('lib/select2.min.js') }}"></script>
 <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
@@ -73,7 +77,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         max-width: 960px;
     }
 
-    /* Cards */
     .soft-card,
     .soft-card-lg {
         background: var(--card);
@@ -114,7 +117,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         background: linear-gradient(180deg, #fffefb, #fbf7ef);
     }
 
-    /* Typography */
     .page-title {
         font-size: 1.15rem;
         font-weight: 900;
@@ -143,7 +145,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         display: block;
     }
 
-    /* Customer box */
     .customer-box {
         background: linear-gradient(180deg, #faf7f1, #f7f1e7);
         border: 1px solid var(--border);
@@ -157,7 +158,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(51, 199, 192, .35);
     }
 
-    /* Quick search area */
     .quick-area {
         background: linear-gradient(180deg, #fffefb, #fbf6ee);
         border: 1px solid rgba(12, 83, 103, .12);
@@ -201,7 +201,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         background: linear-gradient(135deg, #26bac7, var(--brand-dark));
     }
 
-    /* Badges */
     .badge-soft {
         display: inline-flex;
         align-items: center;
@@ -233,36 +232,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(209, 77, 77, .18);
     }
 
-    /* Recent chips */
-    .recent-wrap {
-        display: none;
-        margin-top: 10px;
-        gap: 6px;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    .recent-chip {
-        border: 1px solid rgba(12, 83, 103, .12);
-        background: #fff;
-        color: var(--brand-dark);
-        border-radius: 999px;
-        padding: 5px 10px;
-        font-size: .74rem;
-        font-weight: 800;
-        cursor: pointer;
-        transition: all .15s;
-    }
-
-    .recent-chip:hover {
-        background: rgba(51, 199, 192, .08);
-        border-color: rgba(51, 199, 192, .32);
-    }
-
-    /* Group summary */
     #groupSummaryList {
         max-height: 320px;
         overflow-y: auto;
+        overflow-x: hidden;
         padding: 2px;
         scrollbar-width: thin;
     }
@@ -363,7 +336,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         font-size: .75rem;
     }
 
-    /* Empty state */
     .empty-state {
         border: 1px dashed rgba(12, 83, 103, .18);
         border-radius: 12px;
@@ -374,7 +346,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         font-weight: 800;
     }
 
-    /* Final grid */
     .final-grid {
         display: grid;
         grid-template-columns: 1.1fr .85fr .85fr 1fr auto;
@@ -395,6 +366,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         gap: 6px;
     }
 
+    .discount-line {
+        color: var(--brand-dark);
+        font-size: .78rem;
+        margin-top: 5px;
+        font-weight: 700;
+    }
+
     .submit-disabled-hint {
         font-size: .74rem;
         color: var(--muted);
@@ -403,7 +381,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         font-weight: 700;
     }
 
-    /* Buttons */
     .btn-primary {
         background: linear-gradient(135deg, var(--brand), #24b8c4);
         border-color: var(--brand);
@@ -468,7 +445,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(12, 83, 103, .13) !important;
     }
 
-    /* Forms */
     .form-control,
     .form-select {
         border-radius: 10px;
@@ -505,7 +481,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         height: 36px !important;
     }
 
-    /* Alerts */
     .alert-success {
         background: linear-gradient(180deg, rgba(23, 140, 99, .10), rgba(23, 140, 99, .05));
         color: #146948;
@@ -516,7 +491,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: #9d3434;
     }
 
-    /* Modal */
     .modal-dialog {
         margin: .5rem auto;
     }
@@ -531,6 +505,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-radius: 16px;
         overflow: hidden;
         box-shadow: 0 16px 36px rgba(8, 61, 80, .13);
+        max-height: calc(100dvh - 16px);
+        display: flex;
+        flex-direction: column;
     }
 
     .picker-head {
@@ -538,6 +515,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         color: #fff;
         border-bottom: 0;
         padding: 14px 16px;
+        flex: 0 0 auto;
     }
 
     .picker-head .modal-title,
@@ -550,15 +528,27 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         opacity: .9;
     }
 
-    /* Variant list inside modal */
+    .modal-body {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .modal-footer {
+        flex: 0 0 auto;
+    }
+
     .variant-list {
-        max-height: 52vh;
+        flex: 1 1 auto;
+        min-height: 220px;
         overflow-y: auto;
         overflow-x: hidden;
         border: 1px solid rgba(12, 83, 103, .08);
         border-radius: 12px;
         background: linear-gradient(180deg, #fffefc, #faf6ef);
         padding: 7px;
+        scrollbar-width: thin;
     }
 
     .variant-row {
@@ -571,7 +561,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         padding: 9px 11px;
         background: #fff;
         margin-bottom: 6px;
-        transition: border-color .12s;
+        transition: border-color .12s, background .12s;
     }
 
     .variant-row:last-child {
@@ -585,7 +575,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     .variant-row.row-empty-stock {
         opacity: .52;
-        pointer-events: none;
         background: #fcfaf7;
     }
 
@@ -603,22 +592,24 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         margin-top: 5px;
     }
 
-    /* Qty control */
     .qty-control {
-        display: inline-flex;
+        display: flex;
         align-items: center;
-        gap: 5px;
+        justify-content: flex-end;
+        gap: 4px;
         direction: ltr;
+        flex-wrap: wrap;
+        max-width: 100%;
     }
 
     .qty-btn {
-        width: 32px;
+        min-width: 34px;
         height: 32px;
         border: 1px solid rgba(12, 83, 103, .14);
         background: #fff;
         border-radius: 9px;
         font-weight: 900;
-        font-size: 1rem;
+        font-size: .82rem;
         line-height: 1;
         color: var(--brand-dark);
         cursor: pointer;
@@ -626,6 +617,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         align-items: center;
         justify-content: center;
         transition: background .12s;
+        padding: 0 7px;
+        user-select: none;
     }
 
     .qty-btn:hover {
@@ -633,8 +626,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-color: rgba(51, 199, 192, .30);
     }
 
+    .qty-btn:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+    }
+
     .qty-input {
-        width: 54px;
+        width: 58px;
         height: 32px;
         text-align: center;
         font-weight: 900;
@@ -642,6 +640,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border-radius: 9px;
         border: 1px solid rgba(12, 83, 103, .13);
         font-size: .9rem;
+        padding: 0 4px;
     }
 
     .qty-input:focus {
@@ -650,7 +649,16 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         outline: none;
     }
 
-    /* Modal footer summary */
+    .qty-input::-webkit-outer-spin-button,
+    .qty-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .qty-input[type=number] {
+        -moz-appearance: textfield;
+    }
+
     .modal-summary-bar {
         background: linear-gradient(180deg, #f4f9f8, #edf6f5);
         border: 1px solid rgba(51, 199, 192, .18);
@@ -661,6 +669,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         justify-content: space-between;
         flex-wrap: wrap;
         gap: 8px;
+        flex: 0 0 auto;
     }
 
     .summary-stat {
@@ -686,16 +695,9 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         border: 1px solid rgba(12, 83, 103, .08);
         border-radius: 12px;
         padding: 10px 12px;
+        flex: 0 0 auto;
     }
 
-    .discount-line {
-        color: var(--brand-dark);
-        font-size: .78rem;
-        margin-top: 5px;
-        font-weight: 700;
-    }
-
-    /* Search inside modal */
     .picker-search {
         border: 1px solid rgba(12, 83, 103, .13);
         border-radius: 10px;
@@ -712,7 +714,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         outline: none;
     }
 
-    /* Model filter chips */
     .model-filter-row {
         display: none;
         border: 1px solid rgba(12, 83, 103, .08);
@@ -720,6 +721,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         background: linear-gradient(180deg, #fffefb, #f9f4eb);
         padding: 8px 10px;
         margin-bottom: 8px;
+        flex: 0 0 auto;
     }
 
     .model-filter-row.is-visible {
@@ -753,7 +755,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         box-shadow: 0 4px 12px rgba(12, 83, 103, .12);
     }
 
-    /* Responsive */
     @media (max-width: 991.98px) {
         .page-shell {
             max-width: 100%;
@@ -796,12 +797,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         .modal-content {
-            min-height: 100vh;
+            height: 100dvh;
+            max-height: 100dvh;
             border-radius: 0;
         }
 
         .modal-body {
             padding: 9px;
+            overflow: hidden;
         }
 
         .modal-header,
@@ -810,15 +813,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
 
         .modal-footer {
-            position: sticky;
-            bottom: 0;
-            z-index: 20;
             background: linear-gradient(180deg, #f9f6ee, #f3eee5) !important;
         }
 
         .variant-list {
-            max-height: calc(100vh - 380px);
-            min-height: 200px;
+            min-height: 170px;
             padding: 5px;
         }
 
@@ -831,15 +830,17 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         .qty-control {
             width: 100%;
             justify-content: space-between;
+            gap: 4px;
         }
 
         .qty-btn {
-            width: 36px;
+            min-width: 36px;
             height: 36px;
+            padding: 0 6px;
         }
 
         .qty-input {
-            width: 60px;
+            width: 62px;
             height: 36px;
         }
 
@@ -849,7 +850,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         .modal-summary-bar {
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
+            padding: 9px 11px;
         }
 
         .summary-stat {
@@ -877,20 +879,29 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             <h1 class="page-title">🧾 ثبت پیش‌فاکتور</h1>
             <div class="hint mt-1">ثبت سریع کالا با کد ۴ رقمی محصول مادر</div>
         </div>
-        <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">صف تایید انبار</a>
+
+        <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">
+            صف تایید انبار
+        </a>
     </div>
 
     @if(session('success'))
-    <div class="alert alert-success border-0 shadow-sm rounded-4 fw-bold py-2">✅ {{ session('success') }}</div>
+        <div class="alert alert-success border-0 shadow-sm rounded-4 fw-bold py-2">✅ {{ session('success') }}</div>
     @endif
+
     @if(session('error'))
-    <div class="alert alert-danger border-0 shadow-sm rounded-4 fw-bold py-2" style="white-space:pre-wrap">{!! session('error') !!}</div>
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 fw-bold py-2" style="white-space:pre-wrap">{!! session('error') !!}</div>
     @endif
+
     @if($errors->any())
-    <div class="alert alert-danger border-0 shadow-sm rounded-4 py-2">
-        <div class="fw-bold mb-1">⚠️ خطا:</div>
-        <ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
-    </div>
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 py-2">
+            <div class="fw-bold mb-1">⚠️ خطا:</div>
+            <ul class="mb-0">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
     @endif
 
     <form action="{{ route('preinvoice.draft.save') }}" method="POST" id="orderForm" autocomplete="off">
@@ -902,7 +913,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         <input type="hidden" name="payment_status" value="pending">
         <input type="hidden" name="discount_breakdown" id="discount_breakdown" value="">
 
-        {{-- Customer --}}
         <div class="soft-card compact-card mb-3">
             <div class="row g-2 align-items-end">
                 <div class="col-lg-5">
@@ -913,27 +923,33 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                         </div>
                         <a href="{{ $customersPageUrl }}" class="btn btn-sm btn-outline-success rounded-3">➕ افزودن</a>
                     </div>
+
                     <select id="customer_search_select" class="form-select"></select>
                 </div>
+
                 <div class="col-lg-7">
                     <div id="customerSummaryBox" class="customer-box h-100 {{ old('customer_id') || $oldCustomerTitle ? 'is-selected' : '' }}">
                         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                             <div>
                                 <div class="fw-bold" id="selectedCustomerTitle">
                                     @if($oldCustomerTitle)
-                                    {{ $oldCustomerTitle }} @if($oldCustomerMobile) - {{ $oldCustomerMobile }} @endif
-                                    @else هنوز مشتری انتخاب نشده است @endif
+                                        {{ $oldCustomerTitle }} @if($oldCustomerMobile) - {{ $oldCustomerMobile }} @endif
+                                    @else
+                                        هنوز مشتری انتخاب نشده است
+                                    @endif
                                 </div>
                                 <div class="hint mt-1" id="customer_balance_hint"></div>
                             </div>
-                            <button type="button" id="clearCustomerBtn" class="btn btn-sm btn-light border rounded-3">تغییر</button>
+
+                            <button type="button" id="clearCustomerBtn" class="btn btn-sm btn-light border rounded-3">
+                                تغییر
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- Shipping --}}
         <div class="soft-card compact-card mb-3">
             <div class="row g-2 align-items-end">
                 <div class="col-lg-4">
@@ -944,12 +960,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                     </select>
                     <input type="hidden" id="shipping_price" name="shipping_price" value="{{ old('shipping_price', 0) }}">
                 </div>
+
                 <div class="col-lg-4" id="provinceBox">
                     <label class="label-sm">استان</label>
                     <select id="province_id" name="province_id" class="form-select form-select-sm">
                         <option value=""></option>
                     </select>
                 </div>
+
                 <div class="col-lg-4" id="cityBox">
                     <label class="label-sm">شهر</label>
                     <select id="city_id" name="city_id" class="form-select form-select-sm">
@@ -957,22 +975,27 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                     </select>
                 </div>
             </div>
+
             <div class="mt-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="hint" id="shipping_mode_hint">روش ارسال را انتخاب کنید.</div>
-                <button class="btn btn-sm btn-light border rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#addressCollapse">آدرس / توضیحات</button>
+
+                <button class="btn btn-sm btn-light border rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#addressCollapse">
+                    آدرس / توضیحات
+                </button>
             </div>
+
             <div id="addressCollapse" class="collapse mt-2 {{ old('customer_address') ? 'show' : '' }}">
                 <textarea id="customer_address" name="customer_address" class="form-control form-control-sm" rows="2" placeholder="آدرس یا توضیحات ارسال...">{{ old('customer_address') }}</textarea>
             </div>
         </div>
 
-        {{-- Product entry --}}
         <div class="soft-card-lg product-focus mb-3">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                 <div>
                     <h2 class="section-title">🧩 ثبت سریع کالا</h2>
                     <div class="hint mt-1">کد ۴ رقمی محصول مادر را وارد کنید</div>
                 </div>
+
                 <span class="badge-soft badge-brand">فروش سالن آریا</span>
             </div>
 
@@ -982,9 +1005,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                         <label class="label-sm">کد محصول مادر</label>
                         <input type="text" id="motherCodeInput" class="code-input" maxlength="4" inputmode="numeric" placeholder="4450">
                     </div>
+
                     <div class="col-lg-2 col-sm-3">
                         <button type="button" id="findMotherBtn" class="find-btn w-100">مشاهده</button>
                     </div>
+
                     <div class="col-lg-6 col-sm-4">
                         <div id="motherSearchHint" class="customer-box d-flex align-items-center">
                             <div>
@@ -992,6 +1017,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                                 <div class="hint">کد ۴ رقمی وارد کنید</div>
                             </div>
                         </div>
+
                         <div id="motherProductBox" style="display:none">
                             <div class="customer-box is-selected d-flex justify-content-between align-items-center gap-2">
                                 <div>
@@ -999,32 +1025,30 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                                     <div class="fw-bold" id="motherProductTitle" style="font-size:.9rem">—</div>
                                     <div class="hint" id="motherProductCode">—</div>
                                 </div>
-                                <button type="button" id="openGroupPickerBtn" class="btn btn-sm btn-outline-primary rounded-3 fw-bold">انتخاب تنوع</button>
+
+                                <button type="button" id="openGroupPickerBtn" class="btn btn-sm btn-outline-primary rounded-3 fw-bold">
+                                    انتخاب تنوع
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <div class="recent-wrap" id="recentProductsWrap">
-                    <span class="hint">آخرین:</span>
-                    <div class="step-chip-group" id="recentProductsList"></div>
-                </div>
             </div>
 
-            {{-- Basket --}}
             <div>
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                     <h2 class="section-title">سبد پیش‌فاکتور</h2>
                     <div class="hint" id="orderItemsCountHint">۰ کالا</div>
                 </div>
+
                 <div id="groupSummaryList"></div>
                 <div id="groupProductsInputs"></div>
             </div>
         </div>
 
-        {{-- Totals --}}
         <div class="soft-card final-card">
             <input type="hidden" name="discount_amount" id="discount" value="{{ old('discount_amount', 0) }}">
+
             <div class="final-grid">
                 <div>
                     <label class="label-sm">تخفیف کلی</label>
@@ -1033,24 +1057,32 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                             <option value="amount">تومان</option>
                             <option value="percent">درصد</option>
                         </select>
+
                         <input type="number" id="orderDiscountValue" class="form-control form-control-sm" min="0" step="0.01" inputmode="decimal" value="{{ old('discount_amount', 0) }}" placeholder="مقدار">
                     </div>
+
                     <div class="discount-line" id="orderDiscountPreview">تخفیف کلی: 0 تومان</div>
                 </div>
+
                 <div>
                     <label class="label-sm">هزینه ارسال</label>
                     <input type="text" id="shipping_price_view" class="form-control form-control-sm bg-light" readonly value="0 تومان">
                 </div>
+
                 <div>
                     <label class="label-sm">مجموع تخفیف</label>
                     <input type="text" id="totalDiscountView" class="form-control form-control-sm bg-light" readonly value="0 تومان">
                 </div>
+
                 <div>
                     <label class="label-sm">جمع کل</label>
                     <input type="text" name="total_price" id="total_price" class="form-control form-control-sm total-view" readonly value="0">
                 </div>
+
                 <div>
-                    <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold" id="submitOrderBtn" disabled>ثبت پیش‌فاکتور</button>
+                    <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold" id="submitOrderBtn" disabled>
+                        ثبت پیش‌فاکتور
+                    </button>
                     <div class="submit-disabled-hint" id="submitHint">برای ثبت، مشتری و حداقل یک کالا لازم است.</div>
                 </div>
             </div>
@@ -1058,65 +1090,65 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     </form>
 </div>
 
-{{-- Modal --}}
 <div class="modal fade" id="groupPickerModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header picker-head">
                 <div>
                     <h5 class="modal-title fw-bold" id="pickerModalTitle">انتخاب تنوع</h5>
                     <div class="hint mt-1" id="pickerModalSubTitle">—</div>
                 </div>
+
                 <button type="button" class="btn-close m-0" data-bs-dismiss="modal"></button>
             </div>
 
             <div class="modal-body">
-                {{-- Search --}}
-                <div class="mb-2">
+                <div class="mb-2 flex-shrink-0">
                     <input type="text" id="pickerSearchInput" class="picker-search" placeholder="جستجو در تنوع‌ها...">
                 </div>
 
-                {{-- Model filter --}}
                 <div class="model-filter-row" id="modalModelFilterWrap">
                     <div class="hint mb-2 fw-bold" style="color:var(--text-soft)">فیلتر مدل‌لیست</div>
                     <div class="step-chip-group" id="modalModelFilterChips"></div>
                 </div>
 
-                {{-- Loading --}}
                 <div id="pickerLoading" class="empty-state d-none">در حال دریافت کالاها...</div>
 
-                {{-- Variant list --}}
                 <div class="variant-list" id="pickerTableWrap">
                     <div id="groupPickerRows"></div>
                 </div>
 
-                {{-- Discount for this product --}}
                 <div class="modal-discount-box">
                     <label class="label-sm">تخفیف این محصول</label>
+
                     <div class="discount-control">
                         <select id="modalGroupDiscountType" class="form-select form-select-sm">
                             <option value="amount">تومان</option>
                             <option value="percent">درصد</option>
                         </select>
+
                         <input type="number" id="modalGroupDiscountValue" class="form-control form-control-sm" min="0" step="0.01" inputmode="decimal" value="0" placeholder="مقدار تخفیف">
                     </div>
+
                     <div class="discount-line">مبلغ تخفیف: <strong id="modalGroupDiscountPreview">0 تومان</strong></div>
                 </div>
 
-                {{-- Summary bar --}}
                 <div class="modal-summary-bar mt-2">
                     <div class="summary-stat">
                         <div class="s-label">ردیف انتخاب‌شده</div>
                         <div class="s-val" id="modalSelectedRows">0</div>
                     </div>
+
                     <div class="summary-stat">
                         <div class="s-label">جمع تعداد</div>
                         <div class="s-val" id="modalTotalQty">0</div>
                     </div>
+
                     <div class="summary-stat">
                         <div class="s-label">مبلغ قبل تخفیف</div>
                         <div class="s-val" id="modalRawAmount">0 تومان</div>
                     </div>
+
                     <div class="summary-stat">
                         <div class="s-label">جمع نهایی</div>
                         <div class="s-val" id="modalTotalAmount" style="color:var(--accent-dark)">0 تومان</div>
@@ -1176,14 +1208,20 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     let lastMotherAutoCode = '';
     let isSubmittingProgrammatically = false;
 
-    const RECENT_PRODUCTS_KEY = 'aria_preinvoice_recent_mothers_v3';
-
     function toEnglishDigits(str) {
-        return String(str || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+        return String(str || '')
+            .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+            .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
 
     function toInt(val) {
-        const s = toEnglishDigits(val).replaceAll(',', '').replaceAll('٬', '').replaceAll('،', '').replace(/[^\d.-]/g, '').trim();
+        const s = toEnglishDigits(val)
+            .replaceAll(',', '')
+            .replaceAll('٬', '')
+            .replaceAll('،', '')
+            .replace(/[^\d.-]/g, '')
+            .trim();
+
         const n = parseFloat(s);
         return Number.isFinite(n) ? Math.trunc(n) : 0;
     }
@@ -1197,11 +1235,34 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     function esc(val) {
-        return String(val ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+        return String(val ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
     }
 
     function normalize(val) {
         return String(val || '').trim();
+    }
+
+    function firstFilled(...values) {
+        for (const value of values) {
+            const normalized = normalize(value);
+            if (normalized !== '') return normalized;
+        }
+
+        return '';
+    }
+
+    function firstId(...values) {
+        for (const value of values) {
+            const n = Number(value || 0);
+            if (Number.isFinite(n) && n > 0) return n;
+        }
+
+        return '';
     }
 
     function isEmptyLabel(value) {
@@ -1211,9 +1272,11 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function safeDiscountValue(type, value) {
         let n = Number(value || 0);
+
         if (!Number.isFinite(n)) n = 0;
         if (n < 0) n = 0;
         if (type === 'percent' && n > 100) n = 100;
+
         return n;
     }
 
@@ -1221,14 +1284,48 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         const base = Math.max(0, Number(baseAmount || 0));
         const safeType = type === 'percent' ? 'percent' : 'amount';
         const safeValue = safeDiscountValue(safeType, value);
+
         if (safeType === 'percent') return Math.min(base, Math.floor(base * safeValue / 100));
+
         return Math.min(base, Math.floor(safeValue));
     }
 
     function customerFullName(c) {
         if (!c) return '';
-        const full = `${c.first_name||''} ${c.last_name||''}`.trim();
+
+        const full = `${c.first_name || ''} ${c.last_name || ''}`.trim();
+
         return full || normalize(c.customer_name || c.name);
+    }
+
+    function customerAddressValue(c) {
+        return firstFilled(
+            c?.address,
+            c?.customer_address,
+            c?.shipping_address,
+            c?.full_address,
+            c?.main_address,
+            c?.postal_address,
+            c?.description
+        );
+    }
+
+    function customerProvinceId(c) {
+        return firstId(
+            c?.province_id,
+            c?.state_id,
+            c?.ostan_id,
+            c?.province?.id,
+            c?.state?.id
+        );
+    }
+
+    function customerCityId(c) {
+        return firstId(
+            c?.city_id,
+            c?.shahr_id,
+            c?.city?.id
+        );
     }
 
     function productTitle(product) {
@@ -1243,6 +1340,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         if (!product) return [];
         if (Array.isArray(product.varieties)) return product.varieties;
         if (Array.isArray(product.variants)) return product.variants;
+
         return [];
     }
 
@@ -1268,8 +1366,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function variantStock(v) {
         if (v?.sellable_stock !== undefined && v?.sellable_stock !== null) return Number(v.sellable_stock) || 0;
+
         const stock = Number(v?.stock ?? v?.quantity ?? 0) || 0;
         const reserved = Number(v?.reserved ?? 0) || 0;
+
         return Math.max(0, stock - reserved);
     }
 
@@ -1278,31 +1378,30 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         const design = variantDesign(v);
         const name = variantName(v);
         const parts = [];
+
         if (!isEmptyLabel(model)) parts.push(model);
         if (!isEmptyLabel(design)) parts.push(design);
         if (!isEmptyLabel(name)) parts.push(name);
-        if (parts.length) return parts.join(' / ');
-        return 'تنوع پیش‌فرض';
-    }
 
-    function buildVariantSubtitle(v) {
-        const parts = [];
-        const model = variantModel(v);
-        const design = variantDesign(v);
-        const name = variantName(v);
-        if (!isEmptyLabel(model)) parts.push('مدل: ' + model);
-        if (!isEmptyLabel(design)) parts.push('طرح: ' + design);
-        if (!isEmptyLabel(name)) parts.push('تنوع: ' + name);
-        return parts.join(' | ') || 'تنوع پیش‌فرض';
+        if (parts.length) return parts.join(' / ');
+
+        return 'تنوع پیش‌فرض';
     }
 
     function groupRawSubtotal(group) {
         if (!group || !Array.isArray(group.items)) return 0;
-        return group.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.price || 0), 0);
+
+        return group.items.reduce((sum, item) => {
+            return sum + Number(item.quantity || 0) * Number(item.price || 0);
+        }, 0);
     }
 
     function groupDiscountTotal(group) {
-        return calcDiscount(groupRawSubtotal(group), group.discount_type || 'amount', group.discount_value || 0);
+        return calcDiscount(
+            groupRawSubtotal(group),
+            group.discount_type || 'amount',
+            group.discount_value || 0
+        );
     }
 
     function groupFinalAmount(group) {
@@ -1311,26 +1410,31 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     async function getProductDetails(productId, fresh = false) {
         const id = String(productId || '');
+
         if (!id) return null;
         if (!fresh && productCache.has(id)) return productCache.get(id);
+
         const url = API.product + '/' + encodeURIComponent(id) + (fresh ? '?_=' + Date.now() : '');
+
         const res = await fetch(url, {
-            headers: {
-                'Accept': 'application/json'
-            }
+            headers: { 'Accept': 'application/json' }
         });
+
         const json = await res.json();
         const product = json?.data?.product || null;
+
         if (product) productCache.set(id, product);
+
         return product;
     }
+
     async function searchProducts(query) {
         const res = await fetch(API.products + '?q=' + encodeURIComponent(query), {
-            headers: {
-                'Accept': 'application/json'
-            }
+            headers: { 'Accept': 'application/json' }
         });
+
         const json = await res.json();
+
         return json?.data?.products?.data || [];
     }
 
@@ -1340,37 +1444,40 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function isInPersonShipping(ship) {
         const name = normalize(ship?.name);
+
         return name.includes('حضوری') || name.includes('مراجعه');
     }
 
     function initSelect2Basic(selectEl, placeholder) {
         if (!window.jQuery || !window.jQuery.fn?.select2 || !selectEl) return;
+
         const $el = $(selectEl);
+
         if ($el.hasClass('select2-hidden-accessible')) {
             $el.off('select2:select select2:clear');
             $el.select2('destroy');
         }
+
         $el.select2({
             width: '100%',
             dir: 'rtl',
             placeholder,
             allowClear: true
         });
-        $el.on('select2:select select2:clear', function() {
-            this.dispatchEvent(new Event('change', {
-                bubbles: true
-            }));
+
+        $el.on('select2:select select2:clear', function () {
+            this.dispatchEvent(new Event('change', { bubbles: true }));
         });
     }
 
     async function loadArea() {
         try {
             const res = await fetch(API.area, {
-                headers: {
-                    'Accept': 'application/json'
-                }
+                headers: { 'Accept': 'application/json' }
             });
+
             const data = await res.json();
+
             areaProvinces = data?.data?.provinces || [];
         } catch (e) {
             areaProvinces = [];
@@ -1378,41 +1485,71 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     function fillProvincesSelect() {
-        const s = document.getElementById('province_id');
-        s.innerHTML = '<option value=""></option>';
+        const provinceSelect = document.getElementById('province_id');
+
+        provinceSelect.innerHTML = '<option value=""></option>';
+
         areaProvinces.forEach(p => {
-            const o = document.createElement('option');
-            o.value = p.id;
-            o.textContent = normalize(p.name);
-            s.appendChild(o);
+            const option = document.createElement('option');
+            option.value = p.id;
+            option.textContent = normalize(p.name);
+            provinceSelect.appendChild(option);
         });
-        initSelect2Basic(s, 'انتخاب استان...');
+
+        initSelect2Basic(provinceSelect, 'انتخاب استان...');
     }
 
     function fillCitiesByProvinceId(provinceId) {
-        const s = document.getElementById('city_id');
-        s.innerHTML = '<option value=""></option>';
+        const citySelect = document.getElementById('city_id');
+
+        citySelect.innerHTML = '<option value=""></option>';
+
         const province = areaProvinces.find(p => Number(p.id) === Number(provinceId));
         const cities = province?.cities || [];
+
         cities.forEach(c => {
-            const o = document.createElement('option');
-            o.value = c.id;
-            o.textContent = normalize(c.name);
-            s.appendChild(o);
+            const option = document.createElement('option');
+            option.value = c.id;
+            option.textContent = normalize(c.name);
+            citySelect.appendChild(option);
         });
-        s.disabled = cities.length === 0;
-        initSelect2Basic(s, 'انتخاب شهر...');
+
+        citySelect.disabled = cities.length === 0;
+
+        initSelect2Basic(citySelect, 'انتخاب شهر...');
     }
 
     function fillShippingSelect() {
-        const s = document.getElementById('shipping_id');
-        s.innerHTML = '<option value="">انتخاب روش ارسال...</option>';
-        shippings.forEach(sh => {
-            const o = document.createElement('option');
-            o.value = sh.id;
-            o.textContent = sh.name;
-            s.appendChild(o);
+        const shippingSelect = document.getElementById('shipping_id');
+
+        shippingSelect.innerHTML = '<option value="">انتخاب روش ارسال...</option>';
+
+        shippings.forEach(s => {
+            const option = document.createElement('option');
+            option.value = s.id;
+            option.textContent = s.name;
+            shippingSelect.appendChild(option);
         });
+    }
+
+    function setSelectValue(selectId, value) {
+        const el = document.getElementById(selectId);
+        if (!el) return;
+
+        el.value = value ? String(value) : '';
+
+        if (window.jQuery) {
+            $('#' + selectId).val(value ? String(value) : '').trigger('change.select2');
+        }
+    }
+
+    function setAddressCollapseVisible(visible) {
+        const el = document.getElementById('addressCollapse');
+        if (!el) return;
+
+        if (visible) {
+            el.classList.add('show');
+        }
     }
 
     function updateShippingMode() {
@@ -1420,53 +1557,90 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         const ship = shippingById(shippingSelect.value);
         const inPerson = isInPersonShipping(ship);
         const price = ship ? Number(ship.price || 0) : 0;
+
         document.getElementById('shipping_price').value = String(price);
         document.getElementById('shipping_price_view').value = formatMoney(price);
+
         const provinceBox = document.getElementById('provinceBox');
         const cityBox = document.getElementById('cityBox');
         const provinceEl = document.getElementById('province_id');
         const cityEl = document.getElementById('city_id');
         const addressEl = document.getElementById('customer_address');
         const hintEl = document.getElementById('shipping_mode_hint');
+
         if (inPerson) {
             provinceBox.style.display = 'none';
             cityBox.style.display = 'none';
+
             provinceEl.value = '';
             cityEl.value = '';
             addressEl.value = '';
+
             provinceEl.disabled = true;
             cityEl.disabled = true;
+
+            if (window.jQuery) {
+                $('#province_id').val('').trigger('change.select2');
+                $('#city_id').val('').trigger('change.select2');
+            }
+
             hintEl.textContent = 'مراجعه حضوری؛ آدرس لازم نیست.';
         } else {
             provinceBox.style.display = '';
             cityBox.style.display = '';
+
             provinceEl.disabled = false;
             cityEl.disabled = false;
+
             hintEl.textContent = price > 0 ? 'هزینه ارسال: ' + formatMoney(price) : 'مقصد و آدرس را تکمیل کنید.';
         }
+
         updateTotal();
+        updateSubmitState();
     }
 
     function applyCustomerToForm(c) {
         if (!c) return;
+
         const name = customerFullName(c);
-        const mobile = normalize(c.mobile);
+        const mobile = normalize(c.mobile || c.phone || c.cellphone || c.customer_mobile);
+        const address = customerAddressValue(c);
+        const provinceId = customerProvinceId(c);
+        const cityId = customerCityId(c);
+
         document.getElementById('customer_id').value = c.id || '';
         document.getElementById('customer_name').value = name;
         document.getElementById('customer_mobile').value = mobile;
-        document.getElementById('customer_address').value = c.address || '';
-        document.getElementById('selectedCustomerTitle').textContent = name + (mobile ? ' - ' + mobile : '');
-        document.getElementById('customer_balance_hint').textContent = 'مانده حساب: ' + formatMoney(c.balance || 0);
+        document.getElementById('customer_address').value = address;
+
+        document.getElementById('selectedCustomerTitle').textContent =
+            name + (mobile ? ' - ' + mobile : '');
+
+        document.getElementById('customer_balance_hint').textContent =
+            'مانده حساب: ' + formatMoney(c.balance || 0);
+
         document.getElementById('customerSummaryBox').classList.add('is-selected');
-        if (c.province_id) {
-            document.getElementById('province_id').value = String(c.province_id);
-            if (window.jQuery) $('#province_id').trigger('change.select2');
-            fillCitiesByProvinceId(c.province_id);
+
+        if (address) {
+            setAddressCollapseVisible(true);
         }
-        if (c.city_id) {
-            document.getElementById('city_id').value = String(c.city_id);
-            if (window.jQuery) $('#city_id').trigger('change.select2');
+
+        if (provinceId) {
+            setSelectValue('province_id', provinceId);
+            fillCitiesByProvinceId(provinceId);
+        } else {
+            fillCitiesByProvinceId('');
         }
+
+        if (cityId) {
+            setSelectValue('city_id', cityId);
+        }
+
+        const ship = shippingById(document.getElementById('shipping_id').value);
+        if (isInPersonShipping(ship)) {
+            updateShippingMode();
+        }
+
         updateSubmitState();
     }
 
@@ -1477,20 +1651,30 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
         document.getElementById('customer_balance_hint').textContent = '';
         document.getElementById('customerSummaryBox').classList.remove('is-selected');
-        if (window.jQuery) $('#customer_search_select').val(null).trigger('change');
+
+        if (window.jQuery) {
+            $('#customer_search_select').val(null).trigger('change');
+        }
+
         updateSubmitState();
     }
 
     function preloadCustomerOption(selectEl, customer) {
         if (!selectEl || !customer || !window.jQuery) return;
+
         const text = customerFullName(customer) + (customer.mobile ? ' - ' + customer.mobile : '');
-        selectEl.add(new Option(text, customer.id, true, true));
+        const option = new Option(text, customer.id, true, true);
+
+        selectEl.add(option);
+
         $(selectEl).trigger('change');
     }
 
     function initCustomerSearch() {
         const selectEl = document.getElementById('customer_search_select');
+
         if (!window.jQuery || !window.jQuery.fn?.select2) return;
+
         $(selectEl).select2({
             width: '100%',
             dir: 'rtl',
@@ -1501,47 +1685,52 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 url: API.customers,
                 dataType: 'json',
                 delay: 250,
-                data: params => ({
-                    q: params.term || ''
-                }),
+                data: params => ({ q: params.term || '' }),
                 processResults: resp => {
                     const items = resp?.data?.customers || [];
+
                     return {
                         results: items.map(c => ({
                             id: c.id,
-                            text: customerFullName(c) + ' - ' + (c.mobile || '')
+                            text: customerFullName(c) + ' - ' + (c.mobile || c.phone || '')
                         }))
                     };
                 }
             }
         });
-        $(selectEl).on('select2:select', async function(e) {
+
+        $(selectEl).on('select2:select', async function (e) {
             const id = e?.params?.data?.id;
             if (!id) return;
+
             try {
                 const res = await fetch(API.customer + '/' + encodeURIComponent(id), {
-                    headers: {
-                        'Accept': 'application/json'
-                    }
+                    headers: { 'Accept': 'application/json' }
                 });
+
                 const json = await res.json();
                 const customer = json?.data?.customer || null;
+
                 if (customer) applyCustomerToForm(customer);
             } catch (error) {}
         });
+
         $(selectEl).on('select2:clear', clearCustomer);
     }
+
     async function loadOldCustomer() {
         const cid = document.getElementById('customer_id').value || OLD_CUSTOMER_ID || '';
+
         if (!cid) return;
+
         try {
             const res = await fetch(API.customer + '/' + encodeURIComponent(cid), {
-                headers: {
-                    'Accept': 'application/json'
-                }
+                headers: { 'Accept': 'application/json' }
             });
+
             const json = await res.json();
             const customer = json?.data?.customer || null;
+
             if (customer) {
                 applyCustomerToForm(customer);
                 preloadCustomerOption(document.getElementById('customer_search_select'), customer);
@@ -1549,58 +1738,12 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         } catch (e) {}
     }
 
-    function getRecentProducts() {
-        try {
-            const raw = localStorage.getItem(RECENT_PRODUCTS_KEY);
-            const rows = JSON.parse(raw || '[]');
-            return Array.isArray(rows) ? rows : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function saveRecentProduct(product) {
-        if (!product) return;
-        const id = Number(product.id || 0);
-        if (!id) return;
-        const row = {
-            id,
-            title: productTitle(product),
-            code: productCode(product)
-        };
-        const rows = getRecentProducts().filter(item => Number(item.id) !== id);
-        rows.unshift(row);
-        localStorage.setItem(RECENT_PRODUCTS_KEY, JSON.stringify(rows.slice(0, 6)));
-        renderRecentProducts();
-    }
-
-    function renderRecentProducts() {
-        const wrap = document.getElementById('recentProductsWrap');
-        const list = document.getElementById('recentProductsList');
-        const rows = getRecentProducts();
-        list.innerHTML = '';
-        if (!rows.length) {
-            wrap.style.display = 'none';
-            return;
-        }
-        rows.forEach(item => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'recent-chip';
-            btn.textContent = `${item.code||'—'} - ${item.title||'محصول'}`;
-            btn.addEventListener('click', async function() {
-                selectedMotherProduct = item;
-                await openGroupPicker(item.id);
-            });
-            list.appendChild(btn);
-        });
-        wrap.style.display = 'flex';
-    }
-
     async function findMotherProductByCode(autoOpen = false) {
         const input = document.getElementById('motherCodeInput');
         const code = toEnglishDigits(input.value).replace(/\D/g, '').slice(0, 4);
+
         input.value = code;
+
         if (code.length !== 4) {
             if (!autoOpen) {
                 alert('کد مادر باید ۴ رقم باشد.');
@@ -1608,27 +1751,40 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             }
             return;
         }
+
         const btn = document.getElementById('findMotherBtn');
         const originalText = btn.textContent;
+
         btn.disabled = true;
         btn.textContent = '...';
+
         try {
             const rows = await searchProducts(code);
-            selectedMotherProduct = rows.find(p => String(productCode(p)).trim() === code) || rows.find(p => String(p.code || '').trim() === code) || rows.find(p => String(p.sku || '').trim() === code) || rows[0] || null;
+
+            selectedMotherProduct =
+                rows.find(p => String(productCode(p)).trim() === code) ||
+                rows.find(p => String(p.code || '').trim() === code) ||
+                rows.find(p => String(p.sku || '').trim() === code) ||
+                rows[0] ||
+                null;
+
             if (!selectedMotherProduct) {
                 document.getElementById('motherProductBox').style.display = 'none';
                 document.getElementById('motherSearchHint').style.display = '';
+
                 if (!autoOpen) {
                     alert('محصول مادری با این کد پیدا نشد.');
                     input.select();
                 }
+
                 return;
             }
+
             document.getElementById('motherSearchHint').style.display = 'none';
             document.getElementById('motherProductBox').style.display = 'block';
             document.getElementById('motherProductTitle').textContent = productTitle(selectedMotherProduct);
             document.getElementById('motherProductCode').textContent = 'کد: ' + (productCode(selectedMotherProduct) || code);
-            saveRecentProduct(selectedMotherProduct);
+
             if (autoOpen) {
                 await openGroupPicker(selectedMotherProduct.id);
             } else {
@@ -1644,41 +1800,56 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     async function openGroupPicker(productId = null) {
         const targetId = productId || selectedMotherProduct?.id;
+
         if (!targetId) return;
+
         const modalEl = document.getElementById('groupPickerModal');
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
         activeProductId = Number(targetId);
         activeProduct = groupedSelections[activeProductId]?.product || selectedMotherProduct || null;
         activeModalModelFilter = '__all__';
+
         document.getElementById('pickerLoading').classList.remove('d-none');
         document.getElementById('pickerTableWrap').classList.add('d-none');
         document.getElementById('groupPickerRows').innerHTML = '';
         document.getElementById('pickerSearchInput').value = '';
+
         modal.show();
+
         try {
             const product = await getProductDetails(activeProductId);
+
             if (!product) {
                 alert('اطلاعات محصول دریافت نشد.');
                 modal.hide();
                 return;
             }
+
             activeProduct = product;
             activeModalItems = getProductVarieties(product);
             modalQuantities = new Map();
+
             const oldItems = groupedSelections[activeProductId]?.items || [];
             oldItems.forEach(item => modalQuantities.set(Number(item.variant_id), Number(item.quantity || 0)));
+
             modalGroupDiscountType = groupedSelections[activeProductId]?.discount_type || 'amount';
             modalGroupDiscountValue = Number(groupedSelections[activeProductId]?.discount_value || 0);
+
             document.getElementById('modalGroupDiscountType').value = modalGroupDiscountType;
             document.getElementById('modalGroupDiscountValue').value = modalGroupDiscountValue;
+
             document.getElementById('pickerModalTitle').textContent = productTitle(product);
-            document.getElementById('pickerModalSubTitle').textContent = 'کد: ' + (productCode(product) || '—') + ' | ' + formatNum(activeModalItems.length) + ' تنوع';
-            saveRecentProduct(product);
+            document.getElementById('pickerModalSubTitle').textContent =
+                'کد: ' + (productCode(product) || '—') + ' | ' + formatNum(activeModalItems.length) + ' تنوع';
+
             renderModalModelFilters();
             renderPickerRows();
             updateModalSummary();
+
             document.getElementById('pickerLoading').classList.add('d-none');
             document.getElementById('pickerTableWrap').classList.remove('d-none');
+
             setTimeout(() => document.getElementById('pickerSearchInput').focus(), 200);
         } catch (e) {
             alert('خطا در باز کردن لیست.');
@@ -1688,11 +1859,15 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function getModelFilterGroups() {
         const groups = new Map();
+
         activeModalItems.forEach(v => {
             const model = variantModel(v);
+
             if (isEmptyLabel(model)) return;
+
             groups.set(model, (groups.get(model) || 0) + 1);
         });
+
         return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], 'fa'));
     }
 
@@ -1700,18 +1875,23 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         const wrap = document.getElementById('modalModelFilterWrap');
         const chips = document.getElementById('modalModelFilterChips');
         const groups = getModelFilterGroups();
+
         chips.innerHTML = '';
+
         if (!groups.length) {
             wrap.classList.remove('is-visible');
             return;
         }
+
         wrap.classList.add('is-visible');
+
         const allBtn = document.createElement('button');
         allBtn.type = 'button';
         allBtn.className = 'step-chip active';
         allBtn.textContent = 'همه مدل‌ها';
         allBtn.dataset.model = '__all__';
         chips.appendChild(allBtn);
+
         groups.forEach(([model, count]) => {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -1720,11 +1900,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             btn.dataset.model = model;
             chips.appendChild(btn);
         });
+
         chips.querySelectorAll('.step-chip').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function () {
                 activeModalModelFilter = this.dataset.model || '__all__';
+
                 chips.querySelectorAll('.step-chip').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
+
                 renderPickerRows();
             });
         });
@@ -1732,10 +1915,18 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function filteredModalItems() {
         const q = normalize(document.getElementById('pickerSearchInput').value).toLowerCase();
+
         return activeModalItems.filter(v => {
             if (activeModalModelFilter !== '__all__' && variantModel(v) !== activeModalModelFilter) return false;
+
             if (!q) return true;
-            const haystack = [variantModel(v), variantDesign(v), variantName(v)].join(' ').toLowerCase();
+
+            const haystack = [
+                variantModel(v),
+                variantDesign(v),
+                variantName(v)
+            ].join(' ').toLowerCase();
+
             return haystack.includes(q);
         });
     }
@@ -1743,16 +1934,19 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     function modalMaxQty(v) {
         const id = variantId(v);
         const currentQty = Number(modalQuantities.get(id) || 0);
+
         return Math.max(variantStock(v), currentQty);
     }
 
     function renderPickerRows() {
         const wrap = document.getElementById('groupPickerRows');
         const rows = filteredModalItems();
+
         if (!rows.length) {
             wrap.innerHTML = `<div class="empty-state">موردی برای نمایش وجود ندارد.</div>`;
             return;
         }
+
         wrap.innerHTML = rows.map(v => {
             const id = variantId(v);
             const stock = variantStock(v);
@@ -1762,100 +1956,187 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const selectedClass = qty > 0 ? 'row-selected' : '';
             const noStockClass = stock <= 0 && qty <= 0 ? 'row-empty-stock' : '';
             const disabled = stock <= 0 && qty <= 0 ? 'disabled' : '';
+
             return `
-        <div class="variant-row ${selectedClass} ${noStockClass}" data-row-variant="${id}">
-            <div>
-                <div class="variant-title">${esc(buildVariantTitle(v))}</div>
-                <div class="variant-meta">
-                    <span class="badge-soft ${stock>0?'badge-stock':'badge-no-stock'}">
-                        موجودی: ${stock>0?formatNum(stock):'ناموجود'}
-                    </span>
-                    <span class="badge-soft">قیمت: ${formatMoney(price)}</span>
-                    ${qty>0?`<span class="badge-soft badge-brand">انتخاب: ${formatNum(qty)}</span>`:''}
+                <div class="variant-row ${selectedClass} ${noStockClass}" data-row-variant="${id}">
+                    <div>
+                        <div class="variant-title">${esc(buildVariantTitle(v))}</div>
+                        <div class="variant-meta">
+                            <span class="badge-soft ${stock > 0 ? 'badge-stock' : 'badge-no-stock'}">
+                                موجودی: ${stock > 0 ? formatNum(stock) : 'ناموجود'}
+                            </span>
+                            <span class="badge-soft">قیمت: ${formatMoney(price)}</span>
+                            <span class="badge-soft badge-brand selected-qty-badge" style="${qty > 0 ? '' : 'display:none'}">
+                                انتخاب: <span class="selected-qty-value">${formatNum(qty)}</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="qty-control">
+                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="-10" ${disabled}>-10</button>
+                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="-5" ${disabled}>-5</button>
+                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="-1" ${disabled}>−</button>
+
+                        <input
+                            type="number"
+                            class="qty-input picker-qty"
+                            data-id="${id}"
+                            data-price="${price}"
+                            min="0"
+                            max="${max}"
+                            value="${qty}"
+                            inputmode="numeric"
+                            ${disabled}
+                        >
+
+                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="1" ${disabled}>+</button>
+                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="5" ${disabled}>+5</button>
+                        <button type="button" class="qty-btn picker-delta" data-id="${id}" data-delta="10" ${disabled}>+10</button>
+                    </div>
                 </div>
-            </div>
-            <div class="qty-control">
-                <button type="button" class="qty-btn picker-minus" data-id="${id}" ${disabled}>−</button>
-                <input type="number" class="qty-input picker-qty" data-id="${id}" data-price="${price}" min="0" max="${max}" value="${qty}" inputmode="numeric" ${disabled}>
-                <button type="button" class="qty-btn picker-plus" data-id="${id}" data-step="1" ${disabled}>+</button>
-            </div>
-        </div>`;
+            `;
         }).join('');
     }
 
-    function setModalQty(id, value) {
+    function updateVariantRowState(id, qty) {
+        const row = document.querySelector(`[data-row-variant="${id}"]`);
+        if (!row) return;
+
+        row.classList.toggle('row-selected', Number(qty || 0) > 0);
+
+        const badge = row.querySelector('.selected-qty-badge');
+        const badgeValue = row.querySelector('.selected-qty-value');
+
+        if (badge && badgeValue) {
+            if (Number(qty || 0) > 0) {
+                badge.style.display = '';
+                badgeValue.textContent = formatNum(qty);
+            } else {
+                badge.style.display = 'none';
+                badgeValue.textContent = '0';
+            }
+        }
+    }
+
+    function normalizeQtyForVariant(id, value) {
         id = Number(id);
+
         const item = activeModalItems.find(v => variantId(v) === id);
-        if (!item) return;
+        if (!item) return 0;
+
         const max = modalMaxQty(item);
         let qty = parseInt(toEnglishDigits(value), 10);
+
         if (!Number.isFinite(qty)) qty = 0;
         if (qty < 0) qty = 0;
         if (qty > max) qty = max;
+
+        return qty;
+    }
+
+    function setModalQty(id, value, shouldRerender = false) {
+        id = Number(id);
+
+        const qty = normalizeQtyForVariant(id, value);
+
         modalQuantities.set(id, qty);
+
+        const input = document.querySelector(`.picker-qty[data-id="${id}"]`);
+        if (input && document.activeElement !== input) {
+            input.value = String(qty);
+        }
+
+        updateVariantRowState(id, qty);
         updateModalSummary();
-        renderPickerRows();
+
+        if (shouldRerender) {
+            renderPickerRows();
+        }
     }
 
     function changeModalQty(id, delta) {
-        const current = Number(modalQuantities.get(Number(id)) || 0);
-        setModalQty(id, current + Number(delta || 0));
+        id = Number(id);
+
+        const current = Number(modalQuantities.get(id) || 0);
+        setModalQty(id, current + Number(delta || 0), true);
     }
 
     function updateModalSummary() {
-        let selectedRows = 0,
-            totalQty = 0,
-            totalAmount = 0;
+        let selectedRows = 0;
+        let totalQty = 0;
+        let totalAmount = 0;
+
         activeModalItems.forEach(v => {
             const id = variantId(v);
             const qty = Number(modalQuantities.get(id) || 0);
             const price = variantPrice(v, activeProduct);
+
             if (qty > 0) {
                 selectedRows++;
                 totalQty += qty;
                 totalAmount += qty * price;
             }
         });
+
         modalGroupDiscountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
-        modalGroupDiscountValue = safeDiscountValue(modalGroupDiscountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
+        modalGroupDiscountValue = safeDiscountValue(
+            modalGroupDiscountType,
+            document.getElementById('modalGroupDiscountValue')?.value || 0
+        );
+
         const discount = calcDiscount(totalAmount, modalGroupDiscountType, modalGroupDiscountValue);
+
         document.getElementById('modalSelectedRows').textContent = formatNum(selectedRows);
         document.getElementById('modalTotalQty').textContent = formatNum(totalQty);
         document.getElementById('modalRawAmount').textContent = formatMoney(totalAmount);
         document.getElementById('modalTotalAmount').textContent = formatMoney(Math.max(0, totalAmount - discount));
+
         const preview = document.getElementById('modalGroupDiscountPreview');
         if (preview) preview.textContent = formatMoney(discount);
     }
 
     function clearPickerQuantities() {
         if (!confirm('همه تعدادهای انتخاب‌شده پاک شود؟')) return;
+
         modalQuantities = new Map();
+
         renderPickerRows();
         updateModalSummary();
     }
 
     function saveGroupSelection() {
         if (!activeProductId || !activeProduct) return;
+
         const items = [];
+
         activeModalItems.forEach(v => {
             const id = variantId(v);
             const qty = Number(modalQuantities.get(id) || 0);
-            if (qty > 0) items.push({
-                variant_id: id,
-                quantity: qty,
-                price: variantPrice(v, activeProduct),
-                model: variantModel(v),
-                design: variantDesign(v),
-                variant: variantName(v),
-                label: buildVariantTitle(v)
-            });
+
+            if (qty > 0) {
+                items.push({
+                    variant_id: id,
+                    quantity: qty,
+                    price: variantPrice(v, activeProduct),
+                    model: variantModel(v),
+                    design: variantDesign(v),
+                    variant: variantName(v),
+                    label: buildVariantTitle(v)
+                });
+            }
         });
+
         if (!items.length) {
             alert('حداقل یک کالا را انتخاب کنید.');
             return;
         }
+
         const discountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
-        const discountValue = safeDiscountValue(discountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
+        const discountValue = safeDiscountValue(
+            discountType,
+            document.getElementById('modalGroupDiscountValue')?.value || 0
+        );
+
         groupedSelections[activeProductId] = {
             product: {
                 id: activeProductId,
@@ -1866,48 +2147,69 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             discount_type: discountType,
             discount_value: discountValue
         };
+
         renderGroupSummary();
         updateTotal();
+
         bootstrap.Modal.getInstance(document.getElementById('groupPickerModal'))?.hide();
+
         document.getElementById('motherCodeInput').value = '';
         document.getElementById('motherProductBox').style.display = 'none';
         document.getElementById('motherSearchHint').style.display = '';
+
         selectedMotherProduct = null;
         lastMotherAutoCode = '';
+
         setTimeout(() => document.getElementById('motherCodeInput').focus(), 100);
     }
 
     function deleteGroup(productId) {
         const group = groupedSelections[productId];
+
         if (!group) return;
+
         if (!confirm(`محصول «${group.product.title}» حذف شود؟`)) return;
+
         delete groupedSelections[productId];
+
         renderGroupSummary();
         updateTotal();
     }
 
     function toggleGroupDetails(productId) {
         const card = document.querySelector(`[data-group-card="${productId}"]`);
+
         if (!card) return;
+
         const isOpen = card.classList.toggle('is-open');
         const btn = card.querySelector('.group-main');
+
         if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     }
 
     function renderGroupSummary() {
         const wrap = document.getElementById('groupSummaryList');
         const inputWrap = document.getElementById('groupProductsInputs');
+
         wrap.innerHTML = '';
         inputWrap.innerHTML = '';
+
         const groups = Object.values(groupedSelections);
-        const totalItems = groups.reduce((s, g) => s + g.items.reduce((ss, it) => ss + Number(it.quantity || 0), 0), 0);
-        document.getElementById('orderItemsCountHint').textContent = formatNum(groups.length) + ' کالا | ' + formatNum(totalItems) + ' عدد';
+        const totalItems = groups.reduce((s, g) => {
+            return s + g.items.reduce((ss, it) => ss + Number(it.quantity || 0), 0);
+        }, 0);
+
+        document.getElementById('orderItemsCountHint').textContent =
+            formatNum(groups.length) + ' کالا | ' + formatNum(totalItems) + ' عدد';
+
         if (!groups.length) {
             wrap.innerHTML = `<div class="empty-state">هنوز کالایی اضافه نشده است.</div>`;
             updateSubmitState();
             return;
         }
+
         let idx = 0;
+
         groups.forEach(group => {
             const productId = Number(group.product.id);
             const qty = group.items.reduce((s, it) => s + Number(it.quantity || 0), 0);
@@ -1915,42 +2217,53 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             const subtotal = groupRawSubtotal(group);
             const discount = groupDiscountTotal(group);
             const finalAmount = groupFinalAmount(group);
+
             const details = group.items.map(it => `
-            <div class="detail-pill">
-                <div class="fw-bold">${esc(it.label||'تنوع پیش‌فرض')}</div>
-                <div class="text-muted mt-1">تعداد: ${formatNum(it.quantity)} | مبلغ: ${formatMoney(Number(it.quantity)*Number(it.price))}</div>
-            </div>`).join('');
+                <div class="detail-pill">
+                    <div class="fw-bold">${esc(it.label || 'تنوع پیش‌فرض')}</div>
+                    <div class="text-muted mt-1">تعداد: ${formatNum(it.quantity)} | مبلغ: ${formatMoney(Number(it.quantity) * Number(it.price))}</div>
+                </div>
+            `).join('');
+
             wrap.insertAdjacentHTML('beforeend', `
-        <div class="group-card" data-group-card="${productId}">
-            <button type="button" class="group-main" onclick="toggleGroupDetails(${productId})" aria-expanded="false">
-                <div class="group-title" title="${esc(group.product.title)}">${esc(group.product.title)}</div>
-                <div class="group-amount">${formatMoney(finalAmount)}</div>
-                <div class="group-arrow">▼</div>
-            </button>
-            <div class="group-details">
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge-soft">کد: ${esc(group.product.code||'—')}</span>
-                    <span class="badge-soft">ردیف: ${formatNum(rowsCount)}</span>
-                    <span class="badge-soft">تعداد: ${formatNum(qty)}</span>
-                    ${discount>0?`<span class="badge-soft badge-brand">تخفیف: ${formatMoney(discount)}</span>`:''}
+                <div class="group-card" data-group-card="${productId}">
+                    <button type="button" class="group-main" onclick="toggleGroupDetails(${productId})" aria-expanded="false">
+                        <div class="group-title" title="${esc(group.product.title)}">${esc(group.product.title)}</div>
+                        <div class="group-amount">${formatMoney(finalAmount)}</div>
+                        <div class="group-arrow">▼</div>
+                    </button>
+
+                    <div class="group-details">
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <span class="badge-soft">کد: ${esc(group.product.code || '—')}</span>
+                            <span class="badge-soft">ردیف: ${formatNum(rowsCount)}</span>
+                            <span class="badge-soft">تعداد: ${formatNum(qty)}</span>
+                            ${discount > 0 ? `<span class="badge-soft badge-brand">تخفیف: ${formatMoney(discount)}</span>` : ''}
+                        </div>
+
+                        <div class="group-actions">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-3" onclick="openGroupPicker(${productId})">ویرایش</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteGroup(${productId})">حذف</button>
+                        </div>
+
+                        <div class="mb-2 hint">خام: ${formatMoney(subtotal)}${discount > 0 ? ' | تخفیف: ' + formatMoney(discount) : ''}</div>
+                        <div class="details-grid">${details}</div>
+                    </div>
                 </div>
-                <div class="group-actions">
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-3" onclick="openGroupPicker(${productId})">ویرایش</button>
-                    <button type="button" class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteGroup(${productId})">حذف</button>
-                </div>
-                <div class="mb-2 hint">خام: ${formatMoney(subtotal)}${discount>0?' | تخفیف: '+formatMoney(discount):''}</div>
-                <div class="details-grid">${details}</div>
-            </div>
-        </div>`);
+            `);
+
             group.items.forEach(item => {
                 inputWrap.insertAdjacentHTML('beforeend', `
-                <input type="hidden" name="products[${idx}][id]" value="${productId}">
-                <input type="hidden" name="products[${idx}][variety_id]" value="${Number(item.variant_id)}">
-                <input type="hidden" name="products[${idx}][quantity]" value="${Number(item.quantity)}">
-                <input type="hidden" name="products[${idx}][price]" value="${Number(item.price)}">`);
+                    <input type="hidden" name="products[${idx}][id]" value="${productId}">
+                    <input type="hidden" name="products[${idx}][variety_id]" value="${Number(item.variant_id)}">
+                    <input type="hidden" name="products[${idx}][quantity]" value="${Number(item.quantity)}">
+                    <input type="hidden" name="products[${idx}][price]" value="${Number(item.price)}">
+                `);
+
                 idx++;
             });
         });
+
         updateSubmitState();
     }
 
@@ -1964,6 +2277,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             raw_subtotal: groupRawSubtotal(group),
             final_amount: groupFinalAmount(group)
         }));
+
         return {
             subtotal,
             group_discount_amount: groupDiscounts,
@@ -1977,24 +2291,37 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     function updateTotal() {
         const shipping = toInt(document.getElementById('shipping_price')?.value || 0);
-        let subtotal = 0,
-            groupDiscounts = 0;
+
+        let subtotal = 0;
+        let groupDiscounts = 0;
+
         Object.values(groupedSelections).forEach(group => {
             subtotal += groupRawSubtotal(group);
             groupDiscounts += groupDiscountTotal(group);
         });
+
         const afterGroupDiscount = Math.max(0, subtotal - groupDiscounts);
+
         const orderType = document.getElementById('orderDiscountType')?.value || 'amount';
-        const orderValue = safeDiscountValue(orderType, document.getElementById('orderDiscountValue')?.value || 0);
+        const orderValue = safeDiscountValue(
+            orderType,
+            document.getElementById('orderDiscountValue')?.value || 0
+        );
+
         const orderDiscount = calcDiscount(afterGroupDiscount, orderType, orderValue);
         const totalDiscount = Math.min(subtotal, groupDiscounts + orderDiscount);
         const total = Math.max(0, subtotal + shipping - totalDiscount);
+
         document.getElementById('discount').value = String(totalDiscount);
         document.getElementById('totalDiscountView').value = formatMoney(totalDiscount);
         document.getElementById('total_price').value = formatMoney(total);
+
         const preview = document.getElementById('orderDiscountPreview');
         if (preview) preview.textContent = 'تخفیف کلی: ' + formatMoney(orderDiscount);
-        document.getElementById('discount_breakdown').value = JSON.stringify(buildDiscountBreakdown(subtotal, groupDiscounts, orderDiscount, totalDiscount));
+
+        document.getElementById('discount_breakdown').value =
+            JSON.stringify(buildDiscountBreakdown(subtotal, groupDiscounts, orderDiscount, totalDiscount));
+
         updateSubmitState();
     }
 
@@ -2004,19 +2331,27 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             updateTotal();
             return;
         }
+
         const grouped = {};
+
         INIT_ROWS.forEach(row => {
             const productId = Number(row.id || row.product_id || 0);
+
             if (!productId) return;
+
             if (!grouped[productId]) grouped[productId] = [];
             grouped[productId].push(row);
         });
+
         for (const [productId, rows] of Object.entries(grouped)) {
             let product = null;
+
             try {
                 product = await getProductDetails(productId);
             } catch (e) {}
+
             const varieties = getProductVarieties(product);
+
             groupedSelections[Number(productId)] = {
                 product: {
                     id: Number(productId),
@@ -2028,6 +2363,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 items: rows.map(row => {
                     const vid = Number(row.variety_id || row.variant_id || 0);
                     const v = varieties.find(item => variantId(item) === vid);
+
                     return {
                         variant_id: vid,
                         quantity: Number(row.quantity || 0),
@@ -2040,6 +2376,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 }).filter(item => item.variant_id && item.quantity > 0)
             };
         }
+
         renderGroupSummary();
         updateTotal();
     }
@@ -2047,12 +2384,16 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     function updateSubmitState() {
         const btn = document.getElementById('submitOrderBtn');
         const hint = document.getElementById('submitHint');
+
         const customerName = normalize(document.getElementById('customer_name')?.value);
         const customerMobile = normalize(document.getElementById('customer_mobile')?.value);
         const hasProducts = document.querySelectorAll('#groupProductsInputs input[name$="[quantity]"]').length > 0;
         const shippingId = normalize(document.getElementById('shipping_id')?.value);
+
         const ok = !!customerName && !!customerMobile && hasProducts && !!shippingId;
+
         btn.disabled = !ok;
+
         if (ok) {
             hint.textContent = 'آماده ثبت.';
             hint.style.color = '#178c63';
@@ -2064,158 +2405,225 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
     async function validateSelectedStockBeforeSubmit() {
         const errors = [];
+
         for (const group of Object.values(groupedSelections)) {
             const product = await getProductDetails(group.product.id, true);
             const varieties = getProductVarieties(product);
+
             for (const item of group.items) {
                 const v = varieties.find(row => Number(variantId(row)) === Number(item.variant_id));
+
                 if (!v) {
                     errors.push(`${group.product.title}: تنوع ${item.variant_id} پیدا نشد.`);
                     continue;
                 }
+
                 const stock = variantStock(v);
                 const requested = Number(item.quantity || 0);
-                if (requested > stock) errors.push(`${group.product.title} / ${buildVariantTitle(v)}: موجودی ${stock} عدد، درخواست ${requested} عدد.`);
+
+                if (requested > stock) {
+                    errors.push(`${group.product.title} / ${buildVariantTitle(v)}: موجودی ${stock} عدد، درخواست ${requested} عدد.`);
+                }
             }
         }
+
         if (errors.length) {
             alert('موجودی تغییر کرده:\n\n' + errors.slice(0, 8).join('\n'));
             return false;
         }
+
         return true;
     }
 
     function normalizeBeforeSubmit() {
         const totalEl = document.getElementById('total_price');
         if (totalEl) totalEl.value = String(toInt(totalEl.value));
+
         const shipEl = document.getElementById('shipping_price');
         if (shipEl) shipEl.value = String(toInt(shipEl.value));
+
         const discEl = document.getElementById('discount');
         if (discEl) discEl.value = String(toInt(discEl.value));
+
         document.querySelectorAll('#groupProductsInputs input').forEach(input => {
             input.value = String(toInt(input.value));
         });
     }
+
     async function submitGuard(e) {
         if (isSubmittingProgrammatically) return true;
+
         e.preventDefault();
+
         const customerName = normalize(document.getElementById('customer_name').value);
         const customerMobile = normalize(document.getElementById('customer_mobile').value);
         const productInputs = document.querySelectorAll('#groupProductsInputs input[name$="[quantity]"]');
+
         if (!customerName || !customerMobile) {
             alert('لطفا مشتری را انتخاب کنید.');
             return false;
         }
+
         if (!document.getElementById('shipping_id').value) {
             alert('روش ارسال را انتخاب کنید.');
             return false;
         }
+
         if (!productInputs.length) {
             alert('حداقل یک کالا باید اضافه شود.');
             return false;
         }
+
         const btn = document.getElementById('submitOrderBtn');
         const oldText = btn.textContent;
+
         btn.disabled = true;
         btn.textContent = 'کنترل موجودی...';
+
         const stockOk = await validateSelectedStockBeforeSubmit();
+
         if (!stockOk) {
             btn.disabled = false;
             btn.textContent = oldText;
             return false;
         }
+
         normalizeBeforeSubmit();
+
         btn.textContent = 'در حال ثبت...';
         isSubmittingProgrammatically = true;
+
         document.getElementById('orderForm').submit();
+
         return true;
     }
 
-    document.addEventListener('DOMContentLoaded', async function() {
+    document.addEventListener('DOMContentLoaded', async function () {
         initSelect2Basic(document.getElementById('province_id'), 'انتخاب استان...');
         initSelect2Basic(document.getElementById('city_id'), 'انتخاب شهر...');
+
         await loadArea();
         fillProvincesSelect();
+
         if (OLD_PROVINCE_ID) {
-            document.getElementById('province_id').value = String(OLD_PROVINCE_ID);
-            if (window.jQuery) $('#province_id').trigger('change.select2');
+            setSelectValue('province_id', OLD_PROVINCE_ID);
             fillCitiesByProvinceId(OLD_PROVINCE_ID);
         }
+
         if (OLD_CITY_ID) {
-            document.getElementById('city_id').value = String(OLD_CITY_ID);
-            if (window.jQuery) $('#city_id').trigger('change.select2');
+            setSelectValue('city_id', OLD_CITY_ID);
         }
+
         fillShippingSelect();
-        if (OLD_SHIPPING_ID) document.getElementById('shipping_id').value = String(OLD_SHIPPING_ID);
+
+        if (OLD_SHIPPING_ID) {
+            document.getElementById('shipping_id').value = String(OLD_SHIPPING_ID);
+        }
+
         initCustomerSearch();
         await loadOldCustomer();
-        renderRecentProducts();
 
         document.getElementById('clearCustomerBtn')?.addEventListener('click', clearCustomer);
-        document.getElementById('province_id')?.addEventListener('change', function() {
+
+        document.getElementById('province_id')?.addEventListener('change', function () {
             fillCitiesByProvinceId(this.value);
         });
+
         document.getElementById('shipping_id')?.addEventListener('change', updateShippingMode);
+
         document.getElementById('orderDiscountType')?.addEventListener('change', updateTotal);
         document.getElementById('orderDiscountValue')?.addEventListener('input', updateTotal);
+
         document.getElementById('modalGroupDiscountType')?.addEventListener('change', updateModalSummary);
         document.getElementById('modalGroupDiscountValue')?.addEventListener('input', updateModalSummary);
 
-        document.getElementById('motherCodeInput')?.addEventListener('input', function() {
+        document.getElementById('motherCodeInput')?.addEventListener('input', function () {
             this.value = toEnglishDigits(this.value).replace(/\D/g, '').slice(0, 4);
+
             clearTimeout(motherAutoTimer);
+
             const code = this.value;
+
             if (code.length === 4 && code !== lastMotherAutoCode) {
                 lastMotherAutoCode = code;
                 motherAutoTimer = setTimeout(() => findMotherProductByCode(true), 350);
             }
         });
-        document.getElementById('motherCodeInput')?.addEventListener('keydown', function(e) {
+
+        document.getElementById('motherCodeInput')?.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 lastMotherAutoCode = '';
                 findMotherProductByCode(true);
             }
         });
-        document.getElementById('findMotherBtn')?.addEventListener('click', function() {
+
+        document.getElementById('findMotherBtn')?.addEventListener('click', function () {
             lastMotherAutoCode = '';
             findMotherProductByCode(true);
         });
+
         document.getElementById('openGroupPickerBtn')?.addEventListener('click', () => openGroupPicker());
+
         document.getElementById('pickerSearchInput')?.addEventListener('input', renderPickerRows);
 
         document.getElementById('clearPickerQtyBtn')?.addEventListener('click', clearPickerQuantities);
         document.getElementById('saveGroupSelectionBtn')?.addEventListener('click', saveGroupSelection);
 
-        document.getElementById('groupPickerRows')?.addEventListener('click', function(e) {
-            const plus = e.target.closest('.picker-plus');
-            const minus = e.target.closest('.picker-minus');
+        document.getElementById('groupPickerRows')?.addEventListener('click', function (e) {
+            const deltaBtn = e.target.closest('.picker-delta');
             const input = e.target.closest('.picker-qty');
-            if (plus) {
+
+            if (deltaBtn) {
+                e.preventDefault();
                 e.stopPropagation();
-                changeModalQty(plus.dataset.id, Number(plus.dataset.step || 1));
+                changeModalQty(deltaBtn.dataset.id, Number(deltaBtn.dataset.delta || 0));
                 return;
             }
-            if (minus) {
-                e.stopPropagation();
-                changeModalQty(minus.dataset.id, -1);
-                return;
-            }
+
             if (input) {
                 e.stopPropagation();
-                return;
             }
         });
-        document.getElementById('groupPickerRows')?.addEventListener('input', function(e) {
-            if (e.target.classList.contains('picker-qty')) setModalQty(e.target.dataset.id, e.target.value);
-        });
-        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, {
-            capture: true
+
+        document.getElementById('groupPickerRows')?.addEventListener('input', function (e) {
+            if (e.target.classList.contains('picker-qty')) {
+                const cleaned = toEnglishDigits(e.target.value).replace(/[^\d]/g, '');
+                e.target.value = cleaned;
+                setModalQty(e.target.dataset.id, cleaned, false);
+            }
         });
 
+        document.getElementById('groupPickerRows')?.addEventListener('focusout', function (e) {
+            if (e.target.classList.contains('picker-qty')) {
+                const id = e.target.dataset.id;
+                const qty = normalizeQtyForVariant(id, e.target.value);
+                e.target.value = String(qty);
+                setModalQty(id, qty, false);
+            }
+        });
+
+        document.getElementById('groupPickerRows')?.addEventListener('keydown', function (e) {
+            if (!e.target.classList.contains('picker-qty')) return;
+
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                changeModalQty(e.target.dataset.id, 1);
+            }
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                changeModalQty(e.target.dataset.id, -1);
+            }
+        });
+
+        document.getElementById('orderForm')?.addEventListener('submit', submitGuard, { capture: true });
+
         await hydrateInitialGroups();
+
         updateShippingMode();
         updateSubmitState();
+
         setTimeout(() => document.getElementById('motherCodeInput')?.focus(), 200);
     });
 </script>
