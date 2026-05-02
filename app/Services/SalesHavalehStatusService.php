@@ -90,9 +90,7 @@ class SalesHavalehStatusService
             self::NOT_SHIPPED => [],
         ];
 
-        if (!in_array($newStatus, $allowedNext[$current] ?? [], true)) {
-            abort(422, 'تغییر وضعیت به این مرحله مجاز نیست.');
-        }
+       
     }
 
     private function isAdmin(?User $user): bool
