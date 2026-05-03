@@ -25,6 +25,13 @@
     $oldCategoryId   = old('category_id', $product->category_id);
     $oldModelIds     = array_map('intval', old('model_list_ids', $product->variants->pluck('model_list_id')->filter()->unique()->values()->all()));
     $oldDesignNotes  = array_values(old('design_notes', $product->variants->pluck('variety_name')->filter(fn($name)=>$name && $name !== '—')->unique()->values()->all()));
+
+    $hasModels = count($oldModelIds) > 0;
+    $hasDesigns = count($oldDesignNotes) > 0;
+    $defaultBrandGroup = old('model_brand_group');
+    if (!$defaultBrandGroup && $hasModels) {
+        $defaultBrandGroup = optional($modelLists->firstWhere('id', $oldModelIds[0] ?? null))->brand;
+    }
 @endphp
 
 <style>
@@ -485,7 +492,7 @@
                                     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                                         <div>
                                             <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" value="1" id="useModels" name="use_models" @checked(old('use_models'))>
+                                                <input class="form-check-input" type="checkbox" value="1" id="useModels" name="use_models" @checked(old('use_models', $hasModels ? 1 : 0))>
                                                 <label class="form-check-label fw-bold" for="useModels">این کالا مدل‌لیست دارد</label>
                                             </div>
                                             <div class="muted mt-2">
@@ -506,7 +513,7 @@
                                                 <select name="model_brand_group" id="modelBrandGroup" class="form-select">
                                                     <option value="">انتخاب برند...</option>
                                                     @foreach($brandGroups as $brand)
-                                                        <option value="{{ $brand }}" @selected(old('model_brand_group') == $brand)>{{ $brand }}</option>
+                                                        <option value="{{ $brand }}" @selected($defaultBrandGroup == $brand)>{{ $brand }}</option>
                                                     @endforeach
                                                 </select>
                                                 <div class="form-text">اول برند را انتخاب کن، بعد مدل‌های همان برند را تیک بزن.</div>
@@ -550,7 +557,7 @@
                             <div class="col-lg-5">
                                 <div class="helper-box">
                                     <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" value="1" id="useDesigns" name="use_designs" @checked(old('use_designs'))>
+                                        <input class="form-check-input" type="checkbox" value="1" id="useDesigns" name="use_designs" @checked(old('use_designs', $hasDesigns ? 1 : 0))>
                                         <label class="form-check-label fw-bold" for="useDesigns">این کالا طرح‌بندی دارد</label>
                                     </div>
 
