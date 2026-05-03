@@ -47,9 +47,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Products + categories
-    Route::resource('products', ProductController::class)->except(['show']);
+    Route::resource('products', ProductController::class)->except(['show', 'destroy']);
+    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('role:admin|Admin')->name('products.destroy');
     Route::get('/products/{product}/sales-ledger', [ProductSalesLedgerController::class, 'index'])->name('products.sales-ledger');
-    Route::resource('categories', CategoryController::class)->except(['show']);
+    Route::resource('categories', CategoryController::class)->except(['show', 'destroy']);
+    Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('role:admin|Admin')->name('categories.destroy');
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
 
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
@@ -68,7 +70,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/model-lists', [ModelListController::class, 'index'])->name('model-lists.index');
     Route::post('/model-lists', [ModelListController::class, 'store'])->name('model-lists.store');
     Route::put('/model-lists/{modelList}', [ModelListController::class, 'update'])->name('model-lists.update');
-    Route::delete('/model-lists/{modelList}', [ModelListController::class, 'destroy'])->name('model-lists.destroy');
+    Route::delete('/model-lists/{modelList}', [ModelListController::class, 'destroy'])->middleware('role:admin|Admin')->name('model-lists.destroy');
 
     Route::post('/model-lists/assign-codes', [ModelListController::class, 'assignCodes'])->name('model-lists.assign-codes');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
@@ -82,7 +84,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/shipping-methods/{shippingMethod}', [ShippingMethodController::class, 'destroy'])->name('shipping-methods.destroy');
 
     // Quick category store
-    Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
+    Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->middleware('role:admin|Admin')->name('categories.quickStore');
 
     // Stock movements
     Route::get('/products/{product}/movements/create', [StockMovementController::class, 'create'])->name('movements.create');
@@ -178,8 +180,8 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
 
     // Persons
-    Route::get('/persons', [PersonController::class, 'index'])->name('persons.index');
-    Route::post('/persons', [PersonController::class, 'store'])->name('persons.store');
+    Route::get('/persons', [PersonController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.index');
+    Route::post('/persons', [PersonController::class, 'store'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.store');
 
     // Suppliers
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
@@ -205,11 +207,11 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseReview'])->name('preinvoice.warehouse.review');
     Route::put('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseSave'])->name('preinvoice.warehouse.save');
     Route::post('/preinvoice/warehouse/{uuid}/approve', [PreinvoiceController::class, 'warehouseApprove'])->name('preinvoice.warehouse.approve');
-    Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->name('preinvoice.draft.index');
-    Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->name('preinvoice.draft.edit');
-    Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->name('preinvoice.draft.update');
-    Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->name('preinvoice.draft.finance');
-    Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->name('preinvoice.draft.finalize');
+    Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.index');
+    Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.edit');
+    Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.update');
+    Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finance');
+    Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finalize');
 
     // Preinvoice APIs
     Route::prefix('preinvoice/api')->group(function () {
@@ -242,12 +244,12 @@ Route::post('/customers/import', [CustomerController::class, 'import'])->name('c
     });
 
     // Account statements (گردش حساب اشخاص)
-    Route::get('/account-statements', [AccountStatementController::class, 'index'])->name('account-statements.index');
-    Route::post('/account-statements/{customer}/payments', [InvoicePaymentController::class, 'storeForCustomer'])->name('account-statements.payments.store');
-    Route::get('/account-statements/documents/invoices/{uuid}', [AccountStatementController::class, 'showInvoice'])->name('account-statements.documents.invoices.show');
-    Route::get('/account-statements/documents/returns/{voucher}', [AccountStatementController::class, 'showReturnFromSale'])->name('account-statements.documents.returns.show');
-    Route::get('/account-statements/documents/payments/{payment}', [AccountStatementController::class, 'showPayment'])->name('account-statements.documents.payments.show');
-    Route::get('/account-statements/{customer}', [AccountStatementController::class, 'show'])->name('account-statements.show');
+    Route::get('/account-statements', [AccountStatementController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.index');
+    Route::post('/account-statements/{customer}/payments', [InvoicePaymentController::class, 'storeForCustomer'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.payments.store');
+    Route::get('/account-statements/documents/invoices/{uuid}', [AccountStatementController::class, 'showInvoice'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.invoices.show');
+    Route::get('/account-statements/documents/returns/{voucher}', [AccountStatementController::class, 'showReturnFromSale'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.returns.show');
+    Route::get('/account-statements/documents/payments/{payment}', [AccountStatementController::class, 'showPayment'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.payments.show');
+    Route::get('/account-statements/{customer}', [AccountStatementController::class, 'show'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.show');
 
     // Activity logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');

@@ -263,7 +263,9 @@
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
                     <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
-                    <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
+                    @if($hasRole(['admin', 'Admin', 'finance', 'Accountant']))
+                        <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
+                    @endif
                 </div>
             </div>
         </div>
