@@ -32,6 +32,20 @@
     if (!$defaultBrandGroup && $hasModels) {
         $defaultBrandGroup = optional($modelLists->firstWhere('id', $oldModelIds[0] ?? null))->brand;
     }
+
+    $existingVariants = $product->variants->map(function ($v) {
+        return [
+            'id' => (int) $v->id,
+            'model_list_id' => $v->model_list_id ? (int) $v->model_list_id : null,
+            'variant_name' => (string) $v->variant_name,
+            'variety_name' => (string) $v->variety_name,
+            'variety_code' => (string) $v->variety_code,
+            'sell_price' => (int) $v->sell_price,
+            'buy_price' => $v->buy_price !== null ? (int) $v->buy_price : null,
+            'stock' => (int) $v->stock,
+            'is_active' => (bool) $v->is_active,
+        ];
+    })->values();
 @endphp
 
 <style>
@@ -371,6 +385,7 @@
 
             {{-- hidden inputs برای model_list_ids - اینجا توسط JS مدیریت می‌شن --}}
             <div id="modelHiddenInputsContainer"></div>
+            <div id="variantsHiddenInputsContainer"></div>
 
             {{-- اطلاعات پایه --}}
             <div class="col-12">
@@ -678,6 +693,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var modelQuickFeedbackEl = document.getElementById('modelQuickFeedback');
 
     var modelHiddenInputsContainer = document.getElementById('modelHiddenInputsContainer');
+    var variantsHiddenInputsContainer = document.getElementById('variantsHiddenInputsContainer');
+    var existingVariants = @json($existingVariants);
 
     // مجموعه آیدی‌های انتخاب‌شده - منبع اصلی داده
     var selectedModelIds = new Set(oldModelIds.map(function (x) { return parseInt(x, 10); }));
