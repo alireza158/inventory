@@ -312,7 +312,10 @@ class ProductController extends Controller
             ->orderBy('model_name')
             ->get(['id', 'brand', 'model_name', 'code']);
 
-        return view('products.edit', compact('product', 'categories', 'modelListOptions'));
+        $modelLists = $modelListOptions;
+        $previewSeq4 = $product->short_barcode ?: substr((string) $product->code, 2, 4);
+
+        return view('products.edit', compact('product', 'categories', 'modelListOptions', 'modelLists', 'previewSeq4'));
     }
 
     public function update(Request $request, Product $product)
