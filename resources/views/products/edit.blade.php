@@ -24,8 +24,31 @@
 
     $oldCategoryId   = old('category_id', $product->category_id);
     $oldModelIds     = array_map('intval', old('model_list_ids', $product->variants->pluck('model_list_id')->filter()->unique()->values()->all()));
-    $oldDesignNotes  = array_values(old('design_notes', $product->variants->pluck('variety_name')->filter(fn($name)=>$name && $name !== '—')->unique()->values()->all()));
+    $oldDesignNotes = old('design_notes');
 
+if ($oldDesignNotes === null) {
+    $oldDesignNotes = $product->variants
+        ->pluck('variety_name')
+        ->filter(fn ($name) => $name && $name !== '—')
+        ->unique()
+        ->values()
+        ->map(function ($name) {
+            $name = (string) $name;
+
+            if (preg_match('/^طرح\s+\d+\s*\((.*)\)$/u', $name, $m)) {
+                return $m[1];
+            }
+
+            if (preg_match('/^طرح\s+\d+$/u', $name)) {
+                return '';
+            }
+
+            return $name;
+        })
+        ->all();
+} else {
+    $oldDesignNotes = array_values($oldDesignNotes);
+}
     $hasModels = count($oldModelIds) > 0;
     $hasDesigns = count($oldDesignNotes) > 0;
     $defaultBrandGroup = old('model_brand_group');
@@ -1334,8 +1357,27 @@ function findExistingVariant(modelListId, varietyCode) {
     }) || null;
 }
 
-function makeDesignTitle(i, note) {
+function normalizeDesignNote(note, i) {
     note = String(note || '').trim();
+
+    var fullPattern = new RegExp('^طرح\\s+' + i + '\\s*\\((.*)\\)$', 'u');
+    var match = note.match(fullPattern);
+
+    if (match) {
+        return String(match[1] || '').trim();
+    }
+
+    var plainPattern = new RegExp('^طرح\\s+' + i + '$', 'u');
+
+    if (plainPattern.test(note)) {
+        return '';
+    }
+
+    return note;
+}
+
+function makeDesignTitle(i, note) {
+    note = normalizeDesignNote(note, i);
     return note !== '' ? ('طرح ' + i + ' (' + note + ')') : ('طرح ' + i);
 }
 
