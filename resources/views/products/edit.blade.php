@@ -1314,9 +1314,129 @@ document.addEventListener('DOMContentLoaded', function () {
             submitModelQuickAddEl.disabled = false;
         }
     }
+function appendVariantHidden(index, name, value) {
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'variants[' + index + '][' + name + ']';
+    input.value = value === null || value === undefined ? '' : String(value);
+    variantsHiddenInputsContainer.appendChild(input);
+}
 
+function findExistingVariant(modelListId, varietyCode) {
+    var targetModelId = modelListId ? parseInt(modelListId, 10) : null;
+    var targetDesign2 = String(varietyCode || '0000').slice(-2);
+
+    return existingVariants.find(function (v) {
+        var vModelId = v.model_list_id ? parseInt(v.model_list_id, 10) : null;
+        var vDesign2 = String(v.variety_code || '0000').slice(-2);
+
+        return vModelId === targetModelId && vDesign2 === targetDesign2;
+    }) || null;
+}
+
+function makeDesignTitle(i, note) {
+    note = String(note || '').trim();
+    return note !== '' ? ('طرح ' + i + ' (' + note + ')') : ('طرح ' + i);
+}
+
+function syncHiddenVariantInputs() {
+    variantsHiddenInputsContainer.innerHTML = '';
+
+    var productNameInput = document.querySelector('input[name="name"]');
+    var productName = productNameInput ? String(productNameInput.value || '').trim() : '';
+
+    var modelsOn = useModelsEl.checked;
+    var designsOn = useDesignsEl.checked;
+
+    var models = modelsOn ? selectedModelsData() : [null];
+
+    if (modelsOn && models.length === 0) {
+        return false;
+    }
+
+    var designNotes = currentDesignNotesValues();
+    var designs = [];
+
+    if (designsOn) {
+        var count = getDesignCount();
+
+        for (var i = 1; i <= count; i++) {
+            var title = makeDesignTitle(i, designNotes[i - 1] || '');
+
+            designs.push({
+                index: i,
+                title: title,
+                variety_name: title,
+                variety_code: padLeft(i, 4, '0')
+            });
+        }
+    } else {
+        designs.push({
+            index: 0,
+            title: '',
+            variety_name: '—',
+            variety_code: '0000'
+        });
+    }
+
+    var rowIndex = 0;
+
+    models.forEach(function (model) {
+        designs.forEach(function (design) {
+            var modelListId = model ? parseInt(model.id, 10) : null;
+            var existing = findExistingVariant(modelListId, design.variety_code);
+
+            var variantName = productName;
+
+            if (model && designsOn) {
+                variantName = productName + ' ' + model.model_name + ' ' + design.title;
+            } else if (model && !designsOn) {
+                variantName = productName + ' ' + model.model_name;
+            } else if (!model && designsOn) {
+                variantName = productName + ' ' + design.title;
+            }
+
+            if (existing && existing.id) {
+                appendVariantHidden(rowIndex, 'id', existing.id);
+            }
+
+            appendVariantHidden(rowIndex, 'variant_name', variantName);
+            appendVariantHidden(rowIndex, 'model_list_id', modelListId);
+            appendVariantHidden(rowIndex, 'variety_name', design.variety_name);
+            appendVariantHidden(rowIndex, 'variety_code', design.variety_code);
+
+            appendVariantHidden(rowIndex, 'sell_price', existing ? existing.sell_price : 0);
+            appendVariantHidden(rowIndex, 'buy_price', existing && existing.buy_price !== null ? existing.buy_price : '');
+            appendVariantHidden(rowIndex, 'stock', existing ? existing.stock : 0);
+            appendVariantHidden(rowIndex, 'is_active', existing ? (existing.is_active ? 1 : 0) : 1);
+
+            rowIndex++;
+        });
+    });
+
+    return rowIndex > 0;
+}
     // ─── رویدادها ─────────────────────────────────────────────────
+document.getElementById('productEditForm').addEventListener('submit', function (e) {
+    if (!categoryIdEl.value) {
+        e.preventDefault();
+        alert('لطفاً دسته‌بندی کالا را انتخاب کنید.');
+        return;
+    }
 
+    if (useModelsEl.checked && selectedModelIds.size === 0) {
+        e.preventDefault();
+        alert('برای مدل‌لیست، حداقل یک مدل انتخاب کنید.');
+        return;
+    }
+
+    var ok = syncHiddenVariantInputs();
+
+    if (!ok) {
+        e.preventDefault();
+        alert('هیچ تنوعی برای ارسال ساخته نشد.');
+    }
+});
     modelPickerButton.addEventListener('click', function () {
         if (modelBrandGroupEl.disabled) return;
 
