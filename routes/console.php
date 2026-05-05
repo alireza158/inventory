@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\DB;
 use App\Models\PreinvoiceOrder;
 use App\Models\ProductVariant;
+use App\Models\Product;
+use App\Services\WarehouseStockService;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -32,6 +34,12 @@ Artisan::command('preinvoice:release-expired-freezes', function () {
                 if ($variant) {
                     $variant->reserved = max(0, (int) $variant->reserved - (int) $item->quantity);
                     $variant->save();
+                }
+
+                WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $item->product_id, (int) $item->quantity);
+                $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
+                if ($product) {
+                    $product->update(['stock' => ((int) $product->stock) + ((int) $item->quantity)]);
                 }
             }
 

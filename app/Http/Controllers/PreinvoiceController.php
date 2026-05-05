@@ -146,6 +146,26 @@ class PreinvoiceController extends Controller
             ->with('success', '✅ تایید انبار انجام شد و پیش‌فاکتور به صف مالی ارسال شد.');
     }
 
+    public function warehouseReject(string $uuid, Request $request)
+    {
+        abort_unless($this->canHandleWarehouseActions(), 403);
+        $order = PreinvoiceOrder::query()->where('uuid', $uuid)->firstOrFail();
+        abort_if($order->status !== PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE, 403);
+
+        $data = $request->validate([
+            'warehouse_reject_reason' => 'required|string|max:2000',
+        ]);
+
+        $order->update([
+            'status' => PreinvoiceOrder::STATUS_WAREHOUSE_REJECTED,
+            'warehouse_reject_reason' => $data['warehouse_reject_reason'],
+            'warehouse_reviewed_by' => auth()->id(),
+            'warehouse_reviewed_at' => now(),
+        ]);
+
+        return redirect()->route('preinvoice.warehouse.index')->with('success', '✅ پیش‌فاکتور رد شد.');
+    }
+
     public function draftIndex()
     {
         $orders = PreinvoiceOrder::query()
@@ -591,6 +611,13 @@ class PreinvoiceController extends Controller
 
             $variant->reserved = max(0, (int) $variant->reserved) + (int) $item->quantity;
             $variant->save();
+
+            WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $item->product_id, -((int) $item->quantity));
+
+            $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
+            if ($product) {
+                $product->update(['stock' => ((int) $product->stock) - ((int) $item->quantity)]);
+            }
         }
     }
 
@@ -702,6 +729,8 @@ class PreinvoiceController extends Controller
             }
             $order = $lockedOrder;
 
+            $shouldDeductOnFinalize = !($order->stock_frozen_until && is_null($order->stock_released_at));
+
             foreach ($order->items as $it) {
                 $variant = ProductVariant::query()->whereKey((int) $it->variant_id)->lockForUpdate()->first();
                 if ($variant) {
@@ -767,25 +796,27 @@ class PreinvoiceController extends Controller
                     'line_total' => (int) $it->price * (int) $it->quantity,
                 ]);
 
-                WarehouseStockService::change($centralWarehouseId, (int) $it->product_id, - ((int) $it->quantity));
+                if ($shouldDeductOnFinalize) {
+                    WarehouseStockService::change($centralWarehouseId, (int) $it->product_id, - ((int) $it->quantity));
 
-                $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
-                if ($product) {
-                    $before = (int) $product->stock;
-                    $after = $before - (int) $it->quantity;
-                    $product->update(['stock' => $after]);
+                    $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
+                    if ($product) {
+                        $before = (int) $product->stock;
+                        $after = $before - (int) $it->quantity;
+                        $product->update(['stock' => $after]);
 
-                    StockMovement::create([
-                        'product_id' => $product->id,
-                        'user_id' => auth()->id(),
-                        'type' => 'out',
-                        'reason' => 'sale',
-                        'quantity' => (int) $it->quantity,
-                        'stock_before' => $before,
-                        'stock_after' => $after,
-                        'reference' => $invoice->uuid,
-                        'note' => 'خروج بابت حواله فروش',
-                    ]);
+                        StockMovement::create([
+                            'product_id' => $product->id,
+                            'user_id' => auth()->id(),
+                            'type' => 'out',
+                            'reason' => 'sale',
+                            'quantity' => (int) $it->quantity,
+                            'stock_before' => $before,
+                            'stock_after' => $after,
+                            'reference' => $invoice->uuid,
+                            'note' => 'خروج بابت حواله فروش',
+                        ]);
+                    }
                 }
             }
 
