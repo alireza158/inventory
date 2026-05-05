@@ -26,7 +26,6 @@
         <label class="form-label">تغییر وضعیت حواله</label>
         <select name="status" class="form-select">
           @foreach($statusLabels as $key => $label)
-            @continue(!in_array($key, $allowedStatuses ?? [], true))
             <option value="{{ $key }}" @selected($invoice->status===$key)>{{ $label }}</option>
           @endforeach
         </select>

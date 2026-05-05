@@ -102,9 +102,8 @@ class InvoiceController extends Controller
 
         $statusLabels = $this->statusService->labels();
         $canEditItems = $this->statusService->isEditable($invoice, auth()->user());
-        $allowedStatuses = $this->statusService->allowedTransitions($invoice, auth()->user());
 
-        return view('vouchers.sales.edit', compact('invoice', 'statusLabels', 'canEditItems', 'allowedStatuses'));
+        return view('vouchers.sales.edit', compact('invoice', 'statusLabels', 'canEditItems'));
     }
 
     public function salesVoucherUpdate(string $uuid, Request $request)
