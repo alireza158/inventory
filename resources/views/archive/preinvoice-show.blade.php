@@ -621,38 +621,61 @@
         </div>
 
         <div class="panel-body history-box">
-          @forelse($order->reviews as $r)
-            @if($loop->first)
-              <ul class="side-list">
-            @endif
+          @if($order->activityLogs->isNotEmpty())
+            <ul class="side-list">
+              @foreach($order->activityLogs as $log)
+                <li>
+                  <div class="list-date">
+                    {{ $dateFa($log->occurred_at ?? $log->created_at) }}
+                    |
+                    {{ $log->user?->name ?? 'سیستم' }}
+                    |
+                    {{ $log->action ?? '---' }}
+                  </div>
 
-              <li>
-                <div class="list-date">
-                  {{ $dateFa($r->created_at) }}
-                  |
-                  {{ $r->user?->name ?? '---' }}
-                </div>
+                  <div class="list-body">
+                    <strong>{{ $log->description ?? '---' }}</strong>
 
-                <div class="list-body">
-                  عملیات:
-                  <strong>{{ $r->action ?? '---' }}</strong>
+                    @if(!empty($log->properties))
+                      <div class="mt-2">
+                        @foreach($log->properties as $key => $value)
+                          <div>
+                            • {{ $key }}:
+                            <strong>{{ is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE) : ($value === null ? 'null' : $value) }}</strong>
+                          </div>
+                        @endforeach
+                      </div>
+                    @endif
+                  </div>
+                </li>
+              @endforeach
+            </ul>
+          @endif
 
-                  @if($r->reason)
-                    <br>
-                    دلیل:
-                    {{ $r->reason }}
-                  @endif
-                </div>
-              </li>
+          @if($order->reviews->isNotEmpty())
+            <div class="mt-3 fw-bold">تاریخچه بازبینی انبار/مالی</div>
+            <ul class="side-list mt-2">
+              @foreach($order->reviews as $r)
+                <li>
+                  <div class="list-date">
+                    {{ $dateFa($r->created_at) }}
+                    |
+                    {{ $r->user?->name ?? '---' }}
+                  </div>
+                  <div class="list-body">
+                    عملیات: <strong>{{ $r->action ?? '---' }}</strong>
+                    @if($r->reason)
+                      <br>دلیل: {{ $r->reason }}
+                    @endif
+                  </div>
+                </li>
+              @endforeach
+            </ul>
+          @endif
 
-            @if($loop->last)
-              </ul>
-            @endif
-          @empty
-            <div class="empty-box">
-              لاگی ثبت نشده است.
-            </div>
-          @endforelse
+          @if($order->activityLogs->isEmpty() && $order->reviews->isEmpty())
+            <div class="empty-box">لاگی ثبت نشده است.</div>
+          @endif
         </div>
       </div>
 
