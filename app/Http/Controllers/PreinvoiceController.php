@@ -206,6 +206,44 @@ class PreinvoiceController extends Controller
         return view('preinvoice.all-index', compact('orders', 'status', 'statusLabels'));
     }
 
+
+    public function myIndex(Request $request)
+    {
+        abort_unless(auth()->check(), 403);
+
+        $status = (string) $request->query('status', '');
+        $query = PreinvoiceOrder::query()
+            ->where('created_by', auth()->id())
+            ->withCount('items');
+
+        if ($status !== '') {
+            $query->where('status', $status);
+        }
+
+        $orders = $query->orderByDesc('id')->paginate(20)->withQueryString();
+        $statusLabels = PreinvoiceOrder::statusLabels();
+
+        return view('preinvoice.my-index', compact('orders', 'status', 'statusLabels'));
+    }
+
+    public function myShow(string $uuid)
+    {
+        abort_unless(auth()->check(), 403);
+
+        $order = PreinvoiceOrder::query()
+            ->with([
+                'items.product:id,name',
+                'items.variant:id,variant_name',
+                'creator:id,name',
+                'warehouseReviewer:id,name',
+                'reviews.user:id,name',
+            ])
+            ->where('uuid', $uuid)
+            ->where('created_by', auth()->id())
+            ->firstOrFail();
+
+        return view('archive.preinvoice-show', compact('order'));
+    }
     public function saveDraft(Request $request)
     {
         abort_unless(auth()->check(), 403);
