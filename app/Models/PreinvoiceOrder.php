@@ -34,6 +34,8 @@ class PreinvoiceOrder extends Model
         'warehouse_reject_reason',
         'warehouse_reviewed_by',
         'warehouse_reviewed_at',
+        'stock_frozen_until',
+        'stock_released_at',
     ];
 
     protected $casts = [
@@ -46,6 +48,8 @@ class PreinvoiceOrder extends Model
         'total_price' => 'integer',
         'warehouse_reviewed_by' => 'integer',
         'warehouse_reviewed_at' => 'datetime',
+        'stock_frozen_until' => 'datetime',
+        'stock_released_at' => 'datetime',
     ];
 
     public function items()
