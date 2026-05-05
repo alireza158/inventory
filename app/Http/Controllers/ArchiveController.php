@@ -19,7 +19,9 @@ class ArchiveController extends Controller
                 'creator:id,name',
                 'warehouseReviewer:id,name',
                 'reviews.user:id,name',
+                'activityLogs.user:id,name',
             ])
+            ->where('status', '!=', PreinvoiceOrder::STATUS_FINANCE_APPROVED)
             ->orderByDesc('id')
             ->paginate(15, ['*'], 'preinvoice_page')
             ->withQueryString();
@@ -32,6 +34,7 @@ class ArchiveController extends Controller
                 'payments.cheque',
                 'notes.user:id,name',
                 'histories.actor:id,name',
+                'activityLogs.user:id,name',
             ])
             ->orderByDesc('id')
             ->paginate(15, ['*'], 'invoice_page')
@@ -49,6 +52,7 @@ class ArchiveController extends Controller
                 'creator:id,name',
                 'warehouseReviewer:id,name',
                 'reviews.user:id,name',
+                'activityLogs.user:id,name',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();
@@ -66,6 +70,7 @@ class ArchiveController extends Controller
                 'payments.cheque',
                 'notes.user:id,name',
                 'histories.actor:id,name',
+                'activityLogs.user:id,name',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();

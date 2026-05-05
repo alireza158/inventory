@@ -30,6 +30,7 @@
 
   $itemsCount = $order->items->sum('quantity');
   $itemsTotal = $order->items->sum(fn($it) => (int) $it->quantity * (int) $it->price);
+  $logLabels = ['attributes' => 'مقادیر ثبت‌شده', 'changes' => 'مقادیر جدید', 'old' => 'مقادیر قبلی', 'original' => 'مقادیر قبلی'];
 @endphp
 
 <style>
@@ -354,6 +355,13 @@
     line-height: 1.9;
   }
 
+  .audit-section { margin-top: 10px; border: 1px dashed var(--border); border-radius: 12px; padding: 10px 12px; background: #fff; }
+  .audit-section-title { font-size: .8rem; font-weight: 900; color: #334155; margin-bottom: 6px; }
+  .audit-row { display: flex; gap: 8px; font-size: .8rem; line-height: 1.8; border-top: 1px solid #f1f5f9; padding-top: 4px; margin-top: 4px; }
+  .audit-row:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+  .audit-key { min-width: 140px; color: var(--muted); font-weight: 800; word-break: break-word; }
+  .audit-value { color: #0f172a; word-break: break-word; white-space: pre-wrap; }
+
   .empty-box {
     padding: 22px 12px;
     text-align: center;
@@ -621,38 +629,70 @@
         </div>
 
         <div class="panel-body history-box">
-          @forelse($order->reviews as $r)
-            @if($loop->first)
-              <ul class="side-list">
-            @endif
+          @if($order->activityLogs->isNotEmpty())
+            <ul class="side-list">
+              @foreach($order->activityLogs as $log)
+                <li>
+                  <div class="list-date">
+                    {{ $dateFa($log->occurred_at ?? $log->created_at) }}
+                    |
+                    {{ $log->user?->name ?? 'سیستم' }}
+                    |
+                    {{ $log->action ?? '---' }}
+                  </div>
 
-              <li>
-                <div class="list-date">
-                  {{ $dateFa($r->created_at) }}
-                  |
-                  {{ $r->user?->name ?? '---' }}
-                </div>
+                  <div class="list-body">
+                    <strong>{{ $log->description ?? '---' }}</strong>
 
-                <div class="list-body">
-                  عملیات:
-                  <strong>{{ $r->action ?? '---' }}</strong>
+                    @php($properties = is_array($log->properties) ? $log->properties : [])
+                    @foreach($properties as $groupKey => $groupValue)
+                      <div class="audit-section">
+                        <div class="audit-section-title">{{ $logLabels[$groupKey] ?? $groupKey }}</div>
+                        @if(is_array($groupValue))
+                          @foreach($groupValue as $field => $fieldValue)
+                            <div class="audit-row">
+                              <div class="audit-key">{{ $field }}</div>
+                              <div class="audit-value">{{ is_array($fieldValue) ? json_encode($fieldValue, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : ($fieldValue === null ? '—' : $fieldValue) }}</div>
+                            </div>
+                          @endforeach
+                        @else
+                          <div class="audit-row">
+                            <div class="audit-key">{{ $groupKey }}</div>
+                            <div class="audit-value">{{ $groupValue === null ? '—' : $groupValue }}</div>
+                          </div>
+                        @endif
+                      </div>
+                    @endforeach
+                  </div>
+                </li>
+              @endforeach
+            </ul>
+          @endif
 
-                  @if($r->reason)
-                    <br>
-                    دلیل:
-                    {{ $r->reason }}
-                  @endif
-                </div>
-              </li>
+          @if($order->reviews->isNotEmpty())
+            <div class="mt-3 fw-bold">تاریخچه بازبینی انبار/مالی</div>
+            <ul class="side-list mt-2">
+              @foreach($order->reviews as $r)
+                <li>
+                  <div class="list-date">
+                    {{ $dateFa($r->created_at) }}
+                    |
+                    {{ $r->user?->name ?? '---' }}
+                  </div>
+                  <div class="list-body">
+                    عملیات: <strong>{{ $r->action ?? '---' }}</strong>
+                    @if($r->reason)
+                      <br>دلیل: {{ $r->reason }}
+                    @endif
+                  </div>
+                </li>
+              @endforeach
+            </ul>
+          @endif
 
-            @if($loop->last)
-              </ul>
-            @endif
-          @empty
-            <div class="empty-box">
-              لاگی ثبت نشده است.
-            </div>
-          @endforelse
+          @if($order->activityLogs->isEmpty() && $order->reviews->isEmpty())
+            <div class="empty-box">لاگی ثبت نشده است.</div>
+          @endif
         </div>
       </div>
 
