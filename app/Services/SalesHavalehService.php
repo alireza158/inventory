@@ -186,4 +186,34 @@ class SalesHavalehService
             return $invoice->fresh();
         });
     }
+
+    public function cancelAndRestore(Invoice $invoice, ?string $note = null, ?int $userId = null): Invoice
+    {
+        return DB::transaction(function () use ($invoice, $note, $userId) {
+            $invoice = Invoice::query()->with('items')->lockForUpdate()->findOrFail($invoice->id);
+            if ((string) $invoice->status === SalesHavalehStatusService::NOT_SHIPPED) {
+                return $invoice;
+            }
+
+            foreach ($invoice->items as $item) {
+                $this->inventoryService->adjustCentralStock(
+                    (int) $item->product_id,
+                    (int) $item->quantity,
+                    $invoice->uuid,
+                    'برگشت موجودی بابت کنسلی حواله فروش'
+                );
+            }
+
+            $oldStatus = (string) $invoice->status;
+            $invoice->update([
+                'status' => SalesHavalehStatusService::NOT_SHIPPED,
+                'status_changed_at' => now(),
+                'status_changed_by' => $userId,
+            ]);
+
+            $this->historyService->log($invoice, 'cancelled', 'status', $oldStatus, SalesHavalehStatusService::NOT_SHIPPED, $note ?: 'کنسلی فاکتور و برگشت موجودی', $userId);
+
+            return $invoice->fresh();
+        });
+    }
 }
