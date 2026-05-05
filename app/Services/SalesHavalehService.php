@@ -6,7 +6,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\PreinvoiceOrder;
 use App\Models\ProductVariant;
-use Illuminate\Support\Str;
+use App\Support\DocumentCodeGenerator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 
@@ -118,7 +118,7 @@ class SalesHavalehService
             $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
 
             $invoice = Invoice::query()->create([
-                'uuid' => (string) Str::uuid(),
+                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(Invoice::class),
                 'preinvoice_order_id' => $order->id,
                 'customer_id' => $order->customer_id,
                 'customer_name' => $order->customer_name,
