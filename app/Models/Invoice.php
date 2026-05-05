@@ -29,6 +29,7 @@ class Invoice extends Model
     public function customer() { return $this->belongsTo(Customer::class); }
     public function statusChangedByUser() { return $this->belongsTo(User::class, 'status_changed_by'); }
     public function histories() { return $this->hasMany(SalesHavalehHistory::class)->latest('done_at'); }
+    public function activityLogs() { return $this->morphMany(ActivityLog::class, 'subject')->latest('occurred_at'); }
 
     public function getPaidAmountAttribute(): int
     {

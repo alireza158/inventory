@@ -684,52 +684,55 @@
         </div>
 
         <div class="panel-body history-box">
-          @forelse($invoice->histories as $h)
-            @if($loop->first)
-              <ul class="side-list">
-            @endif
+          @if($invoice->activityLogs->isNotEmpty())
+            <ul class="side-list">
+              @foreach($invoice->activityLogs as $log)
+                <li>
+                  <div class="list-date">
+                    {{ $dateFa($log->occurred_at ?? $log->created_at) }}
+                    |
+                    {{ $log->user?->name ?? 'سیستم' }}
+                    |
+                    {{ $log->action ?? '---' }}
+                  </div>
+                  <div class="list-body">
+                    <strong>{{ $log->description ?? '---' }}</strong>
+                    @if(!empty($log->properties))
+                      <div class="mt-2">
+                        @foreach($log->properties as $key => $value)
+                          <div>
+                            • {{ $key }}:
+                            <strong>{{ is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE) : ($value === null ? 'null' : $value) }}</strong>
+                          </div>
+                        @endforeach
+                      </div>
+                    @endif
+                  </div>
+                </li>
+              @endforeach
+            </ul>
+          @endif
 
-              <li>
-                <div class="list-date">
-                  {{ $dateFa($h->done_at ?? $h->created_at) }}
-                  |
-                  {{ $h->actor?->name ?? '---' }}
-                </div>
+          @if($invoice->histories->isNotEmpty())
+            <div class="mt-3 fw-bold">تاریخچه وضعیت فاکتور</div>
+            <ul class="side-list mt-2">
+              @foreach($invoice->histories as $h)
+                <li>
+                  <div class="list-date">{{ $dateFa($h->done_at ?? $h->created_at) }} | {{ $h->actor?->name ?? '---' }}</div>
+                  <div class="list-body">
+                    <strong>{{ $h->action_type ?? '---' }}</strong>
+                    @if($h->field_name)<br>فیلد: <strong>{{ $h->field_name }}</strong>@endif
+                    @if($h->old_value || $h->new_value)<br>مقدار قبلی: {{ $h->old_value ?? '---' }} <span class="change-arrow">←</span> مقدار جدید: {{ $h->new_value ?? '---' }}@endif
+                    @if($h->description)<br>توضیح: {{ $h->description }}@endif
+                  </div>
+                </li>
+              @endforeach
+            </ul>
+          @endif
 
-                <div class="list-body">
-                  <strong>{{ $h->action_type ?? '---' }}</strong>
-
-                  @if($h->field_name)
-                    <br>
-                    فیلد:
-                    <strong>{{ $h->field_name }}</strong>
-                  @endif
-
-                  @if($h->old_value || $h->new_value)
-                    <br>
-                    مقدار قبلی:
-                    {{ $h->old_value ?? '---' }}
-                    <span class="change-arrow">←</span>
-                    مقدار جدید:
-                    {{ $h->new_value ?? '---' }}
-                  @endif
-
-                  @if($h->description)
-                    <br>
-                    توضیح:
-                    {{ $h->description }}
-                  @endif
-                </div>
-              </li>
-
-            @if($loop->last)
-              </ul>
-            @endif
-          @empty
-            <div class="empty-box">
-              لاگی وجود ندارد.
-            </div>
-          @endforelse
+          @if($invoice->activityLogs->isEmpty() && $invoice->histories->isEmpty())
+            <div class="empty-box">لاگی وجود ندارد.</div>
+          @endif
         </div>
       </div>
 
