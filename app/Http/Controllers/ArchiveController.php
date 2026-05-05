@@ -39,4 +39,37 @@ class ArchiveController extends Controller
 
         return view('archive.index', compact('preinvoices', 'invoices', 'type'));
     }
+
+    public function showPreinvoice(string $uuid)
+    {
+        $order = PreinvoiceOrder::query()
+            ->with([
+                'items.product:id,name',
+                'items.variant:id,variant_name',
+                'creator:id,name',
+                'warehouseReviewer:id,name',
+                'reviews.user:id,name',
+            ])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        return view('archive.preinvoice-show', compact('order'));
+    }
+
+    public function showInvoice(string $uuid)
+    {
+        $invoice = Invoice::query()
+            ->with([
+                'items.product:id,name',
+                'items.variant:id,variant_name',
+                'payments.creator:id,name',
+                'payments.cheque',
+                'notes.user:id,name',
+                'histories.actor:id,name',
+            ])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
+
+        return view('archive.invoice-show', compact('invoice'));
+    }
 }

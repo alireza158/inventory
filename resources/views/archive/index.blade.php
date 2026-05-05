@@ -10,7 +10,7 @@
         <div class="card-body">
           @foreach($preinvoices as $o)
             <div class="border rounded p-3 mb-3">
-              <div class="fw-bold">{{ $o->uuid }} | {{ $o->customer_name }}</div>
+              <div class="fw-bold"><a href="{{ route('archive.preinvoices.show', $o->uuid) }}">{{ $o->uuid }}</a> | {{ $o->customer_name }}</div>
               <div class="small text-muted">وضعیت: {{ $o->status_label }} | ثبت‌کننده: {{ $o->creator?->name ?? '---' }} | بازبین انبار: {{ $o->warehouseReviewer?->name ?? '---' }}</div>
               <div class="small text-muted">تاریخ ثبت: {{ $o->created_at }} | فریز تا: {{ $o->stock_frozen_until ?? '---' }} | آزادسازی: {{ $o->stock_released_at ?? '---' }}</div>
               <ul class="mt-2 mb-2 small">
@@ -39,7 +39,7 @@
         <div class="card-body">
           @foreach($invoices as $inv)
             <div class="border rounded p-3 mb-3">
-              <div class="fw-bold">{{ $inv->uuid }} | {{ $inv->customer_name }}</div>
+              <div class="fw-bold"><a href="{{ route('archive.invoices.show', $inv->uuid) }}">{{ $inv->uuid }}</a> | {{ $inv->customer_name }}</div>
               <div class="small text-muted">وضعیت فعلی: {{ $inv->status }} | جمع کل: {{ number_format((int)$inv->total) }}</div>
 
               <div class="mt-2"><b>آیتم‌ها:</b>
