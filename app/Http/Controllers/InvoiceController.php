@@ -254,6 +254,17 @@ class InvoiceController extends Controller
         return back()->with('success', '✅ وضعیت بروزرسانی شد.');
     }
 
+    public function cancel(string $uuid, Request $request)
+    {
+        $invoice = Invoice::where('uuid', $uuid)->firstOrFail();
+        $data = $request->validate([
+            'note' => 'nullable|string|max:1000',
+        ]);
+        $this->salesHavalehService->cancelAndRestore($invoice, $data['note'] ?? null, auth()->id());
+
+        return back()->with('success', '✅ فاکتور کنسل شد و موجودی به انبار برگشت.');
+    }
+
     private function resolveReportDate(string $dateInput): ?Carbon
     {
         if ($dateInput === '') {

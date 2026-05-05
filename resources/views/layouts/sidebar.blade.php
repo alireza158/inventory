@@ -11,7 +11,7 @@
 
     $salesActive = $isRoute('preinvoice.create', 'customers.*', 'persons.*');
 
-    $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*');
+    $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'archive.*');
 
     $configActive = $isRoute('shipping-methods.*', 'users.*', 'activity-logs.*');
 
@@ -287,6 +287,7 @@
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
                     <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">در انتظار تایید مالی</a>
+                    <a class="sidebar-sublink {{ $is('archive.*') }}" href="{{ route('archive.index') }}">بایگانی اسناد فروش</a>
                     <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
                     <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
                 </div>
