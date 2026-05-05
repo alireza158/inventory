@@ -215,6 +215,8 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finance');
     Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finalize');
     Route::get('/preinvoice/all', [PreinvoiceController::class, 'allIndex'])->middleware('role:admin|Admin|warehouse|finance|Accountant')->name('preinvoice.all.index');
+    Route::get('/preinvoice/my', [PreinvoiceController::class, 'myIndex'])->name('preinvoice.my.index');
+    Route::get('/preinvoice/my/{uuid}', [PreinvoiceController::class, 'myShow'])->name('preinvoice.my.show');
 
     // Preinvoice APIs
     Route::prefix('preinvoice/api')->group(function () {

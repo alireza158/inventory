@@ -9,7 +9,7 @@
 
     $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*', 'preinvoice.warehouse.*', 'products.create', 'products.import.show', 'products.import');
 
-    $salesActive = $isRoute('preinvoice.create', 'customers.*', 'persons.*');
+    $salesActive = $isRoute('preinvoice.create', 'preinvoice.my.*', 'customers.*', 'persons.*');
 
     $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'archive.*');
 
@@ -266,6 +266,7 @@
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
                     <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
+                    <a class="sidebar-sublink {{ $is('preinvoice.my.*') }}" href="{{ route('preinvoice.my.index') }}">پیش‌فاکتورهای من</a>
                     @if($hasRole(['admin', 'Admin', 'finance', 'Accountant']))
                         <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
                     @endif
