@@ -12,11 +12,11 @@ use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
 use App\Models\StockMovement;
 use App\Models\WarehouseStock;
+use App\Support\DocumentCodeGenerator;
 use App\Services\WarehouseStockService;
 use App\Services\PaymentRegistrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -216,7 +216,7 @@ class PreinvoiceController extends Controller
             $shippingId = (int) $validated['shipping_id'];
 
             $order = PreinvoiceOrder::create([
-                'uuid' => (string) Str::uuid(),
+                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(PreinvoiceOrder::class),
                 'created_by' => auth()->id(),
                 'status' => PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE,
 
@@ -847,7 +847,7 @@ class PreinvoiceController extends Controller
             }
 
             $invoice = Invoice::create([
-                'uuid' => (string) Str::uuid(),
+                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(Invoice::class),
                 'preinvoice_order_id' => $order->id,
 
                 'customer_id' => $order->customer_id ?? null,
