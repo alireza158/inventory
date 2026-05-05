@@ -85,7 +85,12 @@ class PreinvoiceController extends Controller
 
         DB::transaction(function () use ($order, $data) {
             $before = $this->snapshotItems($order);
+            $stockLocked = $this->hasActiveFreeze($order);
+            $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $this->replaceOrderItems($order, $data['items']);
+            if ($stockLocked) {
+                $this->applyFrozenStockDelta($oldItems, $data['items']);
+            }
 
             $order->update([
                 'status' => PreinvoiceOrder::STATUS_SUBMITTED_WAREHOUSE,
@@ -119,7 +124,12 @@ class PreinvoiceController extends Controller
 
         DB::transaction(function () use ($order, $data) {
             $before = $this->snapshotItems($order);
+            $stockLocked = $this->hasActiveFreeze($order);
+            $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $this->replaceOrderItems($order, $data['items']);
+            if ($stockLocked) {
+                $this->applyFrozenStockDelta($oldItems, $data['items']);
+            }
 
             $order->refresh()->load('items');
             $this->assertOrderHasStock($order);
@@ -162,6 +172,10 @@ class PreinvoiceController extends Controller
             'warehouse_reviewed_by' => auth()->id(),
             'warehouse_reviewed_at' => now(),
         ]);
+        if ($this->hasActiveFreeze($order)) {
+            $this->releaseReservedStock($order);
+            $order->update(['stock_released_at' => now()]);
+        }
 
         return redirect()->route('preinvoice.warehouse.index')->with('success', '✅ پیش‌فاکتور رد شد.');
     }
@@ -270,8 +284,17 @@ class PreinvoiceController extends Controller
                 'total_price' => 0,
             ]);
 
+            $stockLocked = $this->hasActiveFreeze($order);
+            $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $order->items()->delete();
             $this->syncItems($order, $validated['products']);
+            if ($stockLocked) {
+                $this->applyFrozenStockDelta($oldItems, collect($validated['products'])->map(fn($p) => [
+                    'product_id' => (int) $p['id'],
+                    'variant_id' => (int) $p['variety_id'],
+                    'quantity' => (int) $p['quantity'],
+                ])->all());
+            }
             $order->update(['total_price' => $this->calculateOrderTotal($order)]);
         });
 
@@ -616,6 +639,64 @@ class PreinvoiceController extends Controller
             $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
             if ($product) {
                 $product->update(['stock' => ((int) $product->stock) - ((int) $item->quantity)]);
+            }
+        }
+    }
+
+    private function hasActiveFreeze(PreinvoiceOrder $order): bool
+    {
+        return (bool) ($order->stock_frozen_until && is_null($order->stock_released_at));
+    }
+
+    private function applyFrozenStockDelta(array $oldItems, array $newItems): void
+    {
+        $oldMap = [];
+        foreach ($oldItems as $row) {
+            $key = ((int) $row['product_id']) . ':' . ((int) $row['variant_id']);
+            $oldMap[$key] = ($oldMap[$key] ?? 0) + (int) $row['quantity'];
+        }
+        $newMap = [];
+        foreach ($newItems as $row) {
+            $productId = (int) ($row['product_id'] ?? $row['id'] ?? 0);
+            $variantId = (int) ($row['variant_id'] ?? $row['variety_id'] ?? 0);
+            $qty = (int) ($row['quantity'] ?? 0);
+            $key = $productId . ':' . $variantId;
+            $newMap[$key] = ($newMap[$key] ?? 0) + $qty;
+        }
+
+        foreach (array_unique(array_merge(array_keys($oldMap), array_keys($newMap))) as $key) {
+            [$productId, $variantId] = array_map('intval', explode(':', $key));
+            $delta = ($newMap[$key] ?? 0) - ($oldMap[$key] ?? 0);
+            if ($delta === 0) continue;
+
+            $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->first();
+            if ($variant) {
+                $variant->stock = (int) $variant->stock - $delta;
+                $variant->save();
+            }
+            WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $productId, -$delta);
+            $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+            if ($product) {
+                $product->stock = (int) $product->stock - $delta;
+                $product->save();
+            }
+        }
+    }
+
+    private function releaseReservedStock(PreinvoiceOrder $order): void
+    {
+        $order->loadMissing('items');
+        foreach ($order->items as $item) {
+            $variant = ProductVariant::query()->whereKey((int) $item->variant_id)->lockForUpdate()->first();
+            if ($variant) {
+                $variant->stock = (int) $variant->stock + (int) $item->quantity;
+                $variant->save();
+            }
+            WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $item->product_id, (int) $item->quantity);
+            $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
+            if ($product) {
+                $product->stock = (int) $product->stock + (int) $item->quantity;
+                $product->save();
             }
         }
     }
