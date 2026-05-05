@@ -159,6 +159,19 @@ class PreinvoiceController extends Controller
         return view('preinvoice.drafts-index', compact('orders', 'canFinanceApprove'));
     }
 
+    public function allIndex(Request $request)
+    {
+        $status = (string) $request->query('status', '');
+        $query = PreinvoiceOrder::query()->with(['creator:id,name'])->withCount('items');
+        if ($status !== '') {
+            $query->where('status', $status);
+        }
+        $orders = $query->orderByDesc('id')->paginate(30)->withQueryString();
+        $statusLabels = PreinvoiceOrder::statusLabels();
+
+        return view('preinvoice.all-index', compact('orders', 'status', 'statusLabels'));
+    }
+
     public function saveDraft(Request $request)
     {
         abort_unless(auth()->check(), 403);
@@ -184,9 +197,12 @@ class PreinvoiceController extends Controller
                 'shipping_price' => (int) $this->resolveShippingPrice($shippingId),
                 'discount_amount' => (int) ($validated['discount_amount'] ?? 0),
                 'total_price' => 0,
+                'stock_frozen_until' => now()->addHour(),
+                'stock_released_at' => null,
             ]);
 
             $this->syncItems($order, $validated['products']);
+            $this->reserveOrderStock($order);
             $order->update(['total_price' => $this->calculateOrderTotal($order)]);
         });
 
@@ -563,6 +579,21 @@ class PreinvoiceController extends Controller
         }
     }
 
+    private function reserveOrderStock(PreinvoiceOrder $order): void
+    {
+        $order->loadMissing('items');
+
+        foreach ($order->items as $item) {
+            $variant = ProductVariant::query()->whereKey((int) $item->variant_id)->lockForUpdate()->first();
+            if (!$variant) {
+                continue;
+            }
+
+            $variant->reserved = max(0, (int) $variant->reserved) + (int) $item->quantity;
+            $variant->save();
+        }
+    }
+
     private function canHandleFinanceActions(): bool
     {
         $user = auth()->user();
@@ -675,6 +706,8 @@ class PreinvoiceController extends Controller
                 $variant = ProductVariant::query()->whereKey((int) $it->variant_id)->lockForUpdate()->first();
                 if ($variant) {
                     $it->price = (int) ($variant->sell_price ?? 0);
+                    $variant->reserved = max(0, ((int) $variant->reserved) - ((int) $it->quantity));
+                    $variant->save();
                 }
             }
             $subtotal = (int) $order->items->sum(fn($it) => ((int) $it->price) * ((int) $it->quantity));
