@@ -313,6 +313,12 @@
               </span>
             </div>
 
+            <div class="mt-2">
+              <a href="{{ route('archive.preinvoices.show', $o->uuid) }}" class="btn btn-sm btn-outline-primary">
+                مشاهده
+              </a>
+            </div>
+
             <div class="meta-line mt-2">
               ثبت‌کننده: {{ $o->creator?->name ?? '---' }}
               |
@@ -432,6 +438,12 @@
                   {{ number_format((int) $inv->total) }}
                 </div>
               </div>
+            </div>
+
+            <div class="mt-2">
+              <a href="{{ route('archive.invoices.show', $inv->uuid) }}" class="btn btn-sm btn-outline-primary">
+                مشاهده
+              </a>
             </div>
 
             <details class="details-box">
