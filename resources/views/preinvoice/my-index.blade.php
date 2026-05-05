@@ -3,6 +3,15 @@
 @section('title', 'پیش‌فاکتورهای من')
 
 @section('content')
+@php
+  $toJalali = function ($date) {
+      if (!$date) return '—';
+      if (class_exists(\Hekmatinasser\Verta\Verta::class)) {
+          return \Hekmatinasser\Verta\Verta::instance($date)->format('Y/m/d H:i');
+      }
+      return optional($date)->format('Y/m/d H:i') ?? '—';
+  };
+@endphp
 <div class="container py-4">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h4 class="mb-0">پیش‌فاکتورهای من</h4>
@@ -46,7 +55,7 @@
                 <td>{{ number_format($order->items_count) }}</td>
                 <td>{{ number_format((int) $order->total_price) }} ریال</td>
                 <td>{{ $statusLabels[$order->status] ?? $order->status }}</td>
-                <td>{{ verta($order->created_at)->format('Y/m/d H:i') }}</td>
+                <td>{{ $toJalali($order->created_at) }}</td>
                 <td class="text-end">
                   <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده کامل</a>
                 </td>
