@@ -13,13 +13,26 @@ class ArchiveController extends Controller
         $type = (string) $request->query('type', 'all');
 
         $preinvoices = PreinvoiceOrder::query()
-            ->with(['items.product:id,name', 'items.variant:id,variant_name', 'creator:id,name'])
+            ->with([
+                'items.product:id,name',
+                'items.variant:id,variant_name',
+                'creator:id,name',
+                'warehouseReviewer:id,name',
+                'reviews.user:id,name',
+            ])
             ->orderByDesc('id')
             ->paginate(15, ['*'], 'preinvoice_page')
             ->withQueryString();
 
         $invoices = Invoice::query()
-            ->with(['items.product:id,name', 'items.variant:id,variant_name'])
+            ->with([
+                'items.product:id,name',
+                'items.variant:id,variant_name',
+                'payments.creator:id,name',
+                'payments.cheque',
+                'notes.creator:id,name',
+                'histories.actor:id,name',
+            ])
             ->orderByDesc('id')
             ->paginate(15, ['*'], 'invoice_page')
             ->withQueryString();

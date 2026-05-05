@@ -927,6 +927,7 @@ class PreinvoiceController extends Controller
             $order->update([
                 'status' => PreinvoiceOrder::STATUS_FINANCE_APPROVED,
                 'total_price' => (int) $total,
+                'stock_frozen_until' => null,
                 'stock_released_at' => $order->stock_released_at ?: now(),
             ]);
 

@@ -183,14 +183,14 @@
           <div class="section-title mb-2">📦 وضعیت آماده‌سازی حواله انبار</div>
           <form method="POST" action="{{ route('invoices.status', $invoice->uuid) }}" class="d-flex gap-2">
             @csrf
-            <select name="status" class="form-select">
+            <select name="status" class="form-select" @disabled($invoice->status==='not_shipped')>
               <option value="pending_warehouse_approval" @selected($invoice->status==='pending_warehouse_approval')>در انتظار تایید انبار</option>
               <option value="collecting" @selected($invoice->status==='collecting')>در حال جمع‌آوری</option>
               <option value="checking_discrepancy" @selected($invoice->status==='checking_discrepancy')>چک کردن بار</option>
               <option value="packing" @selected($invoice->status==='packing')>بسته‌بندی بار</option>
               <option value="shipped" @selected($invoice->status==='shipped')>ارسال شد</option>
             </select>
-            <button class="btn btn-primary">ثبت</button>
+            <button class="btn btn-primary" @disabled($invoice->status==='not_shipped')>ثبت</button>
           </form>
           <div class="hint mt-2">آخرین بروزرسانی: {{ $jalaliDT($invoice->updated_at) }}</div>
         </div>

@@ -76,6 +76,10 @@ class SalesHavalehStatusService
             return;
         }
 
+        if ($current === self::NOT_SHIPPED) {
+            abort(422, 'فاکتور کنسل‌شده قابل تغییر وضعیت نیست.');
+        }
+
         if ($this->isAdmin($user)) {
             return;
         }
