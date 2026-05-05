@@ -37,6 +37,7 @@
 
   $itemsCount = $invoice->items?->sum('quantity') ?? 0;
   $paymentsTotal = $invoice->payments?->sum('amount') ?? 0;
+  $logLabels = ['attributes' => 'مقادیر ثبت‌شده', 'changes' => 'مقادیر جدید', 'old' => 'مقادیر قبلی', 'original' => 'مقادیر قبلی'];
 @endphp
 
 <style>
@@ -367,6 +368,12 @@
     font-weight: 750;
     line-height: 1.9;
   }
+  .audit-section { margin-top: 10px; border: 1px dashed var(--border); border-radius: 12px; padding: 10px 12px; background: #fff; }
+  .audit-section-title { font-size: .8rem; font-weight: 900; color: #334155; margin-bottom: 6px; }
+  .audit-row { display: flex; gap: 8px; font-size: .8rem; line-height: 1.8; border-top: 1px solid #f1f5f9; padding-top: 4px; margin-top: 4px; }
+  .audit-row:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+  .audit-key { min-width: 140px; color: var(--muted); font-weight: 800; word-break: break-word; }
+  .audit-value { color: #0f172a; word-break: break-word; white-space: pre-wrap; }
 
   .empty-box {
     padding: 22px 12px;
@@ -697,16 +704,25 @@
                   </div>
                   <div class="list-body">
                     <strong>{{ $log->description ?? '---' }}</strong>
-                    @if(!empty($log->properties))
-                      <div class="mt-2">
-                        @foreach($log->properties as $key => $value)
-                          <div>
-                            • {{ $key }}:
-                            <strong>{{ is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE) : ($value === null ? 'null' : $value) }}</strong>
+                    @php($properties = is_array($log->properties) ? $log->properties : [])
+                    @foreach($properties as $groupKey => $groupValue)
+                      <div class="audit-section">
+                        <div class="audit-section-title">{{ $logLabels[$groupKey] ?? $groupKey }}</div>
+                        @if(is_array($groupValue))
+                          @foreach($groupValue as $field => $fieldValue)
+                            <div class="audit-row">
+                              <div class="audit-key">{{ $field }}</div>
+                              <div class="audit-value">{{ is_array($fieldValue) ? json_encode($fieldValue, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) : ($fieldValue === null ? '—' : $fieldValue) }}</div>
+                            </div>
+                          @endforeach
+                        @else
+                          <div class="audit-row">
+                            <div class="audit-key">{{ $groupKey }}</div>
+                            <div class="audit-value">{{ $groupValue === null ? '—' : $groupValue }}</div>
                           </div>
-                        @endforeach
+                        @endif
                       </div>
-                    @endif
+                    @endforeach
                   </div>
                 </li>
               @endforeach
