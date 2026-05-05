@@ -32,7 +32,7 @@ Artisan::command('preinvoice:release-expired-freezes', function () {
             foreach ($order->items as $item) {
                 $variant = ProductVariant::query()->whereKey((int) $item->variant_id)->lockForUpdate()->first();
                 if ($variant) {
-                    $variant->reserved = max(0, (int) $variant->reserved - (int) $item->quantity);
+                    $variant->stock = (int) $variant->stock + (int) $item->quantity;
                     $variant->save();
                 }
 

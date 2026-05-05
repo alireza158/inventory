@@ -608,8 +608,7 @@ class PreinvoiceController extends Controller
             if (!$variant) {
                 continue;
             }
-
-            $variant->reserved = max(0, (int) $variant->reserved) + (int) $item->quantity;
+            $variant->stock = max(0, (int) $variant->stock - (int) $item->quantity);
             $variant->save();
 
             WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $item->product_id, -((int) $item->quantity));
@@ -735,7 +734,6 @@ class PreinvoiceController extends Controller
                 $variant = ProductVariant::query()->whereKey((int) $it->variant_id)->lockForUpdate()->first();
                 if ($variant) {
                     $it->price = (int) ($variant->sell_price ?? 0);
-                    $variant->reserved = max(0, ((int) $variant->reserved) - ((int) $it->quantity));
                     $variant->save();
                 }
             }
