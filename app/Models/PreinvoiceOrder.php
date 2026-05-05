@@ -72,6 +72,11 @@ class PreinvoiceOrder extends Model
         return $this->hasMany(PreinvoiceOrderReview::class);
     }
 
+    public function activityLogs()
+    {
+        return $this->morphMany(ActivityLog::class, 'subject')->latest('occurred_at');
+    }
+
     public static function statusLabels(): array
     {
         return [

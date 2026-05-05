@@ -368,6 +368,21 @@
                   @endforelse
                 </ul>
 
+                <div class="sub-title">📜 لاگ کامل تغییرات پیش‌فاکتور</div>
+                <ul class="clean-list">
+                  @forelse($o->activityLogs as $log)
+                    <li>
+                      {{ $log->occurred_at ?? $log->created_at }}
+                      |
+                      {{ $log->user?->name ?? 'سیستم' }}
+                      |
+                      {{ $log->description }}
+                    </li>
+                  @empty
+                    <li>لاگ تغییری ثبت نشده است.</li>
+                  @endforelse
+                </ul>
+
               </div>
             </details>
 
@@ -470,6 +485,22 @@
                     </li>
                   @empty
                     <li>یادداشتی ثبت نشده است.</li>
+                  @endforelse
+                </ul>
+
+
+                <div class="sub-title">📜 لاگ کامل تغییرات فاکتور</div>
+                <ul class="clean-list">
+                  @forelse($inv->activityLogs as $log)
+                    <li>
+                      {{ $log->occurred_at ?? $log->created_at }}
+                      |
+                      {{ $log->user?->name ?? 'سیستم' }}
+                      |
+                      {{ $log->description }}
+                    </li>
+                  @empty
+                    <li>لاگ تغییری ثبت نشده است.</li>
                   @endforelse
                 </ul>
 
