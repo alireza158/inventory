@@ -31,6 +31,7 @@ use App\Http\Controllers\SalesHavalehController;
 use App\Http\Controllers\AssetPersonnelController;
 use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AssetTrusteeController;
+use App\Http\Controllers\ArchiveController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
@@ -231,7 +232,8 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
 
-Route::post('/customers/import', [CustomerController::class, 'import'])->name('customers.import');
+    Route::post('/customers/import', [CustomerController::class, 'import'])->name('customers.import');
+    Route::get('/archive', [ArchiveController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant|warehouse')->name('archive.index');
     // Invoices
     Route::prefix('invoices')->group(function () {
         Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');

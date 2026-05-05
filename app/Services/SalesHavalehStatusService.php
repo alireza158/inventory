@@ -37,7 +37,7 @@ class SalesHavalehStatusService
             self::FINAL_CHECK => 'در حال چک نهایی',
             self::PACKING => 'در حال بسته‌بندی',
             self::SHIPPED => 'ارسال شده',
-            self::NOT_SHIPPED => 'ارسال نشده',
+            self::NOT_SHIPPED => 'کنسل شده',
         ];
     }
 

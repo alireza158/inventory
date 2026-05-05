@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\PreinvoiceOrder;
+use App\Models\ProductVariant;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
@@ -196,6 +197,11 @@ class SalesHavalehService
             }
 
             foreach ($invoice->items as $item) {
+                $variant = ProductVariant::query()->whereKey((int) $item->variant_id)->lockForUpdate()->first();
+                if ($variant) {
+                    $variant->stock = (int) $variant->stock + (int) $item->quantity;
+                    $variant->save();
+                }
                 $this->inventoryService->adjustCentralStock(
                     (int) $item->product_id,
                     (int) $item->quantity,
