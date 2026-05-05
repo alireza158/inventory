@@ -30,7 +30,7 @@ class ArchiveController extends Controller
                 'items.variant:id,variant_name',
                 'payments.creator:id,name',
                 'payments.cheque',
-                'notes.creator:id,name',
+                'notes.user:id,name',
                 'histories.actor:id,name',
             ])
             ->orderByDesc('id')

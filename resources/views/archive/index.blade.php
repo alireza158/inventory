@@ -61,7 +61,7 @@
               <div><b>یادداشت‌ها:</b>
                 <ul class="small mb-2">
                   @foreach($inv->notes as $n)
-                    <li>{{ $n->created_at }} | {{ $n->creator?->name ?? '---' }} | {{ $n->note }}</li>
+                    <li>{{ $n->created_at }} | {{ $n->user?->name ?? '---' }} | {{ $n->body }}</li>
                   @endforeach
                 </ul>
               </div>
