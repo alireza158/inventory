@@ -825,6 +825,10 @@ return $currentDir === 'asc' ? '↑' : '↓';
                             <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkSalesLedgerBtn">
                                 کارتکس فروش
                             </button>
+
+                            <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkPurchaseLedgerBtn">
+                                🧾 کارتکس خرید
+                            </button>
                         </div>
                     </div>
 
@@ -990,6 +994,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
                                                 data-edit-url="{{ route('products.edit', $p) }}"
                                                 data-delete-url="{{ route('products.destroy', $p) }}"
                                                 data-sales-ledger-url="{{ route('products.sales-ledger', $p) }}"
+                                                data-purchase-ledger-url="{{ route('products.purchase-ledger', $p) }}"
                                                 data-product-name="{{ $p->name }}"
                                                 data-variants='@json($variantsPayload)'
                                                 data-stock-breakdown='@json($stockBreakdownPayload)'>
@@ -1364,7 +1369,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
             });
 
             if (variantHelpTextEl) {
-                variantHelpTextEl.textContent = 'برای موجودی انبار یا کارتکس فروش، در صورت نیاز تنوع را انتخاب کنید.';
+                variantHelpTextEl.textContent = 'برای موجودی انبار، کارتکس فروش یا کارتکس خرید، در صورت نیاز تنوع را انتخاب کنید.';
             }
         }
 
@@ -1507,6 +1512,26 @@ return $currentDir === 'asc' ? '↑' : '↓';
                 }
 
                 modal.show();
+            });
+
+
+            document.getElementById('bulkPurchaseLedgerBtn')?.addEventListener('click', function() {
+                const selected = getSingleSelected();
+                const variantSelectEl = freshVariantSelect();
+
+                if (!selected) return;
+
+                const baseUrl = selected.dataset.purchaseLedgerUrl;
+                if (!baseUrl) return;
+
+                const params = new URLSearchParams();
+                const selectedVariantId = variantSelectEl?.value ? String(variantSelectEl.value) : '';
+
+                if (selectedVariantId) {
+                    params.set('variant_id', selectedVariantId);
+                }
+
+                window.location.href = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
             });
 
             document.getElementById('bulkSalesLedgerBtn')?.addEventListener('click', function() {
