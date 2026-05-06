@@ -1332,7 +1332,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
                 variantSelectEl.disabled = true;
 
                 if (variantHelpTextEl) {
-                    variantHelpTextEl.textContent = 'عملیات ویرایش، حذف، موجودی و کارتکس فقط برای یک کالا انجام می‌شود.';
+                    variantHelpTextEl.textContent = 'عملیات ویرایش، حذف، موجودی، کارتکس فروش و کارتکس خرید فقط برای یک کالا انجام می‌شود.';
                 }
 
                 return;

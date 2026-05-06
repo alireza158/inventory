@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class ProductPurchaseLedgerController extends Controller
 {
-    public function index(Product $product, Request $request)
+    public function purchaseLedger(Product $product, Request $request)
     {
         $variantId = $request->filled('variant_id') ? (int) $request->input('variant_id') : null;
         $selectedVariant = null;
