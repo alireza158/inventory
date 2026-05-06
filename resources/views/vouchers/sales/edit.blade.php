@@ -5,6 +5,7 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">🧾 ویرایش حواله فروش</h4>
     <div class="d-flex gap-2">
+      <a href="{{ route('vouchers.sales.print', $invoice->uuid) }}" target="_blank" class="btn btn-outline-success">چاپ</a>
       <a href="{{ route('vouchers.sales.show', $invoice->uuid) }}" class="btn btn-outline-secondary">نمایش</a>
       <a href="{{ route('vouchers.sales.index') }}" class="btn btn-outline-dark">بازگشت</a>
     </div>
@@ -19,7 +20,7 @@
     <div class="alert alert-warning">این حواله در وضعیت «{{ $statusLabels[$invoice->status] ?? $invoice->status }}» قابل ویرایش آیتم نیست.</div>
   @endunless
 
-  <form method="POST" action="{{ route('invoices.status', $invoice->uuid) }}" class="card border-0 shadow-sm mb-3">
+  <form method="POST" action="{{ route('vouchers.sales.status', $invoice->uuid) }}" class="card border-0 shadow-sm mb-3">
     @csrf
     <div class="card-body row g-2 align-items-end">
       <div class="col-md-5">

@@ -5,242 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>چاپ فاکتور {{ $invoice->uuid }}</title>
     <style>
-        @page { size: A4; margin: 12mm; }
-
+        :root { --print-font: 10px; --print-border: #222; --print-muted: #666; }
+        @page { size: A4 portrait; margin: 8mm; }
         * { box-sizing: border-box; }
-
         body {
             margin: 0;
             font-family: Tahoma, "IRANSans", Arial, sans-serif;
-            color: #111;
             background: #f3f4f6;
-            line-height: 1.6;
+            color: #111;
+            direction: rtl;
+            font-size: var(--print-font);
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
-
-        .print-toolbar {
-            max-width: 210mm;
-            margin: 14px auto 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
+        .print-actions{
+            width: 190mm; margin: 10px auto; display:flex; justify-content:space-between; gap:8px; align-items:center;
         }
-
+        .print-actions-left { display:flex; gap:6px; align-items:center; }
         .btn {
-            border: 1px solid #111;
-            background: #fff;
-            padding: 7px 14px;
-            border-radius: 8px;
-            color: #111;
-            text-decoration: none;
-            font-size: 13px;
-            cursor: pointer;
+            border: 1px solid #222; background: #fff; color:#111; text-decoration:none; border-radius:8px;
+            padding: 6px 10px; font-size: 10px; cursor:pointer;
+        }
+        .btn-primary { background:#111; color:#fff; }
+        .invoice-page{
+            width:190mm; min-height:277mm; margin:0 auto 16px; background:#fff; padding:8mm;
+            border:1px solid #d1d5db; border-radius:8px;
+        }
+        .invoice-header{ display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:start; margin-bottom:8px; }
+        .header-logo{ display:flex; align-items:center; gap:6px; font-weight:800; }
+        .header-logo img{ width:32px; height:32px; object-fit:contain; }
+        .invoice-title{ margin:0 0 4px; font-size:16px; font-weight:900; text-align:left; }
+        .subtitle{ color:var(--print-muted); font-size:9px; text-align:left; }
+        .info-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px; }
+        .info-box{ border:1px solid var(--print-border); border-radius:6px; padding:6px; page-break-inside:avoid; }
+        .info-box-title{ font-weight:900; border-bottom:1px dashed #777; padding-bottom:3px; margin-bottom:4px; }
+        .info-row{ display:grid; grid-template-columns:85px 1fr; gap:4px; margin-bottom:2px; line-height:1.4; }
+        .info-label{ color:#333; font-weight:700; }
+        .invoice-table{ width:100%; border-collapse:collapse; table-layout:fixed; margin-top:6px; }
+        .invoice-table th,.invoice-table td{ border:1px solid var(--print-border); padding:3px 4px; line-height:1.35; vertical-align:middle; }
+        .invoice-table th{ font-size:9.5px; font-weight:900; background:#f3f4f6; text-align:center; }
+        .invoice-table td{ font-size:9.5px; }
+        .col-index{ width:28px; text-align:center; }
+        .col-qty{ width:42px; text-align:center; }
+        .col-price,.col-total{ width:78px; text-align:left; direction:ltr; }
+        .item-name{ font-weight:800; color:#111; }
+        .item-variant{ margin-top:2px; font-size:8.8px; color:#555; line-height:1.3; max-height:2.7em; overflow:hidden; }
+        .summary-wrap{ display:flex; justify-content:flex-start; margin-top:8px; page-break-inside:avoid; }
+        .summary-table{ width:85mm; border-collapse:collapse; }
+        .summary-table td{ border:1px solid var(--print-border); padding:4px 6px; font-size:10px; }
+        .summary-table .final-row td{ background:#eef2f7; font-weight:900; }
+        .notes-box{ border:1px solid var(--print-border); border-radius:6px; padding:6px; min-height:28px; margin-top:8px; page-break-inside:avoid; }
+        .signature-section{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; page-break-inside:avoid; }
+        .signature-box{ border:1px solid var(--print-border); border-radius:6px; height:50px; padding:6px; font-size:9px; }
+        .signature-title{ font-weight:900; margin-bottom:14px; }
+
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+        tr { page-break-inside: avoid; }
+
+        @media print{
+            body{ background:#fff !important; margin:0; }
+            .no-print,.print-actions{ display:none !important; }
+            .invoice-page{ width:auto; min-height:auto; margin:0; padding:0; border:0; border-radius:0; box-shadow:none; }
+            .invoice-table th,.invoice-table td{ padding:2.5px 3.5px; }
         }
 
-        .btn-primary {
-            background: #111;
-            color: #fff;
-        }
-
-        .invoice-sheet {
-            width: 100%;
-            max-width: 210mm;
-            min-height: 297mm;
-            margin: 10px auto 20px;
-            background: #fff;
-            border: 1px solid #d4d4d8;
-            border-radius: 10px;
-            padding: 16mm 14mm;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .brand img {
-            width: 58px;
-            height: 58px;
-            object-fit: contain;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 6px;
-        }
-
-        .title {
-            text-align: left;
-        }
-
-        .title h1 {
-            margin: 0;
-            font-size: 21px;
-            letter-spacing: .2px;
-        }
-
-        .subtitle {
-            color: #555;
-            font-size: 12px;
-            margin-top: 4px;
-        }
-
-        .box-grid {
-            margin-top: 8px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .box {
-            border: 1px solid #222;
-            border-radius: 8px;
-            padding: 10px;
-            page-break-inside: avoid;
-        }
-
-        .box h3 {
-            margin: 0 0 8px;
-            font-size: 14px;
-            border-bottom: 1px dashed #777;
-            padding-bottom: 5px;
-        }
-
-        .kv {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 4px;
-            font-size: 13px;
-        }
-
-        .kv .k {
-            min-width: 96px;
-            color: #444;
-        }
-
-        .items {
-            margin-top: 12px;
-            border: 1px solid #222;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            border: 1px solid #222;
-            padding: 7px 6px;
-            font-size: 12px;
-            vertical-align: middle;
-        }
-
-        th {
-            background: #f3f4f6;
-            font-weight: 700;
-            text-align: center;
-        }
-
-        td.text-center { text-align: center; }
-        td.text-left { text-align: left; }
-
-        .summary-wrap {
-            margin-top: 10px;
-            display: flex;
-            justify-content: flex-end;
-        }
-
-        .summary {
-            width: 320px;
-            border: 1px solid #222;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .summary td {
-            font-size: 13px;
-            padding: 7px 10px;
-        }
-
-        .summary .total-row td {
-            font-weight: 800;
-            background: #eceff3;
-        }
-
-        .notes {
-            margin-top: 12px;
-            border: 1px solid #222;
-            border-radius: 8px;
-            padding: 9px 10px;
-            min-height: 64px;
-            font-size: 12px;
-            page-break-inside: avoid;
-        }
-
-        .notes h4 {
-            margin: 0 0 6px;
-            font-size: 13px;
-        }
-
-        .signatures {
-            margin-top: 16px;
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 12px;
-            page-break-inside: avoid;
-        }
-
-        .sign-box {
-            border: 1px solid #222;
-            border-radius: 8px;
-            min-height: 92px;
-            padding: 8px;
-            font-size: 12px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .muted { color: #555; }
-
-        @media print {
-            body {
-                background: #fff !important;
-                margin: 0 !important;
-            }
-
-            .print-toolbar {
-                display: none !important;
-            }
-
-            .invoice-sheet {
-                margin: 0 !important;
-                border: 0 !important;
-                border-radius: 0 !important;
-                box-shadow: none !important;
-                max-width: 100% !important;
-                min-height: auto !important;
-                padding: 0 !important;
-            }
-
-            tr, td, th, .box, .notes, .signatures, .summary {
-                page-break-inside: avoid !important;
-            }
-        }
+        body.print-a5 .invoice-page, body.print-a5 .print-actions { width:132mm; }
+        body.print-a5 .invoice-table th, body.print-a5 .invoice-table td { font-size:8.5px; padding:2px 3px; }
+        body.print-a5 .info-grid { grid-template-columns:1fr; }
+        body.print-a5 .summary-table { width:100%; }
     </style>
 </head>
-<body>
+<body class="print-a4">
 @php
     use Morilog\Jalali\Jalalian;
 
@@ -261,55 +97,57 @@
     $firstNote = $invoice->notes->first()?->body ?? null;
 @endphp
 
-<div class="print-toolbar">
-    <a class="btn" href="{{ route('invoices.show', $invoice->uuid) }}">بازگشت به فاکتور</a>
+<div class="print-actions no-print">
+    <div class="print-actions-left">
+        <a class="btn" href="{{ route('vouchers.sales.show', $invoice->uuid) }}">بازگشت به حواله</a>
+        <button type="button" class="btn" onclick="document.body.classList.remove('print-a5');document.body.classList.add('print-a4');">A4</button>
+        <button type="button" class="btn" onclick="document.body.classList.remove('print-a4');document.body.classList.add('print-a5');">A5</button>
+    </div>
     <button type="button" class="btn btn-primary" onclick="window.print()">چاپ</button>
 </div>
 
-<main class="invoice-sheet">
-    <header class="header">
-        <div class="brand">
+<main class="invoice-page">
+    <header class="invoice-header">
+        <div class="header-logo">
             <img src="{{ asset('logo.png') }}" alt="{{ $companyName }}">
             <div>
-                <div style="font-size:18px;font-weight:800">{{ $companyName }}</div>
-                <div class="subtitle">سامانه فروش و انبار</div>
+                <div style="font-size:12px;font-weight:800">{{ $companyName }}</div>
+                <div style="font-size:9px;color:#666">سامانه فروش و انبار</div>
             </div>
         </div>
-        <div class="title">
-            <h1>فاکتور فروش</h1>
-            <div class="subtitle">نسخه قابل چاپ و بایگانی</div>
+        <div>
+            <h1 class="invoice-title">فاکتور فروش / حواله فروش</h1>
+            <div class="subtitle">نسخه چاپی انبار</div>
         </div>
     </header>
 
-    <section class="box-grid">
-        <div class="box">
-            <h3>مشخصات فاکتور</h3>
-            <div class="kv"><div class="k">شماره فاکتور:</div><div><strong>{{ $invoice->uuid }}</strong></div></div>
-            <div class="kv"><div class="k">تاریخ فاکتور:</div><div>{{ $fmtDate($invoice->created_at) }}</div></div>
-            <div class="kv"><div class="k">شماره سفارش:</div><div>{{ $orderRef ?? '—' }}</div></div>
-            <div class="kv"><div class="k">شماره مرجع:</div><div>{{ $invoice->id }}</div></div>
-            <div class="kv"><div class="k">ثبت‌کننده:</div><div>{{ $sellerName ?? '—' }}</div></div>
+    <section class="info-grid">
+        <div class="info-box">
+            <div class="info-box-title">مشخصات فاکتور</div>
+            <div class="info-row"><div class="info-label">شماره فاکتور:</div><div><strong>{{ $invoice->uuid }}</strong></div></div>
+            <div class="info-row"><div class="info-label">تاریخ:</div><div>{{ $fmtDate($invoice->created_at) }}</div></div>
+            <div class="info-row"><div class="info-label">شماره سفارش:</div><div>{{ $orderRef ?? '—' }}</div></div>
+            <div class="info-row"><div class="info-label">ثبت‌کننده:</div><div>{{ $sellerName ?? '—' }}</div></div>
         </div>
-        <div class="box">
-            <h3>مشخصات مشتری</h3>
-            <div class="kv"><div class="k">نام مشتری:</div><div>{{ $invoice->customer_name ?: '—' }}</div></div>
-            <div class="kv"><div class="k">شماره تماس:</div><div>{{ $invoice->customer_mobile ?: '—' }}</div></div>
-            <div class="kv"><div class="k">آدرس:</div><div>{{ $invoice->customer_address ?: '—' }}</div></div>
-            <div class="kv"><div class="k">کد/شناسه:</div><div>{{ $invoice->customer?->national_code ?? '—' }}</div></div>
+        <div class="info-box">
+            <div class="info-box-title">مشخصات مشتری</div>
+            <div class="info-row"><div class="info-label">نام مشتری:</div><div>{{ $invoice->customer_name ?: '—' }}</div></div>
+            <div class="info-row"><div class="info-label">موبایل:</div><div>{{ $invoice->customer_mobile ?: '—' }}</div></div>
+            @if(!empty($invoice->customer_address))
+                <div class="info-row"><div class="info-label">آدرس:</div><div>{{ $invoice->customer_address }}</div></div>
+            @endif
         </div>
     </section>
 
-    <section class="items">
-        <table>
+    <section>
+        <table class="invoice-table">
             <thead>
             <tr>
-                <th style="width:50px">ردیف</th>
-                <th>نام کالا</th>
-                <th>تنوع/مدل/مشخصات</th>
-                <th style="width:70px">تعداد</th>
-                <th style="width:70px">واحد</th>
-                <th style="width:130px">قیمت واحد</th>
-                <th style="width:150px">مبلغ کل ردیف</th>
+                <th class="col-index">ردیف</th>
+                <th>نام کالا / تنوع</th>
+                <th class="col-qty">تعداد</th>
+                <th class="col-price">قیمت واحد</th>
+                <th class="col-total">مبلغ کل</th>
             </tr>
             </thead>
             <tbody>
@@ -319,65 +157,63 @@
                     $variantName = $item->variant?->variant_name ?? '—';
                 @endphp
                 <tr>
-                    <td class="text-center">{{ $loop->iteration }}</td>
-                    <td>{{ $item->product?->name ?? ('#' . $item->product_id) }}</td>
-                    <td>{{ $variantName }}</td>
-                    <td class="text-center">{{ number_format((int) $item->quantity) }}</td>
-                    <td class="text-center">عدد</td>
-                    <td class="text-left">{{ number_format((int) $item->price) }}</td>
-                    <td class="text-left">{{ number_format($lineTotal) }}</td>
+                    <td class="col-index">{{ $loop->iteration }}</td>
+                    <td>
+                        <div class="item-name">{{ $item->product?->name ?? ('#' . $item->product_id) }}</div>
+                        <div class="item-variant">{{ $variantName }}</div>
+                    </td>
+                    <td class="col-qty">{{ number_format((int) $item->quantity) }}</td>
+                    <td class="col-price">{{ number_format((int) $item->price) }}</td>
+                    <td class="col-total">{{ number_format($lineTotal) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="text-center muted">آیتمی برای این فاکتور ثبت نشده است.</td></tr>
+                <tr><td colspan="5" class="col-index">آیتمی برای این فاکتور ثبت نشده است.</td></tr>
             @endforelse
             </tbody>
         </table>
     </section>
 
     <section class="summary-wrap">
-        <table class="summary">
+        <table class="summary-table invoice-summary">
             <tr>
                 <td>جمع جزء</td>
-                <td class="text-left">{{ $money($invoice->subtotal) }}</td>
+                <td style="text-align:left;direction:ltr">{{ $money($invoice->subtotal) }}</td>
             </tr>
             <tr>
                 <td>تخفیف</td>
-                <td class="text-left">{{ $money($invoice->discount_amount) }}</td>
+                <td style="text-align:left;direction:ltr">{{ $money($invoice->discount_amount) }}</td>
             </tr>
             <tr>
                 <td>هزینه ارسال</td>
-                <td class="text-left">{{ $money($invoice->shipping_price) }}</td>
+                <td style="text-align:left;direction:ltr">{{ $money($invoice->shipping_price) }}</td>
             </tr>
             @if($taxAmount > 0)
                 <tr>
                     <td>مالیات</td>
-                    <td class="text-left">{{ $money($taxAmount) }}</td>
+                    <td style="text-align:left;direction:ltr">{{ $money($taxAmount) }}</td>
                 </tr>
             @endif
-            <tr class="total-row">
+            <tr class="final-row">
                 <td>مبلغ نهایی قابل پرداخت</td>
-                <td class="text-left">{{ $money($finalTotal) }}</td>
+                <td style="text-align:left;direction:ltr">{{ $money($finalTotal) }}</td>
             </tr>
         </table>
     </section>
 
-    <section class="notes">
-        <h4>توضیحات / شرایط پرداخت و ارسال</h4>
+    <section class="notes-box">
+        <div style="font-weight:900;margin-bottom:4px">توضیحات</div>
         <div>{{ $firstNote ?: '—' }}</div>
     </section>
 
-    <section class="signatures">
-        <div class="sign-box">
-            <div><strong>امضای صادرکننده</strong></div>
-            <div class="muted">نام و امضا</div>
+    <section class="signature-section">
+        <div class="signature-box">
+            <div class="signature-title">امضای صادرکننده</div>
         </div>
-        <div class="sign-box">
-            <div><strong>امضای مشتری / تحویل‌گیرنده</strong></div>
-            <div class="muted">نام، تاریخ و امضا</div>
+        <div class="signature-box">
+            <div class="signature-title">امضای مشتری / تحویل‌گیرنده</div>
         </div>
-        <div class="sign-box">
-            <div><strong>مهر شرکت</strong></div>
-            <div class="muted">محل درج مهر</div>
+        <div class="signature-box">
+            <div class="signature-title">مهر شرکت</div>
         </div>
     </section>
 </main>
