@@ -50,6 +50,44 @@
     box-shadow: 0 8px 18px rgba(15,23,42,.06);
   }
   .app-menu-btn svg{ width: 22px; height: 22px; }
+
+  .app-back-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    height:34px;
+    padding:0 10px;
+    border:1px solid rgba(12,83,103,.16);
+    background:#fff;
+    color:#0c5367;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:800;
+    cursor:pointer;
+    transition:all .15s ease;
+    white-space:nowrap;
+  }
+  .app-back-btn:hover{
+    background:rgba(51,199,192,.08);
+    border-color:rgba(51,199,192,.35);
+    color:#083d50;
+  }
+  .app-back-btn .back-icon{
+    font-size:22px;
+    line-height:1;
+    font-weight:900;
+  }
+  @media (max-width:575.98px){
+    .app-back-btn{
+      width:36px;
+      min-width:36px;
+      padding:0;
+      border-radius:10px;
+    }
+    .app-back-btn .back-text{ display:none; }
+    .app-back-btn .back-icon{ font-size:24px; }
+  }
 </style>
 <body class="bg-light">
 <div class="d-flex" style="min-height: 100vh">
@@ -60,6 +98,12 @@
     {{-- Main --}}
     <div class="flex-grow-1">
         {{-- Topbar --}}
+@php
+    $backFallbackUrl = url('/');
+    if (\Illuminate\Support\Facades\Route::has('dashboard')) {
+        $backFallbackUrl = route('dashboard');
+    }
+@endphp
 <div class="app-topbar bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center gap-2 fw-bold text-muted">
 
@@ -76,20 +120,31 @@
         <span class="text-truncate">{{ config('app.name','سیستم انبار آریا جانبی') }}</span>
     </div>
 
-    <div class="dropdown">
-        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-            {{ auth()->user()->name ?? 'کاربر' }}
+    <div class="d-flex align-items-center gap-2">
+        <button type="button"
+                class="app-back-btn"
+                id="appBackBtn"
+                data-fallback-url="{{ $backFallbackUrl }}"
+                title="بازگشت">
+            <span class="back-icon">‹</span>
+            <span class="back-text">بازگشت</span>
         </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li><span class="dropdown-item-text text-muted small">{{ auth()->user()->email ?? '' }}</span></li>
-            <li><hr class="dropdown-divider"></li>
-            <li>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button class="dropdown-item text-danger">خروج</button>
-                </form>
-            </li>
-        </ul>
+
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                {{ auth()->user()->name ?? 'کاربر' }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><span class="dropdown-item-text text-muted small">{{ auth()->user()->email ?? '' }}</span></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button class="dropdown-item text-danger">خروج</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
     </div>
 </div>
 
@@ -119,6 +174,20 @@
 
 {{-- فرمت هزارگان برای ورودی‌های money --}}
 <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const backBtn = document.getElementById('appBackBtn');
+    if (!backBtn) return;
+
+    backBtn.addEventListener('click', function () {
+      const fallbackUrl = this.dataset.fallbackUrl || '/';
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      window.location.href = fallbackUrl;
+    });
+  });
+
   function formatMoneyInput(el){
     const raw = (el.value || '').replace(/[^\d]/g,'');
     el.value = raw.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
