@@ -19,6 +19,7 @@ use App\Http\Controllers\PreinvoiceApiController;
 use App\Http\Controllers\PreinvoiceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductSalesLedgerController;
+use App\Http\Controllers\ProductPurchaseLedgerController;
 use App\Http\Controllers\ProductDeactivationDocumentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
@@ -51,6 +52,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('products', ProductController::class)->except(['show', 'destroy']);
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('role:admin|Admin')->name('products.destroy');
     Route::get('/products/{product}/sales-ledger', [ProductSalesLedgerController::class, 'index'])->name('products.sales-ledger');
+    Route::get('/products/{product}/purchase-ledger', [ProductPurchaseLedgerController::class, 'index'])->name('products.purchase-ledger');
     Route::resource('categories', CategoryController::class)->except(['show', 'destroy']);
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('role:admin|Admin')->name('categories.destroy');
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
