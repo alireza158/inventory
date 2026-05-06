@@ -10,7 +10,6 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\StockMovementReportController;
 
@@ -20,10 +19,6 @@ Route::get('/movements', [StockMovementReportController::class, 'index'])
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth'])
     ->name('dashboard');
-
-Route::get('/products/import', [ProductImportController::class, 'show'])->name('products.import.show');
-Route::post('/products/import', [ProductImportController::class, 'import'])->name('products.import');
-Route::get('/products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
 
 Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])

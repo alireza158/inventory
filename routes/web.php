@@ -19,7 +19,6 @@ use App\Http\Controllers\PreinvoiceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductSalesLedgerController;
 use App\Http\Controllers\ProductDeactivationDocumentController;
-use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\StockMovementController;
@@ -56,10 +55,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
 
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
-
-    Route::get('/products/import', [ProductImportController::class, 'show'])->name('products.import.show');
-    Route::post('/products/import', [ProductImportController::class, 'import'])->name('products.import');
-    Route::get('/products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
 
     Route::post('/products/sync-crm', [ProductController::class, 'syncCrm'])->name('products.sync.crm');
     Route::get('/product-deactivation-documents', [ProductDeactivationDocumentController::class, 'index'])->name('product-deactivation-documents.index');
@@ -100,6 +95,8 @@ Route::get('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherEdi
 Route::get('/vouchers/sales/{uuid}/view', [InvoiceController::class, 'salesVoucherShow'])->name('vouchers.sales.show');
 Route::get('/vouchers/sales/{uuid}/history', [InvoiceController::class, 'salesVoucherHistory'])->name('vouchers.sales.history');
 Route::put('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherUpdate'])->name('vouchers.sales.update');
+Route::post('/vouchers/sales/{uuid}/status', [InvoiceController::class, 'updateStatus'])->name('vouchers.sales.status');
+Route::get('/vouchers/sales/{uuid}/print', [InvoiceController::class, 'print'])->name('vouchers.sales.print');
 
 Route::get('/vouchers/section/{type}', [VoucherController::class, 'sectionIndex'])->name('vouchers.section.index');
 Route::get('/vouchers/section/{type}/create', [VoucherController::class, 'sectionCreate'])->name('vouchers.section.create');
