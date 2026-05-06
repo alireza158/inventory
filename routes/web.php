@@ -19,7 +19,6 @@ use App\Http\Controllers\PreinvoiceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductSalesLedgerController;
 use App\Http\Controllers\ProductDeactivationDocumentController;
-use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\StockMovementController;
@@ -56,10 +55,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
 
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
-
-    Route::get('/products/import', [ProductImportController::class, 'show'])->name('products.import.show');
-    Route::post('/products/import', [ProductImportController::class, 'import'])->name('products.import');
-    Route::get('/products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
 
     Route::post('/products/sync-crm', [ProductController::class, 'syncCrm'])->name('products.sync.crm');
     Route::get('/product-deactivation-documents', [ProductDeactivationDocumentController::class, 'index'])->name('product-deactivation-documents.index');
