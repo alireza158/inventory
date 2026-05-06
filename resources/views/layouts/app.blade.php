@@ -121,6 +121,22 @@
     </div>
 
     <div class="d-flex align-items-center gap-2">
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary position-relative" data-bs-toggle="dropdown" id="notifBell">
+                🔔
+                <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:320px">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>اعلان‌ها</strong>
+                    <button class="btn btn-sm btn-link p-0" id="notifReadAllBtn">خواندن همه</button>
+                </div>
+                <div id="notifList" class="small text-muted">در حال بارگذاری...</div>
+                <div class="mt-2 text-center">
+                    <a href="{{ route('notifications.index') }}" class="small">مشاهده همه آلارم‌ها</a>
+                </div>
+            </div>
+        </div>
         <button type="button"
                 class="app-back-btn"
                 id="appBackBtn"
@@ -185,6 +201,33 @@
         return;
       }
       window.location.href = fallbackUrl;
+    });
+  });
+
+  async function loadNotifications(){
+    const [cRes,lRes] = await Promise.all([
+      fetch('{{ route('notifications.unread-count') }}'),
+      fetch('{{ route('notifications.latest') }}')
+    ]);
+    const count = (await cRes.json()).count || 0;
+    const badge = document.getElementById('notifBadge');
+    badge.textContent = count;
+    badge.classList.toggle('d-none', count <= 0);
+
+    const list = await lRes.json();
+    const wrap = document.getElementById('notifList');
+    if (!list.length) { wrap.innerHTML = '<div class=\"text-muted\">اعلانی وجود ندارد.</div>'; return; }
+    wrap.innerHTML = list.map(n => `<a class="d-block text-decoration-none p-2 mb-1 rounded ${n.read_at ? 'bg-light' : 'bg-info bg-opacity-10'}" href="/notifications/${n.id}/open">
+      <div class="fw-bold text-dark">${n.title}</div>
+      <div class="text-muted small">${n.message ?? ''}</div>
+    </a>`).join('');
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    loadNotifications();
+    setInterval(loadNotifications, 45000);
+    document.getElementById('notifReadAllBtn')?.addEventListener('click', async function(){
+      await fetch('{{ route('notifications.read-all') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}'}});
+      loadNotifications();
     });
   });
 

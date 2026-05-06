@@ -12,6 +12,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceNoteController;
 use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ModelListController;
 use App\Http\Controllers\PreinvoiceApiController;
@@ -112,6 +113,13 @@ Route::get('/vouchers/sale-delivery/{uuid}/edit', [VoucherController::class, 'sa
 Route::put('/vouchers/sale-delivery/{uuid}', [VoucherController::class, 'saleDeliveryUpdate'])->name('vouchers.sale-delivery.update');
 
 Route::get('/vouchers/return/customers/{customer}/invoices', [VoucherController::class, 'customerInvoices'])->name('vouchers.return.customer.invoices');
+
+Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+Route::get('/notifications/latest', [NotificationController::class, 'latest'])->name('notifications.latest');
+Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
 
 Route::get('/vouchers/{voucher}', [VoucherController::class, 'show'])->name('vouchers.show');
 Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');

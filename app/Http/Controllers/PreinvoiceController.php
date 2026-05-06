@@ -15,6 +15,7 @@ use App\Models\WarehouseStock;
 use App\Support\DocumentCodeGenerator;
 use App\Services\WarehouseStockService;
 use App\Services\PaymentRegistrationService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -22,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 
 class PreinvoiceController extends Controller
 {
-    public function __construct(private readonly PaymentRegistrationService $paymentService) {}
+    public function __construct(private readonly PaymentRegistrationService $paymentService, private readonly NotificationService $notificationService) {}
 
     public function create()
     {
@@ -108,6 +109,11 @@ class PreinvoiceController extends Controller
                 'before_items' => $before,
                 'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
             ]);
+            if (!empty($order->created_by)) {
+                $this->notificationService->notifyUser((int)$order->created_by,'preinvoice_warehouse_changed','پیش‌فاکتور شما توسط انبار اصلاح شد',
+                    "آیتم‌های پیش‌فاکتور مشتری {$order->customer_name} توسط انبار اصلاح شد.", route('preinvoice.my.show', $order->uuid),
+                    ['level'=>'warning','notifiable_type'=>PreinvoiceOrder::class,'notifiable_id'=>$order->id,'unique_key'=>"operator_warehouse_changed:{$order->id}:{$order->created_by}"]);
+            }
         });
 
         return back()->with('success', '✅ تغییرات انبار ذخیره شد.');
@@ -150,6 +156,15 @@ class PreinvoiceController extends Controller
                 'before_items' => $before,
                 'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
             ]);
+            $this->notificationService->notifyRole('finance','preinvoice_submitted_to_finance','پیش‌فاکتور جدید در انتظار تایید مالی',
+                "پیش‌فاکتور مشتری {$order->customer_name} توسط انبار تایید شد و آماده بررسی مالی است.",
+                route('preinvoice.draft.finance', $order->uuid),
+                ['level'=>'info','notifiable_type'=>PreinvoiceOrder::class,'notifiable_id'=>$order->id,'unique_key'=>"finance_preinvoice_ready:{$order->id}"]);
+            if (!empty($order->created_by)) {
+                $this->notificationService->notifyUser((int)$order->created_by,'preinvoice_warehouse_approved','پیش‌فاکتور شما توسط انبار تایید شد',
+                    "پیش‌فاکتور مشتری {$order->customer_name} تایید انبار شد و وارد صف مالی شد.", route('preinvoice.my.show', $order->uuid),
+                    ['level'=>'success','notifiable_type'=>PreinvoiceOrder::class,'notifiable_id'=>$order->id,'unique_key'=>"operator_warehouse_approved:{$order->id}:{$order->created_by}"]);
+            }
         });
 
         return redirect()->route('preinvoice.warehouse.index')
@@ -175,6 +190,9 @@ class PreinvoiceController extends Controller
         if ($this->hasActiveFreeze($order)) {
             $this->releaseReservedStock($order);
             $order->update(['stock_released_at' => now()]);
+        }
+        if (!empty($order->created_by)) {
+            $this->notificationService->notifyUser((int)$order->created_by,'preinvoice_warehouse_rejected','پیش‌فاکتور شما توسط انبار برگشت خورد','علت: ' . $data['warehouse_reject_reason'], route('preinvoice.my.show', $order->uuid),['level'=>'danger','notifiable_type'=>PreinvoiceOrder::class,'notifiable_id'=>$order->id,'unique_key'=>"operator_warehouse_rejected:{$order->id}:{$order->created_by}"]);
         }
 
         return redirect()->route('preinvoice.warehouse.index')->with('success', '✅ پیش‌فاکتور رد شد.');
@@ -276,6 +294,12 @@ class PreinvoiceController extends Controller
             $this->syncItems($order, $validated['products']);
             $this->reserveOrderStock($order);
             $order->update(['total_price' => $this->calculateOrderTotal($order)]);
+
+            $this->notificationService->notifyRole('warehouse','preinvoice_submitted_to_warehouse','پیش‌فاکتور جدید در انتظار تایید انبار',
+                "پیش‌فاکتور مشتری {$order->customer_name} با مبلغ " . number_format((int) $order->total_price) . " تومان ثبت شد و منتظر بررسی انبار است.",
+                route('preinvoice.warehouse.review', $order->uuid),
+                ['level'=>'info','notifiable_type'=>PreinvoiceOrder::class,'notifiable_id'=>$order->id,'unique_key'=>"warehouse_preinvoice_submitted:{$order->id}"]
+            );
         });
 
         return redirect()->route('preinvoice.warehouse.index')
@@ -975,6 +999,16 @@ class PreinvoiceController extends Controller
                 'stock_frozen_until' => null,
                 'stock_released_at' => now(),
             ]);
+
+            $this->notificationService->notifyRole('warehouse','invoice_ready_for_sales_voucher','فاکتور جدید آماده حواله فروش است',
+                "فاکتور شماره {$invoice->uuid} برای مشتری {$invoice->customer_name} صادر شد و آماده جمع‌آوری/چاپ حواله فروش است.",
+                route('vouchers.sales.print', $invoice->uuid),
+                ['level'=>'success','notifiable_type'=>Invoice::class,'notifiable_id'=>$invoice->id,'unique_key'=>"warehouse_invoice_ready:{$invoice->id}"]);
+            if (!empty($order->created_by)) {
+                $this->notificationService->notifyUser((int)$order->created_by,'preinvoice_finance_approved','پیش‌فاکتور شما تایید مالی شد',
+                    "پیش‌فاکتور مشتری {$order->customer_name} به فاکتور شماره {$invoice->uuid} تبدیل شد.", route('invoices.show', $invoice->uuid),
+                    ['level'=>'success','notifiable_type'=>Invoice::class,'notifiable_id'=>$invoice->id,'unique_key'=>"operator_finance_approved:{$order->id}:{$order->created_by}"]);
+            }
 
             return $invoice;
         });
