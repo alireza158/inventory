@@ -50,6 +50,44 @@
     box-shadow: 0 8px 18px rgba(15,23,42,.06);
   }
   .app-menu-btn svg{ width: 22px; height: 22px; }
+
+  .app-back-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    height:34px;
+    padding:0 10px;
+    border:1px solid rgba(12,83,103,.16);
+    background:#fff;
+    color:#0c5367;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:800;
+    cursor:pointer;
+    transition:all .15s ease;
+    white-space:nowrap;
+  }
+  .app-back-btn:hover{
+    background:rgba(51,199,192,.08);
+    border-color:rgba(51,199,192,.35);
+    color:#083d50;
+  }
+  .app-back-btn .back-icon{
+    font-size:22px;
+    line-height:1;
+    font-weight:900;
+  }
+  @media (max-width:575.98px){
+    .app-back-btn{
+      width:36px;
+      min-width:36px;
+      padding:0;
+      border-radius:10px;
+    }
+    .app-back-btn .back-text{ display:none; }
+    .app-back-btn .back-icon{ font-size:24px; }
+  }
 </style>
 <body class="bg-light">
 <div class="d-flex" style="min-height: 100vh">
@@ -60,6 +98,12 @@
     {{-- Main --}}
     <div class="flex-grow-1">
         {{-- Topbar --}}
+@php
+    $backFallbackUrl = url('/');
+    if (\Illuminate\Support\Facades\Route::has('dashboard')) {
+        $backFallbackUrl = route('dashboard');
+    }
+@endphp
 <div class="app-topbar bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center gap-2 fw-bold text-muted">
 
@@ -76,20 +120,47 @@
         <span class="text-truncate">{{ config('app.name','سیستم انبار آریا جانبی') }}</span>
     </div>
 
-    <div class="dropdown">
-        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-            {{ auth()->user()->name ?? 'کاربر' }}
+    <div class="d-flex align-items-center gap-2">
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary position-relative" data-bs-toggle="dropdown" id="notifBell">
+                🔔
+                <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:320px">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>اعلان‌ها</strong>
+                    <button class="btn btn-sm btn-link p-0" id="notifReadAllBtn">خواندن همه</button>
+                </div>
+                <div id="notifList" class="small text-muted">در حال بارگذاری...</div>
+                <div class="mt-2 text-center">
+                    <a href="{{ route('notifications.index') }}" class="small">مشاهده همه آلارم‌ها</a>
+                </div>
+            </div>
+        </div>
+        <button type="button"
+                class="app-back-btn"
+                id="appBackBtn"
+                data-fallback-url="{{ $backFallbackUrl }}"
+                title="بازگشت">
+            <span class="back-icon">‹</span>
+            <span class="back-text">بازگشت</span>
         </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li><span class="dropdown-item-text text-muted small">{{ auth()->user()->email ?? '' }}</span></li>
-            <li><hr class="dropdown-divider"></li>
-            <li>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button class="dropdown-item text-danger">خروج</button>
-                </form>
-            </li>
-        </ul>
+
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                {{ auth()->user()->name ?? 'کاربر' }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><span class="dropdown-item-text text-muted small">{{ auth()->user()->email ?? '' }}</span></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button class="dropdown-item text-danger">خروج</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
     </div>
 </div>
 
@@ -119,6 +190,47 @@
 
 {{-- فرمت هزارگان برای ورودی‌های money --}}
 <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const backBtn = document.getElementById('appBackBtn');
+    if (!backBtn) return;
+
+    backBtn.addEventListener('click', function () {
+      const fallbackUrl = this.dataset.fallbackUrl || '/';
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      window.location.href = fallbackUrl;
+    });
+  });
+
+  async function loadNotifications(){
+    const [cRes,lRes] = await Promise.all([
+      fetch('{{ route('notifications.unread-count') }}'),
+      fetch('{{ route('notifications.latest') }}')
+    ]);
+    const count = (await cRes.json()).count || 0;
+    const badge = document.getElementById('notifBadge');
+    badge.textContent = count;
+    badge.classList.toggle('d-none', count <= 0);
+
+    const list = await lRes.json();
+    const wrap = document.getElementById('notifList');
+    if (!list.length) { wrap.innerHTML = '<div class=\"text-muted\">اعلانی وجود ندارد.</div>'; return; }
+    wrap.innerHTML = list.map(n => `<a class="d-block text-decoration-none p-2 mb-1 rounded ${n.read_at ? 'bg-light' : 'bg-info bg-opacity-10'}" href="/notifications/${n.id}/open">
+      <div class="fw-bold text-dark">${n.title}</div>
+      <div class="text-muted small">${n.message ?? ''}</div>
+    </a>`).join('');
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    loadNotifications();
+    setInterval(loadNotifications, 45000);
+    document.getElementById('notifReadAllBtn')?.addEventListener('click', async function(){
+      await fetch('{{ route('notifications.read-all') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}'}});
+      loadNotifications();
+    });
+  });
+
   function formatMoneyInput(el){
     const raw = (el.value || '').replace(/[^\d]/g,'');
     el.value = raw.replace(/\B(?=(\d{3})+(?!\d))/g, ",");

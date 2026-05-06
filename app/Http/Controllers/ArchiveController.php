@@ -21,7 +21,7 @@ class ArchiveController extends Controller
                 'reviews.user:id,name',
                 'activityLogs.user:id,name',
             ])
-            ->where('status', '!=', PreinvoiceOrder::STATUS_FINANCE_APPROVED)
+            ->where('status', '!=', PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE)
             ->orderByDesc('id')
             ->paginate(15, ['*'], 'preinvoice_page')
             ->withQueryString();

@@ -5,10 +5,37 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">📄 نمایش فقط‌خواندنی حواله فروش</h4>
     <div class="d-flex gap-2">
+      <a href="{{ route('vouchers.sales.print', $invoice->uuid) }}" target="_blank" class="btn btn-outline-success">چاپ</a>
       <a href="{{ route('vouchers.sales.edit', $invoice->uuid) }}" class="btn btn-outline-primary">ویرایش</a>
       <a href="{{ route('vouchers.sales.index') }}" class="btn btn-outline-secondary">بازگشت</a>
     </div>
   </div>
+
+  @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
+  @if($errors->any())
+    <div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>
+  @endif
+
+  <form method="POST" action="{{ route('vouchers.sales.status', $invoice->uuid) }}" class="card border-0 shadow-sm mb-3">
+    @csrf
+    <div class="card-body row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label">تغییر وضعیت حواله</label>
+        <select name="status" class="form-select">
+          @foreach($statusLabels as $key => $label)
+            <option value="{{ $key }}" @selected($invoice->status===$key)>{{ $label }}</option>
+          @endforeach
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">یادداشت</label>
+        <input name="note" class="form-control" placeholder="اختیاری">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100">ثبت وضعیت</button>
+      </div>
+    </div>
+  </form>
 
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-body row g-2">
