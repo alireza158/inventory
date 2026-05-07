@@ -1540,4 +1540,4 @@ return $currentDir === 'asc' ? '↑' : '↓';
         });
     });
 </script>
-@endsection
+@endsection 
