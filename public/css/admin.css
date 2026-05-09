@@ -1119,35 +1119,3 @@ body{
 
 /* =====================================
    Corporate Minimal Theme (all admin pages)
-===================================== */
-:root{
-  --bg: #f3f4f6;
-  --card: #ffffff;
-  --text: #111827;
-  --muted: #6b7280;
-  --border: #d1d5db;
-  --primary: #374151;
-  --primary-2: #4b5563;
-  --primary-soft: #eef0f3;
-}
-
-body,.bg-light{ background: var(--bg) !important; color: var(--text) !important; }
-
-.app-topbar,
-.navbar,
-.card,.table-card,.filter-card,.stat-card,.alert,
-.app-sidebar,.sidebar-link,.sidebar-sublink,
-.modal-content,.dropdown-menu{
-  background: #fff !important;
-  box-shadow: none !important;
-  border: 1px solid var(--border) !important;
-}
-
-.table thead th{ background: #f9fafb !important; color: #374151 !important; }
-.btn-primary,.btn-success,.btn-info{ background: #374151 !important; border-color:#374151 !important; color:#fff !important; }
-.btn-outline-primary,.btn-outline-secondary,.btn-outline-dark,.btn-outline-success,.btn-outline-danger{
-  color:#374151 !important; border-color:#9ca3af !important;
-}
-
-a,.nav-link{ color:#374151; }
-.text-primary{ color:#374151 !important; }
