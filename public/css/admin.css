@@ -1042,3 +1042,76 @@
     width: 100%;
   }
 }
+/* =====================================
+   Minimal Calm Theme Override (global)
+===================================== */
+:root{
+  --bg: #f5f7f9;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #4b5563;
+  --primary-2: #6b7280;
+  --primary-soft: #eef2f7;
+  --success:#15803d;
+  --success-soft:#eaf7ef;
+  --danger:#b91c1c;
+  --danger-soft:#fdeeee;
+  --warning:#b45309;
+  --warning-soft:#fff5e6;
+  --shadow-sm: 0 2px 10px rgba(15,23,42,.05);
+  --shadow-md: 0 8px 24px rgba(15,23,42,.07);
+  --radius: 12px;
+  --radius-sm: 10px;
+}
+
+body{
+  background: var(--bg) !important;
+  color: var(--text);
+}
+
+.card,.filter-card,.stat-card,.table-card,.app-sidebar{
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+}
+
+.page-title::before,
+.stat-card::before,
+.app-sidebar::before,
+.purchase-item::before{
+  display:none !important;
+}
+
+.btn-primary,
+.page-item.active .page-link,
+.table-card thead th{
+  background: #4b5563 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.btn,
+.form-control,
+.form-select,
+.page-link,
+.badge,
+.sidebar-link,
+.sidebar-sublink{
+  border-radius: 10px !important;
+}
+
+.btn:hover{
+  transform:none !important;
+  box-shadow:none !important;
+}
+
+.table tbody tr:hover,
+#catTree a:hover,
+.sidebar-link:hover,
+.sidebar-sublink:hover{
+  background: #f3f4f6 !important;
+}
