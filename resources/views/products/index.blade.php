@@ -2,234 +2,152 @@
 
 @section('content')
 @php
-$currentSort = $sort ?? 'id';
-$currentDir = $dir ?? 'desc';
+    $currentSort = $sort ?? 'id';
+    $currentDir = $dir ?? 'desc';
 
-$toFa = fn ($value) => strtr((string) $value, [
-'0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴',
-'5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹',
-]);
+    $toFa = fn ($value) => strtr((string) $value, [
+        '0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴',
+        '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹',
+    ]);
 
-$sortLink = function (string $key) use ($currentSort, $currentDir) {
-$nextDir = ($currentSort === $key && $currentDir === 'asc') ? 'desc' : 'asc';
+    $sortLink = function (string $key) use ($currentSort, $currentDir) {
+        $nextDir = ($currentSort === $key && $currentDir === 'asc') ? 'desc' : 'asc';
 
-return route('products.index', array_merge(
-request()->query(),
-['sort' => $key, 'dir' => $nextDir, 'page' => null]
-));
-};
+        return route('products.index', array_merge(
+            request()->query(),
+            ['sort' => $key, 'dir' => $nextDir, 'page' => null]
+        ));
+    };
 
-$sortArrow = function (string $key) use ($currentSort, $currentDir) {
-if ($currentSort !== $key) {
-return '↕';
-}
+    $sortArrow = function (string $key) use ($currentSort, $currentDir) {
+        if ($currentSort !== $key) {
+            return '↕';
+        }
 
-return $currentDir === 'asc' ? '↑' : '↓';
-};
+        return $currentDir === 'asc' ? '↑' : '↓';
+    };
 @endphp
 
 <style>
     :root {
-        --brand: #14B5CC;
-        --brand-dark: #0C5367;
-        --brand-deep: #083D50;
-        --accent: #F1AB27;
-        --purple: #5B43E8;
-        --pink: #E6459A;
+        --brand: #0EA5B7;
+        --brand-dark: #0F5965;
+        --brand-deep: #12343D;
 
-        --bg: #F5F7FB;
+        --bg: #F4F6F8;
         --card: #FFFFFF;
         --soft: #F8FAFC;
-        --border: #E7ECF3;
-        --text: #142B38;
-        --muted: #748292;
+        --border: #E2E8F0;
+        --border-soft: #EEF2F7;
+
+        --text: #1F2937;
+        --muted: #6B7280;
 
         --success: #16A34A;
         --danger: #DC2626;
-        --warning: #F59E0B;
 
-        --radius: 22px;
-        --radius-sm: 14px;
-        --shadow: 0 18px 48px rgba(15, 23, 42, .07);
-        --shadow-sm: 0 8px 24px rgba(15, 23, 42, .045);
+        --radius: 14px;
+        --shadow: 0 8px 24px rgba(15, 23, 42, .05);
     }
 
     body {
-        background:
-            radial-gradient(circle at 12% 8%, rgba(91, 67, 232, .08), transparent 34%),
-            radial-gradient(circle at 85% 20%, rgba(20, 181, 204, .10), transparent 36%),
-            linear-gradient(180deg, #F7F8FC 0%, #EEF3F8 100%);
+        background: var(--bg);
         color: var(--text);
-        font-size: 14px;
+        font-size: 13.5px;
     }
 
     .inventory-page {
-        max-width: 1280px;
+        width: 100%;
+        max-width: 1680px;
         margin: 0 auto;
-        padding: 22px 12px 36px;
+        padding: 18px 16px 34px;
     }
 
-    .inventory-hero {
-        border-radius: 28px;
-        background: linear-gradient(135deg, var(--purple) 0%, #7B39E8 42%, var(--pink) 100%);
-        box-shadow: 0 22px 55px rgba(91, 67, 232, .20);
-        padding: 28px 32px;
-        color: #fff;
-        margin-bottom: 22px;
-        position: relative;
-        overflow: hidden;
+    .page-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
     }
 
-    .inventory-hero::before {
-        content: "";
-        position: absolute;
-        width: 260px;
-        height: 260px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, .12);
-        left: -85px;
-        top: -120px;
+    .inventory-header {
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        border-right: 5px solid var(--brand);
     }
 
-    .inventory-hero::after {
-        content: "";
-        position: absolute;
-        width: 160px;
-        height: 160px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, .10);
-        right: 26%;
-        bottom: -95px;
-    }
-
-    .hero-content {
-        position: relative;
-        z-index: 1;
-    }
-
-    .hero-title {
-        margin: 0;
-        font-size: 1.45rem;
-        font-weight: 900;
-        letter-spacing: -.4px;
-    }
-
-    .hero-subtitle {
-        margin-top: 8px;
-        color: rgba(255, 255, 255, .82);
-        font-size: .86rem;
-        font-weight: 600;
-    }
-
-    .hero-actions {
+    .inventory-header-inner {
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 10px;
+        gap: 14px;
         flex-wrap: wrap;
     }
 
-    .hero-btn {
-        border: 0;
-        border-radius: 14px;
-        padding: 10px 16px;
-        font-weight: 850;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
-        white-space: nowrap;
-    }
-
-    .hero-btn:hover {
-        transform: translateY(-1px);
-        opacity: .96;
-    }
-
-    .hero-btn-primary {
-        background: #fff;
-        color: var(--purple);
-        box-shadow: 0 14px 26px rgba(15, 23, 42, .14);
-    }
-
-    .hero-btn-success {
-        background: rgba(255, 255, 255, .16);
-        color: #fff;
-        border: 1px solid rgba(255, 255, 255, .24);
-    }
-
-    .layout-row {
-        display: grid;
-        grid-template-columns: 260px minmax(0, 1fr);
-        gap: 16px;
-        align-items: start;
-    }
-
-    .glass-card {
-        background: rgba(255, 255, 255, .94);
-        border: 1px solid rgba(231, 236, 243, .92);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        backdrop-filter: blur(10px);
-    }
-
-    .side-card {
-        position: sticky;
-        top: 88px;
-        padding: 18px;
-    }
-
-    .side-title {
+    .page-title {
+        margin: 0;
+        font-size: 1.2rem;
         font-weight: 900;
         color: var(--brand-deep);
-        margin: 0;
     }
 
-    .side-link {
-        font-size: .78rem;
+    .page-subtitle {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: .82rem;
+        line-height: 1.8;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .btn-soft,
+    .btn-main {
+        border-radius: 10px;
+        padding: 8px 13px;
+        font-size: .8rem;
         font-weight: 800;
-        color: var(--purple);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
         text-decoration: none;
+        border: 1px solid transparent;
+        white-space: nowrap;
+        transition: all .15s ease;
+        cursor: pointer;
     }
 
-    .side-link:hover {
-        text-decoration: underline;
+    .btn-main {
+        background: var(--brand);
+        color: #fff;
+        border-color: var(--brand);
     }
 
-    .cat-search {
-        height: 42px;
-        border-radius: 14px;
-        border: 1px solid var(--border);
+    .btn-main:hover {
+        background: var(--brand-dark);
+        border-color: var(--brand-dark);
+        color: #fff;
+    }
+
+    .btn-soft {
         background: #fff;
-        font-size: .84rem;
+        color: var(--brand-deep);
+        border-color: var(--border);
     }
 
-    .cat-tree-wrap {
-        max-height: calc(100vh - 270px);
-        overflow: auto;
-        padding-left: 4px;
-        padding-right: 2px;
-    }
-
-    .cat-tree-wrap::-webkit-scrollbar,
-    .sheet-scroll::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    .cat-tree-wrap::-webkit-scrollbar-thumb,
-    .sheet-scroll::-webkit-scrollbar-thumb {
-        background: #CDD6E3;
-        border-radius: 99px;
-    }
-
-    .main-shell {
-        min-width: 0;
+    .btn-soft:hover {
+        background: var(--soft);
+        color: var(--brand-deep);
     }
 
     .toolbar-card {
-        padding: 18px;
-        margin-bottom: 16px;
+        padding: 15px;
+        margin-bottom: 14px;
     }
 
     .toolbar-top {
@@ -238,32 +156,42 @@ return $currentDir === 'asc' ? '↑' : '↓';
         align-items: center;
         gap: 12px;
         flex-wrap: wrap;
-        margin-bottom: 14px;
+        margin-bottom: 12px;
     }
 
     .section-title {
         margin: 0;
-        font-size: 1rem;
+        font-size: .98rem;
         font-weight: 900;
         color: var(--brand-deep);
     }
 
     .subtle-text {
         color: var(--muted);
-        font-size: .8rem;
+        font-size: .78rem;
         line-height: 1.8;
     }
 
+    .count-badge {
+        background: #ECFEFF;
+        color: var(--brand-dark);
+        border: 1px solid #BAE6FD;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: .78rem;
+        font-weight: 850;
+    }
+
     .operation-strip {
-        background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFF 100%);
+        background: var(--soft);
         border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 12px;
+        border-radius: 12px;
+        padding: 10px;
         display: grid;
-        grid-template-columns: minmax(170px, 1fr) auto;
+        grid-template-columns: minmax(250px, 1fr) auto;
         gap: 10px;
         align-items: center;
-        margin-bottom: 14px;
+        margin-bottom: 13px;
     }
 
     .selected-info {
@@ -274,21 +202,21 @@ return $currentDir === 'asc' ? '↑' : '↓';
     }
 
     .selected-dot {
-        width: 34px;
-        height: 34px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, rgba(91, 67, 232, .12), rgba(20, 181, 204, .16));
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: #DFF7FA;
+        color: var(--brand-dark);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: var(--purple);
         font-weight: 900;
         flex: 0 0 auto;
     }
 
     .selected-title {
         font-weight: 900;
-        font-size: .86rem;
+        font-size: .84rem;
         color: var(--brand-deep);
         white-space: nowrap;
         overflow: hidden;
@@ -296,47 +224,69 @@ return $currentDir === 'asc' ? '↑' : '↓';
     }
 
     .selected-hint {
-        font-size: .74rem;
         color: var(--muted);
+        font-size: .73rem;
         margin-top: 2px;
     }
 
     .operation-actions {
         display: flex;
-        gap: 8px;
+        justify-content: flex-end;
         align-items: center;
         flex-wrap: wrap;
-        justify-content: flex-end;
+        gap: 7px;
     }
 
     .variant-operation-select {
-        width: 190px;
-        height: 36px;
-        border-radius: 12px;
-        font-size: .78rem;
+        width: 185px;
+        height: 35px;
+        border-radius: 10px;
+        font-size: .77rem;
     }
 
     .btn-mini {
-        border-radius: 12px;
+        border-radius: 10px;
         padding: 7px 11px;
-        font-size: .78rem;
-        font-weight: 850;
+        font-size: .77rem;
+        font-weight: 800;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 5px;
         white-space: nowrap;
     }
 
+    .inventory-page .btn-primary {
+        background: var(--brand);
+        border-color: var(--brand);
+    }
+
+    .inventory-page .btn-primary:hover {
+        background: var(--brand-dark);
+        border-color: var(--brand-dark);
+    }
+
+    .inventory-page .btn-outline-primary {
+        color: var(--brand-dark);
+        border-color: rgba(14, 165, 183, .45);
+    }
+
+    .inventory-page .btn-outline-primary:hover {
+        color: #fff;
+        background: var(--brand);
+        border-color: var(--brand);
+    }
+
     .filter-grid {
         display: grid;
-        grid-template-columns: minmax(240px, 1.5fr) minmax(140px, .75fr) minmax(140px, .75fr) minmax(160px, .9fr) auto;
-        gap: 10px;
+        grid-template-columns: minmax(320px, 1.6fr) minmax(145px, .7fr) minmax(145px, .7fr) minmax(190px, .9fr) auto;
+        gap: 9px;
         align-items: end;
     }
 
     .label-sm {
-        font-size: .76rem;
-        font-weight: 850;
+        font-size: .74rem;
+        font-weight: 800;
         color: #526171;
         margin-bottom: 6px;
     }
@@ -344,24 +294,15 @@ return $currentDir === 'asc' ? '↑' : '↓';
     .form-control,
     .form-select {
         border-color: var(--border);
-        border-radius: 13px;
+        border-radius: 10px;
         color: var(--text);
+        font-size: .82rem;
     }
 
     .form-control:focus,
     .form-select:focus {
         border-color: var(--brand);
-        box-shadow: 0 0 0 .18rem rgba(20, 181, 204, .13);
-    }
-
-    .input-group .form-control:first-child {
-        border-top-right-radius: 13px;
-        border-bottom-right-radius: 13px;
-    }
-
-    .input-group .form-control:last-child {
-        border-top-left-radius: 13px;
-        border-bottom-left-radius: 13px;
+        box-shadow: 0 0 0 .14rem rgba(14, 165, 183, .12);
     }
 
     .product-card {
@@ -369,78 +310,74 @@ return $currentDir === 'asc' ? '↑' : '↓';
     }
 
     .product-card-head {
-        padding: 17px 20px;
+        padding: 14px 16px;
         border-bottom: 1px solid var(--border);
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 12px;
         flex-wrap: wrap;
-        background: linear-gradient(180deg, #FFFFFF, #FAFBFF);
-    }
-
-    .count-badge {
-        background: rgba(91, 67, 232, .08);
-        color: var(--purple);
-        border: 1px solid rgba(91, 67, 232, .14);
-        border-radius: 999px;
-        padding: 6px 12px;
-        font-size: .78rem;
-        font-weight: 850;
+        background: #fff;
     }
 
     .sheet-wrap {
-        padding: 16px;
+        padding: 12px;
     }
 
     .sheet-scroll {
-        overflow: auto;
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
         border: 1px solid var(--border);
-        border-radius: 18px;
+        border-radius: 12px;
         background: #fff;
     }
 
     .sheet {
-        margin: 0;
         width: 100%;
+        min-width: 1240px;
+        margin: 0;
         border-collapse: separate;
         border-spacing: 0;
-        min-width: 930px;
+        table-layout: fixed;
     }
+
+    .sheet col.col-check { width: 46px; }
+    .sheet col.col-toggle { width: 46px; }
+    .sheet col.col-code { width: 115px; }
+    .sheet col.col-barcode { width: 165px; }
+    .sheet col.col-stock { width: 110px; }
+    .sheet col.col-buy { width: 165px; }
+    .sheet col.col-sell { width: 165px; }
 
     .sheet thead th {
         position: sticky;
         top: 0;
         z-index: 5;
-        background: #FBFCFF;
-        color: #516070;
-        font-size: .76rem;
+        background: #F8FAFC;
+        color: #475569;
+        font-size: .74rem;
         font-weight: 900;
-        padding: 12px 10px;
+        padding: 11px 10px;
         border-bottom: 1px solid var(--border);
         white-space: nowrap;
         text-align: right;
     }
 
     .sheet tbody td {
-        padding: 12px 10px;
-        font-size: .84rem;
+        padding: 11px 10px;
+        font-size: .82rem;
         vertical-align: middle;
         background: #fff;
-        border-bottom: 1px solid #F1F4F8;
+        border-bottom: 1px solid var(--border-soft);
     }
 
     .sheet tbody tr:hover td {
-        background: #FBFDFF;
+        background: #FAFCFE;
     }
 
     .sheet tbody tr:last-child td {
         border-bottom: 0;
-    }
-
-    .w-1 {
-        width: 1%;
-        white-space: nowrap;
     }
 
     .nowrap {
@@ -449,7 +386,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
 
     .mono {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        letter-spacing: .4px;
+        letter-spacing: .2px;
         direction: ltr;
     }
 
@@ -462,61 +399,30 @@ return $currentDir === 'asc' ? '↑' : '↓';
     }
 
     .sortable-link:hover {
-        color: var(--purple);
+        color: var(--brand-dark);
     }
 
     .sort-arrow {
-        color: #99A3B0;
+        color: #94A3B8;
         font-size: .72rem;
-    }
-
-    .pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        border-radius: 999px;
-        padding: 4px 10px;
-        font-size: .75rem;
-        font-weight: 850;
-        border: 1px solid var(--border);
-        background: #fff;
-        white-space: nowrap;
-    }
-
-    .pill-gray {
-        background: #F8FAFC;
-        color: #4B5563;
-    }
-
-    .pill-danger {
-        background: rgba(220, 38, 38, .08);
-        border-color: rgba(220, 38, 38, .18);
-        color: #B91C1C;
-    }
-
-    .pill-success {
-        background: rgba(22, 163, 74, .10);
-        border-color: rgba(22, 163, 74, .18);
-        color: #15803D;
-    }
-
-    .pill-purple {
-        background: rgba(91, 67, 232, .08);
-        border-color: rgba(91, 67, 232, .16);
-        color: var(--purple);
     }
 
     .product-name-wrap {
         display: flex;
         flex-direction: column;
-        gap: 7px;
-        min-width: 240px;
+        gap: 6px;
+        min-width: 0;
+        width: 100%;
     }
 
     .product-title-text {
-        font-weight: 900;
+        font-weight: 850;
         color: var(--brand-deep);
-        line-height: 1.6;
+        line-height: 1.8;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        word-break: normal;
     }
 
     .sellable-state {
@@ -531,36 +437,64 @@ return $currentDir === 'asc' ? '↑' : '↓';
         align-items: center;
         border-radius: 999px;
         padding: 4px 9px;
-        font-size: .72rem;
-        font-weight: 850;
+        font-size: .71rem;
+        font-weight: 800;
         border: 1px solid transparent;
     }
 
     .sellable-badge.active {
         color: #166534;
-        background: rgba(34, 197, 94, .14);
-        border-color: rgba(22, 101, 52, .16);
+        background: #ECFDF3;
+        border-color: #BBF7D0;
     }
 
     .sellable-badge.inactive {
         color: #991B1B;
-        background: rgba(239, 68, 68, .12);
-        border-color: rgba(153, 27, 27, .16);
+        background: #FEF2F2;
+        border-color: #FECACA;
     }
 
-    .sellable-action-link {
-        font-size: .72rem;
+    .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: .74rem;
         font-weight: 800;
-        text-decoration: none;
+        border: 1px solid var(--border);
+        background: #fff;
+        white-space: nowrap;
+        max-width: 100%;
     }
 
-    .sellable-action-link:hover {
-        text-decoration: underline;
+    .pill-gray {
+        background: #F8FAFC;
+        color: #475569;
+    }
+
+    .pill-danger {
+        background: #FEF2F2;
+        border-color: #FECACA;
+        color: #B91C1C;
+    }
+
+    .pill-success {
+        background: #F0FDF4;
+        border-color: #BBF7D0;
+        color: #15803D;
+    }
+
+    .pill-purple {
+        background: #ECFEFF;
+        border-color: #BAE6FD;
+        color: var(--brand-dark);
     }
 
     .price-inline {
         white-space: nowrap;
-        font-weight: 900;
+        font-weight: 850;
         color: var(--brand-deep);
     }
 
@@ -569,46 +503,68 @@ return $currentDir === 'asc' ? '↑' : '↓';
     }
 
     .toggle-variants {
-        width: 32px;
-        height: 32px;
-        border-radius: 12px;
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         border: 1px solid var(--border);
         background: #fff;
-        color: var(--purple);
+        color: var(--brand-dark);
         font-weight: 900;
         transition: all .15s ease;
     }
 
     .toggle-variants:hover {
-        background: rgba(91, 67, 232, .08);
-        border-color: rgba(91, 67, 232, .20);
+        background: #ECFEFF;
+        border-color: #BAE6FD;
     }
 
     .variant-inner {
-        background: #FAFCFF;
-        border-radius: 16px;
-        border: 1px solid #EDF2F7;
-        padding: 12px;
+        background: #F8FAFC;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 10px;
     }
 
     .variant-table {
         margin: 0;
-        font-size: .8rem;
+        font-size: .79rem;
     }
 
     .variant-table th {
         color: #64748B;
         font-weight: 900;
-        font-size: .74rem;
+        font-size: .73rem;
         white-space: nowrap;
+    }
+
+    .variant-table td {
+        background: transparent !important;
+    }
+
+    .status-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    .status-dot.active {
+        background: #16A34A;
+        box-shadow: 0 0 0 4px rgba(22, 163, 74, .14);
+    }
+
+    .status-dot.inactive {
+        background: #DC2626;
+        box-shadow: 0 0 0 4px rgba(220, 38, 38, .13);
     }
 
     .empty-row {
         color: var(--muted);
-        padding: 52px 0 !important;
+        padding: 44px 0 !important;
         font-weight: 800;
     }
 
@@ -616,17 +572,48 @@ return $currentDir === 'asc' ? '↑' : '↓';
         margin-bottom: 0;
     }
 
+    .offcanvas {
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
+    }
+
+    .offcanvas-header {
+        border-bottom: 1px solid var(--border);
+    }
+
+    .cat-search {
+        height: 40px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #fff;
+        font-size: .82rem;
+    }
+
+    .cat-tree-wrap {
+        max-height: calc(100vh - 190px);
+        overflow: auto;
+        padding-left: 4px;
+        padding-right: 2px;
+    }
+
+    .side-link {
+        font-size: .78rem;
+        font-weight: 800;
+        color: var(--brand);
+        text-decoration: none;
+    }
+
     .modal-content {
         border: 0;
-        border-radius: 22px;
-        box-shadow: 0 28px 70px rgba(15, 23, 42, .18);
+        border-radius: 18px;
+        box-shadow: 0 22px 55px rgba(15, 23, 42, .18);
     }
 
     .modal-header {
-        background: linear-gradient(135deg, var(--purple), var(--pink));
+        background: var(--brand-deep);
         color: #fff;
         border-bottom: 0;
-        border-radius: 22px 22px 0 0;
+        border-radius: 18px 18px 0 0;
     }
 
     .modal-header .btn-close {
@@ -638,46 +625,17 @@ return $currentDir === 'asc' ? '↑' : '↓';
         font-weight: 900;
     }
 
-    .offcanvas {
-        border-top-left-radius: 22px;
-        border-bottom-left-radius: 22px;
+    .min-w-0 {
+        min-width: 0;
     }
 
     @media (max-width: 1199.98px) {
-        .layout-row {
-            grid-template-columns: 230px minmax(0, 1fr);
-        }
-
         .filter-grid {
             grid-template-columns: 1fr 1fr;
         }
 
         .filter-actions {
             grid-column: 1 / -1;
-        }
-    }
-
-    @media (max-width: 991.98px) {
-        .inventory-page {
-            padding: 14px 10px 28px;
-        }
-
-        .layout-row {
-            display: block;
-        }
-
-        .inventory-hero {
-            padding: 22px 18px;
-            border-radius: 22px;
-        }
-
-        .hero-title {
-            font-size: 1.15rem;
-        }
-
-        .toolbar-card,
-        .sheet-wrap {
-            padding: 12px;
         }
 
         .operation-strip {
@@ -687,306 +645,599 @@ return $currentDir === 'asc' ? '↑' : '↓';
         .operation-actions {
             justify-content: flex-start;
         }
-
-        .variant-operation-select {
-            width: min(100%, 240px);
-        }
     }
 
-    @media (max-width: 575.98px) {
+    @media (max-width: 767.98px) {
         body {
             font-size: 13px;
+            background: #F6F7F9;
         }
 
-        .inventory-hero {
-            margin-bottom: 14px;
+        .inventory-page {
+            padding: 10px 8px 24px;
         }
 
-        .hero-actions {
-            width: 100%;
+        .page-card {
+            border-radius: 13px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, .045);
         }
 
-        .hero-btn {
-            width: 100%;
-            justify-content: center;
+        .inventory-header {
+            padding: 13px;
+            margin-bottom: 10px;
+            border-right: 4px solid var(--brand);
         }
 
-        .filter-grid {
+        .inventory-header-inner {
+            display: block;
+        }
+
+        .page-title {
+            font-size: 1.02rem;
+            line-height: 1.8;
+        }
+
+        .page-subtitle {
+            font-size: .76rem;
+            line-height: 1.9;
+            margin-top: 3px;
+        }
+
+        .header-actions {
+            display: grid;
             grid-template-columns: 1fr;
+            gap: 7px;
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .btn-soft,
+        .btn-main {
+            width: 100%;
+            min-height: 39px;
+            font-size: .78rem;
+        }
+
+        .toolbar-card {
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .toolbar-top {
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .section-title {
+            font-size: .9rem;
+        }
+
+        .subtle-text {
+            font-size: .74rem;
+        }
+
+        .count-badge {
+            padding: 5px 10px;
+            font-size: .74rem;
+        }
+
+        .operation-strip {
+            display: block;
+            padding: 9px;
+            border-radius: 11px;
+            margin-bottom: 11px;
+        }
+
+        .selected-info {
+            align-items: flex-start;
+            margin-bottom: 9px;
+        }
+
+        .selected-title {
+            font-size: .78rem;
+            white-space: normal;
+            line-height: 1.8;
+        }
+
+        .selected-hint {
+            font-size: .7rem;
+            line-height: 1.8;
         }
 
         .operation-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
+            gap: 7px;
             width: 100%;
         }
 
         .operation-actions .variant-operation-select {
             grid-column: 1 / -1;
             width: 100%;
+            height: 38px;
         }
 
         .operation-actions .btn-mini {
-            justify-content: center;
+            width: 100%;
+            min-height: 38px;
+            font-size: .74rem;
+        }
+
+        .filter-grid {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .filter-actions {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr;
+            width: 100%;
+        }
+
+        .form-control,
+        .form-select {
+            height: 39px;
+            font-size: .78rem;
+            border-radius: 10px;
         }
 
         .product-card-head {
-            padding: 14px;
+            padding: 12px;
+            align-items: flex-start;
+        }
+
+        .product-card-head .pill {
+            display: none;
         }
 
         .sheet-wrap {
-            padding: 10px;
+            padding: 9px;
+        }
+
+        .sheet-scroll {
+            overflow: visible;
+            border: 0;
+            background: transparent;
+            border-radius: 0;
+        }
+
+        .sheet {
+            display: block;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .sheet colgroup,
+        .sheet thead {
+            display: none;
+        }
+
+        .sheet tbody {
+            display: block;
+            width: 100%;
+        }
+
+        .sheet tbody tr {
+            display: block;
+            width: 100%;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, .04);
+            overflow: hidden;
+        }
+
+        .sheet tbody td {
+            display: grid;
+            grid-template-columns: 88px minmax(0, 1fr);
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 9px 11px;
+            border-bottom: 1px solid var(--border-soft);
+            background: #fff;
+            font-size: .78rem;
+            text-align: right;
+            white-space: normal;
+        }
+
+        .sheet tbody td::before {
+            content: attr(data-label);
+            color: var(--muted);
+            font-size: .7rem;
+            font-weight: 800;
+        }
+
+        .sheet tbody td.mobile-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            background: #F8FAFC;
+        }
+
+        .sheet tbody td.mobile-top::before {
+            display: none;
+        }
+
+        .mobile-row-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mobile-row-title {
+            color: var(--brand-deep);
+            font-weight: 900;
+            font-size: .78rem;
+        }
+
+        .product-title-text {
+            font-size: .82rem;
+            line-height: 1.9;
+            font-weight: 900;
+        }
+
+        .pill {
+            width: fit-content;
+            max-width: 100%;
+            font-size: .72rem;
+            padding: 4px 9px;
+        }
+
+        .price-inline {
+            font-size: .78rem;
+            white-space: normal;
+        }
+
+        .sheet tbody tr.collapse {
+            display: none;
+        }
+
+        .sheet tbody tr.collapse.show {
+            display: block;
+        }
+
+        .sheet tbody tr.collapse td:first-child {
+            display: none;
+        }
+
+        .sheet tbody tr.collapse td.variant-cell {
+            display: block;
+            padding: 9px;
+            border-bottom: 0;
+        }
+
+        .sheet tbody tr.collapse td.variant-cell::before {
+            display: none;
+        }
+
+        .variant-table thead {
+            display: none;
+        }
+
+        .variant-table tbody,
+        .variant-table tr {
+            display: block;
+        }
+
+        .variant-table tr {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 7px;
+            margin-bottom: 8px;
+        }
+
+        .variant-table td {
+            display: flex !important;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 4px !important;
+            border-bottom: 1px solid var(--border-soft) !important;
+            background: #fff !important;
+            font-size: .74rem;
+        }
+
+        .variant-table td::before {
+            content: attr(data-label);
+            color: var(--muted);
+            font-size: .68rem;
+            font-weight: 800;
+        }
+
+        .variant-table td:last-child {
+            border-bottom: 0 !important;
+        }
+
+        .offcanvas {
+            width: min(88vw, 360px) !important;
+        }
+    }
+
+    @media (max-width: 390px) {
+        .sheet tbody td {
+            grid-template-columns: 76px minmax(0, 1fr);
+            padding: 8px 9px;
+        }
+
+        .operation-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .operation-actions .variant-operation-select {
+            grid-column: auto;
+        }
+
+        .filter-actions {
+            grid-template-columns: 1fr;
         }
     }
 </style>
 
 <div class="inventory-page">
-    <div class="inventory-hero">
-        <div class="hero-content d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div class="page-card inventory-header">
+        <div class="inventory-header-inner">
             <div>
-                <h1 class="hero-title">📦 مدیریت کالاها و موجودی</h1>
-                <div class="hero-subtitle">
-                    نمایش کالاها، کنترل موجودی، قیمت‌ها، تنوع‌ها، کارتکس فروش و عملیات سریع
+                <h1 class="page-title">مدیریت کالاها و موجودی</h1>
+                <div class="page-subtitle">
+                    مدیریت کالا، موجودی، قیمت خرید، قیمت فروش، تنوع‌ها و کارتکس‌های انبار
                 </div>
             </div>
 
-            <div class="hero-actions">
-                <a class="hero-btn hero-btn-success" href="{{ route('purchases.create') }}">
-                    ➕ خرید کالا
-                </a>
-
-                <a class="hero-btn hero-btn-primary" href="{{ route('products.create') }}">
-                    افزودن کالا
-                </a>
-
-                <button class="hero-btn hero-btn-success d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas">
+            <div class="header-actions">
+                <button class="btn-soft" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas">
                     دسته‌بندی‌ها
                 </button>
+
+                <a class="btn-soft" href="{{ route('purchases.create') }}">
+                    خرید کالا
+                </a>
+
+                <a class="btn-main" href="{{ route('products.create') }}">
+                    افزودن کالا
+                </a>
             </div>
         </div>
     </div>
 
-    <div class="layout-row">
-        <aside class="d-none d-lg-block">
-            <div class="glass-card side-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h2 class="side-title fs-6">دسته‌بندی‌ها</h2>
-                    <a href="{{ route('products.index', request()->except(['category_id', 'page'])) }}" class="side-link">همه</a>
+    <div id="productsAjaxArea">
+        <div class="page-card toolbar-card">
+            <div class="toolbar-top">
+                <div>
+                    <h2 class="section-title">عملیات و فیلتر کالاها</h2>
+                    <div class="subtle-text">برای عملیات سریع، فقط یک کالا را انتخاب کنید.</div>
                 </div>
 
-                <input type="text" id="catSearch" class="form-control cat-search mb-3" placeholder="جستجو در دسته‌ها...">
-
-                <div class="cat-tree-wrap" id="catTree">
-                    @include('categories._tree', ['nodes' => $categoryTree])
+                <div class="count-badge">
+                    {{ $toFa($products->total() ?? 0) }} کالا
                 </div>
             </div>
-        </aside>
 
-        <main class="main-shell">
-            <div id="productsAjaxArea">
-                <div class="glass-card toolbar-card">
-                    <div class="toolbar-top">
-                        <div>
-                            <h2 class="section-title">عملیات و فیلتر کالاها</h2>
-                            <div class="subtle-text">برای عملیات سریع، فقط یک کالا را انتخاب کنید.</div>
-                        </div>
+            <div class="operation-strip">
+                <div class="selected-info">
+                    <div class="selected-dot" id="selectedCountBadge">۰</div>
 
-                        <div class="count-badge">
-                            {{ $toFa($products->total() ?? 0) }} کالا
-                        </div>
+                    <div class="min-w-0">
+                        <div class="selected-title" id="selectedProductTitle">هیچ کالایی انتخاب نشده است</div>
+                        <div class="selected-hint" id="variantHelpText">برای انتخاب تنوع، ابتدا فقط یک کالا را تیک بزنید.</div>
                     </div>
-
-                    <div class="operation-strip">
-                        <div class="selected-info">
-                            <div class="selected-dot" id="selectedCountBadge">۰</div>
-                            <div class="min-w-0">
-                                <div class="selected-title" id="selectedProductTitle">هیچ کالایی انتخاب نشده است</div>
-                                <div class="selected-hint" id="variantHelpText">برای انتخاب تنوع، ابتدا فقط یک کالا را تیک بزنید.</div>
-                            </div>
-                        </div>
-
-                        <div class="operation-actions">
-                            <button class="btn btn-primary btn-mini" type="button" id="bulkEditBtn">
-                                ویرایش
-                            </button>
-
-                            <button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeleteBtn">
-                                حذف
-                            </button>
-
-                            <select id="bulkVariantSelect" class="form-select form-select-sm variant-operation-select" disabled>
-                                <option value="">تنوع محصول...</option>
-                            </select>
-
-                            <button class="btn btn-outline-primary btn-mini" type="button" id="bulkStockBtn">
-                                موجودی انبار
-                            </button>
-
-                            <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkSalesLedgerBtn">
-                                کارتکس فروش
-                            </button>
-
-                            <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkPurchaseLedgerBtn">
-                                🧾 کارتکس خرید
-                            </button>
-                        </div>
-                    </div>
-
-                    <form method="GET" action="{{ route('products.index') }}">
-                        @if(request('category_id'))
-                        <input type="hidden" name="category_id" value="{{ request('category_id') }}">
-                        @endif
-
-                        <div class="filter-grid">
-                            <div>
-                                <label class="label-sm">جستجو</label>
-                                <input
-                                    name="q"
-                                    class="form-control"
-                                    value="{{ request('q') }}"
-                                    placeholder="نام / کد ۴ رقمی / بارکد محصول...">
-                            </div>
-
-                            <div>
-                                <label class="label-sm">وضعیت موجودی</label>
-                                <select name="stock_status" class="form-select">
-                                    <option value="" @selected(request('stock_status')==='' || is_null(request('stock_status')))>همه</option>
-                                    <option value="out" @selected(request('stock_status')==='out' )>ناموجود</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="label-sm">وضعیت فروش</label>
-                                <select name="sellable_status" class="form-select">
-                                    <option value="" @selected(request('sellable_status')==='' || is_null(request('sellable_status')))>همه</option>
-                                    <option value="sellable" @selected(request('sellable_status')==='sellable' )>قابل فروش</option>
-                                    <option value="unsellable" @selected(request('sellable_status')==='unsellable' )>غیرفعال فروش</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="label-sm">بازه قیمت</label>
-                                <div class="input-group">
-                                    <input name="min_price" class="form-control money" value="{{ request('min_price') }}" placeholder="از">
-                                    <input name="max_price" class="form-control money" value="{{ request('max_price') }}" placeholder="تا">
-                                </div>
-                            </div>
-
-                            <div class="filter-actions d-flex gap-2">
-                                <button class="btn btn-primary btn-mini px-3">اعمال</button>
-                                <a class="btn btn-outline-secondary btn-mini px-3" href="{{ route('products.index') }}">پاک</a>
-                            </div>
-                        </div>
-                    </form>
                 </div>
 
-                <div class="glass-card product-card">
-                    <div class="product-card-head">
-                        <div>
-                            <h2 class="section-title">لیست کالاها</h2>
-                            <div class="subtle-text">
-                                نمایش {{ $toFa($products->firstItem() ?? 0) }} تا {{ $toFa($products->lastItem() ?? 0) }} از {{ $toFa($products->total() ?? 0) }} مورد
-                            </div>
-                        </div>
+                <div class="operation-actions">
+                    <button class="btn btn-primary btn-mini" type="button" id="bulkEditBtn">
+                        ویرایش
+                    </button>
 
-                        <span class="pill pill-purple">
-                            آخرین بروزرسانی لیست
-                        </span>
+                    <button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeleteBtn">
+                        حذف
+                    </button>
+
+                    <button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeactivateBtn">
+                        غیرفعال‌سازی
+                    </button>
+
+                    <select id="bulkVariantSelect" class="form-select form-select-sm variant-operation-select" disabled>
+                        <option value="">تنوع محصول...</option>
+                    </select>
+
+                    <button class="btn btn-outline-primary btn-mini" type="button" id="bulkStockBtn">
+                        موجودی انبار
+                    </button>
+
+                    <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkSalesLedgerBtn">
+                        کارتکس فروش
+                    </button>
+
+                    <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkPurchaseLedgerBtn">
+                        کارتکس خرید
+                    </button>
+                </div>
+            </div>
+
+            <form method="GET" action="{{ route('products.index') }}">
+                @if(request('category_id'))
+                    <input type="hidden" name="category_id" value="{{ request('category_id') }}">
+                @endif
+
+                <div class="filter-grid">
+                    <div>
+                        <label class="label-sm">جستجو</label>
+                        <input
+                            name="q"
+                            class="form-control"
+                            value="{{ request('q') }}"
+                            placeholder="نام / کد ۴ رقمی / بارکد محصول...">
                     </div>
 
-                    <div class="sheet-wrap">
-                        <div class="sheet-scroll">
-                            <table class="sheet">
-                                <thead>
-                                    <tr>
-                                        <th class="w-1 text-center">
-                                            <input type="checkbox" class="form-check-input" id="selectAllProducts" title="انتخاب همه">
-                                        </th>
-                                        <th class="w-1"></th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('short_barcode') }}" class="sortable-link">
-                                                کد کالا
-                                                <span class="sort-arrow">{{ $sortArrow('short_barcode') }}</span>
-                                            </a>
-                                        </th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('barcode') }}" class="sortable-link">
-                                                بارکد
-                                                <span class="sort-arrow">{{ $sortArrow('barcode') }}</span>
-                                            </a>
-                                        </th>
-                                        <th>
-                                            <a href="{{ $sortLink('name') }}" class="sortable-link">
-                                                اسم کالا
-                                                <span class="sort-arrow">{{ $sortArrow('name') }}</span>
-                                            </a>
-                                        </th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('stock') }}" class="sortable-link">
-                                                موجودی
-                                                <span class="sort-arrow">{{ $sortArrow('stock') }}</span>
-                                            </a>
-                                        </th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('variants_buy_price_min') }}" class="sortable-link">
-                                                قیمت خرید
-                                                <span class="sort-arrow">{{ $sortArrow('variants_buy_price_min') }}</span>
-                                            </a>
-                                        </th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('price') }}" class="sortable-link">
-                                                قیمت فروش
-                                                <span class="sort-arrow">{{ $sortArrow('price') }}</span>
-                                            </a>
-                                        </th>
-                                    </tr>
-                                </thead>
+                    <div>
+                        <label class="label-sm">وضعیت موجودی</label>
+                        <select name="stock_status" class="form-select">
+                            <option value="" @selected(request('stock_status') === '' || is_null(request('stock_status')))>همه</option>
+                            <option value="out" @selected(request('stock_status') === 'out')>ناموجود</option>
+                        </select>
+                    </div>
 
-                                <tbody>
-                                    @forelse($products as $p)
-                                    @php
+                    <div>
+                        <label class="label-sm">وضعیت فروش</label>
+                        <select name="sellable_status" class="form-select">
+                            <option value="" @selected(request('sellable_status') === '' || is_null(request('sellable_status')))>همه</option>
+                            <option value="sellable" @selected(request('sellable_status') === 'sellable')>قابل فروش</option>
+                            <option value="unsellable" @selected(request('sellable_status') === 'unsellable')>غیرفعال فروش</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="label-sm">بازه قیمت</label>
+                        <div class="input-group">
+                            <input name="min_price" class="form-control money" value="{{ request('min_price') }}" placeholder="از">
+                            <input name="max_price" class="form-control money" value="{{ request('max_price') }}" placeholder="تا">
+                        </div>
+                    </div>
+
+                    <div class="filter-actions d-flex gap-2">
+                        <button class="btn btn-primary btn-mini px-3">اعمال</button>
+                        <a class="btn btn-outline-secondary btn-mini px-3" href="{{ route('products.index') }}">پاک</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="page-card product-card">
+            <div class="product-card-head">
+                <div>
+                    <h2 class="section-title">لیست کالاها</h2>
+                    <div class="subtle-text">
+                        نمایش {{ $toFa($products->firstItem() ?? 0) }} تا {{ $toFa($products->lastItem() ?? 0) }} از {{ $toFa($products->total() ?? 0) }} مورد
+                    </div>
+                </div>
+
+                <span class="pill pill-purple">
+                    نمایش واکنش‌گرا
+                </span>
+            </div>
+
+            <div class="sheet-wrap">
+                <div class="sheet-scroll">
+                    <table class="sheet">
+                        <colgroup>
+                            <col class="col-check">
+                            <col class="col-toggle">
+                            <col class="col-code">
+                            <col class="col-barcode">
+                            <col class="col-name">
+                            <col class="col-stock">
+                            <col class="col-buy">
+                            <col class="col-sell">
+                        </colgroup>
+
+                        <thead>
+                            <tr>
+                                <th class="text-center">
+                                    <input type="checkbox" class="form-check-input" id="selectAllProducts" title="انتخاب همه">
+                                </th>
+
+                                <th></th>
+
+                                <th>
+                                    <a href="{{ $sortLink('short_barcode') }}" class="sortable-link">
+                                        کد کالا
+                                        <span class="sort-arrow">{{ $sortArrow('short_barcode') }}</span>
+                                    </a>
+                                </th>
+
+                                <th>
+                                    <a href="{{ $sortLink('barcode') }}" class="sortable-link">
+                                        بارکد
+                                        <span class="sort-arrow">{{ $sortArrow('barcode') }}</span>
+                                    </a>
+                                </th>
+
+                                <th>
+                                    <a href="{{ $sortLink('name') }}" class="sortable-link">
+                                        اسم کالا
+                                        <span class="sort-arrow">{{ $sortArrow('name') }}</span>
+                                    </a>
+                                </th>
+
+                                <th>
+                                    <a href="{{ $sortLink('stock') }}" class="sortable-link">
+                                        موجودی
+                                        <span class="sort-arrow">{{ $sortArrow('stock') }}</span>
+                                    </a>
+                                </th>
+
+                                <th>
+                                    <a href="{{ $sortLink('variants_buy_price_min') }}" class="sortable-link">
+                                        قیمت خرید
+                                        <span class="sort-arrow">{{ $sortArrow('variants_buy_price_min') }}</span>
+                                    </a>
+                                </th>
+
+                                <th>
+                                    <a href="{{ $sortLink('price') }}" class="sortable-link">
+                                        قیمت فروش
+                                        <span class="sort-arrow">{{ $sortArrow('price') }}</span>
+                                    </a>
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @forelse($products as $p)
+                                @php
                                     $hasVariants = $p->variants && $p->variants->count() > 0;
                                     $collapseId = 'variantsRow' . $p->id;
 
                                     $short = $p->short_barcode;
+
                                     if (!$short && !empty($p->code) && strlen($p->code) >= 6) {
-                                    $short = substr($p->code, 2, 4);
+                                        $short = substr($p->code, 2, 4);
                                     }
 
                                     $sampleBarcode = null;
+
                                     if ($hasVariants) {
-                                    $firstVar = $p->variants->sortBy('variant_code')->first();
-                                    $sampleBarcode = $firstVar?->variant_code;
+                                        $firstVar = $p->variants->sortBy('variant_code')->first();
+                                        $sampleBarcode = $firstVar?->variant_code;
                                     }
 
                                     $variantsPayload = $p->variants
-                                    ->sortBy('variant_code')
-                                    ->values()
-                                    ->map(function ($v) {
-                                    return [
-                                    'id' => (int) $v->id,
-                                    'name' => $v->variant_name,
-                                    'stock' => (int) $v->stock,
-                                    'is_active' => (bool) $v->is_active,
-                                    ];
-                                    })
-                                    ->all();
+                                        ->sortBy('variant_code')
+                                        ->values()
+                                        ->map(function ($v) {
+                                            return [
+                                                'id' => (int) $v->id,
+                                                'name' => $v->variant_name,
+                                                'stock' => (int) $v->stock,
+                                                'is_active' => (bool) $v->is_active,
+                                            ];
+                                        })
+                                        ->all();
 
                                     $stockBreakdownPayload = $p->warehouseStocks
-                                    ->map(function ($ws) {
-                                    return [
-                                    'warehouse' => $ws->warehouse?->name,
-                                    'qty' => (int) $ws->quantity,
-                                    ];
-                                    })
-                                    ->values()
-                                    ->all();
+                                        ->map(function ($ws) {
+                                            return [
+                                                'warehouse' => $ws->warehouse?->name,
+                                                'qty' => (int) $ws->quantity,
+                                            ];
+                                        })
+                                        ->values()
+                                        ->all();
 
                                     $buyPrice = $p->variants_min_buy_price;
-                                    @endphp
+                                    $isSellable = $p->is_sellable ?? true;
+                                @endphp
 
-                                    <tr>
-                                        <td class="text-center">
+                                <tr>
+                                    <td class="text-center mobile-top">
+                                        <div class="mobile-row-title d-md-none">
+                                            کالا
+                                        </div>
+
+                                        <div class="mobile-row-actions">
                                             <input
                                                 type="checkbox"
                                                 class="form-check-input product-checkbox"
@@ -995,15 +1246,32 @@ return $currentDir === 'asc' ? '↑' : '↓';
                                                 data-delete-url="{{ route('products.destroy', $p) }}"
                                                 data-sales-ledger-url="{{ route('products.sales-ledger', $p) }}"
                                                 data-purchase-ledger-url="{{ route('products.purchase-ledger', $p) }}"
+                                                data-deactivate-url="{{ route('product-deactivation-documents.create', ['product_id' => $p->id]) }}"
+                                                data-deactivation-history-url="{{ route('product-deactivation-documents.index', ['product_name' => $p->name]) }}"
+                                                data-is-sellable="{{ $isSellable ? '1' : '0' }}"
                                                 data-product-name="{{ $p->name }}"
                                                 data-variants='@json($variantsPayload)'
                                                 data-stock-breakdown='@json($stockBreakdownPayload)'>
-                                        </td>
 
-                                        <td class="w-1">
                                             @if($hasVariants)
+                                                <button
+                                                    class="toggle-variants d-md-none"
+                                                    type="button"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#{{ $collapseId }}"
+                                                    aria-expanded="false"
+                                                    aria-controls="{{ $collapseId }}"
+                                                    title="نمایش تنوع‌ها">
+                                                    <span class="variant-symbol">+</span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </td>
+
+                                    <td data-label="تنوع">
+                                        @if($hasVariants)
                                             <button
-                                                class="toggle-variants"
+                                                class="toggle-variants d-none d-md-inline-flex"
                                                 type="button"
                                                 data-bs-toggle="collapse"
                                                 data-bs-target="#{{ $collapseId }}"
@@ -1012,66 +1280,62 @@ return $currentDir === 'asc' ? '↑' : '↓';
                                                 title="نمایش تنوع‌ها">
                                                 <span class="variant-symbol">+</span>
                                             </button>
-                                            @else
+
+                                            <span class="d-md-none pill pill-gray">دارای تنوع</span>
+                                        @else
                                             <span class="text-muted">—</span>
-                                            @endif
-                                        </td>
+                                        @endif
+                                    </td>
 
-                                        <td class="nowrap mono">
-                                            <span class="pill pill-gray">{{ $short ?: '—' }}</span>
-                                        </td>
+                                    <td class="nowrap mono" data-label="کد کالا">
+                                        <span class="pill pill-gray">{{ $short ?: '—' }}</span>
+                                    </td>
 
-                                        <td class="nowrap mono">
-                                            @if($sampleBarcode)
+                                    <td class="nowrap mono" data-label="بارکد">
+                                        @if($sampleBarcode)
                                             <span class="pill pill-gray">{{ $sampleBarcode }}</span>
-                                            @else
+                                        @else
                                             <span class="pill pill-gray">{{ $p->barcode ?: '—' }}</span>
-                                            @endif
-                                        </td>
+                                        @endif
+                                    </td>
 
-                                        <td>
-                                            <div class="product-name-wrap">
-                                                <div class="product-title-text">{{ $p->name }}</div>
+                                    <td data-label="نام کالا">
+                                        <div class="product-name-wrap">
+                                            <div class="product-title-text">{{ $p->name }}</div>
 
-                                                <div class="sellable-state">
-                                                    @if($p->is_sellable ?? true)
+                                            <div class="sellable-state">
+                                                @if($isSellable)
                                                     <span class="sellable-badge active">قابل فروش</span>
-                                                    <a href="{{ route('product-deactivation-documents.create') }}" class="sellable-action-link text-danger">
-                                                        غیرفعال‌سازی
-                                                    </a>
-                                                    @else
+                                                @else
                                                     <span class="sellable-badge inactive">غیرفعال فروش</span>
-                                                    <a href="{{ route('product-deactivation-documents.index', ['product_name' => $p->name]) }}" class="sellable-action-link text-secondary">
-                                                        سوابق
-                                                    </a>
-                                                    @endif
-                                                </div>
+                                                @endif
                                             </div>
-                                        </td>
+                                        </div>
+                                    </td>
 
-                                        <td class="nowrap">
-                                            <span class="pill {{ ((int) $p->stock) === 0 ? 'pill-danger' : 'pill-success' }}">
-                                                {{ $toFa($p->stock ?? 0) }}
-                                            </span>
-                                        </td>
+                                    <td class="nowrap" data-label="موجودی">
+                                        <span class="pill {{ ((int) $p->stock) === 0 ? 'pill-danger' : 'pill-success' }}">
+                                            {{ $toFa($p->stock ?? 0) }}
+                                        </span>
+                                    </td>
 
-                                        <td class="nowrap">
-                                            @if(!is_null($buyPrice))
+                                    <td class="nowrap" data-label="قیمت خرید">
+                                        @if(!is_null($buyPrice))
                                             <span class="price-inline">{{ $toFa(number_format((int) $buyPrice) . ' تومان') }}</span>
-                                            @else
+                                        @else
                                             <span class="buy-price-muted">—</span>
-                                            @endif
-                                        </td>
+                                        @endif
+                                    </td>
 
-                                        <td class="nowrap">
-                                            <span class="price-inline">{{ $toFa(number_format((int) $p->price) . ' تومان') }}</span>
-                                        </td>
-                                    </tr>
+                                    <td class="nowrap" data-label="قیمت فروش">
+                                        <span class="price-inline">{{ $toFa(number_format((int) $p->price) . ' تومان') }}</span>
+                                    </td>
+                                </tr>
 
-                                    @if($hasVariants)
+                                @if($hasVariants)
                                     <tr class="collapse" id="{{ $collapseId }}">
                                         <td></td>
-                                        <td colspan="7">
+                                        <td colspan="7" class="variant-cell">
                                             <div class="variant-inner">
                                                 <div class="table-responsive">
                                                     <table class="table table-sm variant-table">
@@ -1085,26 +1349,40 @@ return $currentDir === 'asc' ? '↑' : '↓';
                                                                 <th class="nowrap">وضعیت</th>
                                                             </tr>
                                                         </thead>
+
                                                         <tbody>
                                                             @foreach($p->variants->sortBy('variant_code') as $v)
-                                                            <tr>
-                                                                <td class="fw-bold">{{ $v->variant_name }}</td>
-                                                                <td class="mono">{{ $v->variant_code }}</td>
-                                                                <td>
-                                                                    @if((int) $v->stock === 0)
-                                                                    <span class="pill pill-danger">۰</span>
-                                                                    @else
-                                                                    <span class="pill pill-success">{{ $toFa($v->stock) }}</span>
-                                                                    @endif
-                                                                </td>
-                                                                <td>{{ $toFa(number_format((int) $v->sell_price) . ' تومان') }}</td>
-                                                                <td>{{ $v->buy_price !== null ? $toFa(number_format((int) $v->buy_price) . ' تومان') : '—' }}</td>
-                                                                <td>
-                                                                    <span class="badge {{ $v->is_active ? 'bg-success' : 'bg-secondary' }}">
-                                                                        {{ $v->is_active ? 'فعال' : 'غیرفعال' }}
-                                                                    </span>
-                                                                </td>
-                                                            </tr>
+                                                                <tr>
+                                                                    <td data-label="نام تنوع" class="fw-bold">{{ $v->variant_name }}</td>
+
+                                                                    <td data-label="بارکد" class="mono">
+                                                                        {{ $v->variant_code }}
+                                                                    </td>
+
+                                                                    <td data-label="موجودی">
+                                                                        @if((int) $v->stock === 0)
+                                                                            <span class="pill pill-danger">۰</span>
+                                                                        @else
+                                                                            <span class="pill pill-success">{{ $toFa($v->stock) }}</span>
+                                                                        @endif
+                                                                    </td>
+
+                                                                    <td data-label="فروش">
+                                                                        {{ $toFa(number_format((int) $v->sell_price) . ' تومان') }}
+                                                                    </td>
+
+                                                                    <td data-label="خرید">
+                                                                        {{ $v->buy_price !== null ? $toFa(number_format((int) $v->buy_price) . ' تومان') : '—' }}
+                                                                    </td>
+
+                                                                    <td data-label="وضعیت">
+                                                                        @if($v->is_active)
+                                                                            <span class="status-dot active" title="فعال" aria-label="فعال"></span>
+                                                                        @else
+                                                                            <span class="status-dot inactive" title="غیرفعال" aria-label="غیرفعال"></span>
+                                                                        @endif
+                                                                    </td>
+                                                                </tr>
                                                             @endforeach
                                                         </tbody>
                                                     </table>
@@ -1112,23 +1390,21 @@ return $currentDir === 'asc' ? '↑' : '↓';
                                             </div>
                                         </td>
                                     </tr>
-                                    @endif
-                                    @empty
-                                    <tr>
-                                        <td colspan="8" class="text-center empty-row">هیچ کالایی ثبت نشده 📦</td>
-                                    </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
+                                @endif
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center empty-row">هیچ کالایی ثبت نشده است.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
 
-                        <div class="mt-3">
-                            {{ $products->links() }}
-                        </div>
-                    </div>
+                <div class="mt-3">
+                    {{ $products->links() }}
                 </div>
             </div>
-        </main>
+        </div>
     </div>
 </div>
 
@@ -1141,17 +1417,13 @@ return $currentDir === 'asc' ? '↑' : '↓';
     <div class="offcanvas-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <div class="fw-bold">انتخاب دسته‌بندی</div>
-            <a href="{{ route('products.index', request()->except(['category_id', 'page'])) }}" class="side-link">همه</a>
+            <a href="{{ route('products.index', request()->except(['category_id', 'page'])) }}" class="side-link">همه کالاها</a>
         </div>
 
         <input type="text" id="catSearchMobile" class="form-control cat-search mb-3" placeholder="جستجو در دسته‌ها...">
 
         <div class="cat-tree-wrap" id="catTreeMobile">
             @include('categories._tree', ['nodes' => $categoryTree])
-        </div>
-
-        <div class="small subtle-text mt-3">
-            افزودن دسته‌بندی از منوی «دسته‌بندی‌ها» در سایدبار انجام می‌شود.
         </div>
     </div>
 </div>
@@ -1180,6 +1452,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
                                 <th class="text-end">تعداد</th>
                             </tr>
                         </thead>
+
                         <tbody id="stockBreakdownBody"></tbody>
                     </table>
                 </div>
@@ -1197,7 +1470,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
         const deleteForm = document.getElementById('bulkDeleteForm');
 
         function faNumber(value) {
-            return String(value ?? '').replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹' [d]);
+            return String(value ?? '').replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
         }
 
         function parseJsonDataset(raw, fallback = []) {
@@ -1226,9 +1499,14 @@ return $currentDir === 'asc' ? '↑' : '↓';
             return document.getElementById('selectedCountBadge');
         }
 
+        function freshDeactivateBtn() {
+            return document.getElementById('bulkDeactivateBtn');
+        }
+
         function bindCatSearch(inputId, treeId) {
             const input = document.getElementById(inputId);
             const tree = document.getElementById(treeId);
+
             if (!input || !tree) return;
 
             input.addEventListener('input', function() {
@@ -1237,7 +1515,9 @@ return $currentDir === 'asc' ? '↑' : '↓';
                 tree.querySelectorAll('a').forEach(a => {
                     const text = (a.textContent || '').trim().toLowerCase();
                     const li = a.closest('li');
+
                     if (!li) return;
+
                     li.style.display = (q === '' || text.includes(q)) ? '' : 'none';
                 });
             });
@@ -1245,6 +1525,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
 
         async function loadProducts(url, pushState = true) {
             const area = document.getElementById('productsAjaxArea');
+
             if (!area) return;
 
             area.style.opacity = '0.55';
@@ -1272,6 +1553,13 @@ return $currentDir === 'asc' ? '↑' : '↓';
                 }
 
                 initAjaxBindings();
+
+                const offcanvasEl = document.getElementById('catOffcanvas');
+                const openedOffcanvas = offcanvasEl ? bootstrap.Offcanvas.getInstance(offcanvasEl) : null;
+
+                if (openedOffcanvas) {
+                    openedOffcanvas.hide();
+                }
             } catch (e) {
                 window.location.href = url;
             } finally {
@@ -1299,6 +1587,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
             const variantHelpTextEl = freshVariantHelp();
             const selectedTitleEl = freshSelectedTitle();
             const selectedBadgeEl = freshSelectedBadge();
+            const deactivateBtn = freshDeactivateBtn();
 
             if (!variantSelectEl) return;
 
@@ -1306,6 +1595,10 @@ return $currentDir === 'asc' ? '↑' : '↓';
 
             if (selectedBadgeEl) {
                 selectedBadgeEl.textContent = faNumber(selected.length);
+            }
+
+            if (deactivateBtn) {
+                deactivateBtn.textContent = 'غیرفعال‌سازی';
             }
 
             if (!selected.length) {
@@ -1332,7 +1625,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
                 variantSelectEl.disabled = true;
 
                 if (variantHelpTextEl) {
-                    variantHelpTextEl.textContent = 'عملیات ویرایش، حذف، موجودی، کارتکس فروش و کارتکس خرید فقط برای یک کالا انجام می‌شود.';
+                    variantHelpTextEl.textContent = 'عملیات ویرایش، حذف، غیرفعال‌سازی، موجودی و کارتکس فقط برای یک کالا انجام می‌شود.';
                 }
 
                 return;
@@ -1342,6 +1635,10 @@ return $currentDir === 'asc' ? '↑' : '↓';
 
             if (selectedTitleEl) {
                 selectedTitleEl.textContent = item.dataset.productName || 'کالای انتخاب شده';
+            }
+
+            if (deactivateBtn) {
+                deactivateBtn.textContent = item.dataset.isSellable === '1' ? 'غیرفعال‌سازی' : 'سوابق غیرفعال‌سازی';
             }
 
             const variants = parseJsonDataset(item.dataset.variants, []);
@@ -1377,6 +1674,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
             document.querySelectorAll('.toggle-variants').forEach(btn => {
                 const targetSel = btn.getAttribute('data-bs-target');
                 const el = document.querySelector(targetSel);
+
                 if (!el) return;
 
                 const symbol = btn.querySelector('.variant-symbol');
@@ -1404,11 +1702,12 @@ return $currentDir === 'asc' ? '↑' : '↓';
 
             form?.addEventListener('submit', function(e) {
                 e.preventDefault();
+
                 const params = new URLSearchParams(new FormData(this));
                 loadProducts(`${this.action}?${params.toString()}`);
             });
 
-            document.querySelectorAll('#productsAjaxArea a.sortable-link, #productsAjaxArea .pagination a, #catTree a, #catTreeMobile a').forEach(link => {
+            document.querySelectorAll('#productsAjaxArea a.sortable-link, #productsAjaxArea .pagination a, #catTreeMobile a').forEach(link => {
                 if (link.dataset.ajaxBound === '1') return;
 
                 link.dataset.ajaxBound = '1';
@@ -1434,12 +1733,15 @@ return $currentDir === 'asc' ? '↑' : '↓';
 
             document.getElementById('bulkEditBtn')?.addEventListener('click', function() {
                 const selected = getSingleSelected();
+
                 if (!selected) return;
+
                 window.location.href = selected.dataset.editUrl;
             });
 
             document.getElementById('bulkDeleteBtn')?.addEventListener('click', function() {
                 const selected = getSingleSelected();
+
                 if (!selected) return;
 
                 if (!confirm(`کالای «${selected.dataset.productName}» حذف شود؟`)) {
@@ -1448,6 +1750,21 @@ return $currentDir === 'asc' ? '↑' : '↓';
 
                 deleteForm.setAttribute('action', selected.dataset.deleteUrl);
                 deleteForm.submit();
+            });
+
+            document.getElementById('bulkDeactivateBtn')?.addEventListener('click', function() {
+                const selected = getSingleSelected();
+
+                if (!selected) return;
+
+                const isSellable = selected.dataset.isSellable === '1';
+
+                if (isSellable) {
+                    window.location.href = selected.dataset.deactivateUrl;
+                    return;
+                }
+
+                window.location.href = selected.dataset.deactivationHistoryUrl;
             });
 
             document.getElementById('bulkStockBtn')?.addEventListener('click', function() {
@@ -1466,9 +1783,9 @@ return $currentDir === 'asc' ? '↑' : '↓';
                     return;
                 }
 
-                stockNameEl.textContent = selectedVariant ?
-                    `${selected.dataset.productName} — ${selectedVariant.name ?? 'تنوع انتخابی'}` :
-                    selected.dataset.productName;
+                stockNameEl.textContent = selectedVariant
+                    ? `${selected.dataset.productName} — ${selectedVariant.name ?? 'تنوع انتخابی'}`
+                    : selected.dataset.productName;
 
                 stockBodyEl.innerHTML = '';
 
@@ -1514,7 +1831,6 @@ return $currentDir === 'asc' ? '↑' : '↓';
                 modal.show();
             });
 
-
             document.getElementById('bulkPurchaseLedgerBtn')?.addEventListener('click', function() {
                 const selected = getSingleSelected();
                 const variantSelectEl = freshVariantSelect();
@@ -1522,6 +1838,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
                 if (!selected) return;
 
                 const baseUrl = selected.dataset.purchaseLedgerUrl;
+
                 if (!baseUrl) return;
 
                 const params = new URLSearchParams();
@@ -1541,6 +1858,7 @@ return $currentDir === 'asc' ? '↑' : '↓';
                 if (!selected) return;
 
                 const baseUrl = selected.dataset.salesLedgerUrl;
+
                 if (!baseUrl) return;
 
                 const params = new URLSearchParams();
@@ -1556,7 +1874,6 @@ return $currentDir === 'asc' ? '↑' : '↓';
             updateVariantSelectState();
         }
 
-        bindCatSearch('catSearch', 'catTree');
         bindCatSearch('catSearchMobile', 'catTreeMobile');
         initAjaxBindings();
 
@@ -1565,4 +1882,4 @@ return $currentDir === 'asc' ? '↑' : '↓';
         });
     });
 </script>
-@endsection 
+@endsection
