@@ -6,6 +6,16 @@
             <div class="alert alert-success">{{ session('success') }}</div>
         @endif
 
+        @if(session('error'))
+            <div class="alert alert-danger">{{ session('error') }}</div>
+        @endif
+
+        @if(!($dbReady ?? false))
+            <div class="alert alert-warning">
+                جداول این ماژول هنوز ساخته نشده‌اند. لطفاً دستور <code>php artisan migrate</code> را اجرا کنید.
+            </div>
+        @endif
+
         <div class="card mb-4">
             <div class="card-body">
                 <form method="POST" action="{{ route('inventory-webhooks.update') }}">
@@ -32,7 +42,7 @@
                         <input type="number" name="timeout_seconds" min="1" max="30" class="form-control" value="{{ old('timeout_seconds', $setting?->timeout_seconds ?? 5) }}">
                     </div>
 
-                    <button class="btn btn-primary">ذخیره تنظیمات</button>
+                    <button class="btn btn-primary" {{ !($dbReady ?? false) ? 'disabled' : '' }}>ذخیره تنظیمات</button>
                 </form>
             </div>
         </div>

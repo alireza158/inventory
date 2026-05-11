@@ -5,19 +5,36 @@ namespace App\Http\Controllers;
 use App\Models\InventoryWebhookLog;
 use App\Models\InventoryWebhookSetting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class InventoryWebhookController extends Controller
 {
     public function index()
     {
+        if (!Schema::hasTable('inventory_webhook_settings') || !Schema::hasTable('inventory_webhook_logs')) {
+            return view('inventory-webhooks.index', [
+                'setting' => null,
+                'logs' => collect(),
+                'dbReady' => false,
+            ]);
+        }
+
         $setting = InventoryWebhookSetting::query()->latest('id')->first();
         $logs = InventoryWebhookLog::query()->latest('id')->limit(100)->get();
 
-        return view('inventory-webhooks.index', compact('setting', 'logs'));
+        return view('inventory-webhooks.index', [
+            'setting' => $setting,
+            'logs' => $logs,
+            'dbReady' => true,
+        ]);
     }
 
     public function update(Request $request)
     {
+        if (!Schema::hasTable('inventory_webhook_settings')) {
+            return redirect()->route('inventory-webhooks.index')->with('error', 'جدول تنظیمات API هنوز ایجاد نشده است. لطفاً migrate را اجرا کنید.');
+        }
+
         $data = $request->validate([
             'is_enabled' => 'nullable|boolean',
             'endpoint_url' => 'nullable|url|max:2048',

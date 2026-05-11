@@ -5,11 +5,16 @@ namespace App\Services;
 use App\Models\InventoryWebhookLog;
 use App\Models\InventoryWebhookSetting;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class InventoryWebhookService
 {
     public static function send(string $event, array $payload): void
     {
+        if (!Schema::hasTable('inventory_webhook_settings') || !Schema::hasTable('inventory_webhook_logs')) {
+            return;
+        }
+
         $setting = InventoryWebhookSetting::query()->latest('id')->first();
 
         if (!$setting || !$setting->is_enabled || empty($setting->endpoint_url)) {
