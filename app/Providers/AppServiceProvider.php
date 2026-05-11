@@ -15,6 +15,10 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
 use App\Observers\ActivityObserver;
+use App\Observers\ProductInventoryObserver;
+use App\Observers\StockMovementObserver;
+use App\Observers\WarehouseStockObserver;
+use App\Models\WarehouseStock;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
 class AppServiceProvider extends ServiceProvider
@@ -38,6 +42,10 @@ class AppServiceProvider extends ServiceProvider
         InvoiceNote::observe(ActivityObserver::class);
         Cheque::observe(ActivityObserver::class);
         StockMovement::observe(ActivityObserver::class);
+
+        Product::observe(ProductInventoryObserver::class);
+        WarehouseStock::observe(WarehouseStockObserver::class);
+        StockMovement::observe(StockMovementObserver::class);
         Paginator::useBootstrapFive(); // یا useBootstrapFour()
     }
 }
