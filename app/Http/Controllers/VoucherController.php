@@ -998,6 +998,7 @@ class VoucherController extends Controller
         ]);
 
         $sum = 0;
+        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
         foreach ($data['items'] as $item) {
             $product = Product::findOrFail($item['product_id']);
@@ -1064,6 +1065,19 @@ class VoucherController extends Controller
                 WarehouseStockService::change((int) $data['from_warehouse_id'], (int) $item['product_id'], -$qty);
                 WarehouseStockService::change((int) $data['to_warehouse_id'], (int) $item['product_id'], $qty);
 
+                $fromWarehouseId = (int) $data['from_warehouse_id'];
+                $toWarehouseId = (int) $data['to_warehouse_id'];
+
+                if ($fromWarehouseId === $centralWarehouseId) {
+                    $variant->update([
+                        'stock' => max(0, (int) $variant->stock - $qty),
+                    ]);
+                } elseif ($toWarehouseId === $centralWarehouseId) {
+                    $variant->update([
+                        'stock' => (int) $variant->stock + $qty,
+                    ]);
+                }
+
                 $movementType = 'out';
                 $movementNote = 'انتقال از ' . $transfer->fromWarehouse->name . ' به ' . $transfer->toWarehouse->name . ' - ' . ($variant->variant_name ?: 'تنوع');
             }
@@ -1113,6 +1127,7 @@ class VoucherController extends Controller
     private function rollbackTransfer(WarehouseTransfer $transfer): void
     {
         $transfer->load('items', 'relatedInvoice');
+        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
         foreach ($transfer->items as $item) {
             $variant = null;
@@ -1151,6 +1166,22 @@ class VoucherController extends Controller
             } else {
                 WarehouseStockService::change((int) $transfer->to_warehouse_id, (int) $item->product_id, -((int) $item->quantity));
                 WarehouseStockService::change((int) $transfer->from_warehouse_id, (int) $item->product_id, (int) $item->quantity);
+
+                if ($variant) {
+                    if ((int) $transfer->from_warehouse_id === $centralWarehouseId) {
+                        $variant->update([
+                            'stock' => (int) $variant->stock + (int) $item->quantity,
+                        ]);
+                    } elseif ((int) $transfer->to_warehouse_id === $centralWarehouseId) {
+                        if ((int) $variant->stock < (int) $item->quantity) {
+                            abort(422, 'امکان ویرایش/حذف وجود ندارد؛ موجودی تنوع کمتر از مقدار حواله است.');
+                        }
+
+                        $variant->update([
+                            'stock' => (int) $variant->stock - (int) $item->quantity,
+                        ]);
+                    }
+                }
             }
         }
 

@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\InventoryWebhookLog;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\Warehouse;
-use App\Models\WarehouseStock;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -15,11 +13,13 @@ class AriyajanebiSyncService
 {
     private const LOGIN_URL = 'https://api.ariyajanebi.ir/v1/admin/login';
     private const UPDATE_URL = 'https://api.ariyajanebi.ir/v1/admin/multi_varieties_update_lite';
-    private const USERNAME = 'Z.adeli60';
+    private const USERNAME = 'admin';
     private const PASSWORD = 'Z.adeli60';
 
     public static function syncProduct(Product $product): void
     {
+        self::processPending();
+
         $variants = $product->variants()->whereNotNull('variety_id')->get(['product_id', 'variety_id', 'sell_price', 'stock']);
         if ($variants->isEmpty()) return;
         self::syncVariants($variants, false);
@@ -27,8 +27,39 @@ class AriyajanebiSyncService
 
     public static function syncVariant(ProductVariant $variant): void
     {
+        self::processPending();
+
         if (empty($variant->variety_id)) return;
         self::syncVariants(collect([$variant]), false);
+    }
+
+    public static function processPending(): void
+    {
+        if (!Schema::hasTable('inventory_webhook_logs')) return;
+
+        InventoryWebhookLog::query()
+            ->where('event', 'ariya.multi_varieties_update_lite')
+            ->where('status', 'pending')
+            ->where(function ($q) {
+                $q->whereNull('next_retry_at')->orWhere('next_retry_at', '<=', now());
+            })
+            ->orderBy('id')
+            ->limit(20)
+            ->get()
+            ->each(function (InventoryWebhookLog $log): void {
+                $payload = (array) data_get($log->payload, 'payload', []);
+                if (empty($payload)) {
+                    $log->update([
+                        'attempts' => (int) $log->attempts + 1,
+                        'error_message' => 'payload missing for retry',
+                        'next_retry_at' => now()->addMinute(),
+                        'sent_at' => now(),
+                    ]);
+                    return;
+                }
+
+                self::sendPayload($payload, false, $log);
+            });
     }
 
     private static function syncVariants($variants, bool $withoutVerify): void
@@ -41,6 +72,11 @@ class AriyajanebiSyncService
         }
 
         $apiLog = self::createApiLog($payload);
+        self::sendPayload($payload, $withoutVerify, $apiLog);
+    }
+
+    private static function sendPayload(array $payload, bool $withoutVerify, ?InventoryWebhookLog $apiLog): void
+    {
 
         try {
             $client = Http::asForm()->timeout(15)->withOptions(['allow_redirects' => false]);
@@ -80,7 +116,7 @@ class AriyajanebiSyncService
         } catch (\Throwable $e) {
             if (!$withoutVerify && str_contains($e->getMessage(), 'cURL error 77')) {
                 Log::warning('Ariyajanebi SSL cert issue detected, retrying without SSL verification.');
-                self::syncVariants($variants, true);
+                self::sendPayload($payload, true, $apiLog);
                 return;
             }
 
@@ -98,7 +134,7 @@ class AriyajanebiSyncService
             'target' => self::UPDATE_URL,
             'status' => 'pending',
             'attempts' => 1,
-            'payload' => ['payload' => ['variants' => self::variantPayloadPreview($payload)]],
+            'payload' => ['payload' => $payload, 'variants' => self::variantPayloadPreview($payload)],
             'sent_at' => now(),
             'next_retry_at' => now()->addMinute(),
         ]);
@@ -124,6 +160,7 @@ class AriyajanebiSyncService
 
         $log->update([
             'status' => $status,
+            'attempts' => (int) $log->attempts + 1,
             'response_code' => $code,
             'error_message' => $error,
             'sent_at' => now(),
@@ -133,18 +170,10 @@ class AriyajanebiSyncService
 
     private static function centralWarehouseQuantityForVariant($variant): int
     {
-        $productId = (int) ($variant->product_id ?? 0);
-        if ($productId <= 0) return max(0, (int) ($variant->stock ?? 0));
-
-        $centralWarehouseId = Warehouse::query()->where('type', 'central')->value('id');
-        if (!$centralWarehouseId) return max(0, (int) ($variant->stock ?? 0));
-
-        $qty = WarehouseStock::query()
-            ->where('warehouse_id', (int) $centralWarehouseId)
-            ->where('product_id', $productId)
-            ->value('quantity');
-
-        return max(0, (int) ($qty ?? 0));
+        // Warehouse stock is currently tracked at product level. For API variety balance,
+        // we must send the selected variant's own stock to avoid applying the same
+        // product quantity to every variant.
+        return max(0, (int) ($variant->stock ?? 0));
     }
 
     private static function extractToken($json): ?string
