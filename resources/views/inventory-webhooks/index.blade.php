@@ -55,7 +55,7 @@
             <table class="table table-striped align-middle">
                 <thead>
                     <tr>
-                        <th>#</th><th>رویداد</th><th>وضعیت</th><th>کد پاسخ</th><th>زمان ارسال</th><th>خطا</th>
+                        <th>#</th><th>رویداد</th><th>محصول/تنوع ارسال‌شده</th><th>وضعیت</th><th>کد پاسخ</th><th>زمان ارسال</th><th>خطا</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -63,13 +63,32 @@
                     <tr>
                         <td>{{ $log->id }}</td>
                         <td>{{ $log->event }}</td>
+                        <td style="max-width:380px;white-space:normal;">
+                            @php($payload = (array) ($log->payload ?? []))
+                            @if(!empty($payload['payload']['product_id']) || !empty($payload['payload']['sku']) || !empty($payload['payload']['name']))
+                                <div>کالا: {{ $payload['payload']['name'] ?? '-' }} (ID: {{ $payload['payload']['product_id'] ?? '-' }})</div>
+                                <div class="small text-muted">SKU: {{ $payload['payload']['sku'] ?? '-' }}</div>
+                            @endif
+
+                            @if(!empty($payload['payload']['movement_id']))
+                                <div class="small">حرکت انبار: #{{ $payload['payload']['movement_id'] }} | محصول: {{ $payload['payload']['product_id'] ?? '-' }}</div>
+                            @endif
+
+                            @if(!empty($payload['payload']['variants']) && is_array($payload['payload']['variants']))
+                                <div class="small mt-1">تنوع‌ها:
+                                    @foreach(array_slice($payload['payload']['variants'], 0, 5) as $v)
+                                        <span class="badge bg-light text-dark border">ID: {{ $v['id'] ?? '-' }} | قیمت: {{ $v['price'] ?? '-' }} | موجودی: {{ $v['balance'] ?? '-' }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </td>
                         <td>{{ $log->status }}</td>
                         <td>{{ $log->response_code ?? '-' }}</td>
                         <td>{{ $log->sent_at?->format('Y-m-d H:i:s') ?? '-' }}</td>
                         <td style="max-width:350px;white-space:normal;">{{ $log->error_message ?? '-' }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted">هنوز ارسالی ثبت نشده است.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted">هنوز ارسالی ثبت نشده است.</td></tr>
                 @endforelse
                 </tbody>
             </table>
