@@ -15,7 +15,7 @@ class AriyajanebiSyncService
 {
     private const LOGIN_URL = 'https://api.ariyajanebi.ir/v1/admin/login';
     private const UPDATE_URL = 'https://api.ariyajanebi.ir/v1/admin/multi_varieties_update_lite';
-    private const USERNAME = 'Z.adeli60';
+    private const USERNAME = 'admin';
     private const PASSWORD = 'Z.adeli60';
 
     public static function syncProduct(Product $product): void
