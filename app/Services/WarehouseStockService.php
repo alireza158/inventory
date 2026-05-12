@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Warehouse;
 use App\Models\WarehouseStock;
+use App\Models\Product;
 
 class WarehouseStockService
 {
@@ -32,7 +33,25 @@ class WarehouseStockService
 
         $stock->update(['quantity' => $newQty]);
 
+
+        self::syncProductStockFromCentral((int) $productId);
+
         return $stock->fresh();
+    }
+
+
+    public static function syncProductStockFromCentral(int $productId): void
+    {
+        $centralId = self::centralWarehouseId();
+
+        $centralQty = (int) (WarehouseStock::query()
+            ->where('warehouse_id', $centralId)
+            ->where('product_id', $productId)
+            ->value('quantity') ?? 0);
+
+        Product::query()->where('id', $productId)->update([
+            'stock' => max(0, $centralQty),
+        ]);
     }
 
     public static function centralWarehouseId(): int
