@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\Product;
 use App\Services\InventoryWebhookService;
+use App\Services\AriyajanebiSyncService;
 
 class ProductInventoryObserver
 {
@@ -22,5 +23,7 @@ class ProductInventoryObserver
             'reserved' => $product->reserved,
             'changed' => $product->getChanges(),
         ]);
+
+        AriyajanebiSyncService::syncProduct($product);
     }
 }

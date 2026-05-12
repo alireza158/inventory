@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\StockMovement;
 use App\Services\InventoryWebhookService;
+use App\Services\AriyajanebiSyncService;
 
 class StockMovementObserver
 {
@@ -22,5 +23,10 @@ class StockMovementObserver
             'reference_type' => $movement->reference_type,
             'reference_id' => $movement->reference_id,
         ]);
+
+        if ($movement->product) {
+            AriyajanebiSyncService::syncProduct($movement->product);
+        }
     }
 }
+
