@@ -10,6 +10,7 @@ use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InventoryWebhookController;
 use App\Http\Controllers\InvoiceNoteController;
 use App\Http\Controllers\InvoicePaymentController;
 use App\Http\Controllers\NotificationController;
@@ -84,6 +85,10 @@ Route::middleware('auth')->group(function () {
 
     // Quick category store
     Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->middleware('role:admin|Admin')->name('categories.quickStore');
+
+
+    Route::get('/inventory-webhooks', [InventoryWebhookController::class, 'index'])->middleware('role:admin|Admin')->name('inventory-webhooks.index');
+    Route::put('/inventory-webhooks', [InventoryWebhookController::class, 'update'])->middleware('role:admin|Admin')->name('inventory-webhooks.update');
 
     // Stock movements
     Route::get('/products/{product}/movements/create', [StockMovementController::class, 'create'])->name('movements.create');
