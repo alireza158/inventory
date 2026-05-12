@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\InventoryWebhookLog;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Warehouse;
 use App\Models\WarehouseStock;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class AriyajanebiSyncService
 {
@@ -31,11 +33,18 @@ class AriyajanebiSyncService
 
     private static function syncVariants($variants, bool $withoutVerify): void
     {
+        $payload = ['_method' => 'PUT'];
+        foreach ($variants->values() as $i => $variant) {
+            $payload["varieties[{$i}][id]"] = (string) $variant->variety_id;
+            $payload["varieties[{$i}][price]"] = (string) max(0, (int) $variant->sell_price);
+            $payload["varieties[{$i}][balance]"] = (string) self::centralWarehouseQuantityForVariant($variant);
+        }
+
+        $apiLog = self::createApiLog($payload);
+
         try {
             $client = Http::asForm()->timeout(15)->withOptions(['allow_redirects' => false]);
-            if ($withoutVerify) {
-                $client = $client->withoutVerifying();
-            }
+            if ($withoutVerify) $client = $client->withoutVerifying();
 
             $login = $client->post(self::LOGIN_URL, [
                 'username' => self::USERNAME,
@@ -43,27 +52,12 @@ class AriyajanebiSyncService
             ]);
 
             if (!$login->successful()) {
-                Log::warning('Ariyajanebi login failed', [
-                    'status' => $login->status(),
-                    'body' => $login->body(),
-                    'without_verify' => $withoutVerify,
-                ]);
+                self::markApiLog($apiLog, 'pending', $login->status(), 'login failed');
                 return;
             }
 
-            $payload = ['_method' => 'PUT'];
-            foreach ($variants->values() as $i => $variant) {
-                $centralStock = self::centralWarehouseQuantityForVariant($variant);
-
-                $payload["varieties[{$i}][id]"] = (string) $variant->variety_id;
-                $payload["varieties[{$i}][price]"] = (string) max(0, (int) $variant->sell_price);
-                $payload["varieties[{$i}][balance]"] = (string) $centralStock;
-            }
-
-            $cookies = $login->cookies()->toArray();
+            $updateClient = $client->withCookies($login->cookies()->toArray(), 'api.ariyajanebi.ir');
             $token = self::extractToken($login->json());
-
-            $updateClient = $client->withCookies($cookies, 'api.ariyajanebi.ir');
             if ($token) {
                 $updateClient = $updateClient->withToken($token)->withHeaders([
                     'Authorization' => 'Bearer ' . $token,
@@ -74,21 +68,14 @@ class AriyajanebiSyncService
             $update = $updateClient->post(self::UPDATE_URL, $payload);
 
             if ($update->status() >= 300 && $update->status() < 400) {
-                Log::warning('Ariyajanebi update redirected (likely auth/session issue)', [
-                    'status' => $update->status(),
-                    'location' => $update->header('Location'),
-                    'without_verify' => $withoutVerify,
-                ]);
+                self::markApiLog($apiLog, 'pending', $update->status(), 'redirect to ' . ($update->header('Location') ?? 'unknown'));
                 return;
             }
 
-            if (!$update->successful()) {
-                Log::warning('Ariyajanebi update failed', [
-                    'status' => $update->status(),
-                    'body' => $update->body(),
-                    'payload' => $payload,
-                    'without_verify' => $withoutVerify,
-                ]);
+            if ($update->successful()) {
+                self::markApiLog($apiLog, 'success', $update->status(), null);
+            } else {
+                self::markApiLog($apiLog, 'pending', $update->status(), mb_substr((string) $update->body(), 0, 500));
             }
         } catch (\Throwable $e) {
             if (!$withoutVerify && str_contains($e->getMessage(), 'cURL error 77')) {
@@ -97,26 +84,60 @@ class AriyajanebiSyncService
                 return;
             }
 
-            Log::error('Ariyajanebi sync exception', [
-                'message' => $e->getMessage(),
-                'without_verify' => $withoutVerify,
-            ]);
+            self::markApiLog($apiLog, 'pending', null, mb_substr($e->getMessage(), 0, 500));
+            Log::error('Ariyajanebi sync exception', ['message' => $e->getMessage(), 'without_verify' => $withoutVerify]);
         }
     }
 
+    private static function createApiLog(array $payload): ?InventoryWebhookLog
+    {
+        if (!Schema::hasTable('inventory_webhook_logs')) return null;
 
+        return InventoryWebhookLog::create([
+            'event' => 'ariya.multi_varieties_update_lite',
+            'target' => self::UPDATE_URL,
+            'status' => 'pending',
+            'attempts' => 1,
+            'payload' => ['payload' => ['variants' => self::variantPayloadPreview($payload)]],
+            'sent_at' => now(),
+            'next_retry_at' => now()->addMinutes(5),
+        ]);
+    }
+
+    private static function variantPayloadPreview(array $payload): array
+    {
+        $rows = [];
+        for ($i = 0; $i < 500; $i++) {
+            if (!isset($payload["varieties[{$i}][id]"])) break;
+            $rows[] = [
+                'id' => $payload["varieties[{$i}][id]"] ?? null,
+                'price' => $payload["varieties[{$i}][price]"] ?? null,
+                'balance' => $payload["varieties[{$i}][balance]"] ?? null,
+            ];
+        }
+        return $rows;
+    }
+
+    private static function markApiLog(?InventoryWebhookLog $log, string $status, ?int $code, ?string $error): void
+    {
+        if (!$log) return;
+
+        $log->update([
+            'status' => $status,
+            'response_code' => $code,
+            'error_message' => $error,
+            'sent_at' => now(),
+            'next_retry_at' => $status === 'success' ? null : now()->addMinutes(5),
+        ]);
+    }
 
     private static function centralWarehouseQuantityForVariant($variant): int
     {
         $productId = (int) ($variant->product_id ?? 0);
-        if ($productId <= 0) {
-            return max(0, (int) ($variant->stock ?? 0));
-        }
+        if ($productId <= 0) return max(0, (int) ($variant->stock ?? 0));
 
         $centralWarehouseId = Warehouse::query()->where('type', 'central')->value('id');
-        if (!$centralWarehouseId) {
-            return max(0, (int) ($variant->stock ?? 0));
-        }
+        if (!$centralWarehouseId) return max(0, (int) ($variant->stock ?? 0));
 
         $qty = WarehouseStock::query()
             ->where('warehouse_id', (int) $centralWarehouseId)
@@ -125,6 +146,7 @@ class AriyajanebiSyncService
 
         return max(0, (int) ($qty ?? 0));
     }
+
     private static function extractToken($json): ?string
     {
         if (!is_array($json)) return null;
@@ -139,9 +161,7 @@ class AriyajanebiSyncService
 
         foreach ($candidates as $candidate) {
             $value = trim((string) $candidate);
-            if ($value !== '') {
-                return $value;
-            }
+            if ($value !== '') return $value;
         }
 
         return null;

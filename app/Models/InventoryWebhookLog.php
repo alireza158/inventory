@@ -10,6 +10,8 @@ class InventoryWebhookLog extends Model
         'setting_id',
         'event',
         'status',
+        'attempts',
+        'target',
         'response_code',
         'error_message',
         'payload',
@@ -19,5 +21,6 @@ class InventoryWebhookLog extends Model
     protected $casts = [
         'payload' => 'array',
         'sent_at' => 'datetime',
+        'next_retry_at' => 'datetime',
     ];
 }

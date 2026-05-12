@@ -6,11 +6,14 @@ use App\Models\InventoryWebhookLog;
 use App\Models\InventoryWebhookSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use App\Services\InventoryWebhookService;
 
 class InventoryWebhookController extends Controller
 {
     public function index()
     {
+        InventoryWebhookService::processPending();
+
         if (!Schema::hasTable('inventory_webhook_settings') || !Schema::hasTable('inventory_webhook_logs')) {
             return view('inventory-webhooks.index', [
                 'setting' => null,

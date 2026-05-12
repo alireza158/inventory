@@ -55,7 +55,7 @@
             <table class="table table-striped align-middle">
                 <thead>
                     <tr>
-                        <th>#</th><th>رویداد</th><th>محصول/تنوع ارسال‌شده</th><th>وضعیت</th><th>کد پاسخ</th><th>زمان ارسال</th><th>خطا</th>
+                        <th>#</th><th>رویداد</th><th>محصول/تنوع ارسال‌شده</th><th>وضعیت</th><th>دفعات تلاش</th><th>تلاش بعدی</th><th>کد پاسخ</th><th>زمان ارسال</th><th>خطا</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -83,12 +83,14 @@
                             @endif
                         </td>
                         <td>{{ $log->status }}</td>
+                        <td>{{ $log->attempts ?? 0 }}</td>
+                        <td>{{ $log->next_retry_at?->format('Y-m-d H:i:s') ?? '-' }}</td>
                         <td>{{ $log->response_code ?? '-' }}</td>
                         <td>{{ $log->sent_at?->format('Y-m-d H:i:s') ?? '-' }}</td>
                         <td style="max-width:350px;white-space:normal;">{{ $log->error_message ?? '-' }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center text-muted">هنوز ارسالی ثبت نشده است.</td></tr>
+                    <tr><td colspan="9" class="text-center text-muted">هنوز ارسالی ثبت نشده است.</td></tr>
                 @endforelse
                 </tbody>
             </table>
