@@ -24,6 +24,11 @@ class ProductInventoryObserver
             'changed' => $product->getChanges(),
         ]);
 
-        AriyajanebiSyncService::syncProduct($product);
+        // Sync all variants only when the product price changes.
+        // Variant stock updates are handled by ProductVariantSyncObserver to avoid
+        // applying one variant stock movement to all variants in external API.
+        if ($product->wasChanged(['price'])) {
+            AriyajanebiSyncService::syncProduct($product);
+        }
     }
 }
