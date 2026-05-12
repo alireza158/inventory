@@ -312,7 +312,10 @@ class ProductController extends Controller
             ->orderBy('model_name')
             ->get(['id', 'brand', 'model_name', 'code']);
 
-        return view('products.edit', compact('product', 'categories', 'modelListOptions'));
+        $modelLists = $modelListOptions;
+        $previewSeq4 = $product->short_barcode ?: substr((string) $product->code, 2, 4);
+
+        return view('products.edit', compact('product', 'categories', 'modelListOptions', 'modelLists', 'previewSeq4'));
     }
 
     public function update(Request $request, Product $product)
@@ -331,6 +334,9 @@ class ProductController extends Controller
             'variants.*.buy_price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required', 'integer', 'min:0'],
             'variants.*.is_active' => ['nullable', 'boolean'],
+            'variants.*.variety_id' => ['nullable', 'integer', 'min:1'],
+            'variant_site_ids' => ['nullable', 'array'],
+            'variant_site_ids.*' => ['nullable', 'integer', 'min:1'],
         ]);
 
         DB::transaction(function () use ($data, $product) {
@@ -369,6 +375,7 @@ class ProductController extends Controller
                     'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
                     'stock' => (int) $v['stock'],
                     'is_active' => (bool) ($v['is_active'] ?? true),
+                    'variety_id' => isset($v['variety_id']) && $v['variety_id'] !== '' ? (int) $v['variety_id'] : null,
                 ];
 
                 if (!empty($v['id'])) {
@@ -392,6 +399,16 @@ class ProductController extends Controller
             ProductVariant::where('product_id', $product->id)
                 ->when(count($keepIds) > 0, fn ($q) => $q->whereNotIn('id', $keepIds))
                 ->delete();
+
+            foreach (($data['variant_site_ids'] ?? []) as $variantId => $siteVariantId) {
+                if ($siteVariantId === null || $siteVariantId === '') {
+                    continue;
+                }
+
+                ProductVariant::where('product_id', $product->id)
+                    ->where('id', (int) $variantId)
+                    ->update(['variety_id' => (int) $siteVariantId]);
+            }
 
             $this->recalcProductSummary($product);
         });

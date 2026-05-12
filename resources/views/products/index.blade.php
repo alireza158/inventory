@@ -29,621 +29,1379 @@
 @endphp
 
 <style>
-    :root{
-        --soft-bg:#f6f8fb;
-        --soft-border:#e8edf3;
-        --card-radius:16px;
-        --grid:#e6ebf2;
-        --grid2:#f4f7fb;
+    :root {
+        --brand: #0EA5B7;
+        --brand-dark: #0F5965;
+        --brand-deep: #12343D;
+
+        --bg: #F4F6F8;
+        --card: #FFFFFF;
+        --soft: #F8FAFC;
+        --border: #E2E8F0;
+        --border-soft: #EEF2F7;
+
+        --text: #1F2937;
+        --muted: #6B7280;
+
+        --success: #16A34A;
+        --danger: #DC2626;
+
+        --radius: 14px;
+        --shadow: 0 8px 24px rgba(15, 23, 42, .05);
     }
 
-    .page-head{
-        background: linear-gradient(180deg, rgba(13,110,253,.10), rgba(13,110,253,0));
-        border: 1px solid var(--soft-border);
-        border-radius: var(--card-radius);
-        padding: 12px 14px;
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-size: 13.5px;
     }
 
-    .page-title{
-        font-weight: 800;
-        letter-spacing: -.3px;
-        margin:0;
+    .inventory-page {
+        width: 100%;
+        max-width: 1680px;
+        margin: 0 auto;
+        padding: 18px 16px 34px;
     }
 
-    .subtle-text{ color:#6b7280; }
-
-    .soft-card{
-        border: 1px solid var(--soft-border);
-        border-radius: var(--card-radius);
-        box-shadow: 0 10px 30px rgba(16,24,40,.06);
-        background:#fff;
+    .page-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
     }
 
-    .sticky-panel{ position: sticky; top: 90px; }
-    .cat-card .form-control{ border-radius: 12px; }
-
-    .cat-tree-wrap{
-        max-height: calc(100vh - 240px);
-        overflow: auto;
-        padding-right: 4px;
+    .inventory-header {
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        border-right: 5px solid var(--brand);
     }
 
-    .cat-tree-wrap::-webkit-scrollbar{ width: 8px; }
-    .cat-tree-wrap::-webkit-scrollbar-thumb{
-        background: #d8dee8;
-        border-radius: 99px;
+    .inventory-header-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
     }
 
-    .filter-card .form-control,
-    .filter-card .form-select{
-        border-radius: 12px;
+    .page-title {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 900;
+        color: var(--brand-deep);
     }
 
-    .btn-soft{
-        border-radius: 12px;
-        border: 1px solid var(--soft-border);
-        background: #fff;
-        padding: .35rem .55rem;
+    .page-subtitle {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: .82rem;
+        line-height: 1.8;
     }
 
-    .btn-soft:hover{ background:#f8fafc; }
-
-    .pill{
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-        border-radius: 999px;
-        padding: 3px 9px;
-        font-size: 12px;
-        font-weight: 700;
-        border: 1px solid var(--soft-border);
-        background: #fff;
-        white-space: nowrap;
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
     }
 
-    .pill-gray{ background:#f8fafc; }
-    .pill-danger{
-        background: rgba(220,53,69,.08);
-        border-color: rgba(220,53,69,.25);
-        color:#b42318;
-    }
-    .pill-success{
-        background: rgba(25,135,84,.10);
-        border-color: rgba(25,135,84,.25);
-        color:#146c43;
-    }
-
-    .product-name-wrap{
-        display:flex;
-        flex-direction:column;
-        align-items:flex-start;
-        gap:8px;
-    }
-
-    .sellable-state{
-        display:flex;
-        align-items:center;
-        gap:8px;
-        flex-wrap:wrap;
-    }
-
-    .sellable-badge{
-        display:inline-flex;
-        align-items:center;
-        border-radius:999px;
-        padding:3px 10px;
-        font-size:12px;
-        font-weight:700;
-        border:1px solid transparent;
-    }
-
-    .sellable-badge.active{
-        color:#166534;
-        background:rgba(34,197,94,.15);
-        border-color:rgba(22,101,52,.2);
-    }
-
-    .sellable-badge.inactive{
-        color:#991b1b;
-        background:rgba(239,68,68,.12);
-        border-color:rgba(153,27,27,.2);
-    }
-
-    .sellable-action-link{
-        font-size:12px;
-        font-weight:600;
-        text-decoration:none;
-    }
-
-    .sellable-action-link:hover{ text-decoration:underline; }
-
-    .sortable-link{
-        color: inherit;
-        text-decoration: none;
-        display:inline-flex;
-        align-items:center;
-        gap:6px;
-    }
-
-    .sortable-link:hover{ color:#0d6efd; }
-
-    .sort-arrow{
-        font-size:11px;
-        color:#6b7280;
-    }
-
-    .bulk-toolbar{
-        border:1px solid var(--soft-border);
-        border-radius:14px;
-        padding:10px 12px;
-        background:#f8fafc;
-    }
-
-    .buy-price-muted{ color:#9ca3af; }
-
-    .price-inline{
-        white-space: nowrap;
-        font-weight: 700;
-    }
-
-    .variant-operation-select{
-        min-width: 240px;
+    .btn-soft,
+    .btn-main {
         border-radius: 10px;
+        padding: 8px 13px;
+        font-size: .8rem;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        text-decoration: none;
+        border: 1px solid transparent;
+        white-space: nowrap;
+        transition: all .15s ease;
+        cursor: pointer;
     }
 
-    .btn-stock-breakdown{
-        border: 0;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+    .btn-main {
+        background: var(--brand);
         color: #fff;
-        box-shadow: 0 8px 18px rgba(37,99,235,.25);
-        transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+        border-color: var(--brand);
     }
 
-    .btn-stock-breakdown:hover{
-        color:#fff;
-        transform: translateY(-1px);
-        box-shadow: 0 12px 22px rgba(37,99,235,.32);
+    .btn-main:hover {
+        background: var(--brand-dark);
+        border-color: var(--brand-dark);
+        color: #fff;
     }
 
-    .btn-stock-breakdown:focus{ color:#fff; }
-
-    .btn-stock-breakdown:disabled{
-        opacity: .65;
-        box-shadow: none;
-        transform: none;
+    .btn-soft {
+        background: #fff;
+        color: var(--brand-deep);
+        border-color: var(--border);
     }
 
-    .mono{
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        letter-spacing: .5px;
+    .btn-soft:hover {
+        background: var(--soft);
+        color: var(--brand-deep);
     }
 
-    .sheet-wrap{
-        border: 1px solid var(--grid);
-        border-radius: var(--card-radius);
+    .toolbar-card {
+        padding: 15px;
+        margin-bottom: 14px;
+    }
+
+    .toolbar-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .section-title {
+        margin: 0;
+        font-size: .98rem;
+        font-weight: 900;
+        color: var(--brand-deep);
+    }
+
+    .subtle-text {
+        color: var(--muted);
+        font-size: .78rem;
+        line-height: 1.8;
+    }
+
+    .count-badge {
+        background: #ECFEFF;
+        color: var(--brand-dark);
+        border: 1px solid #BAE6FD;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: .78rem;
+        font-weight: 850;
+    }
+
+    .operation-strip {
+        background: var(--soft);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px;
+        display: grid;
+        grid-template-columns: minmax(250px, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 13px;
+    }
+
+    .selected-info {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+    }
+
+    .selected-dot {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: #DFF7FA;
+        color: var(--brand-dark);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        flex: 0 0 auto;
+    }
+
+    .selected-title {
+        font-weight: 900;
+        font-size: .84rem;
+        color: var(--brand-deep);
+        white-space: nowrap;
         overflow: hidden;
-        background:#fff;
+        text-overflow: ellipsis;
     }
 
-    .sheet{
-        margin:0;
+    .selected-hint {
+        color: var(--muted);
+        font-size: .73rem;
+        margin-top: 2px;
+    }
+
+    .operation-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .variant-operation-select {
+        width: 185px;
+        height: 35px;
+        border-radius: 10px;
+        font-size: .77rem;
+    }
+
+    .btn-mini {
+        border-radius: 10px;
+        padding: 7px 11px;
+        font-size: .77rem;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+
+    .inventory-page .btn-primary {
+        background: var(--brand);
+        border-color: var(--brand);
+    }
+
+    .inventory-page .btn-primary:hover {
+        background: var(--brand-dark);
+        border-color: var(--brand-dark);
+    }
+
+    .inventory-page .btn-outline-primary {
+        color: var(--brand-dark);
+        border-color: rgba(14, 165, 183, .45);
+    }
+
+    .inventory-page .btn-outline-primary:hover {
+        color: #fff;
+        background: var(--brand);
+        border-color: var(--brand);
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: minmax(320px, 1.6fr) minmax(145px, .7fr) minmax(145px, .7fr) minmax(190px, .9fr) auto;
+        gap: 9px;
+        align-items: end;
+    }
+
+    .label-sm {
+        font-size: .74rem;
+        font-weight: 800;
+        color: #526171;
+        margin-bottom: 6px;
+    }
+
+    .form-control,
+    .form-select {
+        border-color: var(--border);
+        border-radius: 10px;
+        color: var(--text);
+        font-size: .82rem;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 .14rem rgba(14, 165, 183, .12);
+    }
+
+    .product-card {
+        overflow: hidden;
+    }
+
+    .product-card-head {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        background: #fff;
+    }
+
+    .sheet-wrap {
+        padding: 12px;
+    }
+
+    .sheet-scroll {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .sheet {
+        width: 100%;
+        min-width: 1240px;
+        margin: 0;
         border-collapse: separate;
         border-spacing: 0;
-        width:100%;
+        table-layout: fixed;
     }
 
-    .sheet thead th{
+    .sheet col.col-check { width: 46px; }
+    .sheet col.col-toggle { width: 46px; }
+    .sheet col.col-code { width: 115px; }
+    .sheet col.col-barcode { width: 165px; }
+    .sheet col.col-stock { width: 110px; }
+    .sheet col.col-buy { width: 165px; }
+    .sheet col.col-sell { width: 165px; }
+
+    .sheet thead th {
         position: sticky;
         top: 0;
-        z-index: 3;
+        z-index: 5;
+        background: #F8FAFC;
+        color: #475569;
+        font-size: .74rem;
+        font-weight: 900;
+        padding: 11px 10px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+        text-align: right;
+    }
+
+    .sheet tbody td {
+        padding: 11px 10px;
+        font-size: .82rem;
+        vertical-align: middle;
         background: #fff;
-        font-weight: 800;
-        color:#111827;
-        padding: .55rem .6rem;
-        font-size: 13px;
-        border-bottom: 1px solid var(--grid);
-        border-left: 1px solid var(--grid);
+        border-bottom: 1px solid var(--border-soft);
+    }
+
+    .sheet tbody tr:hover td {
+        background: #FAFCFE;
+    }
+
+    .sheet tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .nowrap {
         white-space: nowrap;
     }
 
-    .sheet thead th:first-child{ border-right: 1px solid var(--grid); }
-
-    .sheet td{
-        padding: .55rem .6rem;
-        font-size: 13px;
-        border-bottom: 1px solid var(--grid2);
-        border-left: 1px solid var(--grid);
-        vertical-align: middle;
-        background:#fff;
+    .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        letter-spacing: .2px;
+        direction: ltr;
     }
 
-    .sheet td:first-child{ border-right: 1px solid var(--grid); }
-    .sheet tbody tr:hover td{ background:#fbfdff; }
+    .sortable-link {
+        color: inherit;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
 
-    .toggle-variants{
+    .sortable-link:hover {
+        color: var(--brand-dark);
+    }
+
+    .sort-arrow {
+        color: #94A3B8;
+        font-size: .72rem;
+    }
+
+    .product-name-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .product-title-text {
+        font-weight: 850;
+        color: var(--brand-deep);
+        line-height: 1.8;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        word-break: normal;
+    }
+
+    .sellable-state {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex-wrap: wrap;
+    }
+
+    .sellable-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 9px;
+        font-size: .71rem;
+        font-weight: 800;
+        border: 1px solid transparent;
+    }
+
+    .sellable-badge.active {
+        color: #166534;
+        background: #ECFDF3;
+        border-color: #BBF7D0;
+    }
+
+    .sellable-badge.inactive {
+        color: #991B1B;
+        background: #FEF2F2;
+        border-color: #FECACA;
+    }
+
+    .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: .74rem;
+        font-weight: 800;
+        border: 1px solid var(--border);
+        background: #fff;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+
+    .pill-gray {
+        background: #F8FAFC;
+        color: #475569;
+    }
+
+    .pill-danger {
+        background: #FEF2F2;
+        border-color: #FECACA;
+        color: #B91C1C;
+    }
+
+    .pill-success {
+        background: #F0FDF4;
+        border-color: #BBF7D0;
+        color: #15803D;
+    }
+
+    .pill-purple {
+        background: #ECFEFF;
+        border-color: #BAE6FD;
+        color: var(--brand-dark);
+    }
+
+    .price-inline {
+        white-space: nowrap;
+        font-weight: 850;
+        color: var(--brand-deep);
+    }
+
+    .buy-price-muted {
+        color: #9CA3AF;
+    }
+
+    .toggle-variants {
         width: 30px;
         height: 30px;
         border-radius: 10px;
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        border:1px solid var(--soft-border);
-        background:#fff;
-        font-weight:900;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border);
+        background: #fff;
+        color: var(--brand-dark);
+        font-weight: 900;
+        transition: all .15s ease;
     }
 
-    .toggle-variants:hover{ background:#f8fafc; }
-
-    .variants-wrap{
-        padding: 14px 16px;
-        background: #fafcff;
-        border-top: 1px solid var(--soft-border);
+    .toggle-variants:hover {
+        background: #ECFEFF;
+        border-color: #BAE6FD;
     }
 
-    @media (min-width: 992px){
-        .col-cat { flex: 0 0 auto; width: 24%; }
-        .col-main{ flex: 0 0 auto; width: 76%; }
+    .variant-inner {
+        background: #F8FAFC;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 10px;
     }
 
-    @media (min-width: 1200px){
-        .col-cat { width: 20%; }
-        .col-main{ width: 80%; }
+    .variant-table {
+        margin: 0;
+        font-size: .79rem;
+    }
+
+    .variant-table th {
+        color: #64748B;
+        font-weight: 900;
+        font-size: .73rem;
+        white-space: nowrap;
+    }
+
+    .variant-table td {
+        background: transparent !important;
+    }
+
+    .status-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 999px;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    .status-dot.active {
+        background: #16A34A;
+        box-shadow: 0 0 0 4px rgba(22, 163, 74, .14);
+    }
+
+    .status-dot.inactive {
+        background: #DC2626;
+        box-shadow: 0 0 0 4px rgba(220, 38, 38, .13);
+    }
+
+    .empty-row {
+        color: var(--muted);
+        padding: 44px 0 !important;
+        font-weight: 800;
+    }
+
+    .pagination {
+        margin-bottom: 0;
+    }
+
+    .offcanvas {
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
+    }
+
+    .offcanvas-header {
+        border-bottom: 1px solid var(--border);
+    }
+
+    .cat-search {
+        height: 40px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #fff;
+        font-size: .82rem;
+    }
+
+    .cat-tree-wrap {
+        max-height: calc(100vh - 190px);
+        overflow: auto;
+        padding-left: 4px;
+        padding-right: 2px;
+    }
+
+    .side-link {
+        font-size: .78rem;
+        font-weight: 800;
+        color: var(--brand);
+        text-decoration: none;
+    }
+
+    .modal-content {
+        border: 0;
+        border-radius: 18px;
+        box-shadow: 0 22px 55px rgba(15, 23, 42, .18);
+    }
+
+    .modal-header {
+        background: var(--brand-deep);
+        color: #fff;
+        border-bottom: 0;
+        border-radius: 18px 18px 0 0;
+    }
+
+    .modal-header .btn-close {
+        filter: invert(1);
+        opacity: .9;
+    }
+
+    .modal-title {
+        font-weight: 900;
+    }
+
+    .min-w-0 {
+        min-width: 0;
+    }
+
+    @media (max-width: 1199.98px) {
+        .filter-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .filter-actions {
+            grid-column: 1 / -1;
+        }
+
+        .operation-strip {
+            grid-template-columns: 1fr;
+        }
+
+        .operation-actions {
+            justify-content: flex-start;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        body {
+            font-size: 13px;
+            background: #F6F7F9;
+        }
+
+        .inventory-page {
+            padding: 10px 8px 24px;
+        }
+
+        .page-card {
+            border-radius: 13px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, .045);
+        }
+
+        .inventory-header {
+            padding: 13px;
+            margin-bottom: 10px;
+            border-right: 4px solid var(--brand);
+        }
+
+        .inventory-header-inner {
+            display: block;
+        }
+
+        .page-title {
+            font-size: 1.02rem;
+            line-height: 1.8;
+        }
+
+        .page-subtitle {
+            font-size: .76rem;
+            line-height: 1.9;
+            margin-top: 3px;
+        }
+
+        .header-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 7px;
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .btn-soft,
+        .btn-main {
+            width: 100%;
+            min-height: 39px;
+            font-size: .78rem;
+        }
+
+        .toolbar-card {
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .toolbar-top {
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .section-title {
+            font-size: .9rem;
+        }
+
+        .subtle-text {
+            font-size: .74rem;
+        }
+
+        .count-badge {
+            padding: 5px 10px;
+            font-size: .74rem;
+        }
+
+        .operation-strip {
+            display: block;
+            padding: 9px;
+            border-radius: 11px;
+            margin-bottom: 11px;
+        }
+
+        .selected-info {
+            align-items: flex-start;
+            margin-bottom: 9px;
+        }
+
+        .selected-title {
+            font-size: .78rem;
+            white-space: normal;
+            line-height: 1.8;
+        }
+
+        .selected-hint {
+            font-size: .7rem;
+            line-height: 1.8;
+        }
+
+        .operation-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px;
+            width: 100%;
+        }
+
+        .operation-actions .variant-operation-select {
+            grid-column: 1 / -1;
+            width: 100%;
+            height: 38px;
+        }
+
+        .operation-actions .btn-mini {
+            width: 100%;
+            min-height: 38px;
+            font-size: .74rem;
+        }
+
+        .filter-grid {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .filter-actions {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr;
+            width: 100%;
+        }
+
+        .form-control,
+        .form-select {
+            height: 39px;
+            font-size: .78rem;
+            border-radius: 10px;
+        }
+
+        .product-card-head {
+            padding: 12px;
+            align-items: flex-start;
+        }
+
+        .product-card-head .pill {
+            display: none;
+        }
+
+        .sheet-wrap {
+            padding: 9px;
+        }
+
+        .sheet-scroll {
+            overflow: visible;
+            border: 0;
+            background: transparent;
+            border-radius: 0;
+        }
+
+        .sheet {
+            display: block;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .sheet colgroup,
+        .sheet thead {
+            display: none;
+        }
+
+        .sheet tbody {
+            display: block;
+            width: 100%;
+        }
+
+        .sheet tbody tr {
+            display: block;
+            width: 100%;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, .04);
+            overflow: hidden;
+        }
+
+        .sheet tbody td {
+            display: grid;
+            grid-template-columns: 88px minmax(0, 1fr);
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 9px 11px;
+            border-bottom: 1px solid var(--border-soft);
+            background: #fff;
+            font-size: .78rem;
+            text-align: right;
+            white-space: normal;
+        }
+
+        .sheet tbody td::before {
+            content: attr(data-label);
+            color: var(--muted);
+            font-size: .7rem;
+            font-weight: 800;
+        }
+
+        .sheet tbody td.mobile-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            background: #F8FAFC;
+        }
+
+        .sheet tbody td.mobile-top::before {
+            display: none;
+        }
+
+        .mobile-row-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mobile-row-title {
+            color: var(--brand-deep);
+            font-weight: 900;
+            font-size: .78rem;
+        }
+
+        .product-title-text {
+            font-size: .82rem;
+            line-height: 1.9;
+            font-weight: 900;
+        }
+
+        .pill {
+            width: fit-content;
+            max-width: 100%;
+            font-size: .72rem;
+            padding: 4px 9px;
+        }
+
+        .price-inline {
+            font-size: .78rem;
+            white-space: normal;
+        }
+
+        .sheet tbody tr.collapse {
+            display: none;
+        }
+
+        .sheet tbody tr.collapse.show {
+            display: block;
+        }
+
+        .sheet tbody tr.collapse td:first-child {
+            display: none;
+        }
+
+        .sheet tbody tr.collapse td.variant-cell {
+            display: block;
+            padding: 9px;
+            border-bottom: 0;
+        }
+
+        .sheet tbody tr.collapse td.variant-cell::before {
+            display: none;
+        }
+
+        .variant-table thead {
+            display: none;
+        }
+
+        .variant-table tbody,
+        .variant-table tr {
+            display: block;
+        }
+
+        .variant-table tr {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 7px;
+            margin-bottom: 8px;
+        }
+
+        .variant-table td {
+            display: flex !important;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 4px !important;
+            border-bottom: 1px solid var(--border-soft) !important;
+            background: #fff !important;
+            font-size: .74rem;
+        }
+
+        .variant-table td::before {
+            content: attr(data-label);
+            color: var(--muted);
+            font-size: .68rem;
+            font-weight: 800;
+        }
+
+        .variant-table td:last-child {
+            border-bottom: 0 !important;
+        }
+
+        .offcanvas {
+            width: min(88vw, 360px) !important;
+        }
+    }
+
+    @media (max-width: 390px) {
+        .sheet tbody td {
+            grid-template-columns: 76px minmax(0, 1fr);
+            padding: 8px 9px;
+        }
+
+        .operation-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .operation-actions .variant-operation-select {
+            grid-column: auto;
+        }
+
+        .filter-actions {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 
-<div class="row g-3">
-    <div class="col-cat d-none d-lg-block">
-        <div class="soft-card cat-card sticky-panel">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="fw-bold">دسته‌بندی‌ها</div>
-                    <a href="{{ route('products.index', request()->except(['category_id', 'page'])) }}" class="small text-decoration-none">همه</a>
+<div class="inventory-page">
+    <div class="page-card inventory-header">
+        <div class="inventory-header-inner">
+            <div>
+                <h1 class="page-title">مدیریت کالاها و موجودی</h1>
+                <div class="page-subtitle">
+                    مدیریت کالا، موجودی، قیمت خرید، قیمت فروش، تنوع‌ها و کارتکس‌های انبار
                 </div>
+            </div>
 
-                <input type="text" id="catSearch" class="form-control form-control-sm mb-3" placeholder="جستجو در دسته‌ها...">
+            <div class="header-actions">
+                <button class="btn-soft" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas">
+                    دسته‌بندی‌ها
+                </button>
 
-                <div class="cat-tree-wrap" id="catTree">
-                    @include('categories._tree', ['nodes' => $categoryTree])
-                </div>
+                <a class="btn-soft" href="{{ route('purchases.create') }}">
+                    خرید کالا
+                </a>
+
+                <a class="btn-main" href="{{ route('products.create') }}">
+                    افزودن کالا
+                </a>
             </div>
         </div>
     </div>
 
-    <div class="col-main">
-        <div class="page-head mb-3">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div id="productsAjaxArea">
+        <div class="page-card toolbar-card">
+            <div class="toolbar-top">
                 <div>
-                    <h4 class="page-title">کالاها</h4>
+                    <h2 class="section-title">عملیات و فیلتر کالاها</h2>
+                    <div class="subtle-text">برای عملیات سریع، فقط یک کالا را انتخاب کنید.</div>
                 </div>
 
-                <div class="d-flex gap-2 flex-wrap">
-                    <a class="btn btn-success" href="{{ route('purchases.create') }}">+ خرید کالا</a>
+                <div class="count-badge">
+                    {{ $toFa($products->total() ?? 0) }} کالا
+                </div>
+            </div>
 
-                    <button class="btn btn-soft d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas">
-                        دسته‌بندی‌ها
+            <div class="operation-strip">
+                <div class="selected-info">
+                    <div class="selected-dot" id="selectedCountBadge">۰</div>
+
+                    <div class="min-w-0">
+                        <div class="selected-title" id="selectedProductTitle">هیچ کالایی انتخاب نشده است</div>
+                        <div class="selected-hint" id="variantHelpText">برای انتخاب تنوع، ابتدا فقط یک کالا را تیک بزنید.</div>
+                    </div>
+                </div>
+
+                <div class="operation-actions">
+                    <button class="btn btn-primary btn-mini" type="button" id="bulkEditBtn">
+                        ویرایش
                     </button>
 
-                    <a class="btn btn-primary" href="{{ route('products.create') }}">+ افزودن کالا</a>
+                    <button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeleteBtn">
+                        حذف
+                    </button>
+
+                    <button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeactivateBtn">
+                        غیرفعال‌سازی
+                    </button>
+
+                    <select id="bulkVariantSelect" class="form-select form-select-sm variant-operation-select" disabled>
+                        <option value="">تنوع محصول...</option>
+                    </select>
+
+                    <button class="btn btn-outline-primary btn-mini" type="button" id="bulkStockBtn">
+                        موجودی انبار
+                    </button>
+
+                    <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkSalesLedgerBtn">
+                        کارتکس فروش
+                    </button>
+
+                    <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkPurchaseLedgerBtn">
+                        کارتکس خرید
+                    </button>
                 </div>
             </div>
+
+            <form method="GET" action="{{ route('products.index') }}">
+                @if(request('category_id'))
+                    <input type="hidden" name="category_id" value="{{ request('category_id') }}">
+                @endif
+
+                <div class="filter-grid">
+                    <div>
+                        <label class="label-sm">جستجو</label>
+                        <input
+                            name="q"
+                            class="form-control"
+                            value="{{ request('q') }}"
+                            placeholder="نام / کد ۴ رقمی / بارکد محصول...">
+                    </div>
+
+                    <div>
+                        <label class="label-sm">وضعیت موجودی</label>
+                        <select name="stock_status" class="form-select">
+                            <option value="" @selected(request('stock_status') === '' || is_null(request('stock_status')))>همه</option>
+                            <option value="out" @selected(request('stock_status') === 'out')>ناموجود</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="label-sm">وضعیت فروش</label>
+                        <select name="sellable_status" class="form-select">
+                            <option value="" @selected(request('sellable_status') === '' || is_null(request('sellable_status')))>همه</option>
+                            <option value="sellable" @selected(request('sellable_status') === 'sellable')>قابل فروش</option>
+                            <option value="unsellable" @selected(request('sellable_status') === 'unsellable')>غیرفعال فروش</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="label-sm">بازه قیمت</label>
+                        <div class="input-group">
+                            <input name="min_price" class="form-control money" value="{{ request('min_price') }}" placeholder="از">
+                            <input name="max_price" class="form-control money" value="{{ request('max_price') }}" placeholder="تا">
+                        </div>
+                    </div>
+
+                    <div class="filter-actions d-flex gap-2">
+                        <button class="btn btn-primary btn-mini px-3">اعمال</button>
+                        <a class="btn btn-outline-secondary btn-mini px-3" href="{{ route('products.index') }}">پاک</a>
+                    </div>
+                </div>
+            </form>
         </div>
 
-        <div id="productsAjaxArea">
-            <div class="soft-card filter-card mb-3">
-                <div class="card-body">
-                    <div class="bulk-toolbar mb-3">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <div class="fw-bold">عملیات روی کالا</div>
-                            <div class="small subtle-text">ابتدا یک کالا را انتخاب کنید، سپس عملیات را اجرا کنید.</div>
-                        </div>
-
-                        <div class="d-flex flex-wrap gap-2 mt-2">
-                            <button class="btn btn-primary btn-sm" type="button" id="bulkEditBtn">ویرایش</button>
-                            <button class="btn btn-outline-danger btn-sm" type="button" id="bulkDeleteBtn">حذف</button>
-
-                            <select id="bulkVariantSelect" class="form-select form-select-sm variant-operation-select" disabled>
-                                <option value="">انتخاب تنوع محصول...</option>
-                            </select>
-
-                            <button class="btn btn-sm btn-stock-breakdown" type="button" id="bulkStockBtn">📦 موجودی انبار به تفکیک</button>
-                            <button class="btn btn-sm btn-outline-primary" type="button" id="bulkSalesLedgerBtn">📒 کارتکس فروش</button>
-                        </div>
-
-                        <div class="small subtle-text mt-2" id="variantHelpText">
-                            برای انتخاب تنوع، ابتدا فقط یک کالا را تیک بزنید.
-                        </div>
+        <div class="page-card product-card">
+            <div class="product-card-head">
+                <div>
+                    <h2 class="section-title">لیست کالاها</h2>
+                    <div class="subtle-text">
+                        نمایش {{ $toFa($products->firstItem() ?? 0) }} تا {{ $toFa($products->lastItem() ?? 0) }} از {{ $toFa($products->total() ?? 0) }} مورد
                     </div>
-
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                        <div class="fw-bold">فیلترها</div>
-                    </div>
-
-                    <form method="GET" action="{{ route('products.index') }}">
-                        @if(request('category_id'))
-                            <input type="hidden" name="category_id" value="{{ request('category_id') }}">
-                        @endif
-
-                        <div class="row g-3 align-items-end">
-                            <div class="col-lg-5">
-                                <label class="form-label">جستجو (نام / کد ۴ رقمی / کد محصول)</label>
-                                <input name="q" class="form-control" value="{{ request('q') }}" placeholder="مثلاً 0490 یا گارد یونیک">
-                            </div>
-
-                            <div class="col-lg-3">
-                                <label class="form-label">وضعیت موجودی</label>
-                                <select name="stock_status" class="form-select">
-                                    <option value="" @selected(request('stock_status') === '' || is_null(request('stock_status')))>همه</option>
-                                    <option value="out" @selected(request('stock_status') === 'out')>ناموجود</option>
-                                </select>
-                            </div>
-
-                            <div class="col-lg-2">
-                                <label class="form-label">وضعیت فروش</label>
-                                <select name="sellable_status" class="form-select">
-                                    <option value="" @selected(request('sellable_status') === '' || is_null(request('sellable_status')))>همه</option>
-                                    <option value="sellable" @selected(request('sellable_status') === 'sellable')>قابل فروش</option>
-                                    <option value="unsellable" @selected(request('sellable_status') === 'unsellable')>غیرقابل فروش</option>
-                                </select>
-                            </div>
-
-                            <div class="col-lg-2">
-                                <label class="form-label">بازه قیمت (تومان)</label>
-                                <div class="input-group">
-                                    <input name="min_price" class="form-control money" value="{{ request('min_price') }}" placeholder="از">
-                                    <input name="max_price" class="form-control money" value="{{ request('max_price') }}" placeholder="تا">
-                                </div>
-                            </div>
-
-                            <div class="col-12 d-flex gap-2">
-                                <button class="btn btn-primary">اعمال فیلتر</button>
-                                <a class="btn btn-outline-secondary" href="{{ route('products.index') }}">پاک کردن</a>
-                            </div>
-                        </div>
-                    </form>
                 </div>
+
+                <span class="pill pill-purple">
+                    نمایش واکنش‌گرا
+                </span>
             </div>
 
-            <div class="soft-card">
-                <div class="card-body pb-0">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                        <div class="small subtle-text">
-                            نمایش {{ $products->firstItem() ?? 0 }} تا {{ $products->lastItem() ?? 0 }} از {{ $products->total() ?? 0 }} مورد
-                        </div>
-                    </div>
+            <div class="sheet-wrap">
+                <div class="sheet-scroll">
+                    <table class="sheet">
+                        <colgroup>
+                            <col class="col-check">
+                            <col class="col-toggle">
+                            <col class="col-code">
+                            <col class="col-barcode">
+                            <col class="col-name">
+                            <col class="col-stock">
+                            <col class="col-buy">
+                            <col class="col-sell">
+                        </colgroup>
 
-                    <div class="sheet-wrap">
-                        <div class="table-responsive">
-                            <table class="sheet">
-                                <thead>
-                                    <tr>
-                                        <th class="w-1 text-center">
-                                            <input type="checkbox" class="form-check-input" id="selectAllProducts" title="انتخاب همه">
-                                        </th>
-                                        <th class="w-1"></th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('short_barcode') }}" class="sortable-link">
-                                                کد کالا
-                                                <span class="sort-arrow">{{ $sortArrow('short_barcode') }}</span>
-                                            </a>
-                                        </th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('barcode') }}" class="sortable-link">
-                                                بارکد کالا
-                                                <span class="sort-arrow">{{ $sortArrow('barcode') }}</span>
-                                            </a>
-                                        </th>
-                                        <th>
-                                            <a href="{{ $sortLink('name') }}" class="sortable-link">
-                                                اسم کالا
-                                                <span class="sort-arrow">{{ $sortArrow('name') }}</span>
-                                            </a>
-                                        </th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('stock') }}" class="sortable-link">
-                                                موجودی
-                                                <span class="sort-arrow">{{ $sortArrow('stock') }}</span>
-                                            </a>
-                                        </th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('variants_buy_price_min') }}" class="sortable-link">
-                                                قیمت خرید
-                                                <span class="sort-arrow">{{ $sortArrow('variants_buy_price_min') }}</span>
-                                            </a>
-                                        </th>
-                                        <th class="nowrap">
-                                            <a href="{{ $sortLink('price') }}" class="sortable-link">
-                                                قیمت فروش
-                                                <span class="sort-arrow">{{ $sortArrow('price') }}</span>
-                                            </a>
-                                        </th>
-                                    </tr>
-                                </thead>
+                        <thead>
+                            <tr>
+                                <th class="text-center">
+                                    <input type="checkbox" class="form-check-input" id="selectAllProducts" title="انتخاب همه">
+                                </th>
 
-                                <tbody>
-                                    @forelse($products as $p)
-                                        @php
-                                            $hasVariants = $p->variants && $p->variants->count() > 0;
-                                            $collapseId = 'variantsRow' . $p->id;
+                                <th></th>
 
-                                            $short = $p->short_barcode;
-                                            if (!$short && !empty($p->code) && strlen($p->code) >= 6) {
-                                                $short = substr($p->code, 2, 4);
-                                            }
+                                <th>
+                                    <a href="{{ $sortLink('short_barcode') }}" class="sortable-link">
+                                        کد کالا
+                                        <span class="sort-arrow">{{ $sortArrow('short_barcode') }}</span>
+                                    </a>
+                                </th>
 
-                                            $sampleBarcode = null;
-                                            if ($hasVariants) {
-                                                $firstVar = $p->variants->sortBy('variant_code')->first();
-                                                $sampleBarcode = $firstVar?->variant_code;
-                                            }
+                                <th>
+                                    <a href="{{ $sortLink('barcode') }}" class="sortable-link">
+                                        بارکد
+                                        <span class="sort-arrow">{{ $sortArrow('barcode') }}</span>
+                                    </a>
+                                </th>
 
-                                            $variantsPayload = $p->variants
-                                                ->sortBy('variant_code')
-                                                ->values()
-                                                ->map(function ($v) {
-                                                    return [
-                                                        'id' => (int) $v->id,
-                                                        'name' => $v->variant_name,
-                                                        'stock' => (int) $v->stock,
-                                                        'is_active' => (bool) $v->is_active,
-                                                    ];
-                                                })
-                                                ->all();
+                                <th>
+                                    <a href="{{ $sortLink('name') }}" class="sortable-link">
+                                        اسم کالا
+                                        <span class="sort-arrow">{{ $sortArrow('name') }}</span>
+                                    </a>
+                                </th>
 
-                                            $stockBreakdownPayload = $p->warehouseStocks
-                                                ->map(function ($ws) {
-                                                    return [
-                                                        'warehouse' => $ws->warehouse?->name,
-                                                        'qty' => (int) $ws->quantity,
-                                                    ];
-                                                })
-                                                ->values()
-                                                ->all();
+                                <th>
+                                    <a href="{{ $sortLink('stock') }}" class="sortable-link">
+                                        موجودی
+                                        <span class="sort-arrow">{{ $sortArrow('stock') }}</span>
+                                    </a>
+                                </th>
 
-                                            $buyPrice = $p->variants_min_buy_price;
-                                        @endphp
+                                <th>
+                                    <a href="{{ $sortLink('variants_buy_price_min') }}" class="sortable-link">
+                                        قیمت خرید
+                                        <span class="sort-arrow">{{ $sortArrow('variants_buy_price_min') }}</span>
+                                    </a>
+                                </th>
 
-                                        <tr>
-                                            <td class="text-center">
-                                                <input
-                                                    type="checkbox"
-                                                    class="form-check-input product-checkbox"
-                                                    value="{{ $p->id }}"
-                                                    data-edit-url="{{ route('products.edit', $p) }}"
-                                                    data-delete-url="{{ route('products.destroy', $p) }}"
-                                                    data-sales-ledger-url="{{ route('products.sales-ledger', $p) }}"
-                                                    data-product-name="{{ $p->name }}"
-                                                    data-variants='@json($variantsPayload)'
-                                                    data-stock-breakdown='@json($stockBreakdownPayload)'
-                                                >
-                                            </td>
+                                <th>
+                                    <a href="{{ $sortLink('price') }}" class="sortable-link">
+                                        قیمت فروش
+                                        <span class="sort-arrow">{{ $sortArrow('price') }}</span>
+                                    </a>
+                                </th>
+                            </tr>
+                        </thead>
 
-                                            <td class="w-1">
-                                                @if($hasVariants)
-                                                    <button
-                                                        class="toggle-variants"
-                                                        type="button"
-                                                        data-bs-toggle="collapse"
-                                                        data-bs-target="#{{ $collapseId }}"
-                                                        aria-expanded="false"
-                                                        aria-controls="{{ $collapseId }}"
-                                                        title="نمایش تنوع‌ها"
-                                                    >
-                                                        <span class="variant-symbol">+</span>
-                                                    </button>
-                                                @else
-                                                    <span class="text-muted">—</span>
-                                                @endif
-                                            </td>
+                        <tbody>
+                            @forelse($products as $p)
+                                @php
+                                    $hasVariants = $p->variants && $p->variants->count() > 0;
+                                    $collapseId = 'variantsRow' . $p->id;
 
-                                            <td class="nowrap mono">
-                                                <span class="pill pill-gray">{{ $short ?: '—' }}</span>
-                                            </td>
+                                    $short = $p->short_barcode;
 
-                                            <td class="nowrap mono">
-                                                @if($sampleBarcode)
-                                                    <span class="pill pill-gray">{{ $sampleBarcode }}</span>
-                                                @else
-                                                    <span class="pill pill-gray">{{ $p->barcode ?: '—' }}</span>
-                                                @endif
-                                            </td>
+                                    if (!$short && !empty($p->code) && strlen($p->code) >= 6) {
+                                        $short = substr($p->code, 2, 4);
+                                    }
 
-                                            <td>
-                                                <div class="product-name-wrap">
-                                                    <div class="fw-bold">{{ $p->name }}</div>
-                                                    <div class="sellable-state">
-                                                        @if($p->is_sellable ?? true)
-                                                            <span class="sellable-badge active">✅ قابل فروش</span>
-                                                            <a href="{{ route('product-deactivation-documents.create') }}" class="sellable-action-link text-danger">
-                                                                ثبت سند غیرفعال‌سازی
-                                                            </a>
-                                                        @else
-                                                            <span class="sellable-badge inactive">⛔ غیرفعال فروش</span>
-                                                            <a href="{{ route('product-deactivation-documents.index', ['product_name' => $p->name]) }}" class="sellable-action-link text-secondary">
-                                                                مشاهده سوابق غیرفعال‌سازی
-                                                            </a>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </td>
+                                    $sampleBarcode = null;
 
-                                            <td class="nowrap">
-                                                <span class="pill {{ ((int) $p->stock) === 0 ? 'pill-danger' : 'pill-success' }}">
-                                                    {{ $toFa($p->stock ?? 0) }}
-                                                </span>
-                                            </td>
+                                    if ($hasVariants) {
+                                        $firstVar = $p->variants->sortBy('variant_code')->first();
+                                        $sampleBarcode = $firstVar?->variant_code;
+                                    }
 
-                                            <td class="nowrap">
-                                                @if(!is_null($buyPrice))
-                                                    <span class="price-inline">{{ $toFa(number_format((int) $buyPrice) . ' تومان') }}</span>
-                                                @else
-                                                    <span class="buy-price-muted">—</span>
-                                                @endif
-                                            </td>
+                                    $variantsPayload = $p->variants
+                                        ->sortBy('variant_code')
+                                        ->values()
+                                        ->map(function ($v) {
+                                            return [
+                                                'id' => (int) $v->id,
+                                                'name' => $v->variant_name,
+                                                'stock' => (int) $v->stock,
+                                                'is_active' => (bool) $v->is_active,
+                                            ];
+                                        })
+                                        ->all();
 
-                                            <td class="nowrap">
-                                                <span class="price-inline">{{ $toFa(number_format((int) $p->price) . ' تومان') }}</span>
-                                            </td>
-                                        </tr>
+                                    $stockBreakdownPayload = $p->warehouseStocks
+                                        ->map(function ($ws) {
+                                            return [
+                                                'warehouse' => $ws->warehouse?->name,
+                                                'qty' => (int) $ws->quantity,
+                                            ];
+                                        })
+                                        ->values()
+                                        ->all();
 
+                                    $buyPrice = $p->variants_min_buy_price;
+                                    $isSellable = $p->is_sellable ?? true;
+                                @endphp
+
+                                <tr>
+                                    <td class="text-center mobile-top">
+                                        <div class="mobile-row-title d-md-none">
+                                            کالا
+                                        </div>
+
+                                        <div class="mobile-row-actions">
+                                            <input
+                                                type="checkbox"
+                                                class="form-check-input product-checkbox"
+                                                value="{{ $p->id }}"
+                                                data-edit-url="{{ route('products.edit', $p) }}"
+                                                data-delete-url="{{ route('products.destroy', $p) }}"
+                                                data-sales-ledger-url="{{ route('products.sales-ledger', $p) }}"
+                                                data-purchase-ledger-url="{{ route('products.purchase-ledger', $p) }}"
+                                                data-deactivate-url="{{ route('product-deactivation-documents.create', ['product_id' => $p->id]) }}"
+                                                data-deactivation-history-url="{{ route('product-deactivation-documents.index', ['product_name' => $p->name]) }}"
+                                                data-is-sellable="{{ $isSellable ? '1' : '0' }}"
+                                                data-product-name="{{ $p->name }}"
+                                                data-variants='@json($variantsPayload)'
+                                                data-stock-breakdown='@json($stockBreakdownPayload)'>
+
+                                            @if($hasVariants)
+                                                <button
+                                                    class="toggle-variants d-md-none"
+                                                    type="button"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#{{ $collapseId }}"
+                                                    aria-expanded="false"
+                                                    aria-controls="{{ $collapseId }}"
+                                                    title="نمایش تنوع‌ها">
+                                                    <span class="variant-symbol">+</span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </td>
+
+                                    <td data-label="تنوع">
                                         @if($hasVariants)
-                                            <tr class="collapse bg-light" id="{{ $collapseId }}">
-                                                <td></td>
-                                                <td colspan="7">
-                                                    <div class="p-2">
-                                                        <div class="table-responsive">
-                                                            <table class="table table-sm mb-0">
-                                                                <thead>
-                                                                    <tr>
-                                                                        <th>نام تنوع</th>
-                                                                        <th class="nowrap">بارکد ۱۱</th>
-                                                                        <th class="nowrap">موجودی</th>
-                                                                        <th class="nowrap">فروش</th>
-                                                                        <th class="nowrap">خرید</th>
-                                                                        <th class="nowrap">وضعیت</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    @foreach($p->variants->sortBy('variant_code') as $v)
-                                                                        <tr>
-                                                                            <td class="fw-bold">{{ $v->variant_name }}</td>
-                                                                            <td class="mono">{{ $v->variant_code }}</td>
-                                                                            <td>
-                                                                                @if((int) $v->stock === 0)
-                                                                                    <span class="pill pill-danger">0</span>
-                                                                                @else
-                                                                                    <span class="pill pill-success">{{ $v->stock }}</span>
-                                                                                @endif
-                                                                            </td>
-                                                                            <td>{{ number_format((int) $v->sell_price) }} تومان</td>
-                                                                            <td>{{ $v->buy_price !== null ? number_format((int) $v->buy_price) . ' تومان' : '—' }}</td>
-                                                                            <td>
-                                                                                <span class="badge {{ $v->is_active ? 'bg-success' : 'bg-secondary' }}">
-                                                                                    {{ $v->is_active ? 'فعال' : 'غیرفعال' }}
-                                                                                </span>
-                                                                            </td>
-                                                                        </tr>
-                                                                    @endforeach
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endif
-                                    @empty
-                                        <tr>
-                                            <td colspan="8" class="text-center text-muted py-5">هیچ کالایی ثبت نشده 📦</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                                            <button
+                                                class="toggle-variants d-none d-md-inline-flex"
+                                                type="button"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#{{ $collapseId }}"
+                                                aria-expanded="false"
+                                                aria-controls="{{ $collapseId }}"
+                                                title="نمایش تنوع‌ها">
+                                                <span class="variant-symbol">+</span>
+                                            </button>
 
-                    <div class="mt-3 pb-3">
-                        {{ $products->links() }}
-                    </div>
+                                            <span class="d-md-none pill pill-gray">دارای تنوع</span>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+
+                                    <td class="nowrap mono" data-label="کد کالا">
+                                        <span class="pill pill-gray">{{ $short ?: '—' }}</span>
+                                    </td>
+
+                                    <td class="nowrap mono" data-label="بارکد">
+                                        @if($sampleBarcode)
+                                            <span class="pill pill-gray">{{ $sampleBarcode }}</span>
+                                        @else
+                                            <span class="pill pill-gray">{{ $p->barcode ?: '—' }}</span>
+                                        @endif
+                                    </td>
+
+                                    <td data-label="نام کالا">
+                                        <div class="product-name-wrap">
+                                            <div class="product-title-text">{{ $p->name }}</div>
+
+                                            <div class="sellable-state">
+                                                @if($isSellable)
+                                                    <span class="sellable-badge active">قابل فروش</span>
+                                                @else
+                                                    <span class="sellable-badge inactive">غیرفعال فروش</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td class="nowrap" data-label="موجودی">
+                                        <span class="pill {{ ((int) $p->stock) === 0 ? 'pill-danger' : 'pill-success' }}">
+                                            {{ $toFa($p->stock ?? 0) }}
+                                        </span>
+                                    </td>
+
+                                    <td class="nowrap" data-label="قیمت خرید">
+                                        @if(!is_null($buyPrice))
+                                            <span class="price-inline">{{ $toFa(number_format((int) $buyPrice) . ' تومان') }}</span>
+                                        @else
+                                            <span class="buy-price-muted">—</span>
+                                        @endif
+                                    </td>
+
+                                    <td class="nowrap" data-label="قیمت فروش">
+                                        <span class="price-inline">{{ $toFa(number_format((int) $p->price) . ' تومان') }}</span>
+                                    </td>
+                                </tr>
+
+                                @if($hasVariants)
+                                    <tr class="collapse" id="{{ $collapseId }}">
+                                        <td></td>
+                                        <td colspan="7" class="variant-cell">
+                                            <div class="variant-inner">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm variant-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>نام تنوع</th>
+                                                                <th class="nowrap">بارکد ۱۱</th>
+                                                                <th class="nowrap">موجودی</th>
+                                                                <th class="nowrap">فروش</th>
+                                                                <th class="nowrap">خرید</th>
+                                                                <th class="nowrap">وضعیت</th>
+                                                            </tr>
+                                                        </thead>
+
+                                                        <tbody>
+                                                            @foreach($p->variants->sortBy('variant_code') as $v)
+                                                                <tr>
+                                                                    <td data-label="نام تنوع" class="fw-bold">{{ $v->variant_name }}</td>
+
+                                                                    <td data-label="بارکد" class="mono">
+                                                                        {{ $v->variant_code }}
+                                                                    </td>
+
+                                                                    <td data-label="موجودی">
+                                                                        @if((int) $v->stock === 0)
+                                                                            <span class="pill pill-danger">۰</span>
+                                                                        @else
+                                                                            <span class="pill pill-success">{{ $toFa($v->stock) }}</span>
+                                                                        @endif
+                                                                    </td>
+
+                                                                    <td data-label="فروش">
+                                                                        {{ $toFa(number_format((int) $v->sell_price) . ' تومان') }}
+                                                                    </td>
+
+                                                                    <td data-label="خرید">
+                                                                        {{ $v->buy_price !== null ? $toFa(number_format((int) $v->buy_price) . ' تومان') : '—' }}
+                                                                    </td>
+
+                                                                    <td data-label="وضعیت">
+                                                                        @if($v->is_active)
+                                                                            <span class="status-dot active" title="فعال" aria-label="فعال"></span>
+                                                                        @else
+                                                                            <span class="status-dot inactive" title="غیرفعال" aria-label="غیرفعال"></span>
+                                                                        @endif
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center empty-row">هیچ کالایی ثبت نشده است.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    {{ $products->links() }}
                 </div>
             </div>
         </div>
@@ -652,24 +1410,20 @@
 
 <div class="offcanvas offcanvas-end" tabindex="-1" id="catOffcanvas" aria-labelledby="catOffcanvasLabel">
     <div class="offcanvas-header">
-        <h5 class="offcanvas-title" id="catOffcanvasLabel">دسته‌بندی‌ها</h5>
+        <h5 class="offcanvas-title fw-bold" id="catOffcanvasLabel">دسته‌بندی‌ها</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
 
     <div class="offcanvas-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <div class="fw-bold">انتخاب دسته‌بندی</div>
-            <a href="{{ route('products.index', request()->except(['category_id', 'page'])) }}" class="small text-decoration-none">همه</a>
+            <a href="{{ route('products.index', request()->except(['category_id', 'page'])) }}" class="side-link">همه کالاها</a>
         </div>
 
-        <input type="text" id="catSearchMobile" class="form-control form-control-sm mb-3" placeholder="جستجو در دسته‌ها...">
+        <input type="text" id="catSearchMobile" class="form-control cat-search mb-3" placeholder="جستجو در دسته‌ها...">
 
         <div class="cat-tree-wrap" id="catTreeMobile">
             @include('categories._tree', ['nodes' => $categoryTree])
-        </div>
-
-        <div class="small subtle-text mt-3">
-            افزودن دسته‌بندی از منوی «دسته‌بندی‌ها» در سایدبار انجام می‌شود.
         </div>
     </div>
 </div>
@@ -688,16 +1442,17 @@
             </div>
 
             <div class="modal-body">
-                <div id="stockBreakdownProductName" class="fw-bold mb-2"></div>
+                <div id="stockBreakdownProductName" class="fw-bold mb-3"></div>
 
                 <div class="table-responsive">
-                    <table class="table table-sm">
+                    <table class="table table-sm align-middle">
                         <thead>
                             <tr>
                                 <th>انبار</th>
                                 <th class="text-end">تعداد</th>
                             </tr>
                         </thead>
+
                         <tbody id="stockBreakdownBody"></tbody>
                     </table>
                 </div>
@@ -707,296 +1462,424 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const modalEl = document.getElementById('stockBreakdownModal');
-    const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
-    const stockNameEl = document.getElementById('stockBreakdownProductName');
-    const stockBodyEl = document.getElementById('stockBreakdownBody');
-    const deleteForm = document.getElementById('bulkDeleteForm');
-    const variantSelectEl = document.getElementById('bulkVariantSelect');
-    const variantHelpTextEl = document.getElementById('variantHelpText');
+    document.addEventListener('DOMContentLoaded', function() {
+        const modalEl = document.getElementById('stockBreakdownModal');
+        const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+        const stockNameEl = document.getElementById('stockBreakdownProductName');
+        const stockBodyEl = document.getElementById('stockBreakdownBody');
+        const deleteForm = document.getElementById('bulkDeleteForm');
 
-    function parseJsonDataset(raw, fallback = []) {
-        if (!raw) return fallback;
-
-        try {
-            return JSON.parse(raw);
-        } catch (e) {
-            return fallback;
+        function faNumber(value) {
+            return String(value ?? '').replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
         }
-    }
 
-    function bindCatSearch(inputId, treeId) {
-        const input = document.getElementById(inputId);
-        const tree = document.getElementById(treeId);
-        if (!input || !tree) return;
+        function parseJsonDataset(raw, fallback = []) {
+            if (!raw) return fallback;
 
-        input.addEventListener('input', function () {
-            const q = this.value.trim().toLowerCase();
-
-            tree.querySelectorAll('a').forEach(a => {
-                const text = (a.textContent || '').trim().toLowerCase();
-                const li = a.closest('li');
-                if (!li) return;
-                li.style.display = (q === '' || text.includes(q)) ? '' : 'none';
-            });
-        });
-    }
-
-    async function loadProducts(url, pushState = true) {
-        const area = document.getElementById('productsAjaxArea');
-        if (!area) return;
-
-        area.style.opacity = '0.55';
-
-        try {
-            const res = await fetch(url, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            });
-
-            const html = await res.text();
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-            const incomingArea = doc.getElementById('productsAjaxArea');
-
-            if (!incomingArea) {
-                window.location.href = url;
-                return;
+            try {
+                return JSON.parse(raw);
+            } catch (e) {
+                return fallback;
             }
-
-            area.innerHTML = incomingArea.innerHTML;
-
-            if (pushState) {
-                history.pushState({}, '', url);
-            }
-
-            initAjaxBindings();
-        } catch (e) {
-            window.location.href = url;
-        } finally {
-            area.style.opacity = '1';
-        }
-    }
-
-    function getSelectedProducts() {
-        return Array.from(document.querySelectorAll('.product-checkbox')).filter(ch => ch.checked);
-    }
-
-    function getSingleSelected() {
-        const selected = getSelectedProducts();
-
-        if (selected.length !== 1) {
-            alert('برای این عملیات باید دقیقا یک کالا انتخاب شود.');
-            return null;
         }
 
-        return selected[0];
-    }
-
-    function updateVariantSelectState() {
-        if (!variantSelectEl) return;
-
-        const selected = getSelectedProducts();
-
-        if (selected.length !== 1) {
-            variantSelectEl.innerHTML = '<option value="">انتخاب تنوع محصول...</option>';
-            variantSelectEl.disabled = true;
-
-            if (variantHelpTextEl) {
-                variantHelpTextEl.textContent = 'برای انتخاب تنوع، ابتدا فقط یک کالا را تیک بزنید.';
-            }
-
-            return;
+        function freshVariantSelect() {
+            return document.getElementById('bulkVariantSelect');
         }
 
-        const variants = parseJsonDataset(selected[0].dataset.variants, []);
-        variantSelectEl.disabled = false;
-        variantSelectEl.innerHTML = '<option value="">انتخاب تنوع محصول...</option>';
-
-        if (!variants.length) {
-            variantSelectEl.innerHTML = '<option value="">این کالا تنوعی ندارد</option>';
-            variantSelectEl.disabled = true;
-
-            if (variantHelpTextEl) {
-                variantHelpTextEl.textContent = 'این کالا تنوع ثبت‌شده‌ای ندارد و عملیات روی کل کالا انجام می‌شود.';
-            }
-
-            return;
+        function freshVariantHelp() {
+            return document.getElementById('variantHelpText');
         }
 
-        variants.forEach(variant => {
-            const option = document.createElement('option');
-            option.value = String(variant.id);
-            option.textContent = `${variant.name ?? 'تنوع'} (موجودی کل: ${variant.stock ?? 0})`;
-            variantSelectEl.appendChild(option);
-        });
-
-        if (variantHelpTextEl) {
-            variantHelpTextEl.textContent = 'برای «موجودی انبار» و «کارتکس فروش»، در صورت نیاز تنوع را انتخاب کنید.';
+        function freshSelectedTitle() {
+            return document.getElementById('selectedProductTitle');
         }
-    }
 
-    function initAjaxBindings() {
-        document.querySelectorAll('.toggle-variants').forEach(btn => {
-            const targetSel = btn.getAttribute('data-bs-target');
-            const el = document.querySelector(targetSel);
-            if (!el) return;
+        function freshSelectedBadge() {
+            return document.getElementById('selectedCountBadge');
+        }
 
-            const symbol = btn.querySelector('.variant-symbol');
-            const setSymbol = () => {
-                symbol.textContent = el.classList.contains('show') ? '−' : '+';
-            };
+        function freshDeactivateBtn() {
+            return document.getElementById('bulkDeactivateBtn');
+        }
 
-            setSymbol();
-            el.addEventListener('shown.bs.collapse', setSymbol);
-            el.addEventListener('hidden.bs.collapse', setSymbol);
-        });
+        function bindCatSearch(inputId, treeId) {
+            const input = document.getElementById(inputId);
+            const tree = document.getElementById(treeId);
 
-        const selectAll = document.getElementById('selectAllProducts');
-        const productCheckboxes = Array.from(document.querySelectorAll('.product-checkbox'));
+            if (!input || !tree) return;
 
-        selectAll?.addEventListener('change', function () {
-            productCheckboxes.forEach(ch => ch.checked = this.checked);
-            updateVariantSelectState();
-        });
+            input.addEventListener('input', function() {
+                const q = this.value.trim().toLowerCase();
 
-        productCheckboxes.forEach(ch => ch.addEventListener('change', updateVariantSelectState));
+                tree.querySelectorAll('a').forEach(a => {
+                    const text = (a.textContent || '').trim().toLowerCase();
+                    const li = a.closest('li');
 
-        const form = document.querySelector('#productsAjaxArea form[method="GET"]');
-        form?.addEventListener('submit', function (e) {
-            e.preventDefault();
-            const params = new URLSearchParams(new FormData(this));
-            loadProducts(`${this.action}?${params.toString()}`);
-        });
+                    if (!li) return;
 
-        document.querySelectorAll('#productsAjaxArea a.sortable-link, #productsAjaxArea .pagination a, #catTree a, #catTreeMobile a').forEach(link => {
-            if (link.dataset.ajaxBound === '1') return;
-
-            link.dataset.ajaxBound = '1';
-            link.addEventListener('click', function (e) {
-                if (!this.href || !this.href.includes('/products')) return;
-                e.preventDefault();
-                loadProducts(this.href);
-            });
-        });
-
-        const clearBtn = document.querySelector('#productsAjaxArea a.btn-outline-secondary[href*="products"]');
-        if (clearBtn && clearBtn.dataset.ajaxBound !== '1') {
-            clearBtn.dataset.ajaxBound = '1';
-            clearBtn.addEventListener('click', function (e) {
-                e.preventDefault();
-                loadProducts(this.href);
+                    li.style.display = (q === '' || text.includes(q)) ? '' : 'none';
+                });
             });
         }
 
-        document.getElementById('bulkEditBtn')?.addEventListener('click', function () {
-            const selected = getSingleSelected();
-            if (!selected) return;
-            window.location.href = selected.dataset.editUrl;
-        });
+        async function loadProducts(url, pushState = true) {
+            const area = document.getElementById('productsAjaxArea');
 
-        document.getElementById('bulkDeleteBtn')?.addEventListener('click', function () {
-            const selected = getSingleSelected();
-            if (!selected) return;
+            if (!area) return;
 
-            if (!confirm(`کالای «${selected.dataset.productName}» حذف شود؟`)) {
-                return;
-            }
+            area.style.opacity = '0.55';
 
-            deleteForm.setAttribute('action', selected.dataset.deleteUrl);
-            deleteForm.submit();
-        });
-
-        document.getElementById('bulkStockBtn')?.addEventListener('click', function () {
-            const selected = getSingleSelected();
-            if (!selected || !modal || !stockBodyEl || !stockNameEl) return;
-
-            const variants = parseJsonDataset(selected.dataset.variants, []);
-            const selectedVariantId = variantSelectEl?.value ? Number(variantSelectEl.value) : null;
-            const selectedVariant = selectedVariantId ? variants.find(v => Number(v.id) === selectedVariantId) : null;
-
-            if (variants.length && !selectedVariant) {
-                alert('ابتدا تنوع محصول را انتخاب کنید.');
-                variantSelectEl?.focus();
-                return;
-            }
-
-            stockNameEl.textContent = selectedVariant
-                ? `${selected.dataset.productName} — ${selectedVariant.name ?? 'تنوع انتخابی'}`
-                : selected.dataset.productName;
-
-            stockBodyEl.innerHTML = '';
-
-            const breakdown = parseJsonDataset(selected.dataset.stockBreakdown, []);
-            const variantTotal = Number(selectedVariant?.stock ?? 0);
-            let limitedBreakdown = breakdown;
-
-            if (selectedVariant) {
-                let remaining = variantTotal;
-
-                limitedBreakdown = breakdown
-                    .filter(item => Number(item.qty ?? 0) > 0)
-                    .map(item => {
-                        if (remaining <= 0) return null;
-
-                        const qty = Math.min(Number(item.qty ?? 0), remaining);
-                        remaining -= qty;
-
-                        return {
-                            warehouse: item.warehouse,
-                            qty: qty,
-                        };
-                    })
-                    .filter(Boolean);
-            }
-
-            if (!limitedBreakdown.length) {
-                stockBodyEl.innerHTML = '<tr><td colspan="2" class="text-center text-muted">برای این کالا در انبارها موجودی ثبت نشده است.</td></tr>';
-            } else {
-                limitedBreakdown.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>${item.warehouse ?? '—'}</td><td class="text-end">${item.qty ?? 0}</td>`;
-                    stockBodyEl.appendChild(tr);
+            try {
+                const res = await fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
                 });
 
-                if (selectedVariant) {
-                    const hintRow = document.createElement('tr');
-                    hintRow.innerHTML = `<td colspan="2" class="small text-muted pt-2">جمع موجودی تنوع «${selectedVariant.name ?? 'انتخابی'}»: ${selectedVariant.stock ?? 0}</td>`;
-                    stockBodyEl.appendChild(hintRow);
+                const html = await res.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const incomingArea = doc.getElementById('productsAjaxArea');
+
+                if (!incomingArea) {
+                    window.location.href = url;
+                    return;
                 }
+
+                area.innerHTML = incomingArea.innerHTML;
+
+                if (pushState) {
+                    history.pushState({}, '', url);
+                }
+
+                initAjaxBindings();
+
+                const offcanvasEl = document.getElementById('catOffcanvas');
+                const openedOffcanvas = offcanvasEl ? bootstrap.Offcanvas.getInstance(offcanvasEl) : null;
+
+                if (openedOffcanvas) {
+                    openedOffcanvas.hide();
+                }
+            } catch (e) {
+                window.location.href = url;
+            } finally {
+                area.style.opacity = '1';
+            }
+        }
+
+        function getSelectedProducts() {
+            return Array.from(document.querySelectorAll('.product-checkbox')).filter(ch => ch.checked);
+        }
+
+        function getSingleSelected() {
+            const selected = getSelectedProducts();
+
+            if (selected.length !== 1) {
+                alert('برای این عملیات باید دقیقا یک کالا انتخاب شود.');
+                return null;
             }
 
-            modal.show();
-        });
+            return selected[0];
+        }
 
-        document.getElementById('bulkSalesLedgerBtn')?.addEventListener('click', function () {
-            const selected = getSingleSelected();
-            if (!selected) return;
+        function updateVariantSelectState() {
+            const variantSelectEl = freshVariantSelect();
+            const variantHelpTextEl = freshVariantHelp();
+            const selectedTitleEl = freshSelectedTitle();
+            const selectedBadgeEl = freshSelectedBadge();
+            const deactivateBtn = freshDeactivateBtn();
 
-            const baseUrl = selected.dataset.salesLedgerUrl;
-            if (!baseUrl) return;
+            if (!variantSelectEl) return;
 
-            const params = new URLSearchParams();
-            const selectedVariantId = variantSelectEl?.value ? String(variantSelectEl.value) : '';
+            const selected = getSelectedProducts();
 
-            if (selectedVariantId) {
-                params.set('variant_id', selectedVariantId);
-            } else {
-                params.delete('variant_id');
+            if (selectedBadgeEl) {
+                selectedBadgeEl.textContent = faNumber(selected.length);
             }
 
-            window.location.href = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+            if (deactivateBtn) {
+                deactivateBtn.textContent = 'غیرفعال‌سازی';
+            }
+
+            if (!selected.length) {
+                if (selectedTitleEl) {
+                    selectedTitleEl.textContent = 'هیچ کالایی انتخاب نشده است';
+                }
+
+                variantSelectEl.innerHTML = '<option value="">تنوع محصول...</option>';
+                variantSelectEl.disabled = true;
+
+                if (variantHelpTextEl) {
+                    variantHelpTextEl.textContent = 'برای انتخاب تنوع، ابتدا فقط یک کالا را تیک بزنید.';
+                }
+
+                return;
+            }
+
+            if (selected.length > 1) {
+                if (selectedTitleEl) {
+                    selectedTitleEl.textContent = faNumber(selected.length) + ' کالا انتخاب شده است';
+                }
+
+                variantSelectEl.innerHTML = '<option value="">تنوع محصول...</option>';
+                variantSelectEl.disabled = true;
+
+                if (variantHelpTextEl) {
+                    variantHelpTextEl.textContent = 'عملیات ویرایش، حذف، غیرفعال‌سازی، موجودی و کارتکس فقط برای یک کالا انجام می‌شود.';
+                }
+
+                return;
+            }
+
+            const item = selected[0];
+
+            if (selectedTitleEl) {
+                selectedTitleEl.textContent = item.dataset.productName || 'کالای انتخاب شده';
+            }
+
+            if (deactivateBtn) {
+                deactivateBtn.textContent = item.dataset.isSellable === '1' ? 'غیرفعال‌سازی' : 'سوابق غیرفعال‌سازی';
+            }
+
+            const variants = parseJsonDataset(item.dataset.variants, []);
+
+            variantSelectEl.innerHTML = '<option value="">تنوع محصول...</option>';
+
+            if (!variants.length) {
+                variantSelectEl.innerHTML = '<option value="">این کالا تنوعی ندارد</option>';
+                variantSelectEl.disabled = true;
+
+                if (variantHelpTextEl) {
+                    variantHelpTextEl.textContent = 'این کالا تنوع ثبت‌شده‌ای ندارد؛ عملیات روی کل کالا انجام می‌شود.';
+                }
+
+                return;
+            }
+
+            variantSelectEl.disabled = false;
+
+            variants.forEach(variant => {
+                const option = document.createElement('option');
+                option.value = String(variant.id);
+                option.textContent = `${variant.name ?? 'تنوع'} | موجودی: ${variant.stock ?? 0}`;
+                variantSelectEl.appendChild(option);
+            });
+
+            if (variantHelpTextEl) {
+                variantHelpTextEl.textContent = 'برای موجودی انبار، کارتکس فروش یا کارتکس خرید، در صورت نیاز تنوع را انتخاب کنید.';
+            }
+        }
+
+        function initAjaxBindings() {
+            document.querySelectorAll('.toggle-variants').forEach(btn => {
+                const targetSel = btn.getAttribute('data-bs-target');
+                const el = document.querySelector(targetSel);
+
+                if (!el) return;
+
+                const symbol = btn.querySelector('.variant-symbol');
+
+                const setSymbol = () => {
+                    symbol.textContent = el.classList.contains('show') ? '−' : '+';
+                };
+
+                setSymbol();
+                el.addEventListener('shown.bs.collapse', setSymbol);
+                el.addEventListener('hidden.bs.collapse', setSymbol);
+            });
+
+            const selectAll = document.getElementById('selectAllProducts');
+            const productCheckboxes = Array.from(document.querySelectorAll('.product-checkbox'));
+
+            selectAll?.addEventListener('change', function() {
+                productCheckboxes.forEach(ch => ch.checked = this.checked);
+                updateVariantSelectState();
+            });
+
+            productCheckboxes.forEach(ch => ch.addEventListener('change', updateVariantSelectState));
+
+            const form = document.querySelector('#productsAjaxArea form[method="GET"]');
+
+            form?.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const params = new URLSearchParams(new FormData(this));
+                loadProducts(`${this.action}?${params.toString()}`);
+            });
+
+            document.querySelectorAll('#productsAjaxArea a.sortable-link, #productsAjaxArea .pagination a, #catTreeMobile a').forEach(link => {
+                if (link.dataset.ajaxBound === '1') return;
+
+                link.dataset.ajaxBound = '1';
+
+                link.addEventListener('click', function(e) {
+                    if (!this.href || !this.href.includes('/products')) return;
+
+                    e.preventDefault();
+                    loadProducts(this.href);
+                });
+            });
+
+            const clearBtn = document.querySelector('#productsAjaxArea a.btn-outline-secondary[href*="products"]');
+
+            if (clearBtn && clearBtn.dataset.ajaxBound !== '1') {
+                clearBtn.dataset.ajaxBound = '1';
+
+                clearBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    loadProducts(this.href);
+                });
+            }
+
+            document.getElementById('bulkEditBtn')?.addEventListener('click', function() {
+                const selected = getSingleSelected();
+
+                if (!selected) return;
+
+                window.location.href = selected.dataset.editUrl;
+            });
+
+            document.getElementById('bulkDeleteBtn')?.addEventListener('click', function() {
+                const selected = getSingleSelected();
+
+                if (!selected) return;
+
+                if (!confirm(`کالای «${selected.dataset.productName}» حذف شود؟`)) {
+                    return;
+                }
+
+                deleteForm.setAttribute('action', selected.dataset.deleteUrl);
+                deleteForm.submit();
+            });
+
+            document.getElementById('bulkDeactivateBtn')?.addEventListener('click', function() {
+                const selected = getSingleSelected();
+
+                if (!selected) return;
+
+                const isSellable = selected.dataset.isSellable === '1';
+
+                if (isSellable) {
+                    window.location.href = selected.dataset.deactivateUrl;
+                    return;
+                }
+
+                window.location.href = selected.dataset.deactivationHistoryUrl;
+            });
+
+            document.getElementById('bulkStockBtn')?.addEventListener('click', function() {
+                const selected = getSingleSelected();
+                const variantSelectEl = freshVariantSelect();
+
+                if (!selected || !modal || !stockBodyEl || !stockNameEl) return;
+
+                const variants = parseJsonDataset(selected.dataset.variants, []);
+                const selectedVariantId = variantSelectEl?.value ? Number(variantSelectEl.value) : null;
+                const selectedVariant = selectedVariantId ? variants.find(v => Number(v.id) === selectedVariantId) : null;
+
+                if (variants.length && !selectedVariant) {
+                    alert('ابتدا تنوع محصول را انتخاب کنید.');
+                    variantSelectEl?.focus();
+                    return;
+                }
+
+                stockNameEl.textContent = selectedVariant
+                    ? `${selected.dataset.productName} — ${selectedVariant.name ?? 'تنوع انتخابی'}`
+                    : selected.dataset.productName;
+
+                stockBodyEl.innerHTML = '';
+
+                const breakdown = parseJsonDataset(selected.dataset.stockBreakdown, []);
+                const variantTotal = Number(selectedVariant?.stock ?? 0);
+                let limitedBreakdown = breakdown;
+
+                if (selectedVariant) {
+                    let remaining = variantTotal;
+
+                    limitedBreakdown = breakdown
+                        .filter(item => Number(item.qty ?? 0) > 0)
+                        .map(item => {
+                            if (remaining <= 0) return null;
+
+                            const qty = Math.min(Number(item.qty ?? 0), remaining);
+                            remaining -= qty;
+
+                            return {
+                                warehouse: item.warehouse,
+                                qty: qty,
+                            };
+                        })
+                        .filter(Boolean);
+                }
+
+                if (!limitedBreakdown.length) {
+                    stockBodyEl.innerHTML = '<tr><td colspan="2" class="text-center text-muted">برای این کالا در انبارها موجودی ثبت نشده است.</td></tr>';
+                } else {
+                    limitedBreakdown.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${item.warehouse ?? '—'}</td><td class="text-end fw-bold">${item.qty ?? 0}</td>`;
+                        stockBodyEl.appendChild(tr);
+                    });
+
+                    if (selectedVariant) {
+                        const hintRow = document.createElement('tr');
+                        hintRow.innerHTML = `<td colspan="2" class="small text-muted pt-2">جمع موجودی تنوع «${selectedVariant.name ?? 'انتخابی'}»: ${selectedVariant.stock ?? 0}</td>`;
+                        stockBodyEl.appendChild(hintRow);
+                    }
+                }
+
+                modal.show();
+            });
+
+            document.getElementById('bulkPurchaseLedgerBtn')?.addEventListener('click', function() {
+                const selected = getSingleSelected();
+                const variantSelectEl = freshVariantSelect();
+
+                if (!selected) return;
+
+                const baseUrl = selected.dataset.purchaseLedgerUrl;
+
+                if (!baseUrl) return;
+
+                const params = new URLSearchParams();
+                const selectedVariantId = variantSelectEl?.value ? String(variantSelectEl.value) : '';
+
+                if (selectedVariantId) {
+                    params.set('variant_id', selectedVariantId);
+                }
+
+                window.location.href = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+            });
+
+            document.getElementById('bulkSalesLedgerBtn')?.addEventListener('click', function() {
+                const selected = getSingleSelected();
+                const variantSelectEl = freshVariantSelect();
+
+                if (!selected) return;
+
+                const baseUrl = selected.dataset.salesLedgerUrl;
+
+                if (!baseUrl) return;
+
+                const params = new URLSearchParams();
+                const selectedVariantId = variantSelectEl?.value ? String(variantSelectEl.value) : '';
+
+                if (selectedVariantId) {
+                    params.set('variant_id', selectedVariantId);
+                }
+
+                window.location.href = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+            });
+
+            updateVariantSelectState();
+        }
+
+        bindCatSearch('catSearchMobile', 'catTreeMobile');
+        initAjaxBindings();
+
+        window.addEventListener('popstate', function() {
+            loadProducts(window.location.href, false);
         });
-
-        updateVariantSelectState();
-    }
-
-    bindCatSearch('catSearch', 'catTree');
-    bindCatSearch('catSearchMobile', 'catTreeMobile');
-    initAjaxBindings();
-
-    window.addEventListener('popstate', function () {
-        loadProducts(window.location.href, false);
     });
-});
 </script>
 @endsection

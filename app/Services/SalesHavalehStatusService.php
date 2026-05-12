@@ -37,7 +37,7 @@ class SalesHavalehStatusService
             self::FINAL_CHECK => 'در حال چک نهایی',
             self::PACKING => 'در حال بسته‌بندی',
             self::SHIPPED => 'ارسال شده',
-            self::NOT_SHIPPED => 'ارسال نشده',
+            self::NOT_SHIPPED => 'کنسل شده',
         ];
     }
 
@@ -76,6 +76,10 @@ class SalesHavalehStatusService
             return;
         }
 
+        if ($current === self::NOT_SHIPPED) {
+            abort(422, 'فاکتور کنسل‌شده قابل تغییر وضعیت نیست.');
+        }
+
         if ($this->isAdmin($user)) {
             return;
         }
@@ -90,9 +94,7 @@ class SalesHavalehStatusService
             self::NOT_SHIPPED => [],
         ];
 
-        if (!in_array($newStatus, $allowedNext[$current] ?? [], true)) {
-            abort(422, 'تغییر وضعیت به این مرحله مجاز نیست.');
-        }
+       
     }
 
     private function isAdmin(?User $user): bool

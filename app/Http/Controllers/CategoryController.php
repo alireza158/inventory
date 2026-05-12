@@ -178,48 +178,40 @@ class CategoryController extends Controller
     }
 
     private function generateUniqueTwoDigitCode(?int $ignoreId = null, ?array $usedSet = null): string
-    {
-        $existing = Category::query()
-            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
-            ->pluck('code')
-            ->map(fn ($c) => trim((string) $c))
-            ->filter()
-            ->all();
+{
+    $existing = Category::query()
+        ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+        ->pluck('code')
+        ->map(fn ($c) => trim((string) $c))
+        ->filter()
+        ->all();
 
-        $used = [];
-        foreach ($existing as $c) {
-            if (preg_match('/^\d{2}$/', $c)) {
-                $used[$c] = true;
+    $used = [];
+    foreach ($existing as $c) {
+        if (preg_match('/^\d{2}$/', $c)) {
+            $used[$c] = true;
+        }
+    }
+
+    if (is_array($usedSet)) {
+        foreach ($usedSet as $k => $v) {
+            if ($v === true) {
+                $used[$k] = true;
             }
         }
+    }
 
-        if (is_array($usedSet)) {
-            foreach ($usedSet as $k => $v) {
-                if ($v === true) {
-                    $used[$k] = true;
-                }
-            }
-        }
-
-        if (count($used) >= 100) {
-            abort(422, 'کد ۲ رقمی خالی موجود نیست.');
-        }
-
-        for ($try = 0; $try < 300; $try++) {
-            $n = random_int(0, 99);
-            $code = str_pad((string) $n, 2, '0', STR_PAD_LEFT);
-            if (!isset($used[$code])) {
-                return $code;
-            }
-        }
-
-        for ($i = 0; $i <= 99; $i++) {
-            $code = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
-            if (!isset($used[$code])) {
-                return $code;
-            }
-        }
-
+    if (count($used) >= 100) {
         abort(422, 'کد ۲ رقمی خالی موجود نیست.');
     }
+
+    for ($i = 0; $i <= 99; $i++) {
+        $code = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+        if (!isset($used[$code])) {
+            return $code;
+        }
+    }
+
+    abort(422, 'کد ۲ رقمی خالی موجود نیست.');
+}
 }

@@ -10,16 +10,18 @@ use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InventoryWebhookController;
 use App\Http\Controllers\InvoiceNoteController;
 use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ModelListController;
 use App\Http\Controllers\PreinvoiceApiController;
 use App\Http\Controllers\PreinvoiceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductSalesLedgerController;
+use App\Http\Controllers\ProductPurchaseLedgerController;
 use App\Http\Controllers\ProductDeactivationDocumentController;
-use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\StockMovementController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\SalesHavalehController;
 use App\Http\Controllers\AssetPersonnelController;
 use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AssetTrusteeController;
+use App\Http\Controllers\ArchiveController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
@@ -47,16 +50,15 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Products + categories
-    Route::resource('products', ProductController::class)->except(['show']);
+    Route::resource('products', ProductController::class)->except(['show', 'destroy']);
+    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('role:admin|Admin')->name('products.destroy');
     Route::get('/products/{product}/sales-ledger', [ProductSalesLedgerController::class, 'index'])->name('products.sales-ledger');
-    Route::resource('categories', CategoryController::class)->except(['show']);
+    Route::get('/products/{product}/purchase-ledger', [ProductPurchaseLedgerController::class, 'purchaseLedger'])->name('products.purchase-ledger');
+    Route::resource('categories', CategoryController::class)->except(['show', 'destroy']);
+    Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('role:admin|Admin')->name('categories.destroy');
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
 
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
-
-    Route::get('/products/import', [ProductImportController::class, 'show'])->name('products.import.show');
-    Route::post('/products/import', [ProductImportController::class, 'import'])->name('products.import');
-    Route::get('/products/import/template', [ProductImportController::class, 'template'])->name('products.import.template');
 
     Route::post('/products/sync-crm', [ProductController::class, 'syncCrm'])->name('products.sync.crm');
     Route::get('/product-deactivation-documents', [ProductDeactivationDocumentController::class, 'index'])->name('product-deactivation-documents.index');
@@ -68,7 +70,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/model-lists', [ModelListController::class, 'index'])->name('model-lists.index');
     Route::post('/model-lists', [ModelListController::class, 'store'])->name('model-lists.store');
     Route::put('/model-lists/{modelList}', [ModelListController::class, 'update'])->name('model-lists.update');
-    Route::delete('/model-lists/{modelList}', [ModelListController::class, 'destroy'])->name('model-lists.destroy');
+    Route::delete('/model-lists/{modelList}', [ModelListController::class, 'destroy'])->middleware('role:admin|Admin')->name('model-lists.destroy');
 
     Route::post('/model-lists/assign-codes', [ModelListController::class, 'assignCodes'])->name('model-lists.assign-codes');
     Route::post('/model-lists/import-from-products', [ModelListController::class, 'importFromProducts'])->name('model-lists.import-from-products');
@@ -82,7 +84,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/shipping-methods/{shippingMethod}', [ShippingMethodController::class, 'destroy'])->name('shipping-methods.destroy');
 
     // Quick category store
-    Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->name('categories.quickStore');
+    Route::post('/categories/quick-store', [CategoryController::class, 'quickStore'])->middleware('role:admin|Admin')->name('categories.quickStore');
+
+
+    Route::get('/inventory-webhooks', [InventoryWebhookController::class, 'index'])->middleware('role:admin|Admin')->name('inventory-webhooks.index');
+    Route::put('/inventory-webhooks', [InventoryWebhookController::class, 'update'])->middleware('role:admin|Admin')->name('inventory-webhooks.update');
 
     // Stock movements
     Route::get('/products/{product}/movements/create', [StockMovementController::class, 'create'])->name('movements.create');
@@ -90,22 +96,42 @@ Route::middleware('auth')->group(function () {
     Route::get('/movements', [StockMovementReportController::class, 'index'])->name('movements.index');
 
     // Vouchers
-    Route::get('/vouchers', [VoucherController::class, 'hub'])->name('vouchers.index');
-    Route::get('/vouchers/section/{type}', [VoucherController::class, 'sectionIndex'])->name('vouchers.section.index');
-    Route::get('/vouchers/section/{type}/create', [VoucherController::class, 'sectionCreate'])->name('vouchers.section.create');
-    Route::post('/vouchers/section/{type}', [VoucherController::class, 'sectionStore'])->name('vouchers.section.store');
-    Route::get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
-    Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
-    Route::get('/vouchers/{voucher}', [VoucherController::class, 'show'])->name('vouchers.show');
-    Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
-    Route::get('/vouchers/invoice/{uuid}/products', [VoucherController::class, 'invoiceProducts'])->name('vouchers.invoice.products');
-    Route::get('/vouchers/sale-delivery', [VoucherController::class, 'saleDeliveryIndex'])->name('vouchers.sale-delivery.index');
-    Route::get('/vouchers/sale-delivery/{uuid}/edit', [VoucherController::class, 'saleDeliveryEdit'])->name('vouchers.sale-delivery.edit');
-    Route::put('/vouchers/sale-delivery/{uuid}', [VoucherController::class, 'saleDeliveryUpdate'])->name('vouchers.sale-delivery.update');
-    Route::get('/vouchers/return/customers/{customer}/invoices', [VoucherController::class, 'customerInvoices'])->name('vouchers.return.customer.invoices');
-    Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
-    Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
+Route::get('/vouchers', [VoucherController::class, 'hub'])->name('vouchers.index');
 
+Route::get('/vouchers/sales', [InvoiceController::class, 'salesVouchers'])->name('vouchers.sales.index');
+Route::get('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherEdit'])->name('vouchers.sales.edit');
+Route::get('/vouchers/sales/{uuid}/view', [InvoiceController::class, 'salesVoucherShow'])->name('vouchers.sales.show');
+Route::get('/vouchers/sales/{uuid}/history', [InvoiceController::class, 'salesVoucherHistory'])->name('vouchers.sales.history');
+Route::put('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherUpdate'])->name('vouchers.sales.update');
+Route::post('/vouchers/sales/{uuid}/status', [InvoiceController::class, 'updateStatus'])->name('vouchers.sales.status');
+Route::get('/vouchers/sales/{uuid}/print', [InvoiceController::class, 'print'])->name('vouchers.sales.print');
+
+Route::get('/vouchers/section/{type}', [VoucherController::class, 'sectionIndex'])->name('vouchers.section.index');
+Route::get('/vouchers/section/{type}/create', [VoucherController::class, 'sectionCreate'])->name('vouchers.section.create');
+Route::post('/vouchers/section/{type}', [VoucherController::class, 'sectionStore'])->name('vouchers.section.store');
+
+Route::get('/vouchers/create', [VoucherController::class, 'create'])->name('vouchers.create');
+Route::post('/vouchers', [VoucherController::class, 'store'])->name('vouchers.store');
+
+Route::get('/vouchers/invoice/{uuid}/products', [VoucherController::class, 'invoiceProducts'])->name('vouchers.invoice.products');
+
+Route::get('/vouchers/sale-delivery', [VoucherController::class, 'saleDeliveryIndex'])->name('vouchers.sale-delivery.index');
+Route::get('/vouchers/sale-delivery/{uuid}/edit', [VoucherController::class, 'saleDeliveryEdit'])->name('vouchers.sale-delivery.edit');
+Route::put('/vouchers/sale-delivery/{uuid}', [VoucherController::class, 'saleDeliveryUpdate'])->name('vouchers.sale-delivery.update');
+
+Route::get('/vouchers/return/customers/{customer}/invoices', [VoucherController::class, 'customerInvoices'])->name('vouchers.return.customer.invoices');
+
+Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+Route::get('/notifications/latest', [NotificationController::class, 'latest'])->name('notifications.latest');
+Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
+
+Route::get('/vouchers/{voucher}', [VoucherController::class, 'show'])->name('vouchers.show');
+Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
+Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
+Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
     Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->name('warehouse.outputs');
 
     // Asset trustee module (امین اموال)
@@ -137,11 +163,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/codes/{code}', [AssetDocumentController::class, 'findByCode'])->name('codes.find');
     });
 
-    Route::get('/vouchers/sales', [InvoiceController::class, 'salesVouchers'])->name('vouchers.sales.index');
-    Route::get('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherEdit'])->name('vouchers.sales.edit');
-    Route::get('/vouchers/sales/{uuid}/view', [InvoiceController::class, 'salesVoucherShow'])->name('vouchers.sales.show');
-    Route::get('/vouchers/sales/{uuid}/history', [InvoiceController::class, 'salesVoucherHistory'])->name('vouchers.sales.history');
-    Route::put('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherUpdate'])->name('vouchers.sales.update');
 
     // Sales Havaleh APIs
     Route::post('/sales-havaleh/create-from-financial/{financialId}', [SalesHavalehController::class, 'createFromFinancial'])->name('sales-havaleh.create-from-financial');
@@ -172,8 +193,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy'])->name('purchases.destroy');
 
     // Persons
-    Route::get('/persons', [PersonController::class, 'index'])->name('persons.index');
-    Route::post('/persons', [PersonController::class, 'store'])->name('persons.store');
+    Route::get('/persons', [PersonController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.index');
+    Route::post('/persons', [PersonController::class, 'store'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.store');
 
     // Suppliers
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
@@ -200,11 +221,14 @@ Route::middleware('auth')->group(function () {
     Route::put('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseSave'])->name('preinvoice.warehouse.save');
     Route::post('/preinvoice/warehouse/{uuid}/approve', [PreinvoiceController::class, 'warehouseApprove'])->name('preinvoice.warehouse.approve');
     Route::post('/preinvoice/warehouse/{uuid}/reject', [PreinvoiceController::class, 'warehouseReject'])->name('preinvoice.warehouse.reject');
-    Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->name('preinvoice.draft.index');
-    Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->name('preinvoice.draft.edit');
-    Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->name('preinvoice.draft.update');
-    Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->name('preinvoice.draft.finance');
-    Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->name('preinvoice.draft.finalize');
+    Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.index');
+    Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.edit');
+    Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.update');
+    Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finance');
+    Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finalize');
+    Route::get('/preinvoice/all', [PreinvoiceController::class, 'allIndex'])->middleware('role:admin|Admin|warehouse|finance|Accountant')->name('preinvoice.all.index');
+    Route::get('/preinvoice/my', [PreinvoiceController::class, 'myIndex'])->name('preinvoice.my.index');
+    Route::get('/preinvoice/my/{uuid}', [PreinvoiceController::class, 'myShow'])->name('preinvoice.my.show');
 
     // Preinvoice APIs
     Route::prefix('preinvoice/api')->group(function () {
@@ -222,7 +246,10 @@ Route::middleware('auth')->group(function () {
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
 
-Route::post('/customers/import', [CustomerController::class, 'import'])->name('customers.import');
+    Route::post('/customers/import', [CustomerController::class, 'import'])->name('customers.import');
+    Route::get('/archive', [ArchiveController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant|warehouse')->name('archive.index');
+    Route::get('/archive/preinvoices/{uuid}', [ArchiveController::class, 'showPreinvoice'])->middleware('role:admin|Admin|finance|Accountant|warehouse')->name('archive.preinvoices.show');
+    Route::get('/archive/invoices/{uuid}', [ArchiveController::class, 'showInvoice'])->middleware('role:admin|Admin|finance|Accountant|warehouse')->name('archive.invoices.show');
     // Invoices
     Route::prefix('invoices')->group(function () {
         Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');
@@ -231,18 +258,19 @@ Route::post('/customers/import', [CustomerController::class, 'import'])->name('c
         Route::put('/{uuid}', [InvoiceController::class, 'update'])->name('invoices.update');
         Route::get('/{uuid}', [InvoiceController::class, 'show'])->name('invoices.show');
         Route::post('/{uuid}/status', [InvoiceController::class, 'updateStatus'])->name('invoices.status');
+        Route::post('/{uuid}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
         Route::post('/{uuid}/payments', [InvoicePaymentController::class, 'store'])->name('invoices.payments.store');
         Route::post('/{uuid}/notes', [InvoiceNoteController::class, 'store'])->name('invoices.notes.store');
         Route::post('/payments/{payment}/cheque', [ChequeController::class, 'store'])->name('cheques.store');
     });
 
     // Account statements (گردش حساب اشخاص)
-    Route::get('/account-statements', [AccountStatementController::class, 'index'])->name('account-statements.index');
-    Route::post('/account-statements/{customer}/payments', [InvoicePaymentController::class, 'storeForCustomer'])->name('account-statements.payments.store');
-    Route::get('/account-statements/documents/invoices/{uuid}', [AccountStatementController::class, 'showInvoice'])->name('account-statements.documents.invoices.show');
-    Route::get('/account-statements/documents/returns/{voucher}', [AccountStatementController::class, 'showReturnFromSale'])->name('account-statements.documents.returns.show');
-    Route::get('/account-statements/documents/payments/{payment}', [AccountStatementController::class, 'showPayment'])->name('account-statements.documents.payments.show');
-    Route::get('/account-statements/{customer}', [AccountStatementController::class, 'show'])->name('account-statements.show');
+    Route::get('/account-statements', [AccountStatementController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.index');
+    Route::post('/account-statements/{customer}/payments', [InvoicePaymentController::class, 'storeForCustomer'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.payments.store');
+    Route::get('/account-statements/documents/invoices/{uuid}', [AccountStatementController::class, 'showInvoice'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.invoices.show');
+    Route::get('/account-statements/documents/returns/{voucher}', [AccountStatementController::class, 'showReturnFromSale'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.returns.show');
+    Route::get('/account-statements/documents/payments/{payment}', [AccountStatementController::class, 'showPayment'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.payments.show');
+    Route::get('/account-statements/{customer}', [AccountStatementController::class, 'show'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.show');
 
     // Activity logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
@@ -251,5 +279,7 @@ Route::post('/customers/import', [CustomerController::class, 'import'])->name('c
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
 });
+Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])
+    ->name('model-lists.import-phone-catalog');
 
 require __DIR__ . '/auth.php';

@@ -5,7 +5,8 @@ namespace App\Services;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\PreinvoiceOrder;
-use Illuminate\Support\Str;
+use App\Models\ProductVariant;
+use App\Support\DocumentCodeGenerator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 
@@ -117,7 +118,7 @@ class SalesHavalehService
             $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
 
             $invoice = Invoice::query()->create([
-                'uuid' => (string) Str::uuid(),
+                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(Invoice::class),
                 'preinvoice_order_id' => $order->id,
                 'customer_id' => $order->customer_id,
                 'customer_name' => $order->customer_name,
@@ -182,6 +183,41 @@ class SalesHavalehService
                 $note,
                 $userId
             );
+
+            return $invoice->fresh();
+        });
+    }
+
+    public function cancelAndRestore(Invoice $invoice, ?string $note = null, ?int $userId = null): Invoice
+    {
+        return DB::transaction(function () use ($invoice, $note, $userId) {
+            $invoice = Invoice::query()->with('items')->lockForUpdate()->findOrFail($invoice->id);
+            if ((string) $invoice->status === SalesHavalehStatusService::NOT_SHIPPED) {
+                return $invoice;
+            }
+
+            foreach ($invoice->items as $item) {
+                $variant = ProductVariant::query()->whereKey((int) $item->variant_id)->lockForUpdate()->first();
+                if ($variant) {
+                    $variant->stock = (int) $variant->stock + (int) $item->quantity;
+                    $variant->save();
+                }
+                $this->inventoryService->adjustCentralStock(
+                    (int) $item->product_id,
+                    (int) $item->quantity,
+                    $invoice->uuid,
+                    'برگشت موجودی بابت کنسلی حواله فروش'
+                );
+            }
+
+            $oldStatus = (string) $invoice->status;
+            $invoice->update([
+                'status' => SalesHavalehStatusService::NOT_SHIPPED,
+                'status_changed_at' => now(),
+                'status_changed_by' => $userId,
+            ]);
+
+            $this->historyService->log($invoice, 'cancelled', 'status', $oldStatus, SalesHavalehStatusService::NOT_SHIPPED, $note ?: 'کنسلی فاکتور و برگشت موجودی', $userId);
 
             return $invoice->fresh();
         });

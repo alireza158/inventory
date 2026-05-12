@@ -52,7 +52,13 @@
         </form>
 
         <hr>
-
+<form method="POST" action="{{ route('model-lists.import-phone-catalog') }}" class="mb-2">
+  @csrf
+  <button class="btn btn-outline-success w-100">بارگذاری بانک مدل‌های موبایل</button>
+  <div class="small text-muted mt-2">
+    گوشی‌های معروف Samsung، Apple، Xiaomi، Huawei و... را وارد می‌کند.
+  </div>
+</form>
         <form method="POST" action="{{ route('model-lists.import-from-products') }}" class="mb-2">
           @csrf
           <button class="btn btn-outline-secondary w-100">دریافت مدل‌ها از کالاهای موجود</button>

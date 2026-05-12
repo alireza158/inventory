@@ -18,18 +18,32 @@ class ModelListController extends Controller
                 'title' => 'سامسونگ',
                 'values' => ['Samsung', 'سامسونگ'],
             ],
-            'XiaomiRealme' => [
-                'title' => 'شیائومی و ریلمی',
-                'values' => ['Xiaomi/Realme', 'Xiaomi', 'Realme', 'شیائومی', 'ریلمی'],
+
+            'Xiaomi' => [
+                'title' => 'شیائومی',
+                'values' => ['Xiaomi', 'Xiaomi/Realme', 'Xiaomi / Realme', 'شیائومی'],
             ],
+
+            'Realme' => [
+                'title' => 'ریلمی',
+                'values' => ['Realme', 'Xiaomi/Realme', 'Xiaomi / Realme', 'ریلمی'],
+            ],
+
             'Apple' => [
                 'title' => 'آیفون',
                 'values' => ['Apple (iPhone)', 'Apple', 'iPhone', 'آیفون', 'اپل'],
             ],
-            'HuaweiHonor' => [
-                'title' => 'هواوی و هانر',
-                'values' => ['Huawei/Honor', 'Huawei', 'Honor', 'هواوی', 'هانر'],
+
+            'Huawei' => [
+                'title' => 'هواوی',
+                'values' => ['Huawei', 'Huawei/Honor', 'Huawei / Honor', 'هواوی'],
             ],
+
+            'Honor' => [
+                'title' => 'هانر',
+                'values' => ['Honor', 'Huawei/Honor', 'Huawei / Honor', 'هانر'],
+            ],
+
             'Other' => [
                 'title' => 'سایر',
                 'values' => ['سایر', 'Other', ''],
@@ -41,9 +55,11 @@ class ModelListController extends Controller
     {
         return [
             'Samsung' => 'سامسونگ',
-            'Xiaomi/Realme' => 'شیائومی و ریلمی',
+            'Xiaomi' => 'شیائومی',
+            'Realme' => 'ریلمی',
             'Apple (iPhone)' => 'آیفون',
-            'Huawei/Honor' => 'هواوی و هانر',
+            'Huawei' => 'هواوی',
+            'Honor' => 'هانر',
             'سایر' => 'سایر',
         ];
     }
@@ -54,9 +70,11 @@ class ModelListController extends Controller
 
         $all = ModelList::query()
             ->when($q !== '', function ($query) use ($q) {
-                $query->where('model_name', 'like', "%{$q}%")
-                    ->orWhere('code', 'like', "%{$q}%")
-                    ->orWhere('brand', 'like', "%{$q}%");
+                $query->where(function ($sub) use ($q) {
+                    $sub->where('model_name', 'like', "%{$q}%")
+                        ->orWhere('code', 'like', "%{$q}%")
+                        ->orWhere('brand', 'like', "%{$q}%");
+                });
             })
             ->orderByRaw('CASE WHEN code IS NULL OR code = "" THEN 1 ELSE 0 END')
             ->orderByRaw('CAST(code AS UNSIGNED) ASC')
@@ -65,15 +83,18 @@ class ModelListController extends Controller
             ->get();
 
         $groups = [];
+
         foreach ($this->brandGroups() as $key => $cfg) {
             $groups[$key] = [
                 'title' => $cfg['title'],
                 'items' => $all->filter(function ($row) use ($cfg) {
-                    $b = trim((string) ($row->brand ?? ''));
-                    if ($b === '') {
-                        $b = 'سایر';
+                    $brand = trim((string) ($row->brand ?? ''));
+
+                    if ($brand === '') {
+                        $brand = 'سایر';
                     }
-                    return in_array($b, $cfg['values'], true);
+
+                    return in_array($brand, $cfg['values'], true);
                 })->values(),
             ];
         }
@@ -93,23 +114,28 @@ class ModelListController extends Controller
         ]);
 
         DB::transaction(function () use ($data) {
-            $brand = trim((string) $data['brand']);
-            $modelName = trim((string) $data['model_name']);
+            $brand = $this->normalizeBrand((string) $data['brand']);
+            $modelName = $this->normalizeModelName((string) $data['model_name']);
 
-            $exists = ModelList::query()->where('model_name', $modelName)->lockForUpdate()->first();
+            $exists = ModelList::query()
+                ->whereRaw('LOWER(TRIM(model_name)) = ?', [mb_strtolower($modelName)])
+                ->lockForUpdate()
+                ->first();
+
             if ($exists) {
                 abort(422, 'این مدل قبلاً ثبت شده است.');
             }
 
-            $code = $this->nextCode3();
             ModelList::create([
                 'brand' => $brand,
                 'model_name' => $modelName,
-                'code' => $code,
+                'code' => $this->nextCode3(),
             ]);
         });
 
-        return redirect()->route('model-lists.index')->with('success', 'مدل با موفقیت ذخیره شد.');
+        return redirect()
+            ->route('model-lists.index')
+            ->with('success', 'مدل با موفقیت ذخیره شد.');
     }
 
     public function quickStore(Request $request)
@@ -119,14 +145,19 @@ class ModelListController extends Controller
             'model_name' => ['required', 'string', 'max:255'],
         ]);
 
-        $brand = trim((string) $data['brand']);
-        $modelName = trim((string) $data['model_name']);
+        $brand = $this->normalizeBrand((string) $data['brand']);
+        $modelName = $this->normalizeModelName((string) $data['model_name']);
 
         if ($modelName === '') {
-            return response()->json(['message' => 'نام مدل نمی‌تواند خالی باشد.'], 422);
+            return response()->json([
+                'message' => 'نام مدل نمی‌تواند خالی باشد.',
+            ], 422);
         }
 
-        $result = ['model' => null, 'created' => false];
+        $result = [
+            'model' => null,
+            'created' => false,
+        ];
 
         DB::transaction(function () use (&$result, $brand, $modelName) {
             $existing = ModelList::query()
@@ -135,16 +166,24 @@ class ModelListController extends Controller
                 ->first();
 
             if ($existing) {
-                $result['model'] = $existing;
+                $fixedBrand = $this->normalizeBrand((string) ($existing->brand ?? ''));
+
+                if ($fixedBrand !== $existing->brand) {
+                    $existing->update([
+                        'brand' => $fixedBrand,
+                    ]);
+                }
+
+                $result['model'] = $existing->fresh();
                 return;
             }
 
-            $code = $this->nextCode3();
             $result['model'] = ModelList::create([
                 'brand' => $brand,
                 'model_name' => $modelName,
-                'code' => $code,
+                'code' => $this->nextCode3(),
             ]);
+
             $result['created'] = true;
         });
 
@@ -166,16 +205,21 @@ class ModelListController extends Controller
     public function update(Request $request, ModelList $modelList): RedirectResponse
     {
         $data = $request->validate([
+            'brand' => ['nullable', 'string', 'max:100'],
             'code' => ['required', 'string', 'max:3'],
             'model_name' => ['required', 'string', 'max:255'],
         ]);
 
         $code = $this->normalizeCode3Strict($data['code']);
+
         if ($code === null) {
-            return back()->withErrors(['code' => 'کد باید دقیقاً ۳ رقمی باشد (مثلاً 016 یا 001).']);
+            return back()->withErrors([
+                'code' => 'کد باید دقیقاً ۳ رقمی باشد، مثلاً 016 یا 001.',
+            ]);
         }
 
-        $modelName = trim((string) $data['model_name']);
+        $brand = $this->normalizeBrand((string) ($data['brand'] ?? $modelList->brand ?? 'سایر'));
+        $modelName = $this->normalizeModelName((string) $data['model_name']);
 
         $existsByCode = ModelList::query()
             ->where('id', '!=', $modelList->id)
@@ -183,77 +227,109 @@ class ModelListController extends Controller
             ->exists();
 
         if ($existsByCode) {
-            return back()->withErrors(['code' => 'این کد قبلاً برای مدل دیگری ثبت شده است.']);
+            return back()->withErrors([
+                'code' => 'این کد قبلاً برای مدل دیگری ثبت شده است.',
+            ]);
         }
 
         $existsByName = ModelList::query()
             ->where('id', '!=', $modelList->id)
-            ->where('model_name', $modelName)
+            ->whereRaw('LOWER(TRIM(model_name)) = ?', [mb_strtolower($modelName)])
             ->exists();
 
         if ($existsByName) {
-            return back()->withErrors(['model_name' => 'این نام مدل قبلاً ثبت شده است.']);
+            return back()->withErrors([
+                'model_name' => 'این نام مدل قبلاً ثبت شده است.',
+            ]);
         }
 
         $modelList->update([
+            'brand' => $brand,
             'code' => $code,
             'model_name' => $modelName,
         ]);
 
-        return redirect()->route('model-lists.index')->with('success', 'مدل لیست بروزرسانی شد.');
+        return redirect()
+            ->route('model-lists.index')
+            ->with('success', 'مدل لیست بروزرسانی شد.');
     }
 
     public function destroy(ModelList $modelList): RedirectResponse
     {
         $modelList->delete();
-        return redirect()->route('model-lists.index')->with('success', 'مدل حذف شد.');
+
+        return redirect()
+            ->route('model-lists.index')
+            ->with('success', 'مدل حذف شد.');
     }
 
     public function assignCodes(): RedirectResponse
     {
         DB::transaction(function () {
-            $rows = ModelList::query()->lockForUpdate()->orderBy('id')->get();
+            $rows = ModelList::query()
+                ->lockForUpdate()
+                ->orderBy('id')
+                ->get();
 
             $used = [];
+
             foreach ($rows as $row) {
-                $c = $this->normalizeCode3Strict($row->code);
-                if ($c === null || isset($used[$c])) {
+                $code = $this->normalizeCode3Strict($row->code);
+
+                if ($code === null || isset($used[$code])) {
                     continue;
                 }
-                $used[$c] = true;
+
+                $used[$code] = true;
             }
 
-            $nextInt = $this->maxUsedInt($used) + 1;
-            if ($nextInt < 1) {
-                $nextInt = 1;
-            }
+            $nextInt = max($this->maxUsedInt($used) + 1, 1);
 
             foreach ($rows as $row) {
                 $current = $this->normalizeCode3Strict($row->code);
-
                 $needsFix = $current === null;
+
                 if ($current !== null) {
-                    $dupCount = ModelList::query()->where('code', $current)->count();
-                    if ($dupCount > 1) {
-                        $firstId = ModelList::query()->where('code', $current)->min('id');
-                        if ($row->id !== $firstId) {
+                    $duplicateCount = ModelList::query()
+                        ->where('code', $current)
+                        ->count();
+
+                    if ($duplicateCount > 1) {
+                        $firstId = ModelList::query()
+                            ->where('code', $current)
+                            ->min('id');
+
+                        if ((int) $row->id !== (int) $firstId) {
                             $needsFix = true;
                         }
                     }
                 }
 
-                if (!$needsFix) {
-                    continue;
+                $fixedBrand = $this->normalizeBrand((string) ($row->brand ?? ''));
+
+                $updates = [];
+
+                if ($needsFix) {
+                    $newCode = $this->nextFreeFrom($used, $nextInt);
+                    $updates['code'] = $newCode;
+
+                    $used[$newCode] = true;
+                    $nextInt = (int) $newCode + 1;
                 }
 
-                $new = $this->nextFreeFrom($used, $nextInt);
-                $row->update(['code' => $new]);
-                $used[$new] = true;
-                $nextInt = (int) $new + 1;
+                if ($fixedBrand !== $row->brand) {
+                    $updates['brand'] = $fixedBrand;
+                }
+
+                if (!empty($updates)) {
+                    $row->update($updates);
+                }
             }
         });
 
-        return redirect()->route('model-lists.index')->with('success', 'کدهای مدل‌لیست اصلاح و ۳ رقمی شدند.');
+        return redirect()
+            ->route('model-lists.index')
+            ->with('success', 'کدهای مدل‌لیست اصلاح و برندها یکدست شدند.');
     }
 
     public function importFromProducts(): RedirectResponse
@@ -267,34 +343,53 @@ class ModelListController extends Controller
                 ->pluck('variant_name');
 
             foreach ($names as $full) {
-                $full = trim((string) $full);
+                $full = $this->normalizeModelName((string) $full);
+
                 if ($full === '') {
                     continue;
                 }
 
                 $base = preg_replace('/\s*طرح\s*\d+$/u', '', $full);
-                $base = trim((string) $base);
+                $base = $this->normalizeModelName((string) $base);
+
                 if ($base === '') {
                     continue;
                 }
 
-                $exists = ModelList::query()->where('model_name', $base)->exists();
-                if ($exists) {
-                    continue;
-                }
+                $existing = ModelList::query()
+                    ->whereRaw('LOWER(TRIM(model_name)) = ?', [mb_strtolower($base)])
+                    ->lockForUpdate()
+                    ->first();
 
                 $brand = $this->detectBrand($base);
-                $code = $this->nextCode3();
+
+                if ($existing) {
+                    $fixedBrand = $this->normalizeBrand((string) ($existing->brand ?? ''));
+
+                    if ($fixedBrand === 'سایر' && $brand !== 'سایر') {
+                        $existing->update([
+                            'brand' => $brand,
+                        ]);
+                    } elseif ($fixedBrand !== $existing->brand) {
+                        $existing->update([
+                            'brand' => $fixedBrand,
+                        ]);
+                    }
+
+                    continue;
+                }
 
                 ModelList::create([
                     'brand' => $brand,
                     'model_name' => $base,
-                    'code' => $code,
+                    'code' => $this->nextCode3(),
                 ]);
             }
         });
 
-        return redirect()->route('model-lists.index')->with('success', 'مدل‌ها از کالاهای موجود دریافت و با کد ۳ رقمی ذخیره شدند.');
+        return redirect()
+            ->route('model-lists.index')
+            ->with('success', 'مدل‌ها از کالاهای موجود دریافت و با کد ۳ رقمی ذخیره شدند.');
     }
 
     public function importPhoneCatalog(): RedirectResponse
@@ -303,26 +398,40 @@ class ModelListController extends Controller
             $catalog = PhoneModelCatalog::brands();
 
             foreach ($catalog as $brand => $models) {
+                $brand = $this->normalizeBrand((string) $brand);
+
                 foreach ($models as $modelName) {
-                    $normalizedName = trim((string) $modelName);
+                    $normalizedName = $this->normalizeModelName((string) $modelName);
+
                     if ($normalizedName === '') {
                         continue;
                     }
 
-                    $existing = ModelList::query()->where('model_name', $normalizedName)->lockForUpdate()->first();
+                    $existing = ModelList::query()
+                        ->whereRaw('LOWER(TRIM(model_name)) = ?', [mb_strtolower($normalizedName)])
+                        ->lockForUpdate()
+                        ->first();
+
                     if ($existing) {
-                        if (!$existing->brand || $existing->brand === 'سایر') {
-                            $existing->update(['brand' => $brand]);
+                        $oldBrand = $this->normalizeBrand((string) ($existing->brand ?? ''));
+
+                        if (
+                            $oldBrand === 'سایر' ||
+                            $oldBrand === '' ||
+                            $oldBrand !== $brand
+                        ) {
+                            $existing->update([
+                                'brand' => $brand,
+                            ]);
                         }
+
                         continue;
                     }
-
-                    $code = $this->nextCode3();
 
                     ModelList::create([
                         'brand' => $brand,
                         'model_name' => $normalizedName,
-                        'code' => $code,
+                        'code' => $this->nextCode3(),
                     ]);
                 }
             }
@@ -331,9 +440,53 @@ class ModelListController extends Controller
         return back()->with('success', 'بانک مدل‌های موبایل با موفقیت بارگذاری شد.');
     }
 
+    private function normalizeBrand(string $brand): string
+    {
+        $brand = trim($brand);
+
+        return match ($brand) {
+            'Samsung', 'سامسونگ' => 'Samsung',
+
+            'Apple',
+            'iPhone',
+            'Apple (iPhone)',
+            'آیفون',
+            'اپل' => 'Apple (iPhone)',
+
+            'Xiaomi',
+            'شیائومی' => 'Xiaomi',
+
+            'Realme',
+            'ریلمی' => 'Realme',
+
+            'Huawei',
+            'هواوی' => 'Huawei',
+
+            'Honor',
+            'هانر' => 'Honor',
+
+            'Xiaomi/Realme',
+            'Xiaomi / Realme' => 'Xiaomi',
+
+            'Huawei/Honor',
+            'Huawei / Honor' => 'Huawei',
+
+            default => $brand !== '' ? $brand : 'سایر',
+        };
+    }
+
+    private function normalizeModelName(string $modelName): string
+    {
+        $modelName = trim($modelName);
+        $modelName = preg_replace('/\s+/u', ' ', $modelName);
+
+        return trim((string) $modelName);
+    }
+
     private function normalizeCode3Strict(?string $code): ?string
     {
         $code = trim((string) ($code ?? ''));
+
         if ($code === '') {
             return null;
         }
@@ -347,39 +500,48 @@ class ModelListController extends Controller
 
     private function nextCode3(): string
     {
-        $codes = ModelList::query()->whereNotNull('code')->pluck('code')->all();
+        $codes = ModelList::query()
+            ->whereNotNull('code')
+            ->pluck('code')
+            ->all();
 
         $max = 0;
         $used = [];
-        foreach ($codes as $c) {
-            $n = $this->normalizeCode3Strict($c);
-            if ($n === null) {
+
+        foreach ($codes as $code) {
+            $normalized = $this->normalizeCode3Strict($code);
+
+            if ($normalized === null) {
                 continue;
             }
-            $used[$n] = true;
-            $iv = (int) $n;
-            if ($iv > $max) {
-                $max = $iv;
+
+            $used[$normalized] = true;
+
+            $intValue = (int) $normalized;
+
+            if ($intValue > $max) {
+                $max = $intValue;
             }
         }
 
-        $start = max($max + 1, 1);
-        return $this->nextFreeFrom($used, $start);
+        return $this->nextFreeFrom($used, max($max + 1, 1));
     }
 
     private function nextFreeFrom(array $used, int $start): string
     {
         for ($i = $start; $i <= 999; $i++) {
-            $c = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
-            if (!isset($used[$c])) {
-                return $c;
+            $code = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+
+            if (!isset($used[$code])) {
+                return $code;
             }
         }
 
         for ($i = 1; $i <= 999; $i++) {
-            $c = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
-            if (!isset($used[$c])) {
-                return $c;
+            $code = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+
+            if (!isset($used[$code])) {
+                return $code;
             }
         }
 
@@ -389,12 +551,15 @@ class ModelListController extends Controller
     private function maxUsedInt(array $used): int
     {
         $max = 0;
+
         foreach ($used as $code => $true) {
-            $iv = (int) $code;
-            if ($iv > $max) {
-                $max = $iv;
+            $intValue = (int) $code;
+
+            if ($intValue > $max) {
+                $max = $intValue;
             }
         }
+
         return $max;
     }
 
@@ -403,12 +568,33 @@ class ModelListController extends Controller
         $name = mb_strtolower($modelName);
 
         return match (true) {
-            str_contains($name, 'iphone') || str_contains($name, 'اپل') => 'Apple (iPhone)',
-            str_contains($name, 'samsung') || str_contains($name, 'سامسونگ') || str_contains($name, 'galaxy') => 'Samsung',
-            str_contains($name, 'xiaomi') || str_contains($name, 'شیائومی') || str_contains($name, 'redmi') || str_contains($name, 'poco') => 'Xiaomi/Realme',
-            str_contains($name, 'realme') || str_contains($name, 'ریلمی') => 'Xiaomi/Realme',
-            str_contains($name, 'huawei') || str_contains($name, 'هواوی') => 'Huawei/Honor',
-            str_contains($name, 'honor') || str_contains($name, 'هانر') => 'Huawei/Honor',
+            str_contains($name, 'iphone') ||
+            str_contains($name, 'آیفون') ||
+            str_contains($name, 'اپل') => 'Apple (iPhone)',
+
+            str_contains($name, 'samsung') ||
+            str_contains($name, 'سامسونگ') ||
+            str_contains($name, 'galaxy') => 'Samsung',
+
+            str_contains($name, 'realme') ||
+            str_contains($name, 'ریلمی') ||
+            str_contains($name, 'rmx') ||
+            str_contains($name, 'narzo') => 'Realme',
+
+            str_contains($name, 'xiaomi') ||
+            str_contains($name, 'شیائومی') ||
+            str_contains($name, 'redmi') ||
+            str_contains($name, 'poco') ||
+            str_contains($name, 'mi ') => 'Xiaomi',
+
+            str_contains($name, 'honor') ||
+            str_contains($name, 'هانر') => 'Honor',
+
+            str_contains($name, 'huawei') ||
+            str_contains($name, 'هواوی') ||
+            str_contains($name, 'nova') ||
+            str_contains($name, 'pura') => 'Huawei',
+
             default => 'سایر',
         };
     }

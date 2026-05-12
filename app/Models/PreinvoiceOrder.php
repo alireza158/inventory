@@ -10,11 +10,14 @@ class PreinvoiceOrder extends Model
     use HasFactory;
 
     public const STATUS_DRAFT = 'draft';
-    public const STATUS_SUBMITTED_WAREHOUSE = 'submitted_warehouse';
-    public const STATUS_WAREHOUSE_APPROVED = 'warehouse_approved';
-    public const STATUS_WAREHOUSE_REJECTED = 'warehouse_rejected';
-    public const STATUS_SUBMITTED_FINANCE = 'submitted_finance';
-    public const STATUS_FINANCE_APPROVED = 'finance_approved';
+    public const STATUS_RESERVED_WAITING_WAREHOUSE = 'reserved_waiting_warehouse';
+    public const STATUS_WAREHOUSE_REVIEWING = 'warehouse_reviewing';
+    public const STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE = 'warehouse_approved_waiting_finance';
+    public const STATUS_FINANCE_REVIEWING = 'finance_reviewing';
+    public const STATUS_CONVERTED_TO_INVOICE = 'converted_to_invoice';
+    public const STATUS_CANCELLED_BY_WAREHOUSE = 'cancelled_by_warehouse';
+    public const STATUS_CANCELLED_BY_FINANCE = 'cancelled_by_finance';
+    public const STATUS_RETURNED_TO_WAREHOUSE = 'returned_to_warehouse';
 
     protected $fillable = [
         'uuid',
@@ -34,6 +37,8 @@ class PreinvoiceOrder extends Model
         'warehouse_reject_reason',
         'warehouse_reviewed_by',
         'warehouse_reviewed_at',
+        'stock_frozen_until',
+        'stock_released_at',
     ];
 
     protected $casts = [
@@ -46,6 +51,8 @@ class PreinvoiceOrder extends Model
         'total_price' => 'integer',
         'warehouse_reviewed_by' => 'integer',
         'warehouse_reviewed_at' => 'datetime',
+        'stock_frozen_until' => 'datetime',
+        'stock_released_at' => 'datetime',
     ];
 
     public function items()
@@ -68,15 +75,23 @@ class PreinvoiceOrder extends Model
         return $this->hasMany(PreinvoiceOrderReview::class);
     }
 
+    public function activityLogs()
+    {
+        return $this->morphMany(ActivityLog::class, 'subject')->latest('occurred_at');
+    }
+
     public static function statusLabels(): array
     {
         return [
             self::STATUS_DRAFT => 'ثبت شده / اولیه',
-            self::STATUS_SUBMITTED_WAREHOUSE => 'در انتظار تایید انبار',
-            self::STATUS_WAREHOUSE_APPROVED => 'تایید شده توسط انبار',
-            self::STATUS_WAREHOUSE_REJECTED => 'رد شده توسط انبار',
-            self::STATUS_SUBMITTED_FINANCE => 'در انتظار تایید مالی',
-            self::STATUS_FINANCE_APPROVED => 'تایید شده مالی',
+            self::STATUS_RESERVED_WAITING_WAREHOUSE => 'رزرو شده و در انتظار تایید انبار',
+            self::STATUS_WAREHOUSE_REVIEWING => 'در حال بررسی توسط انبار',
+            self::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE => 'تایید انبار و در انتظار مالی',
+            self::STATUS_FINANCE_REVIEWING => 'در حال بررسی توسط مالی',
+            self::STATUS_CONVERTED_TO_INVOICE => 'تبدیل‌شده به فاکتور',
+            self::STATUS_CANCELLED_BY_WAREHOUSE => 'لغوشده توسط انبار',
+            self::STATUS_CANCELLED_BY_FINANCE => 'لغوشده توسط مالی',
+            self::STATUS_RETURNED_TO_WAREHOUSE => 'برگشت‌خورده از مالی به انبار',
         ];
     }
 
