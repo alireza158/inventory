@@ -691,6 +691,39 @@ if ($oldDesignNotes === null) {
 
                     <div class="d-flex gap-2">
                         <a href="{{ route('products.index') }}" class="btn btn-outline-secondary">انصراف</a>
+
+    <div class="card-soft mt-3">
+        <div class="section-head">
+            <div class="section-title">شناسه متغییر سایت (برای سینک API)</div>
+            <div class="muted">برای هر تنوع، شناسه همان متغییر داخل سایت را وارد کنید.</div>
+        </div>
+        <div class="p-3 table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>تنوع انبار</th>
+                        <th>کد تنوع</th>
+                        <th>شناسه متغییر سایت</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($product->variants as $variant)
+                        <tr>
+                            <td>{{ $variant->variant_name }}</td>
+                            <td><span class="mono">{{ $variant->variant_code }}</span></td>
+                            <td style="max-width:220px;">
+                                <input type="number" min="1" class="form-control"
+                                       name="variant_site_ids[{{ $variant->id }}]"
+                                       value="{{ old('variant_site_ids.'.$variant->id, $variant->variety_id) }}"
+                                       placeholder="مثلاً 26830">
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+
                         <button type="submit" class="btn btn-primary">ثبت کالا</button>
                     </div>
                 </div>
