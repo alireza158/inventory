@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Warehouse;
+use App\Models\WarehouseStock;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -11,12 +13,12 @@ class AriyajanebiSyncService
 {
     private const LOGIN_URL = 'https://api.ariyajanebi.ir/v1/admin/login';
     private const UPDATE_URL = 'https://api.ariyajanebi.ir/v1/admin/multi_varieties_update_lite';
-    private const USERNAME = 'admin';
+    private const USERNAME = 'Z.adeli60';
     private const PASSWORD = 'Z.adeli60';
 
     public static function syncProduct(Product $product): void
     {
-        $variants = $product->variants()->whereNotNull('variety_id')->get(['variety_id', 'sell_price', 'stock']);
+        $variants = $product->variants()->whereNotNull('variety_id')->get(['product_id', 'variety_id', 'sell_price', 'stock']);
         if ($variants->isEmpty()) return;
         self::syncVariants($variants, false);
     }
@@ -51,9 +53,11 @@ class AriyajanebiSyncService
 
             $payload = ['_method' => 'PUT'];
             foreach ($variants->values() as $i => $variant) {
+                $centralStock = self::centralWarehouseQuantityForVariant($variant);
+
                 $payload["varieties[{$i}][id]"] = (string) $variant->variety_id;
                 $payload["varieties[{$i}][price]"] = (string) max(0, (int) $variant->sell_price);
-                $payload["varieties[{$i}][balance]"] = (string) max(0, (int) $variant->stock);
+                $payload["varieties[{$i}][balance]"] = (string) $centralStock;
             }
 
             $cookies = $login->cookies()->toArray();
@@ -100,6 +104,27 @@ class AriyajanebiSyncService
         }
     }
 
+
+
+    private static function centralWarehouseQuantityForVariant($variant): int
+    {
+        $productId = (int) ($variant->product_id ?? 0);
+        if ($productId <= 0) {
+            return max(0, (int) ($variant->stock ?? 0));
+        }
+
+        $centralWarehouseId = Warehouse::query()->where('type', 'central')->value('id');
+        if (!$centralWarehouseId) {
+            return max(0, (int) ($variant->stock ?? 0));
+        }
+
+        $qty = WarehouseStock::query()
+            ->where('warehouse_id', (int) $centralWarehouseId)
+            ->where('product_id', $productId)
+            ->value('quantity');
+
+        return max(0, (int) ($qty ?? 0));
+    }
     private static function extractToken($json): ?string
     {
         if (!is_array($json)) return null;
