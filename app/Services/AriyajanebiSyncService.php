@@ -39,7 +39,9 @@ class AriyajanebiSyncService
     private static function syncVariants($variants): void
     {
         try {
-            $login = Http::asForm()->post(self::LOGIN_URL, [
+            $client = Http::asForm()->timeout(15);
+
+            $login = $client->post(self::LOGIN_URL, [
                 'username' => self::USERNAME,
                 'password' => self::PASSWORD,
             ]);
@@ -64,7 +66,48 @@ class AriyajanebiSyncService
                 Log::warning('Ariyajanebi update failed', ['status' => $update->status(), 'body' => $update->body(), 'payload' => $payload]);
             }
         } catch (\Throwable $e) {
+            if (str_contains($e->getMessage(), 'cURL error 77')) {
+                Log::warning('Ariyajanebi SSL cert issue detected, retrying without SSL verification.');
+                self::syncVariantsWithoutVerify($variants);
+                return;
+            }
+
             Log::error('Ariyajanebi sync exception', ['message' => $e->getMessage()]);
+        }
+    }
+
+
+    private static function syncVariantsWithoutVerify($variants): void
+    {
+        try {
+            $client = Http::asForm()->withoutVerifying()->timeout(15);
+
+            $login = $client->post(self::LOGIN_URL, [
+                'username' => self::USERNAME,
+                'password' => self::PASSWORD,
+            ]);
+
+            if (!$login->successful()) {
+                Log::warning('Ariyajanebi login failed (without verify)', ['status' => $login->status(), 'body' => $login->body()]);
+                return;
+            }
+
+            $cookies = $login->cookies();
+            $payload = ['_method' => 'PUT'];
+
+            foreach ($variants->values() as $i => $variant) {
+                $payload["varieties[{$i}][id]"] = (string) $variant->variety_id;
+                $payload["varieties[{$i}][price]"] = (string) max(0, (int) $variant->sell_price);
+                $payload["varieties[{$i}][balance]"] = (string) max(0, (int) $variant->stock);
+            }
+
+            $update = $client->withCookies($cookies->toArray(), 'api.ariyajanebi.ir')->post(self::UPDATE_URL, $payload);
+
+            if (!$update->successful()) {
+                Log::warning('Ariyajanebi update failed (without verify)', ['status' => $update->status(), 'body' => $update->body(), 'payload' => $payload]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Ariyajanebi sync exception (without verify)', ['message' => $e->getMessage()]);
         }
     }
 }
