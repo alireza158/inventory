@@ -302,7 +302,7 @@ class PreinvoiceController extends Controller
             );
         });
 
-        return redirect()->route('preinvoice.warehouse.index')
+        return redirect()->route('preinvoice.create')
             ->with('success', '✅ پیش‌فاکتور ثبت و برای تایید انبار ارسال شد.');
     }
 

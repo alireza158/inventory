@@ -861,68 +861,33 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             grid-template-columns: 1fr;
         }
 
-        .modal-summary-bar {
-            flex-direction: column;
-            gap: 10px;
-        }
+function getProductVarieties(product) {
+    if (!product) return [];
+    if (Array.isArray(product.varieties)) return product.varieties;
+    if (Array.isArray(product.variants)) return product.variants;
+    return [];
+}
 
-        .summary-stat {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            text-align: right;
-        }
+function varietyModelLabel(v) {
+    return normalizeText(v && v.model_list_name) || '—';
+}
 
-        .summary-stat .s-label {
-            font-size: .75rem;
-        }
+function varietyDesignLabel(v) {
+    const designName = normalizeText(v && v.variety_name);
+    const designCode = normalizeText(v && v.variety_code);
 
-        .summary-stat .s-val {
-            font-size: 1rem;
-        }
-    }
-</style>
+    if (designName && designCode) return designName + ' (' + designCode + ')';
+    if (designName) return designName;
+    if (designCode) return designCode;
+    return normalizeText(v && v.variant_name) || '—';
+}
 
-<div class="container page-shell py-3">
-
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <div>
-            <h1 class="page-title">🧾 ثبت پیش‌فاکتور</h1>
-            <div class="hint mt-1">ثبت سریع کالا با کد ۴ رقمی محصول مادر</div>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="autosave-pill" id="localDraftStatus">ذخیره خودکار فعال</span>
-            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" id="clearLocalDraftTopBtn">پاک‌کردن پیش‌نویس</button>
-            <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">صف تایید انبار</a>
-        </div>
-    </div>
-
-    <div class="local-draft-banner" id="localDraftBanner">
-        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-            <div>
-                <div class="fw-bold" style="color:var(--brand-darker)">پیش‌نویس ذخیره‌شده پیدا شد</div>
-                <div class="hint mt-1" id="localDraftBannerText">می‌توانید ادامه ثبت پیش‌فاکتور قبلی را لود کنید.</div>
-            </div>
-            <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn btn-sm btn-primary rounded-3" id="loadLocalDraftBtn">لود پیش‌نویس</button>
-                <button type="button" class="btn btn-sm btn-outline-danger rounded-3" id="discardLocalDraftBtn">حذف پیش‌نویس</button>
-            </div>
-        </div>
-    </div>
-
-    @if(session('success'))
-    <div class="alert alert-success border-0 shadow-sm rounded-4 fw-bold py-2">✅ {{ session('success') }}</div>
-    @endif
-    @if(session('error'))
-    <div class="alert alert-danger border-0 shadow-sm rounded-4 fw-bold py-2" style="white-space:pre-wrap">{!! session('error') !!}</div>
-    @endif
-    @if($errors->any())
-    <div class="alert alert-danger border-0 shadow-sm rounded-4 py-2">
-        <div class="fw-bold mb-1">⚠️ خطا:</div>
-        <ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
-    </div>
-    @endif
+function productStockValue(product) {
+    if (!product) return 0;
+    if (product.quantity !== undefined && product.quantity !== null) return Number(product.quantity) || 0;
+    if (product.stock !== undefined && product.stock !== null) return Number(product.stock) || 0;
+    return 0;
+}
 
     <form action="{{ route('preinvoice.draft.save') }}" method="POST" id="orderForm" autocomplete="off">
         @csrf
@@ -1282,9 +1247,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         return Number(v?.id || 0);
     }
 
-    function variantModel(v) {
-        return normalize(v?.model_list_name || v?.model_name || v?.model_list?.name) || '—';
-    }
+    const hasValidRow = Array.from(block.querySelectorAll('.variety-row')).some(function (row) {
+        const varietyEl = row.querySelector('.selected-variety-id');
+        return !!(varietyEl && varietyEl.value);
+    });
 
     function variantDesign(v) {
         return normalize(v?.design_name || v?.pattern_name || v?.variety_name || v?.type_name) || '—';
@@ -1365,11 +1331,82 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         }
     }
 
-    function removeLocalDraft(showMessage = true) {
-        localStorage.removeItem(LOCAL_DRAFT_KEY);
-        hideLocalDraftBanner();
-        if (showMessage) updateLocalDraftStatus('پیش‌نویس پاک شد', false);
-    }
+function addProductBlock(prefill) {
+    prefill = prefill || {};
+    const container = document.getElementById('productBlocksContainer');
+    const blockIndex = container.children.length + 1;
+
+    const block = createEl(
+        '<div class="product-block">' +
+            '<div class="product-header">' +
+                '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">' +
+                    '<div>' +
+                        '<div class="fw-bold text-primary">محصول #' + blockIndex + '</div>' +
+                        '<div class="hint">محصول را انتخاب کن و تنوع‌ها را وارد کن</div>' +
+                    '</div>' +
+                    '<div class="d-flex gap-2 flex-wrap">' +
+                        '<span class="chip"><span class="text-muted">نام:</span><span class="fw-bold product-name-label">—</span></span>' +
+                        '<span class="chip"><span class="text-muted">کد:</span><span class="fw-bold product-code-label">—</span></span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="product-body">' +
+                '<div class="mb-2">' +
+                    '<label class="compact-label">انتخاب کالا</label>' +
+                    '<select class="form-select form-select-sm product-select" required></select>' +
+                '</div>' +
+
+                '<div class="varieties-wrapper">' +
+                    '<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">' +
+                        '<div class="fw-semibold fs-7 text-secondary">تنوع‌های این محصول</div>' +
+                        '<button type="button" class="btn btn-outline-primary btn-sm add-variety-btn">➕ افزودن تنوع</button>' +
+                    '</div>' +
+
+                    '<div class="varieties-list-container"></div>' +
+
+                    '<div class="row-tools d-flex justify-content-between align-items-center flex-wrap gap-2">' +
+                        '<div class="block-subtotal-box d-flex justify-content-between align-items-center gap-3">' +
+                            '<span class="fw-bold fs-7">جمع این محصول</span>' +
+                            '<span class="fw-bold block-subtotal">0 تومان</span>' +
+                        '</div>' +
+                        '<div class="d-flex align-items-center gap-2">' +
+                            '<button type="button" class="icon-btn ok collapse-block-btn" title="تکمیل محصول">✓</button>' +
+                            '<button type="button" class="icon-btn danger remove-block-btn" title="حذف محصول">✕</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="product-summary">' +
+                '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">' +
+                    '<div class="summary-line">' +
+                        '<span class="fw-bold summary-title">—</span>' +
+                        '<span class="text-muted mx-2">|</span>' +
+                        '<span class="summary-rows text-muted">0 تنوع</span>' +
+                    '</div>' +
+                    '<div class="d-flex align-items-center gap-2 flex-wrap">' +
+                        '<span class="chip"><span class="text-muted">جمع:</span><span class="fw-bold summary-subtotal">0 تومان</span></span>' +
+                        '<button type="button" class="icon-btn muted edit-block-btn" title="باز کردن محصول">✎</button>' +
+                        '<button type="button" class="icon-btn danger remove-block-btn" title="حذف محصول">✕</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>'
+    );
+
+    container.appendChild(block);
+
+    const productSelect = block.querySelector('.product-select');
+    let productChangeToken = 0;
+    initProductSelect2(productSelect);
+
+    block.querySelectorAll('.remove-block-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            block.remove();
+            updateTotal();
+        });
+    });
 
     function updateLocalDraftStatus(text, saved = false) {
         const el = document.getElementById('localDraftStatus');
@@ -1432,17 +1469,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             return;
         }
 
-        try {
-            localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(collectLocalDraftPayload()));
-            updateLocalDraftStatus('ذخیره شد', true);
-
-            setTimeout(() => {
-                updateLocalDraftStatus('ذخیره خودکار فعال', false);
-            }, 1600);
-        } catch (e) {
-            updateLocalDraftStatus('خطا در ذخیره محلی', false);
-        }
-    }
+    productSelect.addEventListener('change', async function () {
+        const token = ++productChangeToken;
+        const pid = productSelect.value || '';
+        const list = block.querySelector('.varieties-list-container');
 
     function scheduleLocalDraftSave() {
         if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
@@ -1468,14 +1498,12 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             $('#city_id').trigger('change.select2');
         }
 
-        document.getElementById('orderDiscountType').value = 'amount';
-        document.getElementById('orderDiscountValue').value = 0;
-        groupedSelections = {};
-        selectedMotherProduct = null;
-        document.getElementById('motherCodeInput').value = '';
-        document.getElementById('motherProductBox').style.display = 'none';
-        document.getElementById('motherSearchHint').style.display = '';
-    }
+        const product = await getProductDetails(pid);
+        if (token !== productChangeToken) return;
+
+        list.innerHTML = '';
+        const name = productTitle(product) || '—';
+        const code = product && product.code ? product.code : '—';
 
     async function applyLocalDraft(draft) {
         if (!draft) return;
@@ -1501,22 +1529,70 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             $('#customer_search_select').trigger('change');
         }
 
-        document.getElementById('shipping_id').value = draft.shipping?.shipping_id || '';
-        document.getElementById('customer_address').value = draft.shipping?.address || '';
-        document.getElementById('orderDiscountType').value = draft.discount?.type || 'amount';
-        document.getElementById('orderDiscountValue').value = draft.discount?.value || 0;
+async function addVarietyRow(block, productId, prefillRow) {
+    const list = block.querySelector('.varieties-list-container');
+    const idx = globalRowIndex++;
 
-        updateShippingMode();
+    const row = createEl(
+        '<div class="variety-row row g-2 align-items-end">' +
+            '<input type="hidden" name="products[' + idx + '][id]" class="hidden-product-id" value="' + String(productId) + '">' +
+            '<input type="hidden" name="products[' + idx + '][variety_id]" class="selected-variety-id" value="">' +
 
-        if (draft.shipping?.province_id) {
-            document.getElementById('province_id').value = String(draft.shipping.province_id);
-            if (window.jQuery) $('#province_id').trigger('change.select2');
-            fillCitiesByProvinceId(draft.shipping.province_id);
-        }
+            '<div class="col-md-3">' +
+                '<label class="compact-label">مدل‌لیست</label>' +
+                '<select class="form-select form-select-sm model-select" required>' +
+                    '<option value="">در حال بارگذاری...</option>' +
+                '</select>' +
+            '</div>' +
 
-        if (draft.shipping?.city_id) {
-            document.getElementById('city_id').value = String(draft.shipping.city_id);
-            if (window.jQuery) $('#city_id').trigger('change.select2');
+            '<div class="col-md-3">' +
+                '<label class="compact-label">طرح‌بندی</label>' +
+                '<select class="form-select form-select-sm design-select" required disabled>' +
+                    '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>' +
+                '</select>' +
+                '<div class="mt-1 d-flex gap-2 flex-wrap">' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">مدل‌لیست: <span class="selected-model-label">—</span></span>' +
+                    '<span class="badge bg-light text-dark" style="border:1px solid #e2e8f0;">طرح‌بندی: <span class="selected-design-label">—</span></span>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="col-md-2">' +
+                '<label class="compact-label">تعداد</label>' +
+                '<input type="number" name="products[' + idx + '][quantity]" class="form-control form-control-sm quantity-input" min="1" value="1" required>' +
+            '</div>' +
+
+            '<div class="col-md-4">' +
+                '<label class="compact-label">قیمت واحد</label>' +
+                '<input type="text" class="form-control form-control-sm price-view" readonly>' +
+                '<input type="hidden" name="products[' + idx + '][price]" class="price-raw" value="0">' +
+                '<div class="mt-1 d-flex gap-2 flex-wrap align-items-center">' +
+                    '<span class="badge bg-secondary stock-badge">—</span>' +
+                    '<span class="badge bg-light text-dark mono code11-badge" style="border:1px solid #e2e8f0;">—</span>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="col-md-1 text-center">' +
+                '<button type="button" class="icon-btn danger remove-variety-btn mt-4 mt-md-0" title="حذف تنوع">✕</button>' +
+            '</div>' +
+        '</div>'
+    );
+
+    list.appendChild(row);
+
+    const modelSelect = row.querySelector('.model-select');
+    const designSelect = row.querySelector('.design-select');
+    const varietyInput = row.querySelector('.selected-variety-id');
+    const qtyInput = row.querySelector('.quantity-input');
+    const priceRaw = row.querySelector('.price-raw');
+    const priceView = row.querySelector('.price-view');
+    const codeBadge = row.querySelector('.code11-badge');
+    const modelLabelEl = row.querySelector('.selected-model-label');
+    const designLabelEl = row.querySelector('.selected-design-label');
+
+    row.querySelector('.remove-variety-btn').addEventListener('click', function () {
+        if (list.children.length <= 1) {
+            alert('حداقل یک تنوع باید برای این محصول وجود داشته باشد.');
+            return;
         }
 
         groupedSelections = draft.groupedSelections || {};
@@ -1526,116 +1602,64 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         hideLocalDraftBanner();
         updateLocalDraftStatus('پیش‌نویس لود شد', true);
 
-        isHydratingLocalDraft = false;
-        scheduleLocalDraftSave();
+    const product = await getProductDetails(productId);
+    const varieties = getProductVarieties(product).filter(function (v) {
+        return varietyStockValue(v) > 0;
+    });
+
+    modelSelect.innerHTML = '<option value="">انتخاب مدل‌لیست...</option>';
+    designSelect.innerHTML = '<option value="">ابتدا مدل‌لیست را انتخاب کنید</option>';
+    designSelect.disabled = true;
+
+    if (!varieties.length) {
+        modelSelect.innerHTML = '<option value="">مدل موجودی‌دار ندارد</option>';
+        modelSelect.disabled = true;
+        designSelect.innerHTML = '<option value="">طرح موجودی‌دار ندارد</option>';
+
+        qtyInput.value = '0';
+        qtyInput.disabled = true;
+        priceRaw.value = '0';
+        priceView.value = '';
+        varietyInput.value = '';
+        setStockUI(row, 0);
+        codeBadge.textContent = '—';
+        modelLabelEl.textContent = '—';
+        designLabelEl.textContent = '—';
+        updateTotal();
+        return;
     }
 
-    function bindLocalDraftEvents() {
-        document.getElementById('loadLocalDraftBtn')?.addEventListener('click', function() {
-            const draft = getLocalDraft();
-            if (!draft) {
-                alert('پیش‌نویسی برای لود شدن پیدا نشد.');
-                hideLocalDraftBanner();
-                return;
-            }
-            applyLocalDraft(draft);
-        });
+    const modelGroups = new Map();
+    varieties.forEach(function (v) {
+        const key = varietyModelLabel(v);
+        if (!modelGroups.has(key)) modelGroups.set(key, []);
+        modelGroups.get(key).push(v);
+    });
 
-        document.getElementById('discardLocalDraftBtn')?.addEventListener('click', function() {
-            if (!confirm('پیش‌نویس ذخیره‌شده حذف شود؟')) return;
-            removeLocalDraft(true);
-        });
+    Array.from(modelGroups.keys()).sort(function (a, b) {
+        return a.localeCompare(b, 'fa');
+    }).forEach(function (modelName) {
+        const opt = document.createElement('option');
+        opt.value = modelName;
+        opt.textContent = modelName;
+        modelSelect.appendChild(opt);
+    });
 
-        document.getElementById('clearLocalDraftTopBtn')?.addEventListener('click', function() {
-            if (!confirm('پیش‌نویس محلی و فرم فعلی پاک شود؟')) return;
-            isHydratingLocalDraft = true;
-            clearVisibleFormOnly();
-            renderGroupSummary();
-            updateShippingMode();
+    if (prefillRow) {
+        if (prefillRow.quantity) qtyInput.value = String(prefillRow.quantity);
+    }
+
+    function applySelectedVariety(v) {
+        if (!v) {
+            varietyInput.value = '';
+            priceRaw.value = '0';
+            priceView.value = '';
+            setStockUI(row, 0);
+            codeBadge.textContent = '—';
+            modelLabelEl.textContent = '—';
+            designLabelEl.textContent = '—';
             updateTotal();
-            updateSubmitState();
-            isHydratingLocalDraft = false;
-            removeLocalDraft(true);
-        });
-
-        ['customer_address', 'shipping_id', 'province_id', 'city_id', 'orderDiscountType', 'orderDiscountValue'].forEach(id => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.addEventListener('change', scheduleLocalDraftSave);
-            el.addEventListener('input', scheduleLocalDraftSave);
-        });
-
-        window.addEventListener('beforeunload', function() {
-            saveLocalDraftNow();
-        });
-    }
-
-    async function getProductDetails(productId, fresh = false) {
-        const id = String(productId || '');
-        if (!id) return null;
-        if (!fresh && productCache.has(id)) return productCache.get(id);
-        const url = API.product + '/' + encodeURIComponent(id) + (fresh ? '?_=' + Date.now() : '');
-        const res = await fetch(url, {
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-        const json = await res.json();
-        const product = json?.data?.product || null;
-        if (product) productCache.set(id, product);
-        return product;
-    }
-
-    async function searchProducts(query) {
-        const res = await fetch(API.products + '?q=' + encodeURIComponent(query), {
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-        const json = await res.json();
-        return json?.data?.products?.data || [];
-    }
-
-    function shippingById(id) {
-        return shippings.find(s => Number(s.id) === Number(id)) || null;
-    }
-
-    function isInPersonShipping(ship) {
-        const name = normalize(ship?.name);
-        return name.includes('حضوری') || name.includes('مراجعه');
-    }
-
-    function initSelect2Basic(selectEl, placeholder) {
-        if (!window.jQuery || !window.jQuery.fn?.select2 || !selectEl) return;
-        const $el = $(selectEl);
-        if ($el.hasClass('select2-hidden-accessible')) {
-            $el.off('select2:select select2:clear');
-            $el.select2('destroy');
-        }
-        $el.select2({
-            width: '100%',
-            dir: 'rtl',
-            placeholder,
-            allowClear: true
-        });
-        $el.on('select2:select select2:clear', function() {
-            this.dispatchEvent(new Event('change', {
-                bubbles: true
-            }));
-        });
-    }
-
-    async function loadArea() {
-        try {
-            const res = await fetch(API.area, {
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-            const data = await res.json();
-            areaProvinces = data?.data?.provinces || [];
-        } catch (e) {
-            areaProvinces = [];
+            return;
         }
     }
 
@@ -1651,20 +1675,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         initSelect2Basic(s, 'انتخاب استان...');
     }
 
-    function fillCitiesByProvinceId(provinceId) {
-        const s = document.getElementById('city_id');
-        s.innerHTML = '<option value=""></option>';
-        const province = areaProvinces.find(p => Number(p.id) === Number(provinceId));
-        const cities = province?.cities || [];
-        cities.forEach(c => {
-            const o = document.createElement('option');
-            o.value = c.id;
-            o.textContent = normalize(c.name);
-            s.appendChild(o);
-        });
-        s.disabled = cities.length === 0;
-        initSelect2Basic(s, 'انتخاب شهر...');
-    }
+        varietyInput.value = String(v.id);
+        priceRaw.value = String(price);
+        priceView.value = formatPrice(price) + ' تومان';
+        setStockUI(row, stock);
+        codeBadge.textContent = code11 ? String(code11) : ('VID-' + String(v.id));
+        modelLabelEl.textContent = varietyModelLabel(v);
+        designLabelEl.textContent = varietyDesignLabel(v);
 
     function fillShippingSelect() {
         const s = document.getElementById('shipping_id');
@@ -1710,92 +1727,61 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         scheduleLocalDraftSave();
     }
 
-    function applyCustomerToForm(c) {
-        if (!c) return;
-        const name = customerFullName(c);
-        const mobile = normalize(c.mobile);
-        document.getElementById('customer_id').value = c.id || '';
-        document.getElementById('customer_name').value = name;
-        document.getElementById('customer_mobile').value = mobile;
-        document.getElementById('customer_address').value = c.address || '';
-        document.getElementById('selectedCustomerTitle').textContent = name + (mobile ? ' - ' + mobile : '');
-        document.getElementById('customer_balance_hint').textContent = 'مانده حساب: ' + formatMoney(c.balance || 0);
-        document.getElementById('customerSummaryBox').classList.add('is-selected');
-        if (c.province_id) {
-            document.getElementById('province_id').value = String(c.province_id);
-            if (window.jQuery) $('#province_id').trigger('change.select2');
-            fillCitiesByProvinceId(c.province_id);
-        }
-        if (c.city_id) {
-            document.getElementById('city_id').value = String(c.city_id);
-            if (window.jQuery) $('#city_id').trigger('change.select2');
-        }
-        updateSubmitState();
-        scheduleLocalDraftSave();
+    function fillDesignsByModel(modelName) {
+        const designs = modelGroups.get(modelName) || [];
+        designSelect.innerHTML = '<option value="">انتخاب طرح‌بندی...</option>';
+        designSelect.disabled = designs.length === 0;
+
+        designs.forEach(function (v) {
+            const opt = document.createElement('option');
+            opt.value = String(v.id);
+            opt.textContent = varietyDesignLabel(v);
+            designSelect.appendChild(opt);
+        });
     }
 
-    function clearCustomer() {
-        document.getElementById('customer_id').value = '';
-        document.getElementById('customer_name').value = '';
-        document.getElementById('customer_mobile').value = '';
-        document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
-        document.getElementById('customer_balance_hint').textContent = '';
-        document.getElementById('customerSummaryBox').classList.remove('is-selected');
-        if (window.jQuery) $('#customer_search_select').val(null).trigger('change');
-        updateSubmitState();
-        scheduleLocalDraftSave();
-    }
+    modelSelect.addEventListener('change', function () {
+        fillDesignsByModel(modelSelect.value);
+        applySelectedVariety(null);
+    });
 
-    function preloadCustomerOption(selectEl, customer) {
-        if (!selectEl || !customer || !window.jQuery) return;
-        const text = customerFullName(customer) + (customer.mobile ? ' - ' + customer.mobile : '');
-        selectEl.add(new Option(text, customer.id, true, true));
-        $(selectEl).trigger('change');
-    }
+    designSelect.addEventListener('change', function () {
+        const vid = parseInt(designSelect.value || 0, 10);
+        const selected = varieties.find(function (v) {
+            return Number(v.id) === Number(vid);
+        }) || null;
+        applySelectedVariety(selected);
+    });
 
-    function initCustomerSearch() {
-        const selectEl = document.getElementById('customer_search_select');
-        if (!window.jQuery || !window.jQuery.fn?.select2) return;
-        $(selectEl).select2({
-            width: '100%',
-            dir: 'rtl',
-            placeholder: 'نام یا شماره موبایل مشتری...',
-            allowClear: true,
-            minimumInputLength: 1,
-            ajax: {
-                url: API.customers,
-                dataType: 'json',
-                delay: 250,
-                data: params => ({
-                    q: params.term || ''
-                }),
-                processResults: resp => {
-                    const items = resp?.data?.customers || [];
-                    return {
-                        results: items.map(c => ({
-                            id: c.id,
-                            text: customerFullName(c) + ' - ' + (c.mobile || '')
-                        }))
-                    };
-                }
+    const prefillVariantId = parseInt(prefillRow && prefillRow.variety_id ? prefillRow.variety_id : 0, 10);
+    const prefillVariant = prefillVariantId
+        ? (varieties.find(function (v) { return Number(v.id) === Number(prefillVariantId); }) || null)
+        : null;
+
+    if (prefillVariant) {
+        const prefillModel = varietyModelLabel(prefillVariant);
+        modelSelect.value = prefillModel;
+        fillDesignsByModel(prefillModel);
+        designSelect.value = String(prefillVariant.id);
+        applySelectedVariety(prefillVariant);
+    } else {
+        modelSelect.value = modelSelect.options.length > 1 ? modelSelect.options[1].value : '';
+        if (modelSelect.value) {
+            fillDesignsByModel(modelSelect.value);
+            if (designSelect.options.length > 1) {
+                designSelect.value = designSelect.options[1].value;
+                const selected = varieties.find(function (v) {
+                    return Number(v.id) === Number(designSelect.value);
+                }) || null;
+                applySelectedVariety(selected);
+            } else {
+                applySelectedVariety(null);
             }
-        });
-        $(selectEl).on('select2:select', async function(e) {
-            const id = e?.params?.data?.id;
-            if (!id) return;
-            try {
-                const res = await fetch(API.customer + '/' + encodeURIComponent(id), {
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-                const json = await res.json();
-                const customer = json?.data?.customer || null;
-                if (customer) applyCustomerToForm(customer);
-            } catch (error) {}
-        });
-        $(selectEl).on('select2:clear', clearCustomer);
+        } else {
+            applySelectedVariety(null);
+        }
     }
+}
 
     async function loadOldCustomer() {
         const cid = document.getElementById('customer_id').value || OLD_CUSTOMER_ID || '';
