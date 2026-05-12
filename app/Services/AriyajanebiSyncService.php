@@ -100,7 +100,7 @@ class AriyajanebiSyncService
             'attempts' => 1,
             'payload' => ['payload' => ['variants' => self::variantPayloadPreview($payload)]],
             'sent_at' => now(),
-            'next_retry_at' => now()->addMinutes(5),
+            'next_retry_at' => now()->addMinutes(1),
         ]);
     }
 
