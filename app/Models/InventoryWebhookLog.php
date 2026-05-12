@@ -16,6 +16,7 @@ class InventoryWebhookLog extends Model
         'error_message',
         'payload',
         'sent_at',
+        'next_retry_at',
     ];
 
     protected $casts = [

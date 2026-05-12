@@ -92,7 +92,7 @@ class InventoryWebhookService
                 'response_code' => $response->status(),
                 'error_message' => mb_substr((string) $response->body(), 0, 2000),
                 'sent_at' => now(),
-                'next_retry_at' => now()->addMinutes(5),
+                'next_retry_at' => now()->addMinute(),
             ]);
         } catch (\Throwable $e) {
             $log->update([
@@ -100,7 +100,7 @@ class InventoryWebhookService
                 'attempts' => (int) $log->attempts + 1,
                 'error_message' => mb_substr($e->getMessage(), 0, 2000),
                 'sent_at' => now(),
-                'next_retry_at' => now()->addMinutes(5),
+                'next_retry_at' => now()->addMinute(),
             ]);
         }
     }

@@ -15,7 +15,7 @@ class AriyajanebiSyncService
 {
     private const LOGIN_URL = 'https://api.ariyajanebi.ir/v1/admin/login';
     private const UPDATE_URL = 'https://api.ariyajanebi.ir/v1/admin/multi_varieties_update_lite';
-    private const USERNAME = 'admin';
+    private const USERNAME = 'Z.adeli60';
     private const PASSWORD = 'Z.adeli60';
 
     public static function syncProduct(Product $product): void
@@ -100,7 +100,7 @@ class AriyajanebiSyncService
             'attempts' => 1,
             'payload' => ['payload' => ['variants' => self::variantPayloadPreview($payload)]],
             'sent_at' => now(),
-            'next_retry_at' => now()->addMinutes(1),
+            'next_retry_at' => now()->addMinute(),
         ]);
     }
 
@@ -127,7 +127,7 @@ class AriyajanebiSyncService
             'response_code' => $code,
             'error_message' => $error,
             'sent_at' => now(),
-            'next_retry_at' => $status === 'success' ? null : now()->addMinutes(5),
+            'next_retry_at' => $status === 'success' ? null : now()->addMinute(),
         ]);
     }
 
