@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\InventoryWebhookLog;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\Warehouse;
-use App\Models\WarehouseStock;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -133,18 +131,10 @@ class AriyajanebiSyncService
 
     private static function centralWarehouseQuantityForVariant($variant): int
     {
-        $productId = (int) ($variant->product_id ?? 0);
-        if ($productId <= 0) return max(0, (int) ($variant->stock ?? 0));
-
-        $centralWarehouseId = Warehouse::query()->where('type', 'central')->value('id');
-        if (!$centralWarehouseId) return max(0, (int) ($variant->stock ?? 0));
-
-        $qty = WarehouseStock::query()
-            ->where('warehouse_id', (int) $centralWarehouseId)
-            ->where('product_id', $productId)
-            ->value('quantity');
-
-        return max(0, (int) ($qty ?? 0));
+        // Warehouse stock is currently tracked at product level. For API variety balance,
+        // we must send the selected variant's own stock to avoid applying the same
+        // product quantity to every variant.
+        return max(0, (int) ($variant->stock ?? 0));
     }
 
     private static function extractToken($json): ?string
