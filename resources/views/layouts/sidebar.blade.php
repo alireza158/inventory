@@ -13,7 +13,7 @@
 
     $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'archive.*');
 
-    $configActive = $isRoute('shipping-methods.*', 'users.*', 'activity-logs.*');
+    $configActive = $isRoute('shipping-methods.*', 'users.*', 'activity-logs.*', 'inventory-webhooks.*');
 
     $initialOpenSection = match (true) {
         $productsActive => 'products',
@@ -313,6 +313,7 @@
                     <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
                     <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
                     <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
+                    <a class="sidebar-sublink {{ $is('inventory-webhooks.*') }}" href="{{ route('inventory-webhooks.index') }}">مدیریت API موجودی/قیمت</a>
                 </div>
             </div>
         </div>
