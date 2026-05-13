@@ -1218,10 +1218,14 @@
                                         ->all();
 
                                     $stockBreakdownPayload = $p->warehouseStocks
-                                        ->map(function ($ws) {
+                                        ->whereNull('product_variant_id')
+                                        ->groupBy('warehouse_id')
+                                        ->map(function ($rows) {
+                                            $first = $rows->first();
+
                                             return [
-                                                'warehouse' => $ws->warehouse?->name,
-                                                'qty' => (int) $ws->quantity,
+                                                'warehouse' => $first?->warehouse?->name,
+                                                'qty' => (int) $rows->sum('quantity'),
                                             ];
                                         })
                                         ->values()
