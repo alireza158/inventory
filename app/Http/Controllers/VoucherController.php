@@ -124,8 +124,8 @@ class VoucherController extends Controller
                     WarehouseStockService::change(
                         $centralWarehouseId,
                         (int) $item->product_id,
-                        $variantId,
-                        -$deltaQty
+                        -$deltaQty,
+                        $variantId
                     );
                 }
 
@@ -448,8 +448,8 @@ class VoucherController extends Controller
                     WarehouseStockService::change(
                         $centralWarehouseId,
                         (int) $item->product_id,
-                        $variantId,
-                        -$delta
+                        -$delta,
+                        $variantId
                     );
 
                     $product?->refresh();
@@ -1069,8 +1069,8 @@ class VoucherController extends Controller
                 WarehouseStockService::change(
                     (int) $data['to_warehouse_id'],
                     (int) $item['product_id'],
-                    (int) $item['variant_id'],
-                    $qty
+                    $qty,
+                    (int) $item['variant_id']
                 );
 
                 $movementType = 'in';
@@ -1092,15 +1092,15 @@ class VoucherController extends Controller
                 WarehouseStockService::change(
                     (int) $data['from_warehouse_id'],
                     (int) $item['product_id'],
-                    (int) $item['variant_id'],
-                    -$qty
+                    -$qty,
+                    (int) $item['variant_id']
                 );
 
                 WarehouseStockService::change(
                     (int) $data['to_warehouse_id'],
                     (int) $item['product_id'],
-                    (int) $item['variant_id'],
-                    $qty
+                    $qty,
+                    (int) $item['variant_id']
                 );
 
                 $movementType = 'out';
@@ -1122,15 +1122,15 @@ class VoucherController extends Controller
                 WarehouseStockService::change(
                     (int) $data['from_warehouse_id'],
                     (int) $item['product_id'],
-                    (int) $item['variant_id'],
-                    -$qty
+                    -$qty,
+                    (int) $item['variant_id']
                 );
 
                 WarehouseStockService::change(
                     (int) $data['to_warehouse_id'],
                     (int) $item['product_id'],
-                    (int) $item['variant_id'],
-                    $qty
+                    $qty,
+                    (int) $item['variant_id']
                 );
 
                 $movementType = 'out';
@@ -1201,36 +1201,36 @@ class VoucherController extends Controller
                 WarehouseStockService::change(
                     (int) $transfer->to_warehouse_id,
                     (int) $item->product_id,
-                    $variantId,
-                    -((int) $item->quantity)
+                    -((int) $item->quantity),
+                    $variantId
                 );
             } elseif ($transfer->voucher_type === WarehouseTransfer::TYPE_SCRAP) {
                 WarehouseStockService::change(
                     (int) $transfer->from_warehouse_id,
                     (int) $item->product_id,
-                    $variantId,
-                    (int) $item->quantity
+                    (int) $item->quantity,
+                    $variantId
                 );
 
                 WarehouseStockService::change(
                     (int) $transfer->to_warehouse_id,
                     (int) $item->product_id,
-                    $variantId,
-                    -((int) $item->quantity)
+                    -((int) $item->quantity),
+                    $variantId
                 );
             } else {
                 WarehouseStockService::change(
                     (int) $transfer->to_warehouse_id,
                     (int) $item->product_id,
-                    $variantId,
-                    -((int) $item->quantity)
+                    -((int) $item->quantity),
+                    $variantId
                 );
 
                 WarehouseStockService::change(
                     (int) $transfer->from_warehouse_id,
                     (int) $item->product_id,
-                    $variantId,
-                    (int) $item->quantity
+                    (int) $item->quantity,
+                    $variantId
                 );
             }
         }
