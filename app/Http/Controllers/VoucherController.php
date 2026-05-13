@@ -6,7 +6,6 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
-use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
@@ -43,7 +42,7 @@ class VoucherController extends Controller
             ->where('is_active', true)
             ->where(function ($q) {
                 $q->where('type', 'scrap')
-                  ->orWhere('name', 'like', '%ضایعات%');
+                    ->orWhere('name', 'like', '%ضایعات%');
             })
             ->orderBy('id')
             ->first();
@@ -91,7 +90,7 @@ class VoucherController extends Controller
     public function salesUpdate(string $uuid, Request $request)
     {
         $invoice = Invoice::query()
-            ->with(['items.product'])
+            ->with(['items.product', 'items.variant'])
             ->where('uuid', $uuid)
             ->firstOrFail();
 
@@ -112,17 +111,22 @@ class VoucherController extends Controller
                     abort(422, 'آیتم نامعتبر است.');
                 }
 
+                $variantId = (int) ($item->variant_id ?? 0);
+                if ($variantId <= 0) {
+                    abort(422, 'برای این آیتم فاکتور، مدل/تنوع ثبت نشده است.');
+                }
+
                 $newQty = (int) $row['quantity'];
                 $newPrice = (int) $row['price'];
                 $deltaQty = $newQty - (int) $item->quantity;
 
                 if ($deltaQty !== 0) {
-                    WarehouseStockService::change($centralWarehouseId, (int) $item->product_id, -$deltaQty);
-
-                    $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
-                    if ($product) {
-                        $product->update(['stock' => (int) $product->stock - $deltaQty]);
-                    }
+                    WarehouseStockService::change(
+                        $centralWarehouseId,
+                        (int) $item->product_id,
+                        $variantId,
+                        -$deltaQty
+                    );
                 }
 
                 $item->update([
@@ -191,7 +195,7 @@ class VoucherController extends Controller
         $salesInvoices = collect();
         if ($type === 'sale') {
             $salesInvoices = Invoice::query()
-                ->with(['items.product'])
+                ->with(['items.product', 'items.variant'])
                 ->whereNotNull('preinvoice_order_id')
                 ->when($dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
                 ->when($dateTo, fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
@@ -371,7 +375,6 @@ class VoucherController extends Controller
         return redirect()->route('vouchers.section.index', 'return-from-sale')->with('success', 'برگشت از فروش ثبت شد.');
     }
 
-
     public function saleDeliveryIndex(Request $request)
     {
         $q = trim((string) $request->get('q', ''));
@@ -393,14 +396,20 @@ class VoucherController extends Controller
 
     public function saleDeliveryEdit(string $uuid)
     {
-        $invoice = Invoice::query()->with(['items.product', 'items.variant'])->where('uuid', $uuid)->firstOrFail();
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
 
         return view('vouchers.sale-delivery.edit', compact('invoice'));
     }
 
     public function saleDeliveryUpdate(string $uuid, Request $request)
     {
-        $invoice = Invoice::query()->with(['items.product'])->where('uuid', $uuid)->firstOrFail();
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
 
         $data = $request->validate([
             'status' => ['required', 'in:pending_warehouse_approval,collecting,checking_discrepancy,packing,shipped,not_shipped'],
@@ -420,19 +429,33 @@ class VoucherController extends Controller
                     continue;
                 }
 
+                $variantId = (int) ($item->variant_id ?? 0);
+                if ($variantId <= 0) {
+                    abort(422, 'برای یکی از آیتم‌های فاکتور، مدل/تنوع ثبت نشده است.');
+                }
+
                 $oldQty = (int) $item->quantity;
                 $newQty = (int) $payload['quantity'];
                 $delta = $newQty - $oldQty;
 
                 if ($delta !== 0) {
-                    WarehouseStockService::change($centralWarehouseId, (int) $item->product_id, -$delta);
+                    $product = Product::query()
+                        ->whereKey((int) $item->product_id)
+                        ->first();
 
-                    $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
+                    $before = (int) ($product?->stock ?? 0);
+
+                    WarehouseStockService::change(
+                        $centralWarehouseId,
+                        (int) $item->product_id,
+                        $variantId,
+                        -$delta
+                    );
+
+                    $product?->refresh();
+                    $after = (int) ($product?->stock ?? 0);
+
                     if ($product) {
-                        $before = (int) $product->stock;
-                        $after = $before - $delta;
-                        $product->update(['stock' => $after]);
-
                         StockMovement::create([
                             'product_id' => $product->id,
                             'user_id' => auth()->id(),
@@ -442,7 +465,7 @@ class VoucherController extends Controller
                             'stock_before' => $before,
                             'stock_after' => $after,
                             'reference' => $invoice->uuid,
-                            'note' => 'اصلاح اقلام حواله فروش کالا',
+                            'note' => 'اصلاح اقلام حواله فروش کالا - ' . ($item->variant?->variant_name ?? 'تنوع'),
                         ]);
                     }
                 }
@@ -731,7 +754,7 @@ class VoucherController extends Controller
         $invoices = Invoice::query()->latest('id')->limit(300)->get(['id', 'uuid', 'customer_name']);
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
-        $voucher->load('items.product', 'relatedInvoice');
+        $voucher->load('items.product', 'items.variant', 'relatedInvoice');
 
         $fixedVoucherType = null;
         $sectionSlug = null;
@@ -945,10 +968,16 @@ class VoucherController extends Controller
             }
 
             if ($voucherType !== WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
-                $available = max(0, ((int) $variant->stock) - ((int) ($variant->reserved ?? 0)));
+                $available = WarehouseStockService::available(
+                    (int) $data['from_warehouse_id'],
+                    (int) $item['product_id'],
+                    (int) $item['variant_id']
+                );
+
+                $available = max(0, $available - (int) ($variant->reserved ?? 0));
 
                 if ((int) $item['quantity'] > $available) {
-                    abort(422, 'ردیف ' . $rowNo . ': مقدار انتخابی از موجودی تنوع بیشتر است. موجودی فعلی: ' . $available);
+                    abort(422, 'ردیف ' . $rowNo . ': مقدار انتخابی از موجودی این مدل/تنوع در انبار مبدا بیشتر است. موجودی فعلی: ' . $available);
                 }
             } else {
                 $remaining = (int) ($invoiceVariantRemaining[(int) $item['variant_id']] ?? 0);
@@ -998,10 +1027,11 @@ class VoucherController extends Controller
         ]);
 
         $sum = 0;
-        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
         foreach ($data['items'] as $item) {
-            $product = Product::findOrFail($item['product_id']);
+            $product = Product::query()
+                ->whereKey((int) $item['product_id'])
+                ->firstOrFail();
 
             $variant = ProductVariant::query()
                 ->whereKey((int) ($item['variant_id'] ?? 0))
@@ -1018,6 +1048,7 @@ class VoucherController extends Controller
             }
 
             $qty = (int) $item['quantity'];
+            $stockBefore = (int) $product->stock;
 
             $invoiceItemPrice = null;
             if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $relatedInvoice) {
@@ -1035,54 +1066,85 @@ class VoucherController extends Controller
             $sum += $lineTotal;
 
             if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
-                WarehouseStockService::change((int) $data['to_warehouse_id'], (int) $item['product_id'], $qty);
-                $this->syncGlobalProductStock((int) $item['product_id'], +$qty);
-
-                $variant->update([
-                    'stock' => (int) $variant->stock + $qty,
-                ]);
+                WarehouseStockService::change(
+                    (int) $data['to_warehouse_id'],
+                    (int) $item['product_id'],
+                    (int) $item['variant_id'],
+                    $qty
+                );
 
                 $movementType = 'in';
+                $movementReason = 'return';
                 $movementNote = 'مرجوعی از مشتری - ' . ($variant->variant_name ?: 'تنوع');
             } elseif ($voucherType === WarehouseTransfer::TYPE_SCRAP) {
-                $available = max(0, ((int) $variant->stock) - ((int) ($variant->reserved ?? 0)));
+                $available = WarehouseStockService::available(
+                    (int) $data['from_warehouse_id'],
+                    (int) $item['product_id'],
+                    (int) $item['variant_id']
+                );
+
+                $available = max(0, $available - (int) ($variant->reserved ?? 0));
+
                 if ($qty > $available) {
-                    abort(422, 'موجودی تنوع برای ثبت ضایعات کافی نیست.');
+                    abort(422, 'موجودی این مدل/تنوع برای ثبت ضایعات کافی نیست.');
                 }
 
-                WarehouseStockService::change((int) $data['from_warehouse_id'], (int) $item['product_id'], -$qty);
-                WarehouseStockService::change((int) $data['to_warehouse_id'], (int) $item['product_id'], $qty);
+                WarehouseStockService::change(
+                    (int) $data['from_warehouse_id'],
+                    (int) $item['product_id'],
+                    (int) $item['variant_id'],
+                    -$qty
+                );
 
-                $this->syncGlobalProductStock((int) $item['product_id'], -$qty);
-
-                $variant->update([
-                    'stock' => (int) $variant->stock - $qty,
-                ]);
+                WarehouseStockService::change(
+                    (int) $data['to_warehouse_id'],
+                    (int) $item['product_id'],
+                    (int) $item['variant_id'],
+                    $qty
+                );
 
                 $movementType = 'out';
+                $movementReason = 'transfer';
                 $movementNote = 'انتقال به انبار ضایعات - ' . ($variant->variant_name ?: 'تنوع');
             } else {
-                WarehouseStockService::change((int) $data['from_warehouse_id'], (int) $item['product_id'], -$qty);
-                WarehouseStockService::change((int) $data['to_warehouse_id'], (int) $item['product_id'], $qty);
+                $available = WarehouseStockService::available(
+                    (int) $data['from_warehouse_id'],
+                    (int) $item['product_id'],
+                    (int) $item['variant_id']
+                );
 
-                $fromWarehouseId = (int) $data['from_warehouse_id'];
-                $toWarehouseId = (int) $data['to_warehouse_id'];
+                $available = max(0, $available - (int) ($variant->reserved ?? 0));
 
-                if ($fromWarehouseId === $centralWarehouseId) {
-                    $variant->update([
-                        'stock' => max(0, (int) $variant->stock - $qty),
-                    ]);
-                } elseif ($toWarehouseId === $centralWarehouseId) {
-                    $variant->update([
-                        'stock' => (int) $variant->stock + $qty,
-                    ]);
+                if ($qty > $available) {
+                    abort(422, 'موجودی این مدل/تنوع در انبار مبدا کافی نیست.');
                 }
 
+                WarehouseStockService::change(
+                    (int) $data['from_warehouse_id'],
+                    (int) $item['product_id'],
+                    (int) $item['variant_id'],
+                    -$qty
+                );
+
+                WarehouseStockService::change(
+                    (int) $data['to_warehouse_id'],
+                    (int) $item['product_id'],
+                    (int) $item['variant_id'],
+                    $qty
+                );
+
                 $movementType = 'out';
-                $movementNote = 'انتقال از ' . $transfer->fromWarehouse->name . ' به ' . $transfer->toWarehouse->name . ' - ' . ($variant->variant_name ?: 'تنوع');
+                $movementReason = 'transfer';
+                $movementNote = 'انتقال از '
+                    . ($transfer->fromWarehouse?->name ?? 'انبار مبدا')
+                    . ' به '
+                    . ($transfer->toWarehouse?->name ?? 'انبار مقصد')
+                    . ' - '
+                    . ($variant->variant_name ?: 'تنوع');
             }
 
-            $before = (int) $product->stock;
+            $product->refresh();
+            $stockAfter = (int) $product->stock;
 
             $transfer->items()->create([
                 'product_id' => $item['product_id'],
@@ -1099,10 +1161,10 @@ class VoucherController extends Controller
                 'product_id' => $product->id,
                 'user_id' => auth()->id(),
                 'type' => $movementType,
-                'reason' => $voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN ? 'return' : 'transfer',
+                'reason' => $movementReason,
                 'quantity' => $qty,
-                'stock_before' => $before,
-                'stock_after' => (int) Product::find($product->id)->stock,
+                'stock_before' => $stockBefore,
+                'stock_after' => $stockAfter,
                 'reference' => $transfer->reference ?: ('TR-' . $transfer->id),
                 'note' => $movementNote,
             ]);
@@ -1127,61 +1189,49 @@ class VoucherController extends Controller
     private function rollbackTransfer(WarehouseTransfer $transfer): void
     {
         $transfer->load('items', 'relatedInvoice');
-        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
         foreach ($transfer->items as $item) {
-            $variant = null;
+            $variantId = (int) $item->product_variant_id;
 
-            if (!empty($item->product_variant_id)) {
-                $variant = ProductVariant::query()
-                    ->whereKey((int) $item->product_variant_id)
-                    ->lockForUpdate()
-                    ->first();
+            if ($variantId <= 0) {
+                abort(422, 'برای یکی از ردیف‌های این حواله، تنوع کالا ثبت نشده است.');
             }
 
             if ($transfer->voucher_type === WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
-                WarehouseStockService::change((int) $transfer->to_warehouse_id, (int) $item->product_id, -((int) $item->quantity));
-                $this->syncGlobalProductStock((int) $item->product_id, -((int) $item->quantity));
-
-                if ($variant) {
-                    if ((int) $variant->stock < (int) $item->quantity) {
-                        abort(422, 'امکان ویرایش/حذف وجود ندارد؛ موجودی تنوع کمتر از مقدار مرجوعی است.');
-                    }
-
-                    $variant->update([
-                        'stock' => (int) $variant->stock - (int) $item->quantity,
-                    ]);
-                }
+                WarehouseStockService::change(
+                    (int) $transfer->to_warehouse_id,
+                    (int) $item->product_id,
+                    $variantId,
+                    -((int) $item->quantity)
+                );
             } elseif ($transfer->voucher_type === WarehouseTransfer::TYPE_SCRAP) {
-                WarehouseStockService::change((int) $transfer->from_warehouse_id, (int) $item->product_id, (int) $item->quantity);
-                WarehouseStockService::change((int) $transfer->to_warehouse_id, (int) $item->product_id, -((int) $item->quantity));
+                WarehouseStockService::change(
+                    (int) $transfer->from_warehouse_id,
+                    (int) $item->product_id,
+                    $variantId,
+                    (int) $item->quantity
+                );
 
-                $this->syncGlobalProductStock((int) $item->product_id, (int) $item->quantity);
-
-                if ($variant) {
-                    $variant->update([
-                        'stock' => (int) $variant->stock + (int) $item->quantity,
-                    ]);
-                }
+                WarehouseStockService::change(
+                    (int) $transfer->to_warehouse_id,
+                    (int) $item->product_id,
+                    $variantId,
+                    -((int) $item->quantity)
+                );
             } else {
-                WarehouseStockService::change((int) $transfer->to_warehouse_id, (int) $item->product_id, -((int) $item->quantity));
-                WarehouseStockService::change((int) $transfer->from_warehouse_id, (int) $item->product_id, (int) $item->quantity);
+                WarehouseStockService::change(
+                    (int) $transfer->to_warehouse_id,
+                    (int) $item->product_id,
+                    $variantId,
+                    -((int) $item->quantity)
+                );
 
-                if ($variant) {
-                    if ((int) $transfer->from_warehouse_id === $centralWarehouseId) {
-                        $variant->update([
-                            'stock' => (int) $variant->stock + (int) $item->quantity,
-                        ]);
-                    } elseif ((int) $transfer->to_warehouse_id === $centralWarehouseId) {
-                        if ((int) $variant->stock < (int) $item->quantity) {
-                            abort(422, 'امکان ویرایش/حذف وجود ندارد؛ موجودی تنوع کمتر از مقدار حواله است.');
-                        }
-
-                        $variant->update([
-                            'stock' => (int) $variant->stock - (int) $item->quantity,
-                        ]);
-                    }
-                }
+                WarehouseStockService::change(
+                    (int) $transfer->from_warehouse_id,
+                    (int) $item->product_id,
+                    $variantId,
+                    (int) $item->quantity
+                );
             }
         }
 
@@ -1260,6 +1310,7 @@ class VoucherController extends Controller
             'checking_discrepancy' => 'در حال بررسی مغایرت',
             'packing' => 'در حال بسته‌بندی',
             'shipped' => 'ارسال شده',
+            'not_shipped' => 'ارسال نشده',
             'draft' => 'پیش‌نویس',
             'finalized' => 'نهایی شده',
             'cancelled' => 'لغو شده',
@@ -1271,6 +1322,7 @@ class VoucherController extends Controller
     private function humanReasonLabel(?string $type): string
     {
         $labels = $this->combinedReasonLabels() + WarehouseTransfer::typeOptions();
+
         return $labels[$type ?? ''] ?? ($type ?: '—');
     }
 
@@ -1334,15 +1386,8 @@ class VoucherController extends Controller
             ->get();
     }
 
-    private function syncGlobalProductStock(int $productId, int $delta): void
+    private function syncGlobalProductStock(int $productId, int $delta = 0): void
     {
-        $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
-
-        if (!$product) {
-            return;
-        }
-
-        $newStock = max(0, ((int) $product->stock) + $delta);
-        $product->update(['stock' => $newStock]);
+        WarehouseStockService::syncProductStockFromCentral($productId);
     }
 }

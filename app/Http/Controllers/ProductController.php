@@ -7,6 +7,7 @@ use App\Models\ModelList;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\CrmProductSyncService;
+use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -17,7 +18,7 @@ class ProductController extends Controller
         $query = Product::query()
             ->with([
                 'category',
-                'variants',
+                'variants.warehouseStocks.warehouse',
                 'warehouseStocks.warehouse',
             ])
             ->withMin('variants', 'buy_price');
@@ -56,16 +57,16 @@ class ProductController extends Controller
         }
 
         $sort = (string) $request->get('sort', 'id');
-        $dir  = strtolower((string) $request->get('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $dir = strtolower((string) $request->get('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $allowedSorts = [
-            'short_barcode'     => 'short_barcode',
-            'barcode'           => 'barcode',
-            'name'              => 'name',
-            'stock'             => 'stock',
+            'short_barcode' => 'short_barcode',
+            'barcode' => 'barcode',
+            'name' => 'name',
+            'stock' => 'stock',
             'variants_buy_price_min' => 'variants_min_buy_price',
-            'price'             => 'price',
-            'id'                => 'id',
+            'price' => 'price',
+            'id' => 'id',
         ];
 
         $sortColumn = $allowedSorts[$sort] ?? 'id';
@@ -101,9 +102,6 @@ class ProductController extends Controller
         return view('products.create', compact('categories', 'modelLists', 'previewSeq4'));
     }
 
-    /**
-     * PPPP پیش‌نمایش
-     */
     private function peekNextProductSeq4(): string
     {
         $mx = DB::table('products')
@@ -111,8 +109,12 @@ class ProductController extends Controller
             ->value('mx');
 
         $next = ((int) $mx) + 1;
-        if ($next < 1) $next = 1;
-        if ($next > 9999) $next = 9999;
+        if ($next < 1) {
+            $next = 1;
+        }
+        if ($next > 9999) {
+            $next = 9999;
+        }
 
         return str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
@@ -121,33 +123,35 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
-            'name'        => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
 
-            'use_models'        => ['nullable'],
-            'use_designs'       => ['nullable'],
+            'use_models' => ['nullable'],
+            'use_designs' => ['nullable'],
             'model_brand_group' => ['nullable', 'string', 'max:100'],
 
-            'model_list_ids'   => ['nullable', 'array'],
+            'model_list_ids' => ['nullable', 'array'],
             'model_list_ids.*' => ['integer', 'exists:model_lists,id'],
 
-            'design_count'      => ['nullable', 'integer', 'min:1', 'max:99'],
-            'design_notes'      => ['nullable', 'array'],
-            'design_notes.*'    => ['nullable', 'string', 'max:120'],
+            'design_count' => ['nullable', 'integer', 'min:1', 'max:99'],
+            'design_notes' => ['nullable', 'array'],
+            'design_notes.*' => ['nullable', 'string', 'max:120'],
 
-            'buy_price'  => ['nullable', 'integer', 'min:0'],
+            'buy_price' => ['nullable', 'integer', 'min:0'],
             'sell_price' => ['nullable', 'integer', 'min:0'],
             'is_sellable' => ['nullable', 'boolean'],
         ]);
 
-        $useModels  = $request->boolean('use_models');
+        $useModels = $request->boolean('use_models');
         $useDesigns = $request->boolean('use_designs');
 
         if ($useModels && empty($data['model_brand_group'])) {
             abort(422, 'برای مدل‌لیست: ابتدا گروه برند را انتخاب کنید.');
         }
+
         if ($useModels && empty($data['model_list_ids'])) {
             abort(422, 'برای مدل‌لیست: حداقل یک مدل انتخاب کنید.');
         }
+
         if ($useDesigns && empty($data['design_count'])) {
             abort(422, 'برای طرح‌بندی: تعداد طرح را وارد کنید.');
         }
@@ -159,36 +163,30 @@ class ProductController extends Controller
         $isSellable = $request->boolean('is_sellable', true);
 
         DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes, $isSellable) {
-
             $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
 
-            // CC
             $cat2 = $this->normalizeCategory2($category->code);
             if ($cat2 === null) {
                 abort(422, 'کد دسته‌بندی باید ۲ رقمی باشد (00 تا 99).');
             }
 
-            // PPPP واقعی
             $seq4 = $this->nextProductSeq4();
-
-            // CCPPpp => 6 digit
             $productCode6 = $cat2 . $seq4;
 
             $product = Product::create([
-                'category_id'   => $category->id,
-                'name'          => trim($data['name']),
-                'sku'           => 'AUTO-' . now()->format('YmdHis') . '-' . random_int(100, 999),
-                'code'          => $productCode6,
+                'category_id' => $category->id,
+                'name' => trim($data['name']),
+                'sku' => 'AUTO-' . now()->format('YmdHis') . '-' . random_int(100, 999),
+                'code' => $productCode6,
                 'short_barcode' => $seq4,
-                'stock'         => 0,
-                'price'         => 0,
-                'is_sellable'   => $isSellable,
+                'stock' => 0,
+                'price' => 0,
+                'is_sellable' => $isSellable,
             ]);
 
             $sellPrice = (int) ($data['sell_price'] ?? 0);
-            $buyPrice  = isset($data['buy_price']) ? (int) $data['buy_price'] : null;
+            $buyPrice = isset($data['buy_price']) ? (int) $data['buy_price'] : null;
 
-            // مدل‌ها با حفظ ترتیب انتخاب کاربر
             $models = collect();
             if ($useModels) {
                 $ids = array_values(array_map('intval', $data['model_list_ids']));
@@ -200,25 +198,23 @@ class ProductController extends Controller
                 $models = collect($ids)->map(fn ($id) => $map->get($id))->filter()->values();
             }
 
-            // CASE 1: بدون مدل و بدون طرح
             if (!$useModels && !$useDesigns) {
                 $variantCode = $this->buildVariantCode11($productCode6, '000', '00');
 
                 ProductVariant::create([
-                    'product_id'    => $product->id,
+                    'product_id' => $product->id,
                     'model_list_id' => null,
-                    'variant_name'  => $product->name,
-                    'variety_name'  => '—',
-                    'variety_code'  => '0000',
-                    'variant_code'  => $variantCode,
-                    'sell_price'    => $sellPrice,
-                    'buy_price'     => $buyPrice,
-                    'stock'         => 0,
-                    'reserved'      => 0,
+                    'variant_name' => $product->name,
+                    'variety_name' => '—',
+                    'variety_code' => '0000',
+                    'variant_code' => $variantCode,
+                    'sell_price' => $sellPrice,
+                    'buy_price' => $buyPrice,
+                    'stock' => 0,
+                    'reserved' => 0,
                 ]);
             }
 
-            // CASE 2: فقط طرح
             if ($useDesigns && !$useModels) {
                 $d = (int) $data['design_count'];
 
@@ -226,46 +222,44 @@ class ProductController extends Controller
                     $design2 = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                     $variantCode = $this->buildVariantCode11($productCode6, '000', $design2);
 
-                    $designNote  = (string) ($designNotes->get($i - 1) ?? '');
+                    $designNote = (string) ($designNotes->get($i - 1) ?? '');
                     $designTitle = $designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i);
 
                     ProductVariant::create([
-                        'product_id'    => $product->id,
+                        'product_id' => $product->id,
                         'model_list_id' => null,
-                        'variant_name'  => $product->name . ' ' . $designTitle,
-                        'variety_name'  => $designTitle,
-                        'variety_code'  => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
-                        'variant_code'  => $variantCode,
-                        'sell_price'    => $sellPrice,
-                        'buy_price'     => $buyPrice,
-                        'stock'         => 0,
-                        'reserved'      => 0,
+                        'variant_name' => $product->name . ' ' . $designTitle,
+                        'variety_name' => $designTitle,
+                        'variety_code' => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+                        'variant_code' => $variantCode,
+                        'sell_price' => $sellPrice,
+                        'buy_price' => $buyPrice,
+                        'stock' => 0,
+                        'reserved' => 0,
                     ]);
                 }
             }
 
-            // CASE 3: فقط مدل
             if ($useModels && !$useDesigns) {
                 foreach ($models as $m) {
                     $model3 = $this->normalizeModel3($m->code);
                     $variantCode = $this->buildVariantCode11($productCode6, $model3, '00');
 
                     ProductVariant::create([
-                        'product_id'    => $product->id,
+                        'product_id' => $product->id,
                         'model_list_id' => $m->id,
-                        'variant_name'  => $product->name . ' ' . $m->model_name,
-                        'variety_name'  => '—',
-                        'variety_code'  => '0000',
-                        'variant_code'  => $variantCode,
-                        'sell_price'    => $sellPrice,
-                        'buy_price'     => $buyPrice,
-                        'stock'         => 0,
-                        'reserved'      => 0,
+                        'variant_name' => $product->name . ' ' . $m->model_name,
+                        'variety_name' => '—',
+                        'variety_code' => '0000',
+                        'variant_code' => $variantCode,
+                        'sell_price' => $sellPrice,
+                        'buy_price' => $buyPrice,
+                        'stock' => 0,
+                        'reserved' => 0,
                     ]);
                 }
             }
 
-            // CASE 4: مدل + طرح
             if ($useModels && $useDesigns) {
                 $d = (int) $data['design_count'];
 
@@ -276,20 +270,20 @@ class ProductController extends Controller
                         $design2 = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                         $variantCode = $this->buildVariantCode11($productCode6, $model3, $design2);
 
-                        $designNote  = (string) ($designNotes->get($i - 1) ?? '');
+                        $designNote = (string) ($designNotes->get($i - 1) ?? '');
                         $designTitle = $designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i);
 
                         ProductVariant::create([
-                            'product_id'    => $product->id,
+                            'product_id' => $product->id,
                             'model_list_id' => $m->id,
-                            'variant_name'  => $product->name . ' ' . $m->model_name . ' ' . $designTitle,
-                            'variety_name'  => $designTitle,
-                            'variety_code'  => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
-                            'variant_code'  => $variantCode,
-                            'sell_price'    => $sellPrice,
-                            'buy_price'     => $buyPrice,
-                            'stock'         => 0,
-                            'reserved'      => 0,
+                            'variant_name' => $product->name . ' ' . $m->model_name . ' ' . $designTitle,
+                            'variety_name' => $designTitle,
+                            'variety_code' => str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+                            'variant_code' => $variantCode,
+                            'sell_price' => $sellPrice,
+                            'buy_price' => $buyPrice,
+                            'stock' => 0,
+                            'reserved' => 0,
                         ]);
                     }
                 }
@@ -303,7 +297,7 @@ class ProductController extends Controller
 
     public function edit(Product $product)
     {
-        $product->load('variants');
+        $product->load(['variants.warehouseStocks.warehouse']);
 
         $categories = Category::orderBy('name')->get();
 
@@ -322,7 +316,7 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
-            'name'        => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
 
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
@@ -348,6 +342,7 @@ class ProductController extends Controller
             ]);
 
             $keepIds = [];
+            $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
             foreach ($data['variants'] as $v) {
                 $ignoreId = !empty($v['id']) ? (int) $v['id'] : null;
@@ -361,7 +356,9 @@ class ProductController extends Controller
                 }
 
                 $design2 = substr((string) $v['variety_code'], -2);
-                if (!preg_match('/^\d{2}$/', $design2)) $design2 = '00';
+                if (!preg_match('/^\d{2}$/', $design2)) {
+                    $design2 = '00';
+                }
 
                 $variantCode = $this->buildVariantCode11((string) $product->code, $modelCode3, $design2, $ignoreId);
 
@@ -373,10 +370,11 @@ class ProductController extends Controller
                     'variant_code' => $variantCode,
                     'sell_price' => (int) $v['sell_price'],
                     'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
-                    'stock' => (int) $v['stock'],
                     'is_active' => (bool) ($v['is_active'] ?? true),
                     'variety_id' => isset($v['variety_id']) && $v['variety_id'] !== '' ? (int) $v['variety_id'] : null,
                 ];
+
+                $variant = null;
 
                 if (!empty($v['id'])) {
                     $variant = ProductVariant::where('product_id', $product->id)
@@ -388,11 +386,22 @@ class ProductController extends Controller
                         $keepIds[] = $variant->id;
                     }
                 } else {
-                $variant = ProductVariant::create(array_merge($payload, [
+                    $variant = ProductVariant::create(array_merge($payload, [
                         'product_id' => $product->id,
                         'reserved' => 0,
+                        'stock' => 0,
                     ]));
+
                     $keepIds[] = $variant->id;
+                }
+
+                if ($variant) {
+                    WarehouseStockService::set(
+                        $centralWarehouseId,
+                        (int) $product->id,
+                        (int) $variant->id,
+                        (int) $v['stock']
+                    );
                 }
             }
 
@@ -419,6 +428,7 @@ class ProductController extends Controller
     public function destroy(Product $product)
     {
         $product->delete();
+
         return redirect()->route('products.index')->with('success', 'کالا حذف شد.');
     }
 
@@ -438,22 +448,21 @@ class ProductController extends Controller
         }
 
         $products = $query->orderBy('name')->paginate(50)->withQueryString();
+
         return view('products.pricelist', compact('products'));
     }
 
     public function syncCrm(CrmProductSyncService $service)
-{
-    $res = $service->sync();
+    {
+        $res = $service->sync();
 
-    return redirect()
-        ->route('products.index')
-        ->with(
-            'success',
-            "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']} | خطا: {$res['failed']}"
-        );
-}
-
-    // ---------------- Helpers ----------------
+        return redirect()
+            ->route('products.index')
+            ->with(
+                'success',
+                "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']} | خطا: {$res['failed']}"
+            );
+    }
 
     private function recalcProductSummary(Product $product): void
     {
@@ -473,8 +482,13 @@ class ProductController extends Controller
     private function normalizeCategory2(?string $code): ?string
     {
         $c = trim((string) ($code ?? ''));
-        if ($c === '') return null;
-        if (!preg_match('/^\d{2}$/', $c)) return null;
+        if ($c === '') {
+            return null;
+        }
+        if (!preg_match('/^\d{2}$/', $c)) {
+            return null;
+        }
+
         return $c;
     }
 
@@ -482,12 +496,10 @@ class ProductController extends Controller
     {
         $c = preg_replace('/\D+/', '', (string) ($code ?? ''));
         $c = substr($c, 0, 3);
+
         return str_pad($c, 3, '0', STR_PAD_LEFT);
     }
 
-    /**
-     * تولید PPPP واقعی (قفل داخل تراکنش)
-     */
     private function nextProductSeq4(): string
     {
         $mx = DB::table('products')
@@ -496,14 +508,13 @@ class ProductController extends Controller
             ->value('mx');
 
         $next = ((int) $mx) + 1;
-        if ($next > 9999) abort(422, 'حداکثر 9999 کالا پشتیبانی می‌شود (PPPP چهار رقمی است).');
+        if ($next > 9999) {
+            abort(422, 'حداکثر 9999 کالا پشتیبانی می‌شود (PPPP چهار رقمی است).');
+        }
 
         return str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 
-    /**
-     * ساخت کد 11 رقمی: CCPPPPMMMDD
-     */
     private function buildVariantCode11(string $productCode6, string $model3, string $design2, ?int $ignoreId = null): string
     {
         $code = $productCode6 . $model3 . $design2;

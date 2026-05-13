@@ -52,9 +52,14 @@ class ProductVariant extends Model
         return $this->belongsTo(Color::class);
     }
 
+    public function warehouseStocks()
+    {
+        return $this->hasMany(WarehouseStock::class, 'product_variant_id');
+    }
+
     public function getAvailableStockAttribute(): int
     {
-        return max(0, ($this->stock ?? 0) - ($this->reserved ?? 0));
+        return max(0, ((int) ($this->stock ?? 0)) - ((int) ($this->reserved ?? 0)));
     }
 
     public function scopeActive($query)
