@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class WarehouseStockService
 {
-    public static function change(int $warehouseId, int $productId, int $variantId, int $delta): WarehouseStock
+    public static function change(int $warehouseId, int $productId, int $delta, ?int $productVariantId = null): WarehouseStock
     {
         return DB::transaction(function () use ($warehouseId, $productId, $variantId, $delta) {
             self::assertVariantBelongsToProduct($productId, $variantId);
@@ -223,84 +223,5 @@ class WarehouseStockService
         );
 
         return (int) $warehouse->id;
-    }
-
-    private static function lockOrCreateStock(int $warehouseId, int $productId, int $variantId): WarehouseStock
-    {
-        $stock = WarehouseStock::query()
-            ->where('warehouse_id', $warehouseId)
-            ->where('product_id', $productId)
-            ->where('product_variant_id', $variantId)
-            ->lockForUpdate()
-            ->first();
-
-        if ($stock) {
-            return $stock;
-        }
-
-        $initialQty = self::initialQuantityForMissingStock($warehouseId, $variantId);
-
-        WarehouseStock::create([
-            'warehouse_id' => $warehouseId,
-            'product_id' => $productId,
-            'product_variant_id' => $variantId,
-            'quantity' => $initialQty,
-        ]);
-
-        return WarehouseStock::query()
-            ->where('warehouse_id', $warehouseId)
-            ->where('product_id', $productId)
-            ->where('product_variant_id', $variantId)
-            ->lockForUpdate()
-            ->firstOrFail();
-    }
-
-    private static function ensureStockExists(int $warehouseId, int $productId, int $variantId): WarehouseStock
-    {
-        $stock = WarehouseStock::query()
-            ->where('warehouse_id', $warehouseId)
-            ->where('product_id', $productId)
-            ->where('product_variant_id', $variantId)
-            ->first();
-
-        if ($stock) {
-            return $stock;
-        }
-
-        $initialQty = self::initialQuantityForMissingStock($warehouseId, $variantId);
-
-        return WarehouseStock::create([
-            'warehouse_id' => $warehouseId,
-            'product_id' => $productId,
-            'product_variant_id' => $variantId,
-            'quantity' => $initialQty,
-        ]);
-    }
-
-    private static function initialQuantityForMissingStock(int $warehouseId, int $variantId): int
-    {
-        $centralId = self::centralWarehouseId();
-
-        if ((int) $warehouseId !== (int) $centralId) {
-            return 0;
-        }
-
-        return max(0, (int) (
-            ProductVariant::query()
-                ->whereKey($variantId)
-                ->value('stock') ?? 0
-        ));
-    }
-
-    private static function assertVariantBelongsToProduct(int $productId, int $variantId): void
-    {
-        $exists = ProductVariant::query()
-            ->whereKey($variantId)
-            ->where('product_id', $productId)
-            ->exists();
-
-        if (!$exists) {
-            abort(422, 'مدل/تنوع انتخابی متعلق به این کالا نیست.');
-        }
     }
 }
