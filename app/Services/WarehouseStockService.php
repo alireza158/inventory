@@ -27,8 +27,9 @@ class WarehouseStockService
                 'quantity' => $newQty,
             ]);
 
-            self::syncVariantStockFromCentral($variantId);
+            self::syncVariantStockFromCentral((int) $variantId);
             self::syncProductStockFromCentral($productId);
+            self::syncWarehouseProductAggregate($warehouseId, $productId);
 
             return $stock->fresh(['warehouse', 'product', 'variant']);
         });
@@ -49,8 +50,9 @@ class WarehouseStockService
                 'quantity' => $quantity,
             ]);
 
-            self::syncVariantStockFromCentral($variantId);
+            self::syncVariantStockFromCentral((int) $variantId);
             self::syncProductStockFromCentral($productId);
+            self::syncWarehouseProductAggregate($warehouseId, $productId);
 
             return $stock->fresh(['warehouse', 'product', 'variant']);
         });
@@ -265,6 +267,38 @@ class WarehouseStockService
             'product_id' => $productId,
             'product_variant_id' => $variantId,
             'quantity' => 0,
+        ]);
+    }
+
+
+    private static function syncWarehouseProductAggregate(int $warehouseId, int $productId): void
+    {
+        $total = (int) WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->whereNotNull('product_variant_id')
+            ->sum('quantity');
+
+        $aggregate = WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->whereNull('product_variant_id')
+            ->lockForUpdate()
+            ->first();
+
+        if ($aggregate) {
+            $aggregate->update([
+                'quantity' => max(0, $total),
+            ]);
+
+            return;
+        }
+
+        WarehouseStock::create([
+            'warehouse_id' => $warehouseId,
+            'product_id' => $productId,
+            'product_variant_id' => null,
+            'quantity' => max(0, $total),
         ]);
     }
 
