@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class WarehouseStockService
 {
-    public static function change(int $warehouseId, int $productId, int $delta, ?int $productVariantId = null): WarehouseStock
+    public static function change(int $warehouseId, int $productId, int $delta, ?int $variantId = null): WarehouseStock
     {
         return DB::transaction(function () use ($warehouseId, $productId, $variantId, $delta) {
             self::assertVariantBelongsToProduct($productId, $variantId);
@@ -208,6 +208,64 @@ class WarehouseStockService
                     }
                 });
         });
+    }
+
+
+    private static function assertVariantBelongsToProduct(int $productId, ?int $variantId): void
+    {
+        if (!$variantId) {
+            return;
+        }
+
+        $exists = ProductVariant::query()
+            ->whereKey($variantId)
+            ->where('product_id', $productId)
+            ->exists();
+
+        if (!$exists) {
+            abort(422, 'تنوع انتخاب‌شده برای این محصول معتبر نیست.');
+        }
+    }
+
+    private static function lockOrCreateStock(int $warehouseId, int $productId, ?int $variantId): WarehouseStock
+    {
+        $stock = WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->where('product_variant_id', $variantId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($stock) {
+            return $stock;
+        }
+
+        return WarehouseStock::create([
+            'warehouse_id' => $warehouseId,
+            'product_id' => $productId,
+            'product_variant_id' => $variantId,
+            'quantity' => 0,
+        ]);
+    }
+
+    private static function ensureStockExists(int $warehouseId, int $productId, ?int $variantId): WarehouseStock
+    {
+        $stock = WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->where('product_variant_id', $variantId)
+            ->first();
+
+        if ($stock) {
+            return $stock;
+        }
+
+        return WarehouseStock::create([
+            'warehouse_id' => $warehouseId,
+            'product_id' => $productId,
+            'product_variant_id' => $variantId,
+            'quantity' => 0,
+        ]);
     }
 
     public static function centralWarehouseId(): int
