@@ -8,7 +8,7 @@ use App\Models\Product;
 
 class WarehouseStockService
 {
-    public static function change(int $warehouseId, int $productId, int $delta): WarehouseStock
+    public static function change(int $warehouseId, int $productId, int $delta, ?int $productVariantId = null): WarehouseStock
     {
         $stock = WarehouseStock::query()
             ->where('warehouse_id', $warehouseId)
@@ -64,4 +64,3 @@ class WarehouseStockService
         return (int) $warehouse->id;
     }
 }
-
