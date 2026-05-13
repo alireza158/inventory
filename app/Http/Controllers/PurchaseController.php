@@ -363,7 +363,7 @@ class PurchaseController extends Controller
                 'note' => 'ثبت/ویرایش خرید کالا - مدل: ' . $variant->variant_name,
             ]);
 
-            WarehouseStockService::change($warehouseId, $product->id, $quantity);
+            WarehouseStockService::change($warehouseId, $product->id, $quantity, (int) $variant->id);
 
             $purchase->items()->create([
                 'product_id' => $product->id,
@@ -442,7 +442,7 @@ class PurchaseController extends Controller
                 'stock' => (int) $variant->stock - (int) $item->quantity,
             ]);
 
-            WarehouseStockService::change($warehouseId, (int) $variant->product_id, -((int) $item->quantity));
+            WarehouseStockService::change($warehouseId, (int) $variant->product_id, -((int) $item->quantity), (int) $variant->id);
 
             $affectedProductIds[] = $variant->product_id;
         }
