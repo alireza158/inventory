@@ -1208,11 +1208,25 @@
                                         ->sortBy('variant_code')
                                         ->values()
                                         ->map(function ($v) {
+                                            $variantBreakdown = $v->warehouseStocks
+                                                ->groupBy('warehouse_id')
+                                                ->map(function ($rows) {
+                                                    $first = $rows->first();
+
+                                                    return [
+                                                        'warehouse' => $first?->warehouse?->name,
+                                                        'qty' => (int) $rows->sum('quantity'),
+                                                    ];
+                                                })
+                                                ->values()
+                                                ->all();
+
                                             return [
                                                 'id' => (int) $v->id,
                                                 'name' => $v->variant_name,
                                                 'stock' => (int) $v->stock,
                                                 'is_active' => (bool) $v->is_active,
+                                                'warehouse_breakdown' => $variantBreakdown,
                                             ];
                                         })
                                         ->all();
@@ -1801,26 +1815,12 @@
                 stockBodyEl.innerHTML = '';
 
                 const breakdown = parseJsonDataset(selected.dataset.stockBreakdown, []);
-                const variantTotal = Number(selectedVariant?.stock ?? 0);
                 let limitedBreakdown = breakdown;
 
                 if (selectedVariant) {
-                    let remaining = variantTotal;
-
-                    limitedBreakdown = breakdown
-                        .filter(item => Number(item.qty ?? 0) > 0)
-                        .map(item => {
-                            if (remaining <= 0) return null;
-
-                            const qty = Math.min(Number(item.qty ?? 0), remaining);
-                            remaining -= qty;
-
-                            return {
-                                warehouse: item.warehouse,
-                                qty: qty,
-                            };
-                        })
-                        .filter(Boolean);
+                    limitedBreakdown = Array.isArray(selectedVariant.warehouse_breakdown)
+                        ? selectedVariant.warehouse_breakdown.filter(item => Number(item.qty ?? 0) > 0)
+                        : [];
                 }
 
                 if (!limitedBreakdown.length) {
