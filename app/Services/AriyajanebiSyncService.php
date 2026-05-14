@@ -26,7 +26,6 @@ class AriyajanebiSyncService
             'variety_id',
             'sell_price',
             'stock',
-            'sku',
             'variant_code',
             'variety_code',
             'variant_name',
