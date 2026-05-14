@@ -7,6 +7,7 @@ use App\Models\ProductVariant;
 use App\Models\Warehouse;
 use App\Models\WarehouseStock;
 use Illuminate\Support\Facades\DB;
+use App\Services\AriyajanebiSyncService;
 
 class WarehouseStockService
 {
@@ -30,6 +31,7 @@ class WarehouseStockService
             self::syncVariantStockFromCentral((int) $variantId);
             self::syncProductStockFromCentral($productId);
             self::syncWarehouseProductAggregate($warehouseId, $productId);
+            self::syncExternalProductIfCentralWarehouse($warehouseId, $productId);
 
             return $stock->fresh(['warehouse', 'product', 'variant']);
         });
@@ -53,6 +55,7 @@ class WarehouseStockService
             self::syncVariantStockFromCentral((int) $variantId);
             self::syncProductStockFromCentral($productId);
             self::syncWarehouseProductAggregate($warehouseId, $productId);
+            self::syncExternalProductIfCentralWarehouse($warehouseId, $productId);
 
             return $stock->fresh(['warehouse', 'product', 'variant']);
         });
@@ -270,6 +273,27 @@ class WarehouseStockService
         ]);
     }
 
+
+
+    private static function syncExternalProductIfCentralWarehouse(int $warehouseId, int $productId): void
+    {
+        if ($warehouseId !== self::centralWarehouseId()) {
+            return;
+        }
+
+        DB::afterCommit(function () use ($productId) {
+            $product = Product::query()
+                ->with('variants')
+                ->whereKey($productId)
+                ->first();
+
+            if (!$product) {
+                return;
+            }
+
+            AriyajanebiSyncService::syncProduct($product);
+        });
+    }
 
     private static function syncWarehouseProductAggregate(int $warehouseId, int $productId): void
     {
