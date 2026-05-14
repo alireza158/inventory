@@ -1218,16 +1218,23 @@
                                         ->all();
 
                                     $stockBreakdownPayload = $p->warehouseStocks
-                                        ->whereNull('product_variant_id')
                                         ->groupBy('warehouse_id')
                                         ->map(function ($rows) {
                                             $first = $rows->first();
 
+                                            $variantRows = $rows->whereNotNull('product_variant_id');
+                                            $aggregateRows = $rows->whereNull('product_variant_id');
+
+                                            $qty = $variantRows->isNotEmpty()
+                                                ? (int) $variantRows->sum('quantity')
+                                                : (int) $aggregateRows->sum('quantity');
+
                                             return [
                                                 'warehouse' => $first?->warehouse?->name,
-                                                'qty' => (int) $rows->sum('quantity'),
+                                                'qty' => max(0, $qty),
                                             ];
                                         })
+                                        ->filter(fn ($row) => (int) ($row['qty'] ?? 0) > 0)
                                         ->values()
                                         ->all();
 
