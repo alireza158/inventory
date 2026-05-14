@@ -1207,7 +1207,7 @@
                                     $variantsPayload = $p->variants
                                         ->sortBy('variant_code')
                                         ->values()
-                                        ->map(function ($v) {
+                                        ->map(function ($v) use ($p) {
                                             $variantBreakdown = $p->warehouseStocks
                                                 ->where('product_variant_id', (int) $v->id)
                                                 ->groupBy('warehouse_id')
