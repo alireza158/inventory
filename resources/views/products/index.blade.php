@@ -1208,7 +1208,8 @@
                                         ->sortBy('variant_code')
                                         ->values()
                                         ->map(function ($v) {
-                                            $variantBreakdown = $v->warehouseStocks
+                                            $variantBreakdown = $p->warehouseStocks
+                                                ->where('product_variant_id', (int) $v->id)
                                                 ->groupBy('warehouse_id')
                                                 ->map(function ($rows) {
                                                     $first = $rows->first();
@@ -1218,6 +1219,7 @@
                                                         'qty' => (int) $rows->sum('quantity'),
                                                     ];
                                                 })
+                                                ->filter(fn ($row) => (int) ($row['qty'] ?? 0) > 0)
                                                 ->values()
                                                 ->all();
 
