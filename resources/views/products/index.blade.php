@@ -1207,23 +1207,50 @@
                                     $variantsPayload = $p->variants
                                         ->sortBy('variant_code')
                                         ->values()
-                                        ->map(function ($v) {
+                                        ->map(function ($v) use ($p) {
+                                            $variantBreakdown = $p->warehouseStocks
+                                                ->where('product_variant_id', (int) $v->id)
+                                                ->groupBy('warehouse_id')
+                                                ->map(function ($rows) {
+                                                    $first = $rows->first();
+
+                                                    return [
+                                                        'warehouse' => $first?->warehouse?->name,
+                                                        'qty' => (int) $rows->sum('quantity'),
+                                                    ];
+                                                })
+                                                ->filter(fn ($row) => (int) ($row['qty'] ?? 0) > 0)
+                                                ->values()
+                                                ->all();
+
                                             return [
                                                 'id' => (int) $v->id,
                                                 'name' => $v->variant_name,
                                                 'stock' => (int) $v->stock,
                                                 'is_active' => (bool) $v->is_active,
+                                                'warehouse_breakdown' => $variantBreakdown,
                                             ];
                                         })
                                         ->all();
 
                                     $stockBreakdownPayload = $p->warehouseStocks
-                                        ->map(function ($ws) {
+                                        ->groupBy('warehouse_id')
+                                        ->map(function ($rows) {
+                                            $first = $rows->first();
+
+                                            $variantRows = $rows->whereNotNull('product_variant_id');
+                                            $aggregateRows = $rows->whereNull('product_variant_id');
+
+                                            $qty = $variantRows->isNotEmpty()
+                                                ? (int) $variantRows->sum('quantity')
+                                                : (int) $aggregateRows->sum('quantity');
+
                                             return [
-                                                'warehouse' => $ws->warehouse?->name,
-                                                'qty' => (int) $ws->quantity,
+                                                'warehouse' => $first?->warehouse?->name,
+                                                'qty' => max(0, $qty),
                                             ];
                                         })
+                                        ->filter(fn ($row) => (int) ($row['qty'] ?? 0) > 0)
                                         ->values()
                                         ->all();
 
@@ -1790,26 +1817,12 @@
                 stockBodyEl.innerHTML = '';
 
                 const breakdown = parseJsonDataset(selected.dataset.stockBreakdown, []);
-                const variantTotal = Number(selectedVariant?.stock ?? 0);
                 let limitedBreakdown = breakdown;
 
                 if (selectedVariant) {
-                    let remaining = variantTotal;
-
-                    limitedBreakdown = breakdown
-                        .filter(item => Number(item.qty ?? 0) > 0)
-                        .map(item => {
-                            if (remaining <= 0) return null;
-
-                            const qty = Math.min(Number(item.qty ?? 0), remaining);
-                            remaining -= qty;
-
-                            return {
-                                warehouse: item.warehouse,
-                                qty: qty,
-                            };
-                        })
-                        .filter(Boolean);
+                    limitedBreakdown = Array.isArray(selectedVariant.warehouse_breakdown)
+                        ? selectedVariant.warehouse_breakdown.filter(item => Number(item.qty ?? 0) > 0)
+                        : [];
                 }
 
                 if (!limitedBreakdown.length) {

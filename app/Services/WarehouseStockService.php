@@ -7,10 +7,11 @@ use App\Models\ProductVariant;
 use App\Models\Warehouse;
 use App\Models\WarehouseStock;
 use Illuminate\Support\Facades\DB;
+use App\Services\AriyajanebiSyncService;
 
 class WarehouseStockService
 {
-    public static function change(int $warehouseId, int $productId, int $delta, ?int $productVariantId = null): WarehouseStock
+    public static function change(int $warehouseId, int $productId, int $delta, ?int $variantId = null): WarehouseStock
     {
         return DB::transaction(function () use ($warehouseId, $productId, $variantId, $delta) {
             self::assertVariantBelongsToProduct($productId, $variantId);
@@ -27,8 +28,10 @@ class WarehouseStockService
                 'quantity' => $newQty,
             ]);
 
-            self::syncVariantStockFromCentral($variantId);
+            self::syncVariantStockFromCentral((int) $variantId);
             self::syncProductStockFromCentral($productId);
+            self::syncWarehouseProductAggregate($warehouseId, $productId);
+            self::syncExternalProductIfCentralWarehouse($warehouseId, $productId);
 
             return $stock->fresh(['warehouse', 'product', 'variant']);
         });
@@ -49,8 +52,10 @@ class WarehouseStockService
                 'quantity' => $quantity,
             ]);
 
-            self::syncVariantStockFromCentral($variantId);
+            self::syncVariantStockFromCentral((int) $variantId);
             self::syncProductStockFromCentral($productId);
+            self::syncWarehouseProductAggregate($warehouseId, $productId);
+            self::syncExternalProductIfCentralWarehouse($warehouseId, $productId);
 
             return $stock->fresh(['warehouse', 'product', 'variant']);
         });
@@ -208,6 +213,117 @@ class WarehouseStockService
                     }
                 });
         });
+    }
+
+
+    private static function assertVariantBelongsToProduct(int $productId, ?int $variantId): void
+    {
+        if (!$variantId) {
+            return;
+        }
+
+        $exists = ProductVariant::query()
+            ->whereKey($variantId)
+            ->where('product_id', $productId)
+            ->exists();
+
+        if (!$exists) {
+            abort(422, 'تنوع انتخاب‌شده برای این محصول معتبر نیست.');
+        }
+    }
+
+    private static function lockOrCreateStock(int $warehouseId, int $productId, ?int $variantId): WarehouseStock
+    {
+        $stock = WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->where('product_variant_id', $variantId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($stock) {
+            return $stock;
+        }
+
+        return WarehouseStock::create([
+            'warehouse_id' => $warehouseId,
+            'product_id' => $productId,
+            'product_variant_id' => $variantId,
+            'quantity' => 0,
+        ]);
+    }
+
+    private static function ensureStockExists(int $warehouseId, int $productId, ?int $variantId): WarehouseStock
+    {
+        $stock = WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->where('product_variant_id', $variantId)
+            ->first();
+
+        if ($stock) {
+            return $stock;
+        }
+
+        return WarehouseStock::create([
+            'warehouse_id' => $warehouseId,
+            'product_id' => $productId,
+            'product_variant_id' => $variantId,
+            'quantity' => 0,
+        ]);
+    }
+
+
+
+    private static function syncExternalProductIfCentralWarehouse(int $warehouseId, int $productId): void
+    {
+        if ($warehouseId !== self::centralWarehouseId()) {
+            return;
+        }
+
+        DB::afterCommit(function () use ($productId) {
+            $product = Product::query()
+                ->with('variants')
+                ->whereKey($productId)
+                ->first();
+
+            if (!$product) {
+                return;
+            }
+
+            AriyajanebiSyncService::syncProduct($product);
+        });
+    }
+
+    private static function syncWarehouseProductAggregate(int $warehouseId, int $productId): void
+    {
+        $total = (int) WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->whereNotNull('product_variant_id')
+            ->sum('quantity');
+
+        $aggregate = WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->whereNull('product_variant_id')
+            ->lockForUpdate()
+            ->first();
+
+        if ($aggregate) {
+            $aggregate->update([
+                'quantity' => max(0, $total),
+            ]);
+
+            return;
+        }
+
+        WarehouseStock::create([
+            'warehouse_id' => $warehouseId,
+            'product_id' => $productId,
+            'product_variant_id' => null,
+            'quantity' => max(0, $total),
+        ]);
     }
 
     public static function centralWarehouseId(): int
