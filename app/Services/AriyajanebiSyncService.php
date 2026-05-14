@@ -20,8 +20,19 @@ class AriyajanebiSyncService
     {
         self::processPending();
 
-        $variants = $product->variants()->whereNotNull('variety_id')->get(['product_id', 'variety_id', 'sell_price', 'stock']);
+        $variants = $product->variants()->whereNotNull('variety_id')->get([
+            'id',
+            'product_id',
+            'variety_id',
+            'sell_price',
+            'stock',
+            'variant_code',
+            'variety_code',
+            'variant_name',
+            'variety_name',
+        ]);
         if ($variants->isEmpty()) return;
+        $variants->each->setRelation('product', $product);
         self::syncVariants($variants, false);
     }
 
@@ -30,6 +41,9 @@ class AriyajanebiSyncService
         self::processPending();
 
         if (empty($variant->variety_id)) return;
+        if (!$variant->relationLoaded('product')) {
+            $variant->loadMissing('product:id,name,code,sku,barcode');
+        }
         self::syncVariants(collect([$variant]), false);
     }
 
@@ -71,7 +85,7 @@ class AriyajanebiSyncService
             $payload["varieties[{$i}][balance]"] = (string) self::centralWarehouseQuantityForVariant($variant);
         }
 
-        $apiLog = self::createApiLog($payload);
+        $apiLog = self::createApiLog($payload, $variants);
         self::sendPayload($payload, $withoutVerify, $apiLog);
     }
 
@@ -125,7 +139,7 @@ class AriyajanebiSyncService
         }
     }
 
-    private static function createApiLog(array $payload): ?InventoryWebhookLog
+    private static function createApiLog(array $payload, $variants): ?InventoryWebhookLog
     {
         if (!Schema::hasTable('inventory_webhook_logs')) return null;
 
@@ -134,21 +148,36 @@ class AriyajanebiSyncService
             'target' => self::UPDATE_URL,
             'status' => 'pending',
             'attempts' => 1,
-            'payload' => ['payload' => $payload, 'variants' => self::variantPayloadPreview($payload)],
+            'payload' => [
+                'payload' => $payload,
+                'variants' => self::variantPayloadPreview($payload, $variants),
+            ],
             'sent_at' => now(),
             'next_retry_at' => now()->addMinute(),
         ]);
     }
 
-    private static function variantPayloadPreview(array $payload): array
+    private static function variantPayloadPreview(array $payload, $variants): array
     {
         $rows = [];
-        for ($i = 0; $i < 500; $i++) {
-            if (!isset($payload["varieties[{$i}][id]"])) break;
+        foreach ($variants->values() as $i => $variant) {
+            $product = $variant->product;
+
             $rows[] = [
                 'id' => $payload["varieties[{$i}][id]"] ?? null,
                 'price' => $payload["varieties[{$i}][price]"] ?? null,
                 'balance' => $payload["varieties[{$i}][balance]"] ?? null,
+                'product_id' => $variant->product_id,
+                'product_name' => $product?->name,
+                'product_code' => $product?->code,
+                'product_sku' => $product?->sku,
+                'product_barcode' => $product?->barcode,
+                'variant_id' => $variant->id,
+                'variant_name' => $variant->variant_name,
+                'variant_code' => $variant->variant_code,
+                'variety_name' => $variant->variety_name,
+                'variety_code' => $variant->variety_code,
+                'variant_sku' => $variant->sku,
             ];
         }
         return $rows;
