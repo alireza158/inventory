@@ -53,6 +53,6 @@ return [
     'token'               => env('ARIYA_CRM_TOKEN'),
     'default_category_id' => env('ARIYA_DEFAULT_CATEGORY_ID', 1),
     'username' => env('ARIYA_ADMIN_USERNAME', 'admin'),
-    'password' => env('ARIYA_ADMIN_PASSWORD'),
+    'password' => env('ARIYA_ADMIN_PASSWORD','Z.adeli60'),
 ],
 ];
