@@ -34,11 +34,6 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-    'ariya_crm' => [
-    'base_url' => env('ARIYA_CRM_BASE_URL', 'https://crm.ariyajanebi.ir/public'),
-    'token'    => env('ARIYA_CRM_TOKEN'),
-    ],
-
     'external_sync' => [
         'base_url' => env('EXTERNAL_SYNC_BASE_URL', 'https://crm.ariyajanebi.ir'),
         'token' => env('EXTERNAL_SYNC_TOKEN'),
@@ -57,5 +52,8 @@ return [
     'products_url'        => env('ARIYA_CRM_PRODUCTS_URL', 'https://api.ariyajanebi.ir/v1/front/products'),
     'token'               => env('ARIYA_CRM_TOKEN'),
     'default_category_id' => env('ARIYA_DEFAULT_CATEGORY_ID', 1),
+    'username' => env('ARIYA_ADMIN_USERNAME', 'admin'),
+    'password' => env('ARIYA_ADMIN_PASSWORD'),
+    'verify_ssl' => env('ARIYA_CRM_VERIFY_SSL', true),
 ],
 ];
