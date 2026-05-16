@@ -16,17 +16,32 @@ class AriyajanebiOrderImportService
 {
     private const LOGIN_URL = 'https://api.ariyajanebi.ir/v1/admin/login';
     private const ORDERS_URL = 'https://api.ariyajanebi.ir/v1/admin/orders';
+    private const USERNAME = 'admin';
+    private const PASSWORD = 'Z.adeli60';
+
+    private ?string $lastError = null;
+
+    public function lastError(): ?string
+    {
+        return $this->lastError;
+    }
 
     public function importPendingOrders(): int
     {
+        $this->lastError = null;
+
         $client = $this->authenticatedClient();
         if (!$client) {
+            if (!$this->lastError) {
+                $this->lastError = 'اتصال/ورود به API آریاجنبی ناموفق بود.';
+            }
             return 0;
         }
 
         $response = $client->get(self::ORDERS_URL);
         if (!$response->successful()) {
             Log::warning('Ariya orders list failed', ['status' => $response->status()]);
+            $this->lastError = 'دریافت لیست سفارشات از API ناموفق بود. HTTP ' . $response->status();
             return 0;
         }
 
@@ -164,18 +179,22 @@ class AriyajanebiOrderImportService
 
     private function authenticatedClient(bool $withoutVerify = false)
     {
-        $username = (string) config('services.ariya_crm.username', 'admin');
-        $password = (string) config('services.ariya_crm.password', '');
+        $username = (string) config('services.ariya_crm.username', self::USERNAME);
+        $password = (string) config('services.ariya_crm.password', self::PASSWORD);
+        if (trim($password) === '') {
+            $password = self::PASSWORD;
+        }
 
         try {
-            $client = Http::asForm()->timeout(20)->withOptions(['allow_redirects' => false]);
+            $client = Http::asForm()->timeout(45)->withOptions(['allow_redirects' => false]);
             if ($withoutVerify) {
                 $client = $client->withoutVerifying();
             }
 
             $login = $client->post(self::LOGIN_URL, ['username' => $username, 'password' => $password]);
             if (!$login->successful()) {
-                Log::warning('Ariya login failed for order import', ['status' => $login->status()]);
+                Log::warning('Ariya login failed for order import', ['status' => $login->status(), 'location' => $login->header('Location')]);
+                $this->lastError = 'ورود به API ناموفق بود. HTTP ' . $login->status();
                 return null;
             }
 
@@ -198,7 +217,14 @@ class AriyajanebiOrderImportService
                 return $this->authenticatedClient(true);
             }
 
+            if (str_contains($e->getMessage(), 'cURL error 28')) {
+                $this->lastError = 'timeout در اتصال به API. لطفاً مجدداً تلاش کنید.';
+            }
+
             Log::error('Ariyajanebi order import auth exception', ['message' => $e->getMessage(), 'without_verify' => $withoutVerify]);
+            if (!$this->lastError) {
+                $this->lastError = 'خطا در ارتباط با API: ' . mb_substr($e->getMessage(), 0, 180);
+            }
             return null;
         }
     }

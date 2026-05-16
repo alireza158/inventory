@@ -17,10 +17,14 @@ class PullNewAriyajanebiOrdersCommand extends Command
         if ($count > 0) {
             $this->info("{$count} سفارش جدید ثبت شد.");
         } else {
-            $this->comment('سفارش جدیدی برای ثبت وجود نداشت.');
+            $error = $service->lastError();
+            if ($error) {
+                $this->error('ایمپورت انجام نشد: ' . $error);
+            } else {
+                $this->comment('سفارش جدیدی برای ثبت وجود نداشت.');
+            }
         }
 
         return self::SUCCESS;
     }
 }
-
