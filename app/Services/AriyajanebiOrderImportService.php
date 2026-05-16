@@ -20,6 +20,7 @@ class AriyajanebiOrderImportService
     private const PASSWORD = 'Z.adeli60';
 
     private ?string $lastError = null;
+    private bool $sslVerifyDisabledForRuntime = false;
 
     public function lastError(): ?string
     {
@@ -29,6 +30,8 @@ class AriyajanebiOrderImportService
     public function importPendingOrders(): int
     {
         $this->lastError = null;
+
+        $this->sslVerifyDisabledForRuntime = false;
 
         $client = $this->authenticatedClient();
         if (!$client) {
@@ -186,8 +189,11 @@ class AriyajanebiOrderImportService
         }
 
         try {
+            $verifySsl = (bool) config('services.ariya_crm.verify_ssl', true);
+            $shouldDisableVerify = $withoutVerify || !$verifySsl || $this->sslVerifyDisabledForRuntime;
+
             $client = Http::asForm()->timeout(45)->withOptions(['allow_redirects' => false]);
-            if ($withoutVerify) {
+            if ($shouldDisableVerify) {
                 $client = $client->withoutVerifying();
             }
 
@@ -213,7 +219,8 @@ class AriyajanebiOrderImportService
             return $authed;
         } catch (\Throwable $e) {
             if (!$withoutVerify && str_contains($e->getMessage(), 'cURL error 77')) {
-                Log::warning('Ariyajanebi SSL cert issue detected in order import, retrying without SSL verification.');
+                $this->sslVerifyDisabledForRuntime = true;
+                Log::warning('Ariyajanebi SSL cert issue detected in order import, retrying without SSL verification. Set ARIYA_CRM_VERIFY_SSL=false to stop this warning.');
                 return $this->authenticatedClient(true);
             }
 
