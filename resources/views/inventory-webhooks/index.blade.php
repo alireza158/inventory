@@ -65,6 +65,13 @@
                         <td>{{ $log->event }}</td>
                         <td style="max-width:380px;white-space:normal;">
                             @php($payload = (array) ($log->payload ?? []))
+                            @php($variantRows = [])
+                            @if(!empty($payload['variants']) && is_array($payload['variants']))
+                                @php($variantRows = $payload['variants'])
+                            @elseif(!empty($payload['payload']['variants']) && is_array($payload['payload']['variants']))
+                                @php($variantRows = $payload['payload']['variants'])
+                            @endif
+
                             @if(!empty($payload['payload']['product_id']) || !empty($payload['payload']['sku']) || !empty($payload['payload']['name']))
                                 <div>کالا: {{ $payload['payload']['name'] ?? '-' }} (ID: {{ $payload['payload']['product_id'] ?? '-' }})</div>
                                 <div class="small text-muted">SKU: {{ $payload['payload']['sku'] ?? '-' }}</div>
@@ -74,10 +81,14 @@
                                 <div class="small">حرکت انبار: #{{ $payload['payload']['movement_id'] }} | محصول: {{ $payload['payload']['product_id'] ?? '-' }}</div>
                             @endif
 
-                            @if(!empty($payload['payload']['variants']) && is_array($payload['payload']['variants']))
+                            @if(!empty($variantRows))
                                 <div class="small mt-1">تنوع‌ها:
-                                    @foreach(array_slice($payload['payload']['variants'], 0, 5) as $v)
-                                        <span class="badge bg-light text-dark border">ID: {{ $v['id'] ?? '-' }} | قیمت: {{ $v['price'] ?? '-' }} | موجودی: {{ $v['balance'] ?? '-' }}</span>
+                                    @foreach(array_slice($variantRows, 0, 5) as $v)
+                                        <div class="border rounded p-1 mb-1 bg-light-subtle">
+                                            <div>ID: {{ $v['id'] ?? '-' }} | قیمت: {{ $v['price'] ?? '-' }} | موجودی: {{ $v['balance'] ?? '-' }}</div>
+                                            <div>محصول: {{ $v['product_name'] ?? '-' }} | کد محصول: {{ $v['product_code'] ?? '-' }}</div>
+                                            <div>تنوع: {{ $v['variant_name'] ?? '-' }} | کد تنوع: {{ $v['variant_code'] ?? '-' }}</div>
+                                        </div>
                                     @endforeach
                                 </div>
                             @endif
