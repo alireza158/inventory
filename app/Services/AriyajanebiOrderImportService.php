@@ -162,27 +162,44 @@ class AriyajanebiOrderImportService
         return collect();
     }
 
-    private function authenticatedClient()
+    private function authenticatedClient(bool $withoutVerify = false)
     {
         $username = (string) config('services.ariya_crm.username', 'admin');
-        $password = (string) config('services.ariya_crm.password', 'Z.adeli60');
+        $password = (string) config('services.ariya_crm.password', '');
 
-        $client = Http::asForm()->timeout(20)->withOptions(['allow_redirects' => false]);
-        $login = $client->post(self::LOGIN_URL, ['username' => $username, 'password' => $password]);
-        if (!$login->successful()) {
-            Log::warning('Ariya login failed for order import', ['status' => $login->status()]);
+        try {
+            $client = Http::asForm()->timeout(20)->withOptions(['allow_redirects' => false]);
+            if ($withoutVerify) {
+                $client = $client->withoutVerifying();
+            }
+
+            $login = $client->post(self::LOGIN_URL, ['username' => $username, 'password' => $password]);
+            if (!$login->successful()) {
+                Log::warning('Ariya login failed for order import', ['status' => $login->status()]);
+                return null;
+            }
+
+            $token = Arr::get($login->json(), 'token')
+                ?: Arr::get($login->json(), 'access_token')
+                ?: Arr::get($login->json(), 'data.token');
+
+            $authed = $client->withCookies($login->cookies()->toArray(), 'api.ariyajanebi.ir');
+            if ($token) {
+                $authed = $authed->withToken((string) $token)->withHeaders([
+                    'Authorization' => 'Bearer ' . $token,
+                    'X-API-TOKEN' => $token,
+                ]);
+            }
+
+            return $authed;
+        } catch (\Throwable $e) {
+            if (!$withoutVerify && str_contains($e->getMessage(), 'cURL error 77')) {
+                Log::warning('Ariyajanebi SSL cert issue detected in order import, retrying without SSL verification.');
+                return $this->authenticatedClient(true);
+            }
+
+            Log::error('Ariyajanebi order import auth exception', ['message' => $e->getMessage(), 'without_verify' => $withoutVerify]);
             return null;
         }
-
-        $token = Arr::get($login->json(), 'token')
-            ?: Arr::get($login->json(), 'access_token')
-            ?: Arr::get($login->json(), 'data.token');
-
-        $authed = $client->withCookies($login->cookies()->toArray(), 'api.ariyajanebi.ir');
-        if ($token) {
-            $authed = $authed->withToken((string) $token);
-        }
-
-        return $authed;
     }
 }
