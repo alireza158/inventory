@@ -11,6 +11,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class AriyajanebiOrderImportService
 {
@@ -21,6 +22,7 @@ class AriyajanebiOrderImportService
 
     private ?string $lastError = null;
     private bool $sslVerifyDisabledForRuntime = false;
+    private int $maxAttempts = 3;
 
     public function lastError(): ?string
     {
@@ -41,7 +43,11 @@ class AriyajanebiOrderImportService
             return 0;
         }
 
-        $response = $client->get(self::ORDERS_URL);
+        $response = $this->sendWithRetry($client, self::ORDERS_URL);
+        if (!$response) {
+            $this->lastError = $this->lastError ?: 'عدم پاسخ API در دریافت لیست سفارش‌ها.';
+            return 0;
+        }
         if (!$response->successful()) {
             Log::warning('Ariya orders list failed', ['status' => $response->status()]);
             $this->lastError = 'دریافت لیست سفارشات از API ناموفق بود. HTTP ' . $response->status();
@@ -58,7 +64,11 @@ class AriyajanebiOrderImportService
                 continue;
             }
 
-            $detail = $client->get(self::ORDERS_URL . '/' . $orderId);
+            $detail = $this->sendWithRetry($client, self::ORDERS_URL . '/' . $orderId);
+            if (!$detail) {
+                Log::warning('Ariya order detail unreachable', ['order_id' => $orderId]);
+                continue;
+            }
             if (!$detail->successful()) {
                 Log::warning('Ariya order detail failed', ['order_id' => $orderId, 'status' => $detail->status()]);
                 continue;
@@ -192,12 +202,28 @@ class AriyajanebiOrderImportService
             $verifySsl = (bool) config('services.ariya_crm.verify_ssl', true);
             $shouldDisableVerify = $withoutVerify || !$verifySsl || $this->sslVerifyDisabledForRuntime;
 
-            $client = Http::asForm()->timeout(45)->withOptions(['allow_redirects' => false]);
+            $client = Http::asForm()->timeout(45)->connectTimeout(15)->withOptions(['allow_redirects' => false]);
             if ($shouldDisableVerify) {
                 $client = $client->withoutVerifying();
             }
 
-            $login = $client->post(self::LOGIN_URL, ['username' => $username, 'password' => $password]);
+            $login = null;
+            $lastException = null;
+            for ($attempt = 1; $attempt <= $this->maxAttempts; $attempt++) {
+                try {
+                    $login = $client->post(self::LOGIN_URL, ['username' => $username, 'password' => $password]);
+                    break;
+                } catch (Throwable $ex) {
+                    $lastException = $ex;
+                    if ($attempt < $this->maxAttempts) {
+                        usleep($attempt * 400000);
+                    }
+                }
+            }
+
+            if (!$login && $lastException) {
+                throw $lastException;
+            }
             if (!$login->successful()) {
                 Log::warning('Ariya login failed for order import', ['status' => $login->status(), 'location' => $login->header('Location')]);
                 $this->lastError = 'ورود به API ناموفق بود. HTTP ' . $login->status();
@@ -226,6 +252,10 @@ class AriyajanebiOrderImportService
 
             if (str_contains($e->getMessage(), 'cURL error 28')) {
                 $this->lastError = 'timeout در اتصال به API. لطفاً مجدداً تلاش کنید.';
+            } elseif (str_contains($e->getMessage(), 'cURL error 35')) {
+                $this->lastError = 'اتصال شبکه به API قطع شد (connection reset). لطفاً دوباره تلاش کنید.';
+            } elseif (str_contains($e->getMessage(), 'Resolving timed out')) {
+                $this->lastError = 'DNS در اتصال به API timeout شد. اینترنت/ DNS سرور را بررسی کنید.';
             }
 
             Log::error('Ariyajanebi order import auth exception', ['message' => $e->getMessage(), 'without_verify' => $withoutVerify]);
@@ -234,5 +264,31 @@ class AriyajanebiOrderImportService
             }
             return null;
         }
+    }
+
+    private function sendWithRetry($client, string $url)
+    {
+        $response = null;
+        for ($attempt = 1; $attempt <= $this->maxAttempts; $attempt++) {
+            try {
+                $response = $client->get($url);
+                return $response;
+            } catch (Throwable $e) {
+                Log::warning('Ariya API request attempt failed', [
+                    'url' => $url,
+                    'attempt' => $attempt,
+                    'message' => $e->getMessage(),
+                ]);
+
+                if ($attempt >= $this->maxAttempts) {
+                    $this->lastError = 'خطای شبکه در ارتباط با API: ' . mb_substr($e->getMessage(), 0, 120);
+                    return null;
+                }
+
+                usleep($attempt * 400000);
+            }
+        }
+
+        return $response;
     }
 }
