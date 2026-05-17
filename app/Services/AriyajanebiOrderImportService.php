@@ -140,7 +140,7 @@ class AriyajanebiOrderImportService
             return null;
         }
 
-        $response = $this->sendWithRetry($client, self::ORDERS_URL);
+        $response = $this->sendWithRetry($client, self::ORDERS_URL . '?per_page=1&page=1', 1);
         if (!$response || !$response->successful()) {
             if ($response && !$response->successful()) {
                 $this->lastError = 'دریافت لیست سفارشات از API ناموفق بود. HTTP ' . $response->status();
@@ -387,10 +387,11 @@ class AriyajanebiOrderImportService
         }
     }
 
-    private function sendWithRetry($client, string $url)
+    private function sendWithRetry($client, string $url, ?int $attempts = null)
     {
         $response = null;
-        for ($attempt = 1; $attempt <= $this->maxAttempts; $attempt++) {
+        $attempts = max(1, $attempts ?? $this->maxAttempts);
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
             try {
                 $response = $client->get($url);
                 return $response;
@@ -401,7 +402,7 @@ class AriyajanebiOrderImportService
                     'message' => $e->getMessage(),
                 ]);
 
-                if ($attempt >= $this->maxAttempts) {
+                if ($attempt >= $attempts) {
                     $this->lastError = 'خطای شبکه در ارتباط با API: ' . mb_substr($e->getMessage(), 0, 120);
                     return null;
                 }

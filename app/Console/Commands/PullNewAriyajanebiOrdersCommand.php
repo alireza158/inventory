@@ -12,6 +12,27 @@ class PullNewAriyajanebiOrdersCommand extends Command
 
     public function handle(AriyajanebiOrderImportService $service): int
     {
+        if ($this->option('show-first')) {
+            $first = $service->firstOrderSnapshot();
+            if (!$first) {
+                $error = $service->lastError();
+                $this->warn($error ? ('خطا: ' . $error) : 'اولین سفارش از API قابل دریافت نبود.');
+                return self::FAILURE;
+            }
+
+            $this->line('--- اولین سفارش API (صفحه اول) ---');
+            $this->line('id: ' . ($first['id'] ?? '-'));
+            if (($first['id'] ?? 0) <= 0) {
+                $this->warn('شناسه سفارش معتبر نبود. raw_id: ' . ($first['raw_id'] ?? '-'));
+            }
+            $this->line('created_at: ' . ($first['created_at'] ?? '-'));
+            $this->line('status: ' . ($first['status'] ?? '-'));
+            $this->line('total: ' . ($first['total'] ?? '-'));
+            $this->line('already_imported: ' . (($first['already_imported'] ?? false) ? 'yes' : 'no'));
+
+            return self::SUCCESS;
+        }
+
         $count = $service->importPendingOrders();
 
         if ($count > 0) {
@@ -40,23 +61,6 @@ class PullNewAriyajanebiOrdersCommand extends Command
                 $this->line('total: ' . ($latest['total'] ?? '-'));
                 $this->line('already_imported: ' . (($latest['already_imported'] ?? false) ? 'yes' : 'no'));
                 $this->line('راهنما: اگر id درست است ولی ایمپورت نمی‌شود، جزئیات سفارش (endpoint /orders/{id}) احتمالاً آیتم خالی برمی‌گرداند.');
-            }
-        }
-
-        if ($this->option('show-first')) {
-            $first = $service->firstOrderSnapshot();
-            if (!$first) {
-                $this->warn('اولین سفارش از API قابل دریافت نبود.');
-            } else {
-                $this->line('--- اولین سفارش API (صفحه اول) ---');
-                $this->line('id: ' . ($first['id'] ?? '-'));
-                if (($first['id'] ?? 0) <= 0) {
-                    $this->warn('شناسه سفارش معتبر نبود. raw_id: ' . ($first['raw_id'] ?? '-'));
-                }
-                $this->line('created_at: ' . ($first['created_at'] ?? '-'));
-                $this->line('status: ' . ($first['status'] ?? '-'));
-                $this->line('total: ' . ($first['total'] ?? '-'));
-                $this->line('already_imported: ' . (($first['already_imported'] ?? false) ? 'yes' : 'no'));
             }
         }
 
