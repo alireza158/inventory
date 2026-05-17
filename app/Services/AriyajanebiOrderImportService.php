@@ -132,7 +132,15 @@ class AriyajanebiOrderImportService
 
     private function extractOrdersCollection(mixed $json): Collection
     {
-        $data = Arr::get($json, 'data', $json);
+        $data = Arr::get($json, 'data.orders.data');
+
+        if (!is_array($data)) {
+            $data = Arr::get($json, 'data.orders');
+        }
+
+        if (!is_array($data)) {
+            $data = Arr::get($json, 'data', $json);
+        }
 
         if (is_array($data) && isset($data['data']) && is_array($data['data'])) {
             $data = $data['data'];
@@ -148,6 +156,7 @@ class AriyajanebiOrderImportService
             Arr::get($order, 'order_id'),
             Arr::get($order, 'order.id'),
             Arr::get($order, 'orderId'),
+            Arr::get($order, 'order.id.value'),
         ];
 
         foreach ($candidates as $candidate) {
@@ -250,6 +259,8 @@ class AriyajanebiOrderImportService
         $candidates = [
             Arr::get($order, 'items', []),
             Arr::get($order, 'order_items', []),
+            Arr::get($order, 'data.items', []),
+            Arr::get($order, 'data.order_items', []),
             Arr::get($order, 'products', []),
         ];
 

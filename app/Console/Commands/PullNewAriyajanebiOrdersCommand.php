@@ -39,6 +39,7 @@ class PullNewAriyajanebiOrdersCommand extends Command
                 $this->line('status: ' . ($latest['status'] ?? '-'));
                 $this->line('total: ' . ($latest['total'] ?? '-'));
                 $this->line('already_imported: ' . (($latest['already_imported'] ?? false) ? 'yes' : 'no'));
+                $this->line('راهنما: اگر id درست است ولی ایمپورت نمی‌شود، جزئیات سفارش (endpoint /orders/{id}) احتمالاً آیتم خالی برمی‌گرداند.');
             }
         }
 
