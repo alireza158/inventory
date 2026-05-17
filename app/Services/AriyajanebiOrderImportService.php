@@ -33,6 +33,11 @@ class AriyajanebiOrderImportService
 
     public function importPendingOrders(): int
     {
+        return $this->importFromLastImportedOnFirstPage(2360);
+    }
+
+    public function importFromLastImportedOnFirstPage(int $minimumStartId = 2360): int
+    {
         $this->lastError = null;
 
         $this->sslVerifyDisabledForRuntime = false;
@@ -45,7 +50,7 @@ class AriyajanebiOrderImportService
             return 0;
         }
 
-        $response = $this->sendWithRetry($client, self::ORDERS_URL);
+        $response = $this->sendWithRetry($client, self::ORDERS_URL . '?page=1');
         if (!$response) {
             $this->lastError = $this->lastError ?: 'عدم پاسخ API در دریافت لیست سفارش‌ها.';
             return 0;
@@ -58,20 +63,32 @@ class AriyajanebiOrderImportService
 
         $orders = $this->extractOrdersCollection($response->json());
 
+        $maxApiOrderId = (int) $orders->map(fn (array $row) => $this->extractOrderId($row))->max();
+        if ($maxApiOrderId <= 0) {
+            return 0;
+        }
+
+        $lastImportedId = (int) (Invoice::query()->max('external_order_id') ?? 0);
+        $startId = max($minimumStartId, $lastImportedId + 1);
+        if ($startId > $maxApiOrderId) {
+            return 0;
+        }
+
         $created = 0;
-        foreach ($orders as $orderRow) {
-            $orderId = $this->extractOrderId($orderRow);
-            if ($orderId <= 0 || Invoice::query()->where('external_order_id', $orderId)->exists()) {
+        for ($orderId = $startId; $orderId <= $maxApiOrderId; $orderId++) {
+            if (Invoice::query()->where('external_order_id', $orderId)->exists()) {
                 continue;
             }
 
-            $detail = $this->sendWithRetry($client, self::ORDERS_URL . '/' . $orderId);
+            $detail = $this->sendWithRetry($client, self::ORDERS_URL . '/' . $orderId, 1);
             if (!$detail) {
                 Log::warning('Ariya order detail unreachable', ['order_id' => $orderId]);
                 continue;
             }
             if (!$detail->successful()) {
-                Log::warning('Ariya order detail failed', ['order_id' => $orderId, 'status' => $detail->status()]);
+                if ($detail->status() !== 404) {
+                    Log::warning('Ariya order detail failed', ['order_id' => $orderId, 'status' => $detail->status()]);
+                }
                 continue;
             }
 
