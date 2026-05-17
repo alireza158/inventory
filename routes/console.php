@@ -18,3 +18,5 @@ Schedule::call(function () {
     InventoryWebhookService::processPending();
     AriyajanebiSyncService::processPending();
 })->everyMinute();
+
+Schedule::command('ariya:import-orders')->everyThirtyMinutes();
