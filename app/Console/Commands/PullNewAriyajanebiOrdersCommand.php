@@ -32,6 +32,9 @@ class PullNewAriyajanebiOrdersCommand extends Command
             } else {
                 $this->line('--- آخرین سفارش API ---');
                 $this->line('id: ' . ($latest['id'] ?? '-'));
+                if (($latest['id'] ?? 0) <= 0) {
+                    $this->warn('شناسه سفارش معتبر نبود. raw_id: ' . ($latest['raw_id'] ?? '-'));
+                }
                 $this->line('created_at: ' . ($latest['created_at'] ?? '-'));
                 $this->line('status: ' . ($latest['status'] ?? '-'));
                 $this->line('total: ' . ($latest['total'] ?? '-'));

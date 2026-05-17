@@ -56,12 +56,11 @@ class AriyajanebiOrderImportService
             return 0;
         }
 
-        $orders = collect(Arr::get($response->json(), 'data', $response->json()))
-            ->filter(fn ($row) => is_array($row));
+        $orders = $this->extractOrdersCollection($response->json());
 
         $created = 0;
         foreach ($orders as $orderRow) {
-            $orderId = (int) Arr::get($orderRow, 'id', 0);
+            $orderId = $this->extractOrderId($orderRow);
             if ($orderId <= 0 || Invoice::query()->where('external_order_id', $orderId)->exists()) {
                 continue;
             }
@@ -107,28 +106,57 @@ class AriyajanebiOrderImportService
             return null;
         }
 
-        $orders = collect(Arr::get($response->json(), 'data', $response->json()))
-            ->filter(fn ($row) => is_array($row));
+        $orders = $this->extractOrdersCollection($response->json());
 
         $latest = $orders
-            ->sortByDesc(fn (array $row) => (int) Arr::get($row, 'id', 0))
+            ->sortByDesc(fn (array $row) => $this->extractOrderId($row))
             ->first();
 
         if (!is_array($latest)) {
             return null;
         }
 
-        $externalId = (int) Arr::get($latest, 'id', 0);
+        $externalId = $this->extractOrderId($latest);
 
         return [
             'id' => $externalId,
             'created_at' => Arr::get($latest, 'created_at'),
             'status' => Arr::get($latest, 'status'),
             'total' => Arr::get($latest, 'total'),
+            'raw_id' => Arr::get($latest, 'id', Arr::get($latest, 'order.id')),
             'already_imported' => $externalId > 0
                 ? Invoice::query()->where('external_order_id', $externalId)->exists()
                 : false,
         ];
+    }
+
+    private function extractOrdersCollection(mixed $json): Collection
+    {
+        $data = Arr::get($json, 'data', $json);
+
+        if (is_array($data) && isset($data['data']) && is_array($data['data'])) {
+            $data = $data['data'];
+        }
+
+        return collect(is_array($data) ? $data : [])->filter(fn ($row) => is_array($row));
+    }
+
+    private function extractOrderId(array $order): int
+    {
+        $candidates = [
+            Arr::get($order, 'id'),
+            Arr::get($order, 'order_id'),
+            Arr::get($order, 'order.id'),
+            Arr::get($order, 'orderId'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_numeric($candidate) && (int) $candidate > 0) {
+                return (int) $candidate;
+            }
+        }
+
+        return 0;
     }
 
     private function createInvoiceFromExternalOrder(array $order): bool
