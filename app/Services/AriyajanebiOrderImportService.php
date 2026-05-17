@@ -89,6 +89,48 @@ class AriyajanebiOrderImportService
         return $created;
     }
 
+    public function latestOrderSnapshot(): ?array
+    {
+        $this->lastError = null;
+        $this->sslVerifyDisabledForRuntime = false;
+
+        $client = $this->authenticatedClient();
+        if (!$client) {
+            return null;
+        }
+
+        $response = $this->sendWithRetry($client, self::ORDERS_URL);
+        if (!$response || !$response->successful()) {
+            if ($response && !$response->successful()) {
+                $this->lastError = 'دریافت لیست سفارشات از API ناموفق بود. HTTP ' . $response->status();
+            }
+            return null;
+        }
+
+        $orders = collect(Arr::get($response->json(), 'data', $response->json()))
+            ->filter(fn ($row) => is_array($row));
+
+        $latest = $orders
+            ->sortByDesc(fn (array $row) => (int) Arr::get($row, 'id', 0))
+            ->first();
+
+        if (!is_array($latest)) {
+            return null;
+        }
+
+        $externalId = (int) Arr::get($latest, 'id', 0);
+
+        return [
+            'id' => $externalId,
+            'created_at' => Arr::get($latest, 'created_at'),
+            'status' => Arr::get($latest, 'status'),
+            'total' => Arr::get($latest, 'total'),
+            'already_imported' => $externalId > 0
+                ? Invoice::query()->where('external_order_id', $externalId)->exists()
+                : false,
+        ];
+    }
+
     private function createInvoiceFromExternalOrder(array $order): bool
     {
         $externalOrderId = (int) Arr::get($order, 'id', 0);
