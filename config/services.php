@@ -55,5 +55,6 @@ return [
     'username' => env('ARIYA_ADMIN_USERNAME', 'admin'),
     'password' => env('ARIYA_ADMIN_PASSWORD'),
     'verify_ssl' => env('ARIYA_CRM_VERIFY_SSL', true),
+    'ssl_warning_ttl_seconds' => env('ARIYA_SSL_WARNING_TTL_SECONDS', 43200),
 ],
 ];

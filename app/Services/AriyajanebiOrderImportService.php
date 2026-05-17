@@ -8,6 +8,7 @@ use App\Models\ProductVariant;
 use App\Support\DocumentCodeGenerator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,7 @@ class AriyajanebiOrderImportService
     private ?string $lastError = null;
     private bool $sslVerifyDisabledForRuntime = false;
     private int $maxAttempts = 3;
+    private const SSL_WARNING_CACHE_KEY = 'ariya_order_import_ssl77_warning_logged';
 
     public function lastError(): ?string
     {
@@ -246,7 +248,7 @@ class AriyajanebiOrderImportService
         } catch (\Throwable $e) {
             if (!$withoutVerify && str_contains($e->getMessage(), 'cURL error 77')) {
                 $this->sslVerifyDisabledForRuntime = true;
-                Log::warning('Ariyajanebi SSL cert issue detected in order import, retrying without SSL verification. Set ARIYA_CRM_VERIFY_SSL=false to stop this warning.');
+                $this->logSslFallbackWarningOnce();
                 return $this->authenticatedClient(true);
             }
 
@@ -290,5 +292,17 @@ class AriyajanebiOrderImportService
         }
 
         return $response;
+    }
+
+    private function logSslFallbackWarningOnce(): void
+    {
+        $ttlSeconds = (int) config('services.ariya_crm.ssl_warning_ttl_seconds', 43200);
+        if ($ttlSeconds < 60) {
+            $ttlSeconds = 60;
+        }
+
+        if (Cache::add(self::SSL_WARNING_CACHE_KEY, 1, now()->addSeconds($ttlSeconds))) {
+            Log::warning('Ariyajanebi SSL cert issue detected in order import, retrying without SSL verification. Set ARIYA_CRM_VERIFY_SSL=false to stop this warning.');
+        }
     }
 }
