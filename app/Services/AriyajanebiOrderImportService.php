@@ -278,13 +278,28 @@ class AriyajanebiOrderImportService
                 return false;
             }
 
+            $customerName = trim((string) (Arr::get($order, 'customer_name')
+                ?? Arr::get($order, 'customer.full_name')
+                ?? Arr::get($order, 'customer.name')
+                ?? Arr::get($order, 'customer.mobile')
+                ?? 'مشتری سایت'));
+
+            if ($customerName === '') {
+                $customerName = 'مشتری سایت';
+            }
+
+            $customerAddress = Arr::get($order, 'customer_address', Arr::get($order, 'customer.address'));
+            if (!is_string($customerAddress) || trim($customerAddress) === '') {
+                $customerAddress = (string) (Arr::get($order, 'address') ?: '—');
+            }
+
             $preinvoice = PreinvoiceOrder::query()->create([
                 'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(PreinvoiceOrder::class),
                 'external_order_id' => $externalOrderId,
                 'status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
-                'customer_name' => Arr::get($order, 'customer_name', Arr::get($order, 'customer.name')),
+                'customer_name' => $customerName,
                 'customer_mobile' => Arr::get($order, 'customer_mobile', Arr::get($order, 'customer.mobile')),
-                'customer_address' => Arr::get($order, 'customer_address', Arr::get($order, 'customer.address')),
+                'customer_address' => $customerAddress,
                 'shipping_price' => max(0, (int) Arr::get($order, 'shipping_price', Arr::get($order, 'shipping_amount', 0))),
                 'shipping_id' => (int) Arr::get($order, 'shipping_id', 0),
                 'discount_amount' => max(0, (int) Arr::get($order, 'discount_amount', 0)),
