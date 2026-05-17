@@ -21,6 +21,7 @@ class PreinvoiceOrder extends Model
 
     protected $fillable = [
         'uuid',
+        'external_order_id',
         'created_by',
         'status',
         'customer_id', // <-- این فیلد اضافه شد تا باگ ذخیره نشدن مشتری رفع شود
@@ -43,6 +44,7 @@ class PreinvoiceOrder extends Model
 
     protected $casts = [
         'customer_id' => 'integer',
+        'external_order_id' => 'integer',
         'province_id' => 'integer',
         'city_id' => 'integer',
         'shipping_id' => 'integer',

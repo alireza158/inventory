@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\PreinvoiceOrder;
+use App\Models\PreinvoiceOrderItem;
 use App\Models\ProductVariant;
 use App\Support\DocumentCodeGenerator;
 use Illuminate\Support\Arr;
@@ -76,7 +78,7 @@ class AriyajanebiOrderImportService
 
         $created = 0;
         for ($orderId = $startId; $orderId <= $maxApiOrderId; $orderId++) {
-            if (Invoice::query()->where('external_order_id', $orderId)->exists()) {
+            if (PreinvoiceOrder::query()->where('external_order_id', $orderId)->exists()) {
                 continue;
             }
 
@@ -98,7 +100,7 @@ class AriyajanebiOrderImportService
                 continue;
             }
 
-            if ($this->createInvoiceFromExternalOrder($detailRow)) {
+            if ($this->createPreinvoiceFromExternalOrder($detailRow)) {
                 $created++;
             }
         }
@@ -224,7 +226,7 @@ class AriyajanebiOrderImportService
         return 0;
     }
 
-    private function createInvoiceFromExternalOrder(array $order): bool
+    private function createPreinvoiceFromExternalOrder(array $order): bool
     {
         $externalOrderId = $this->extractOrderId($order);
         if ($externalOrderId <= 0) {
@@ -233,7 +235,7 @@ class AriyajanebiOrderImportService
         }
 
         return (bool) DB::transaction(function () use ($order, $externalOrderId) {
-            if (Invoice::query()->where('external_order_id', $externalOrderId)->lockForUpdate()->exists()) {
+            if (PreinvoiceOrder::query()->where('external_order_id', $externalOrderId)->lockForUpdate()->exists()) {
                 return false;
             }
 
@@ -276,35 +278,32 @@ class AriyajanebiOrderImportService
                 return false;
             }
 
-            $invoice = Invoice::query()->create([
-                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(Invoice::class),
+            $preinvoice = PreinvoiceOrder::query()->create([
+                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(PreinvoiceOrder::class),
                 'external_order_id' => $externalOrderId,
+                'status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
                 'customer_name' => Arr::get($order, 'customer_name', Arr::get($order, 'customer.name')),
                 'customer_mobile' => Arr::get($order, 'customer_mobile', Arr::get($order, 'customer.mobile')),
                 'customer_address' => Arr::get($order, 'customer_address', Arr::get($order, 'customer.address')),
-                'shipping_price' => max(0, (int) Arr::get($order, 'shipping_price', 0)),
+                'shipping_price' => max(0, (int) Arr::get($order, 'shipping_price', Arr::get($order, 'shipping_amount', 0))),
+                'shipping_id' => (int) Arr::get($order, 'shipping_id', 0),
                 'discount_amount' => max(0, (int) Arr::get($order, 'discount_amount', 0)),
-                'subtotal' => $subtotal,
-                'total' => max($subtotal + (int) Arr::get($order, 'shipping_price', 0) - (int) Arr::get($order, 'discount_amount', 0), 0),
-                'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
-                'status_changed_at' => now(),
+                'total_price' => max($subtotal + (int) Arr::get($order, 'shipping_price', Arr::get($order, 'shipping_amount', 0)) - (int) Arr::get($order, 'discount_amount', 0), 0),
+                'province_id' => (int) Arr::get($order, 'province_id', 0),
+                'city_id' => Arr::get($order, 'city_id') !== null ? (int) Arr::get($order, 'city_id') : null,
             ]);
 
             foreach ($resolvedItems as $row) {
                 /** @var ProductVariant $variant */
                 $variant = $row['variant'];
 
-                InvoiceItem::query()->create([
-                    'invoice_id' => $invoice->id,
+                PreinvoiceOrderItem::query()->create([
+                    'preinvoice_order_id' => $preinvoice->id,
                     'product_id' => (int) $variant->product_id,
                     'variant_id' => (int) $variant->id,
                     'quantity' => (int) $row['quantity'],
                     'price' => (int) $row['price'],
-                    'line_total' => (int) $row['line_total'],
                 ]);
-
-                $variant->stock = (int) $variant->stock - (int) $row['quantity'];
-                $variant->save();
             }
 
             return true;
