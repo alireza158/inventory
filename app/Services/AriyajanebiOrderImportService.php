@@ -130,6 +130,44 @@ class AriyajanebiOrderImportService
         ];
     }
 
+    public function firstOrderSnapshot(): ?array
+    {
+        $this->lastError = null;
+        $this->sslVerifyDisabledForRuntime = false;
+
+        $client = $this->authenticatedClient();
+        if (!$client) {
+            return null;
+        }
+
+        $response = $this->sendWithRetry($client, self::ORDERS_URL);
+        if (!$response || !$response->successful()) {
+            if ($response && !$response->successful()) {
+                $this->lastError = 'دریافت لیست سفارشات از API ناموفق بود. HTTP ' . $response->status();
+            }
+            return null;
+        }
+
+        $orders = $this->extractOrdersCollection($response->json());
+        $first = $orders->first();
+        if (!is_array($first)) {
+            return null;
+        }
+
+        $externalId = $this->extractOrderId($first);
+
+        return [
+            'id' => $externalId,
+            'created_at' => Arr::get($first, 'created_at'),
+            'status' => Arr::get($first, 'status'),
+            'total' => Arr::get($first, 'total'),
+            'raw_id' => Arr::get($first, 'id', Arr::get($first, 'order.id')),
+            'already_imported' => $externalId > 0
+                ? Invoice::query()->where('external_order_id', $externalId)->exists()
+                : false,
+        ];
+    }
+
     private function extractOrdersCollection(mixed $json): Collection
     {
         $data = Arr::get($json, 'data.orders.data');
