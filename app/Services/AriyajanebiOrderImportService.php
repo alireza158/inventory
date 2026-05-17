@@ -92,8 +92,9 @@ class AriyajanebiOrderImportService
                 continue;
             }
 
-            $detailRow = Arr::get($detail->json(), 'data', $detail->json());
+            $detailRow = $this->extractOrderDetailRow($detail->json());
             if (!is_array($detailRow)) {
+                Log::warning('Ariya order detail payload invalid', ['order_id' => $orderId]);
                 continue;
             }
 
@@ -225,8 +226,9 @@ class AriyajanebiOrderImportService
 
     private function createInvoiceFromExternalOrder(array $order): bool
     {
-        $externalOrderId = (int) Arr::get($order, 'id', 0);
+        $externalOrderId = $this->extractOrderId($order);
         if ($externalOrderId <= 0) {
+            Log::warning('External order id could not be extracted', ['order_payload_keys' => array_keys($order)]);
             return false;
         }
 
@@ -314,6 +316,7 @@ class AriyajanebiOrderImportService
         $candidates = [
             Arr::get($order, 'items', []),
             Arr::get($order, 'order_items', []),
+            Arr::get($order, 'orderItems', []),
             Arr::get($order, 'data.items', []),
             Arr::get($order, 'data.order_items', []),
             Arr::get($order, 'products', []),
@@ -326,6 +329,32 @@ class AriyajanebiOrderImportService
         }
 
         return collect();
+    }
+
+    private function extractOrderDetailRow(mixed $json): ?array
+    {
+        $candidates = [
+            Arr::get($json, 'data.order'),
+            Arr::get($json, 'data.orders'),
+            Arr::get($json, 'data'),
+            $json,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_array($candidate) && !empty($candidate)) {
+                if (array_is_list($candidate)) {
+                    $first = $candidate[0] ?? null;
+                    if (is_array($first)) {
+                        return $first;
+                    }
+                    continue;
+                }
+
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function authenticatedClient(bool $withoutVerify = false)
