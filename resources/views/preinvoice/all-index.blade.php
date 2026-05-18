@@ -408,6 +408,7 @@
             <th>جمع</th>
             <th>انقضای فریز</th>
             <th>تاریخ ثبت</th>
+            <th class="text-end">عملیات</th>
           </tr>
         </thead>
 
@@ -480,10 +481,13 @@
                   {{ $o->created_at ? Jalalian::fromDateTime($o->created_at)->format('Y/m/d H:i') : '—' }}
                 </span>
               </td>
+              <td class="text-end">
+                <a href="{{ route('archive.preinvoices.show', $o->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
+              </td>
             </tr>
           @empty
             <tr>
-              <td colspan="9">
+              <td colspan="10">
                 <div class="empty-state">
                   <div class="empty-icon">🗂️</div>
                   <h6>موردی یافت نشد</h6>

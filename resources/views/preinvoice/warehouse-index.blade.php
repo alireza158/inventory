@@ -38,7 +38,12 @@
               <td>{{ number_format((int) $order->total_price) }}</td>
               <td>{{ $order->creator?->name ?? '—' }}</td>
               <td><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{{ $order->status_label }}</span></td>
-              <td class="text-end"><a href="{{ route('preinvoice.warehouse.review', $order->uuid) }}" class="btn btn-sm btn-outline-primary">بررسی و تایید</a></td>
+              <td class="text-end">
+                <div class="d-flex gap-1 justify-content-end">
+                  <a href="{{ route('preinvoice.warehouse.review', $order->uuid) }}" class="btn btn-sm btn-outline-primary">بررسی و تایید</a>
+                  <a href="{{ route('archive.preinvoices.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
+                </div>
+              </td>
             </tr>
           @empty
             <tr><td colspan="8" class="text-center py-4">موردی برای بررسی انبار وجود ندارد.</td></tr>

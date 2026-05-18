@@ -43,7 +43,7 @@
               <th>مبلغ نهایی</th>
               <th>وضعیت</th>
               <th>تاریخ ثبت</th>
-              <th class="text-end">جزئیات</th>
+              <th class="text-end">عملیات</th>
             </tr>
           </thead>
           <tbody>
@@ -57,7 +57,10 @@
                 <td>{{ $statusLabels[$order->status] ?? $order->status }}</td>
                 <td>{{ $toJalali($order->created_at) }}</td>
                 <td class="text-end">
-                  <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده کامل</a>
+                  <div class="d-flex gap-1 justify-content-end">
+                    <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده کامل</a>
+                    <a href="{{ route('preinvoice.my.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
+                  </div>
                 </td>
               </tr>
             @empty
