@@ -292,6 +292,7 @@ class AriyajanebiOrderImportService
             if (!is_string($customerAddress) || trim($customerAddress) === '') {
                 $customerAddress = (string) (Arr::get($order, 'address') ?: '—');
             }
+            $customerAddress = $this->normalizeAddressText($customerAddress);
 
             $preinvoice = PreinvoiceOrder::query()->create([
                 'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(PreinvoiceOrder::class),
@@ -369,6 +370,33 @@ class AriyajanebiOrderImportService
         }
 
         return null;
+    }
+
+    private function normalizeAddressText(string $address): string
+    {
+        $address = trim($address);
+        if ($address === '') {
+            return '—';
+        }
+
+        if ((str_starts_with($address, '{') && str_ends_with($address, '}')) || (str_starts_with($address, '[') && str_ends_with($address, ']'))) {
+            $decoded = json_decode($address, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $fullAddress = trim((string) Arr::get($decoded, 'full_address', ''));
+                if ($fullAddress !== '') {
+                    return $fullAddress;
+                }
+
+                $cityName = trim((string) Arr::get($decoded, 'city.name', ''));
+                $street = trim((string) Arr::get($decoded, 'address', ''));
+                $parts = array_values(array_filter([$cityName, $street], fn ($p) => $p !== ''));
+                if (!empty($parts)) {
+                    return implode(' - ', $parts);
+                }
+            }
+        }
+
+        return $address;
     }
 
     private function authenticatedClient(bool $withoutVerify = false)
