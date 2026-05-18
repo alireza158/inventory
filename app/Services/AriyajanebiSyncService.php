@@ -199,10 +199,10 @@ class AriyajanebiSyncService
 
     private static function centralWarehouseQuantityForVariant($variant): int
     {
-        // Warehouse stock is currently tracked at product level. For API variety balance,
-        // we must send the selected variant's own stock to avoid applying the same
-        // product quantity to every variant.
-        return max(0, (int) ($variant->stock ?? 0));
+        // For external storefront stock, we should send saleable quantity.
+        // During preinvoice freeze, `reserved` increases (temporary hold), so
+        // balance must drop immediately; on final approval, `stock` decreases too.
+        return max(0, ((int) ($variant->stock ?? 0)) - ((int) ($variant->reserved ?? 0)));
     }
 
     private static function extractToken($json): ?string
