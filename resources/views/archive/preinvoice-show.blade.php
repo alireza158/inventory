@@ -431,10 +431,13 @@
             {{ $order->status_label }}
           </span>
 
-          <a href="{{ route('archive.index') }}" class="btn back-btn d-inline-flex align-items-center gap-2">
-            <span>بازگشت</span>
-            <span>↩</span>
-          </a>
+          <div class="d-flex flex-wrap gap-2 no-print justify-content-lg-end">
+            <button type="button" onclick="window.print()" class="btn back-btn">پرینت</button>
+            <a href="{{ route('archive.index') }}" class="btn back-btn d-inline-flex align-items-center gap-2">
+              <span>بازگشت</span>
+              <span>↩</span>
+            </a>
+          </div>
         </div>
 
       </div>
@@ -700,5 +703,9 @@
 
   </div>
 </div>
+
+@if(request()->boolean('print'))
+  <script>window.print();</script>
+@endif
 
 @endsection

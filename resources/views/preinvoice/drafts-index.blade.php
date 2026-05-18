@@ -55,6 +55,7 @@
                 <div class="d-flex gap-2 justify-content-end">
                   <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش</a>
                   <a class="btn btn-sm btn-success" href="{{ route('preinvoice.draft.finance', $o->uuid) }}">مشاهده</a>
+                  <a class="btn btn-sm btn-outline-dark" href="{{ route('archive.preinvoices.show', $o->uuid) }}?print=1" target="_blank">پرینت</a>
                 </div>
               </td>
             </tr>
