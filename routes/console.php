@@ -19,4 +19,4 @@ Schedule::call(function () {
     AriyajanebiSyncService::processPending();
 })->everyMinute();
 
-Schedule::command('ariya:import-orders')->everyThirtyMinutes();
+Schedule::command('ariya:import-orders')->everyFiveMinutes();
