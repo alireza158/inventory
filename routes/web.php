@@ -293,5 +293,39 @@ Route::get('/vouchers/return/customers/{customer}/invoices', [VoucherController:
 Route::get('/vouchers/invoice/{uuid}/products', [VoucherController::class, 'invoiceProducts'])
     ->name('vouchers.invoice.products');
 
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 
+use Illuminate\Http\Request;
+
+Route::get('/auto-login', function (Request $request) {
+    $phone = $request->query('phone'); // شماره تماس واقعی کاربر
+
+    if (!$phone) {
+        abort(400, 'Phone required');
+    }
+
+    // POST به CRM بدون SSL verify
+    $response = Http::withOptions(['verify' => false])
+        ->post('https://crm.ariyajanebi.ir/api/token-for-client', [
+            'phone' => $phone,
+            'secret' => env('CRM_CLIENT_SECRET')
+        ]);
+
+    if ($response->failed()) {
+        abort(401, 'Unauthorized');
+    }
+
+    $data = json_decode(base64_decode($response['token']), true);
+
+    // لاگین در Laravel
+    $user = \App\Models\User::updateOrCreate(
+        ['phone' => $data['phone']],
+        ['name' => $data['name']]
+    );
+
+    Auth::login($user);
+
+    return redirect('/dashboard');
+});
 require __DIR__ . '/auth.php';
