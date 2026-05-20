@@ -282,4 +282,16 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
 Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])
     ->name('model-lists.import-phone-catalog');
 
+
+
+// اگر این دو route را از قبل نداری، داخل routes/web.php اضافه کن.
+// اگر route مشابه داری، فقط مطمئن شو URL ها با همین دو آدرس یکی باشند.
+
+Route::get('/vouchers/return/customers/{customer}/invoices', [VoucherController::class, 'customerInvoices'])
+    ->name('vouchers.return.customer-invoices');
+
+Route::get('/vouchers/invoice/{uuid}/products', [VoucherController::class, 'invoiceProducts'])
+    ->name('vouchers.invoice.products');
+
+
 require __DIR__ . '/auth.php';

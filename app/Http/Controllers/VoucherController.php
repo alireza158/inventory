@@ -247,17 +247,48 @@ class VoucherController extends Controller
     public function customerInvoices(Customer $customer)
     {
         $invoices = Invoice::query()
+            ->withCount('items')
             ->where('customer_id', $customer->id)
+            ->whereHas('items')
             ->latest('id')
-            ->get(['uuid', 'customer_name', 'created_at']);
+            ->limit(200)
+            ->get([
+                'id',
+                'uuid',
+                'customer_id',
+                'customer_name',
+                'customer_mobile',
+                'created_at',
+                'subtotal',
+                'total',
+                'status',
+            ])
+            ->map(function (Invoice $invoice) {
+                return [
+                    'id' => (int) $invoice->id,
+                    'uuid' => (string) $invoice->uuid,
+                    'customer_name' => (string) ($invoice->customer_name ?? ''),
+                    'customer_mobile' => (string) ($invoice->customer_mobile ?? ''),
+                    'created_at' => optional($invoice->created_at)->format('Y-m-d H:i'),
+                    'invoice_date' => optional($invoice->created_at)->format('Y-m-d H:i'),
+                    'subtotal' => (int) ($invoice->subtotal ?? 0),
+                    'total' => (int) ($invoice->total ?? 0),
+                    'status' => (string) ($invoice->status ?? ''),
+                    'items_count' => (int) ($invoice->items_count ?? 0),
+                ];
+            })
+            ->values();
 
-        return response()->json($invoices);
+        return response()->json([
+            'invoices' => $invoices,
+        ]);
     }
 
     public function returnCreate()
     {
         $customers = Customer::query()
             ->orderBy('first_name')
+            ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'mobile']);
 
         $warehouses = $this->selectableWarehouses()
@@ -266,18 +297,11 @@ class VoucherController extends Controller
 
         $returnReasons = WarehouseTransfer::returnReasonOptions();
 
-        $products = Product::query()
-            ->where('is_sellable', true)
-            ->whereHas('variants', fn ($q) => $q->active())
-            ->orderBy('name')
-            ->get(['id', 'name', 'code']);
-
-        $variants = ProductVariant::query()
-            ->active()
-            ->orderBy('variant_name')
-            ->get(['id', 'product_id', 'variant_name', 'variant_code', 'stock', 'reserved']);
-
-        return view('vouchers.return-create', compact('customers', 'warehouses', 'returnReasons', 'products', 'variants'));
+        return view('vouchers.return-create', compact(
+            'customers',
+            'warehouses',
+            'returnReasons'
+        ));
     }
 
     public function returnStore(Request $request)
@@ -773,7 +797,10 @@ class VoucherController extends Controller
 
     public function invoiceProducts(string $uuid)
     {
-        $invoice = Invoice::query()->with('items.product', 'items.variant')->where('uuid', $uuid)->firstOrFail();
+        $invoice = Invoice::query()
+            ->with(['items.product', 'items.variant'])
+            ->where('uuid', $uuid)
+            ->firstOrFail();
 
         $returnedQtyByVariant = WarehouseTransfer::query()
             ->where('voucher_type', WarehouseTransfer::TYPE_CUSTOMER_RETURN)
@@ -785,26 +812,30 @@ class VoucherController extends Controller
             ->map(fn ($items) => (int) $items->sum('quantity'));
 
         $products = $invoice->items
+            ->filter(fn ($item) => (int) ($item->variant_id ?? 0) > 0)
             ->groupBy(function ($item) {
                 return ((int) $item->product_id) . ':' . ((int) $item->variant_id);
             })
             ->map(function ($items) use ($returnedQtyByVariant) {
                 $first = $items->first();
-                $invoicedQty = (int) $items->sum('quantity');
                 $variantId = (int) ($first->variant_id ?? 0);
+                $invoicedQty = (int) $items->sum('quantity');
                 $returnedQty = (int) ($returnedQtyByVariant[$variantId] ?? 0);
+                $remainingQty = max($invoicedQty - $returnedQty, 0);
 
                 return [
                     'product_id' => (int) $first->product_id,
                     'variant_id' => $variantId,
                     'category_id' => (int) ($first->product?->category_id ?? 0),
-                    'name' => $first->product?->name ?? ('#' . (int) $first->product_id),
+                    'name' => (string) ($first->product?->name ?? ('#' . (int) $first->product_id)),
                     'product_code' => (string) ($first->product?->code ?? ''),
                     'variant_name' => (string) ($first->variant?->variant_name ?? ''),
                     'variant_code' => (string) ($first->variant?->variant_code ?? ''),
                     'variant_stock' => (int) ($first->variant?->stock ?? 0),
                     'qty' => $invoicedQty,
-                    'remaining_qty' => max($invoicedQty - $returnedQty, 0),
+                    'already_returned_qty' => $returnedQty,
+                    'remaining_qty' => $remainingQty,
+                    'unit_price' => (int) ($first->price ?? 0),
                 ];
             })
             ->values();

@@ -1,6 +1,8 @@
 @extends('layouts.app')
 
 @section('content')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+
 <style>
     :root{
         --brd:#e8edf3;
@@ -8,6 +10,7 @@
         --soft:#f8fafc;
         --soft2:#f3f6fb;
         --blue:#2563eb;
+        --blue-soft:#eff6ff;
         --ok:#16a34a;
         --danger:#dc2626;
         --warn:#f59e0b;
@@ -50,21 +53,10 @@
         padding:12px;
     }
 
-    .chip{
-        display:inline-flex;
-        align-items:center;
-        gap:8px;
-        padding:6px 10px;
-        border-radius:999px;
-        border:1px solid var(--brd);
-        background:var(--soft);
-        font-size:12px;
-    }
-
-    .info-card{
-        border:1px solid var(--brd);
+    .selected-invoice-box{
+        border:1px solid #dbeafe;
+        background:#f8fbff;
         border-radius:14px;
-        background:#fff;
         padding:12px;
     }
 
@@ -75,6 +67,7 @@
         padding:12px;
         cursor:pointer;
         transition:.18s ease;
+        height:100%;
     }
 
     .invoice-card:hover{
@@ -97,11 +90,13 @@
         vertical-align:middle;
     }
 
-    .line-total-box{
-        border:1px dashed #dbeafe;
-        background:#f8fbff;
+    .empty-state{
+        border:1px dashed var(--brd);
         border-radius:14px;
-        padding:12px;
+        background:#fff;
+        padding:16px;
+        color:var(--muted);
+        text-align:center;
     }
 
     .sticky-submit{
@@ -118,6 +113,65 @@
     .mono{
         font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
         letter-spacing:.5px;
+        direction:ltr;
+        display:inline-block;
+    }
+
+    .qty-input{
+        max-width:130px;
+    }
+
+    .select2-container{
+        width:100% !important;
+        direction:rtl;
+    }
+
+    .select2-container .select2-selection--single{
+        height:38px;
+        border:1px solid #ced4da;
+        border-radius:.375rem;
+        display:flex;
+        align-items:center;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered{
+        width:100%;
+        padding-right:.75rem;
+        padding-left:2rem;
+        color:#212529;
+        line-height:36px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow{
+        height:36px;
+        left:6px;
+        right:auto;
+    }
+
+    .select2-dropdown{
+        direction:rtl;
+        text-align:right;
+        z-index:9999;
+    }
+
+    .customer-result-name{
+        font-weight:800;
+        font-size:13px;
+    }
+
+    .customer-result-phone{
+        color:var(--muted);
+        font-size:12px;
+        margin-top:2px;
+        direction:ltr;
+        text-align:right;
+    }
+
+    .manual-modal-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,.45);
+        z-index:1040;
     }
 </style>
 
@@ -142,7 +196,9 @@
         <div class="section-head">
             <div>
                 <div class="section-title">فرم ثبت برگشت از فروش</div>
-                <div class="muted">مشتری را انتخاب کن، فاکتور همان مشتری را از پاپ‌آپ بردار، بعد کالاهای همان فاکتور را برای برگشت ثبت کن.</div>
+                <div class="muted">
+                    مشتری را جستجو کن، فاکتور را انتخاب کن؛ کالاهای خریداری‌شده همان فاکتور به‌صورت خودکار در جدول برگشتی لود می‌شوند.
+                </div>
             </div>
         </div>
 
@@ -156,24 +212,40 @@
                     <div class="col-lg-4">
                         <label class="form-label">مشتری</label>
                         <select name="customer_id" id="customerSelect" class="form-select" required>
-                            <option value="">انتخاب مشتری...</option>
+                            <option value="">جستجو با نام، نام خانوادگی یا شماره تماس...</option>
+
                             @foreach($customers as $customer)
-                                <option value="{{ $customer->id }}" @selected(old('customer_id') == $customer->id)>
-                                    {{ trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? '')) ?: ('مشتری #' . $customer->id) }}
-                                    @if(!empty($customer->mobile)) | {{ $customer->mobile }} @endif
+                                @php
+                                    $customerFullName = trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? ''));
+                                    $customerTitle = $customerFullName !== '' ? $customerFullName : ('مشتری #' . $customer->id);
+                                    $customerPhone = $customer->mobile
+                                        ?? $customer->phone
+                                        ?? $customer->tel
+                                        ?? $customer->telephone
+                                        ?? '';
+                                    $customerSearch = trim($customerTitle . ' ' . $customerPhone . ' ' . $customer->id);
+                                @endphp
+
+                                <option
+                                    value="{{ $customer->id }}"
+                                    data-search="{{ $customerSearch }}"
+                                    data-name="{{ $customerTitle }}"
+                                    data-phone="{{ $customerPhone }}"
+                                    @selected(old('customer_id') == $customer->id)
+                                >
+                                    {{ $customerTitle }}@if($customerPhone) | {{ $customerPhone }}@endif
                                 </option>
                             @endforeach
                         </select>
+                        <div class="form-text">Select2 فعال است؛ با اسم، فامیل، موبایل یا ID مشتری جستجو کن.</div>
                     </div>
 
                     <div class="col-lg-4">
                         <label class="form-label">فاکتور مشتری</label>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-outline-primary w-100" id="openInvoiceModalBtn" disabled>
-                                انتخاب فاکتور
-                            </button>
-                        </div>
-                        <div class="form-text">بعد از انتخاب مشتری، لیست فاکتورهای همان مشتری باز می‌شود.</div>
+                        <button type="button" class="btn btn-outline-primary w-100" id="openInvoiceModalBtn" disabled>
+                            انتخاب فاکتور
+                        </button>
+                        <div class="form-text">بعد از انتخاب مشتری، این دکمه فعال می‌شود.</div>
                     </div>
 
                     <div class="col-lg-4">
@@ -190,65 +262,106 @@
 
                     <div class="col-md-4">
                         <label class="form-label">علت برگشت از فروش</label>
-                        <select name="return_reason" class="form-select" required>
+                        <select name="return_reason" id="returnReasonSelect" class="form-select" required>
                             <option value="">انتخاب علت...</option>
                             @foreach($returnReasons as $reasonKey => $reasonTitle)
-                                <option value="{{ $reasonKey }}" @selected(old('return_reason') === $reasonKey)>{{ $reasonTitle }}</option>
+                                <option value="{{ $reasonKey }}" @selected(old('return_reason') === $reasonKey)>
+                                    {{ $reasonTitle }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">علت برگشت از فروش</label>
-                        <select name="return_reason" class="form-select" required>
-                            <option value="">انتخاب علت...</option>
-                            @foreach($returnReasons as $reasonKey => $reasonTitle)
-                                <option value="{{ $reasonKey }}" @selected(old('return_reason') === $reasonKey)>{{ $reasonTitle }}</option>
-                            @endforeach
-                        </select>
+                    <div class="col-md-8">
+                        <div class="selected-invoice-box h-100 d-none" id="selectedInvoiceBox">
+                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                <div>
+                                    <div class="muted mb-1">فاکتور انتخاب‌شده</div>
+                                    <div class="fw-bold mono" id="selectedInvoiceUuid">—</div>
+                                </div>
+
+                                <div>
+                                    <div class="muted mb-1">تاریخ</div>
+                                    <div class="fw-bold" id="selectedInvoiceDate">—</div>
+                                </div>
+
+                                <div>
+                                    <div class="muted mb-1">مبلغ کل</div>
+                                    <div class="fw-bold"><span id="selectedInvoiceTotal">—</span> تومان</div>
+                                </div>
+
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="changeInvoiceBtn">
+                                    تغییر فاکتور
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="hint-box h-100" id="invoiceEmptyBox">
+                            <div class="fw-bold mb-1">هنوز فاکتوری انتخاب نشده است.</div>
+                            <div class="muted">بعد از انتخاب مشتری، روی «انتخاب فاکتور» بزن؛ سپس کالاها خودکار در جدول پایین می‌آیند.</div>
+                        </div>
                     </div>
 
-                    <div class="col-md-4">
-                        <label class="form-label">علت برگشت از فروش</label>
-                        <select name="return_reason" class="form-select" required>
-                            <option value="">انتخاب علت...</option>
-                            @foreach($returnReasons as $reasonKey => $reasonTitle)
-                                <option value="{{ $reasonKey }}" @selected(old('return_reason') === $reasonKey)>{{ $reasonTitle }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <div class="col-12 d-none" id="itemsSection">
+                        <div class="card-soft">
+                            <div class="section-head">
+                                <div>
+                                    <div class="section-title">کالاهای برگشتی</div>
+                                    <div class="muted">
+                                        ردیف‌ها به‌صورت خودکار از کالاهای خریداری‌شده در فاکتور انتخاب‌شده ساخته می‌شوند. ردیف‌هایی که برگشت ندارند را حذف کن یا تعداد را تغییر بده.
+                                    </div>
+                                </div>
 
-                    <div class="col-12">
-                        <div class="table-responsive">
-                            <table class="table table-striped" id="itemsTable">
-                                <thead>
-                                <tr>
-                                    <th>محصول (جستجو با نام/کد)</th>
-                                    <th>تنوع/طرح</th>
-                                    <th>موجودی تنوع</th>
-                                    <th>حداکثر مجاز مرجوعی</th>
-                                    <th>تعداد برگشتی</th>
-                                    <th></th>
-                                </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="reloadItemsBtn">
+                                    بازخوانی کالاهای فاکتور
+                                </button>
+                            </div>
+
+                            <div class="p-3">
+                                <div class="alert alert-warning py-2 d-none" id="itemsWarningBox"></div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-striped line-table" id="itemsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>محصول خریداری‌شده</th>
+                                                <th>کد کالا</th>
+                                                <th>تنوع / طرح</th>
+                                                <th>کد تنوع</th>
+                                                <th>تعداد فاکتور</th>
+                                                <th>قبلاً برگشتی</th>
+                                                <th>قابل برگشت</th>
+                                                <th>موجودی تنوع</th>
+                                                <th style="width:150px;">تعداد برگشتی</th>
+                                                <th style="width:80px;"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+
+                                <div class="empty-state d-none" id="itemsEmptyState">
+                                    برای این فاکتور کالایی با مقدار قابل برگشت پیدا نشد.
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">شماره حواله (اختیاری)</label>
-                        <input name="reference" class="form-control" value="{{ old('reference') }}">
+                        <label class="form-label">شماره حواله / ارجاع اختیاری</label>
+                        <input name="reference" class="form-control" value="{{ old('reference') }}" maxlength="100">
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">توضیحات (اختیاری)</label>
-                        <input name="note" class="form-control" value="{{ old('note') }}">
+                        <label class="form-label">توضیحات اختیاری</label>
+                        <input name="note" class="form-control" value="{{ old('note') }}" maxlength="255">
                     </div>
 
                     <div class="col-12">
                         <div class="sticky-submit">
-                            <button type="submit" class="btn btn-success w-100" id="submitBtn">ثبت برگشت از فروش</button>
+                            <button type="submit" class="btn btn-success w-100" id="submitBtn">
+                                ثبت برگشت از فروش
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -257,18 +370,17 @@
     </div>
 </div>
 
-{{-- modal فاکتورها --}}
 <div class="modal fade" id="invoicePickerModal" tabindex="-1" aria-labelledby="invoicePickerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">انتخاب فاکتور مشتری</h5>
+                <h5 class="modal-title" id="invoicePickerModalLabel">انتخاب فاکتور مشتری</h5>
                 <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
             <div class="modal-body">
                 <div class="mb-3">
-                    <input type="text" class="form-control" id="invoiceSearchInput" placeholder="جستجو در شناسه فاکتور یا تاریخ...">
+                    <input type="text" class="form-control" id="invoiceSearchInput" placeholder="جستجو در شناسه فاکتور، تاریخ، مبلغ یا نام مشتری...">
                 </div>
 
                 <div id="invoiceListWrap" class="row g-3">
@@ -280,266 +392,608 @@
 
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">بستن</button>
-                <button type="button" class="btn btn-primary" id="confirmInvoiceBtn" disabled>انتخاب این فاکتور</button>
+                <button type="button" class="btn btn-primary" id="confirmInvoiceBtn" disabled>
+                    انتخاب این فاکتور و لود کالاها
+                </button>
             </div>
         </div>
     </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
-const customerSelect = document.getElementById('customerSelect');
-const warehouseSelect = document.getElementById('warehouseSelect');
-const openInvoiceModalBtn = document.getElementById('openInvoiceModalBtn');
-const addItemBtn = document.getElementById('addItemBtn');
-const tbody = document.querySelector('#itemsTable tbody');
-const returnForm = document.getElementById('returnForm');
-const itemsSection = document.getElementById('itemsSection');
+document.addEventListener('DOMContentLoaded', function () {
+    const customerSelect = document.getElementById('customerSelect');
+    const warehouseSelect = document.getElementById('warehouseSelect');
+    const returnReasonSelect = document.getElementById('returnReasonSelect');
+    const openInvoiceModalBtn = document.getElementById('openInvoiceModalBtn');
+    const changeInvoiceBtn = document.getElementById('changeInvoiceBtn');
+    const invoicePickerModalEl = document.getElementById('invoicePickerModal');
+    const invoiceSearchInput = document.getElementById('invoiceSearchInput');
+    const invoiceListWrap = document.getElementById('invoiceListWrap');
+    const confirmInvoiceBtn = document.getElementById('confirmInvoiceBtn');
+    const relatedInvoiceUuid = document.getElementById('relatedInvoiceUuid');
+    const selectedInvoiceBox = document.getElementById('selectedInvoiceBox');
+    const invoiceEmptyBox = document.getElementById('invoiceEmptyBox');
+    const selectedInvoiceUuid = document.getElementById('selectedInvoiceUuid');
+    const selectedInvoiceDate = document.getElementById('selectedInvoiceDate');
+    const selectedInvoiceTotal = document.getElementById('selectedInvoiceTotal');
+    const itemsSection = document.getElementById('itemsSection');
+    const reloadItemsBtn = document.getElementById('reloadItemsBtn');
+    const itemsEmptyState = document.getElementById('itemsEmptyState');
+    const itemsWarningBox = document.getElementById('itemsWarningBox');
+    const tbody = document.querySelector('#itemsTable tbody');
+    const returnForm = document.getElementById('returnForm');
+    const submitBtn = document.getElementById('submitBtn');
 
-const relatedInvoiceUuid = document.getElementById('relatedInvoiceUuid');
-const selectedInvoiceUuid = document.getElementById('selectedInvoiceUuid');
-const selectedInvoiceDate = document.getElementById('selectedInvoiceDate');
-const selectedInvoiceTotal = document.getElementById('selectedInvoiceTotal');
-const selectedInvoiceText = document.getElementById('selectedInvoiceText');
-const returnGrandTotal = document.getElementById('returnGrandTotal');
-
-let invoiceVariants = [];
-
-function productOptions(selected='') {
-    const uniq = new Map();
-    invoiceVariants.forEach(v => {
-        const k = String(v.product_id);
-        if (!uniq.has(k)) uniq.set(k, v);
-    });
-    return '<option value="">انتخاب محصول...</option>' + Array.from(uniq.values()).map(p =>
-        `<option value="${p.product_id}" ${String(selected)===String(p.product_id)?'selected':''}>${p.name} ${p.product_code ? '('+p.product_code+')' : ''}</option>`
-    ).join('');
-}
-
-function variantOptions(productId, selected='') {
-    if (!productId) return '<option value="">ابتدا محصول را انتخاب کنید...</option>';
-    const rows = invoiceVariants.filter(v => String(v.product_id)===String(productId) && Number(v.remaining_qty||0) > 0);
-    if (!rows.length) return '<option value="">تنوع مجازی باقی نمانده</option>';
-    return '<option value="">انتخاب تنوع...</option>' + rows.map(v =>
-        `<option value="${v.variant_id}" data-max="${v.remaining_qty}" data-stock="${v.variant_stock || 0}" ${String(selected)===String(v.variant_id)?'selected':''}>${v.variant_name || 'بدون نام'} ${v.variant_code ? '['+v.variant_code+']' : ''}</option>`
-    ).join('');
-}
-
-function itemRow(i){
-    return `<tr>
-        <td><select name="items[${i}][product_id]" class="form-select product-select" required>${productOptions()}</select></td>
-        <td>
-          <select name="items[${i}][variant_id]" class="form-select variant-select" required>
-            <option value="">ابتدا محصول را انتخاب کنید...</option>
-          </select>
-        </td>
-        <td><span class="badge text-bg-light stock-badge">—</span></td>
-        <td><span class="badge text-bg-light max-badge">—</span></td>
-        <td><input type="number" min="1" name="items[${i}][quantity]" class="form-control qty" required></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td>
-      </tr>`;
-}
-
-function bindRow(tr){
-    const productSelect = tr.querySelector('.product-select');
-    const variantSelect = tr.querySelector('.variant-select');
-    const qtyInput = tr.querySelector('.qty');
-    const stockBadge = tr.querySelector('.stock-badge');
-    const maxBadge = tr.querySelector('.max-badge');
-
-    const syncMax = () => {
-        const opt = variantSelect.selectedOptions[0];
-        const max = Number(opt?.dataset.max || 0);
-        const stock = Number(opt?.dataset.stock || 0);
-        stockBadge.textContent = stock > 0 ? stock.toLocaleString('fa-IR') : '۰';
-        if (max > 0) {
-            qtyInput.max = String(max);
-            if (Number(qtyInput.value || 0) > max) qtyInput.value = String(max);
-            maxBadge.textContent = max.toLocaleString('fa-IR');
-        } else {
-            qtyInput.value = '';
-            qtyInput.removeAttribute('max');
-            maxBadge.textContent = '—';
-        }
+    const endpoints = {
+        customerInvoicesBase: @json(url('/vouchers/return/customers')),
+        invoiceProductsBase: @json(url('/vouchers/invoice')),
     };
 
-    productSelect.addEventListener('change', () => {
-        variantSelect.innerHTML = variantOptions(productSelect.value, '');
-        qtyInput.value = '';
-        syncMax();
-    });
-    variantSelect.addEventListener('change', syncMax);
-    qtyInput.addEventListener('input', syncMax);
-}
+    const oldRelatedInvoiceUuid = @json(old('related_invoice_uuid'));
+    const oldItems = @json(old('items', []));
 
-function addRow(prefill = null) {
-    const index = tbody.querySelectorAll('tr').length;
-    tbody.insertAdjacentHTML('beforeend', rowTemplate(index));
-    const tr = tbody.querySelector('tr:last-child');
+    let customerInvoices = [];
+    let selectedInvoice = null;
+    let invoiceItems = [];
+    let manualBackdrop = null;
 
-    bindRow(tr);
+    function normalizeDigits(value) {
+        const persian = '۰۱۲۳۴۵۶۷۸۹';
+        const arabic = '٠١٢٣٤٥٦٧٨٩';
 
-    if (prefill) {
-        const productSelect = tr.querySelector('.product-select');
-        const qtyInput = tr.querySelector('.qty-input');
-
-        productSelect.value = String(prefill.product_id || '');
-        productSelect.dispatchEvent(new Event('change'));
-
-        qtyInput.value = String(prefill.quantity || '');
-        qtyInput.dispatchEvent(new Event('input'));
-    }
-}
-
-function renderInvoiceCards(list) {
-    invoiceListWrap.innerHTML = '';
-
-    if (!list.length) {
-        invoiceListWrap.innerHTML = `
-            <div class="col-12">
-                <div class="text-muted">فاکتوری برای این مشتری پیدا نشد.</div>
-            </div>
-        `;
-        confirmInvoiceBtn.disabled = true;
-        return;
+        return String(value || '')
+            .replace(/[۰-۹]/g, function (d) { return String(persian.indexOf(d)); })
+            .replace(/[٠-٩]/g, function (d) { return String(arabic.indexOf(d)); });
     }
 
-    list.forEach(inv => {
-        const col = document.createElement('div');
-        col.className = 'col-md-6';
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
 
-        const isActive = selectedInvoice && selectedInvoice.uuid === inv.uuid;
+    function toMoney(value) {
+        const number = Number(value || 0);
+        return number.toLocaleString('fa-IR');
+    }
 
-        col.innerHTML = `
-            <div class="invoice-card ${isActive ? 'active' : ''}" data-uuid="${escapeHtml(inv.uuid)}">
-                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                    <div class="fw-bold mono">${escapeHtml(inv.uuid)}</div>
-                    <span class="badge text-bg-light">فاکتور فروش</span>
-                </div>
+    function makeModalController(modalEl) {
+        if (window.bootstrap && window.bootstrap.Modal) {
+            return window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        }
 
-                <div class="mt-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                    <div>
-                        <div class="muted">تاریخ فاکتور</div>
-                        <div class="fw-bold">${escapeHtml(inv.invoice_date || inv.created_at || '—')}</div>
-                    </div>
+        let controller = {
+            show: function () {
+                modalEl.classList.add('show');
+                modalEl.style.display = 'block';
+                modalEl.removeAttribute('aria-hidden');
+                modalEl.setAttribute('aria-modal', 'true');
+                document.body.classList.add('modal-open');
 
-                    <div class="text-start">
-                        <div class="muted">مبلغ کل</div>
-                        <div class="fw-bold">${toMoney(inv.total || 0)} تومان</div>
-                    </div>
-                </div>
-            </div>
-        `;
+                if (!manualBackdrop) {
+                    manualBackdrop = document.createElement('div');
+                    manualBackdrop.className = 'manual-modal-backdrop';
+                    manualBackdrop.addEventListener('click', function () { controller.hide(); });
+                    document.body.appendChild(manualBackdrop);
+                }
+            },
+            hide: function () {
+                modalEl.classList.remove('show');
+                modalEl.style.display = 'none';
+                modalEl.setAttribute('aria-hidden', 'true');
+                modalEl.removeAttribute('aria-modal');
+                document.body.classList.remove('modal-open');
 
-        col.querySelector('.invoice-card').addEventListener('click', function () {
-            selectedInvoice = inv;
-            renderInvoiceCards(filteredInvoices(invoiceSearchInput.value || ''));
-            confirmInvoiceBtn.disabled = false;
+                if (manualBackdrop) {
+                    manualBackdrop.remove();
+                    manualBackdrop = null;
+                }
+            }
+        };
+
+        modalEl.querySelectorAll('[data-bs-dismiss="modal"]').forEach(function (btn) {
+            btn.addEventListener('click', function () { controller.hide(); });
         });
 
-        invoiceListWrap.appendChild(col);
-    });
-}
+        return controller;
+    }
 
-function filteredInvoices(keyword) {
-    const q = String(keyword || '').trim().toLowerCase();
-    if (!q) return customerInvoices;
+    const modalController = makeModalController(invoicePickerModalEl);
 
-    return customerInvoices.filter(inv => {
-        return String(inv.uuid || '').toLowerCase().includes(q) ||
-               String(inv.invoice_date || inv.created_at || '').toLowerCase().includes(q) ||
-               String(inv.total || '').toLowerCase().includes(q);
-    });
-}
+    function showItemsWarning(message) {
+        itemsWarningBox.textContent = message || '';
+        itemsWarningBox.classList.toggle('d-none', !message);
+    }
 
-async function loadCustomerInvoices(customerId) {
-    invoiceListWrap.innerHTML = `
-        <div class="col-12"><div class="text-muted">در حال بارگذاری فاکتورها...</div></div>
-    `;
-    confirmInvoiceBtn.disabled = true;
-    selectedInvoice = null;
+    function showLoadingInvoices() {
+        invoiceListWrap.innerHTML = '<div class="col-12"><div class="text-muted">در حال بارگذاری فاکتورها...</div></div>';
+        confirmInvoiceBtn.disabled = true;
+    }
 
-    const res = await fetch(`{{ url('/vouchers/return/customers') }}/${customerId}/invoices`, {
-        headers: { 'Accept': 'application/json' }
-    });
+    function showInvoiceError(message) {
+        invoiceListWrap.innerHTML = '<div class="col-12"><div class="text-danger">' + escapeHtml(message) + '</div></div>';
+        confirmInvoiceBtn.disabled = true;
+    }
 
-    if (!res.ok) {
-        invoiceListWrap.innerHTML = `
-            <div class="col-12"><div class="text-danger">خطا در دریافت فاکتورها.</div></div>
+    function resetInvoiceSelection() {
+        selectedInvoice = null;
+        customerInvoices = [];
+        invoiceItems = [];
+
+        relatedInvoiceUuid.value = '';
+        selectedInvoiceUuid.textContent = '—';
+        selectedInvoiceDate.textContent = '—';
+        selectedInvoiceTotal.textContent = '—';
+
+        selectedInvoiceBox.classList.add('d-none');
+        invoiceEmptyBox.classList.remove('d-none');
+
+        itemsSection.classList.add('d-none');
+        tbody.innerHTML = '';
+        itemsEmptyState.classList.add('d-none');
+        showItemsWarning('');
+        confirmInvoiceBtn.disabled = true;
+    }
+
+    function applySelectedInvoice(invoice) {
+        selectedInvoice = invoice;
+        relatedInvoiceUuid.value = invoice.uuid || '';
+        selectedInvoiceUuid.textContent = invoice.uuid || '—';
+        selectedInvoiceDate.textContent = invoice.invoice_date || invoice.created_at || '—';
+        selectedInvoiceTotal.textContent = toMoney(invoice.total || 0);
+
+        selectedInvoiceBox.classList.remove('d-none');
+        invoiceEmptyBox.classList.add('d-none');
+    }
+
+    function filteredInvoices(keyword) {
+        const q = normalizeDigits(keyword).trim().toLowerCase();
+        if (!q) return customerInvoices;
+
+        return customerInvoices.filter(function (invoice) {
+            const haystack = normalizeDigits([
+                invoice.uuid || '',
+                invoice.invoice_date || '',
+                invoice.created_at || '',
+                invoice.total || '',
+                invoice.customer_name || '',
+                invoice.customer_mobile || ''
+            ].join(' ')).toLowerCase();
+
+            return haystack.includes(q);
+        });
+    }
+
+    function renderInvoiceCards(list) {
+        invoiceListWrap.innerHTML = '';
+
+        if (!list.length) {
+            invoiceListWrap.innerHTML = '<div class="col-12"><div class="text-muted">فاکتوری برای این مشتری پیدا نشد.</div></div>';
+            confirmInvoiceBtn.disabled = true;
+            return;
+        }
+
+        list.forEach(function (invoice) {
+            const col = document.createElement('div');
+            col.className = 'col-md-6';
+
+            const isActive = selectedInvoice && String(selectedInvoice.uuid) === String(invoice.uuid);
+
+            col.innerHTML = `
+                <div class="invoice-card ${isActive ? 'active' : ''}" data-uuid="${escapeHtml(invoice.uuid || '')}">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                        <div class="fw-bold mono">${escapeHtml(invoice.uuid || '—')}</div>
+                        <span class="badge text-bg-light">فاکتور فروش</span>
+                    </div>
+
+                    <div class="mt-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                        <div>
+                            <div class="muted">تاریخ فاکتور</div>
+                            <div class="fw-bold">${escapeHtml(invoice.invoice_date || invoice.created_at || '—')}</div>
+                        </div>
+
+                        <div class="text-start">
+                            <div class="muted">مبلغ کل</div>
+                            <div class="fw-bold">${toMoney(invoice.total || 0)} تومان</div>
+                        </div>
+
+                        <div class="text-start">
+                            <div class="muted">تعداد آیتم</div>
+                            <div class="fw-bold">${toMoney(invoice.items_count || 0)}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            col.querySelector('.invoice-card').addEventListener('click', function () {
+                selectedInvoice = invoice;
+                confirmInvoiceBtn.disabled = false;
+                renderInvoiceCards(filteredInvoices(invoiceSearchInput.value || ''));
+            });
+
+            invoiceListWrap.appendChild(col);
+        });
+    }
+
+    async function loadCustomerInvoices(customerId) {
+        showLoadingInvoices();
+        selectedInvoice = null;
+
+        try {
+            const url = endpoints.customerInvoicesBase + '/' + encodeURIComponent(customerId) + '/invoices';
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!response.ok) {
+                showInvoiceError('خطا در دریافت فاکتورها. route مربوط به customerInvoices را بررسی کن.');
+                return;
+            }
+
+            const payload = await response.json();
+            customerInvoices = Array.isArray(payload) ? payload : (payload.invoices || []);
+            renderInvoiceCards(customerInvoices);
+        } catch (error) {
+            showInvoiceError('ارتباط با سرور برای دریافت فاکتورها برقرار نشد.');
+        }
+    }
+
+    function normalizeInvoiceProductsPayload(payload) {
+        const raw = payload.products || payload.items || payload.variants || [];
+
+        return raw.map(function (item) {
+            const qty = Number(item.qty || item.quantity || item.invoice_qty || 0);
+            const returned = Number(item.already_returned_qty || item.returned_qty || 0);
+            const remaining = Number(item.remaining_qty !== undefined ? item.remaining_qty : Math.max(qty - returned, 0));
+
+            return {
+                product_id: Number(item.product_id || 0),
+                variant_id: Number(item.variant_id || item.product_variant_id || 0),
+                name: String(item.name || item.product_name || 'بدون نام'),
+                product_code: String(item.product_code || item.code || ''),
+                variant_name: String(item.variant_name || 'بدون تنوع'),
+                variant_code: String(item.variant_code || ''),
+                variant_stock: Number(item.variant_stock || item.stock || 0),
+                qty: qty,
+                already_returned_qty: returned,
+                remaining_qty: remaining,
+                unit_price: Number(item.unit_price || item.price || 0),
+            };
+        }).filter(function (item) {
+            return item.product_id > 0 && item.variant_id > 0;
+        });
+    }
+
+    function oldQuantityFor(productId, variantId) {
+        if (!Array.isArray(oldItems)) return null;
+
+        const found = oldItems.find(function (row) {
+            return String(row.product_id || '') === String(productId) &&
+                   String(row.variant_id || '') === String(variantId);
+        });
+
+        if (!found) return null;
+        const qty = Number(found.quantity || 0);
+        return qty > 0 ? qty : null;
+    }
+
+    function itemRowTemplate(item, index, useOldQuantity) {
+        const remaining = Number(item.remaining_qty || 0);
+        const defaultQtyFromOld = useOldQuantity ? oldQuantityFor(item.product_id, item.variant_id) : null;
+        const defaultQty = defaultQtyFromOld !== null ? Math.min(defaultQtyFromOld, remaining) : remaining;
+
+        return `
+            <tr data-product-id="${escapeHtml(item.product_id)}" data-variant-id="${escapeHtml(item.variant_id)}">
+                <td>
+                    <input type="hidden" name="items[${index}][product_id]" value="${escapeHtml(item.product_id)}">
+                    <div class="fw-bold">${escapeHtml(item.name)}</div>
+                </td>
+                <td><span class="mono">${escapeHtml(item.product_code || '—')}</span></td>
+                <td>
+                    <input type="hidden" name="items[${index}][variant_id]" value="${escapeHtml(item.variant_id)}">
+                    <div>${escapeHtml(item.variant_name || '—')}</div>
+                </td>
+                <td><span class="mono">${escapeHtml(item.variant_code || '—')}</span></td>
+                <td><span class="badge text-bg-light">${toMoney(item.qty || 0)}</span></td>
+                <td><span class="badge text-bg-light">${toMoney(item.already_returned_qty || 0)}</span></td>
+                <td><span class="badge text-bg-primary">${toMoney(remaining)}</span></td>
+                <td><span class="badge text-bg-light">${toMoney(item.variant_stock || 0)}</span></td>
+                <td>
+                    <input
+                        type="number"
+                        min="1"
+                        max="${escapeHtml(remaining)}"
+                        name="items[${index}][quantity]"
+                        class="form-control qty-input"
+                        value="${escapeHtml(defaultQty)}"
+                        required
+                    >
+                </td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-row-btn">حذف</button>
+                </td>
+            </tr>
         `;
-        return;
     }
 
-    customerInvoices = await res.json();
-    renderInvoiceCards(customerInvoices);
-}
+    function bindItemRows() {
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            const removeBtn = tr.querySelector('.remove-row-btn');
+            const qtyInput = tr.querySelector('.qty-input');
 
-async function loadInvoiceProducts(uuid) {
-    const res = await fetch(`{{ url('/vouchers/invoice') }}/${uuid}/products`, {
-        headers: { 'Accept': 'application/json' }
+            removeBtn.addEventListener('click', function () {
+                tr.remove();
+                refreshItemsStateAfterDelete();
+            });
+
+            qtyInput.addEventListener('input', function () {
+                const max = Number(qtyInput.max || 0);
+                let value = Number(qtyInput.value || 0);
+
+                if (max > 0 && value > max) {
+                    qtyInput.value = String(max);
+                }
+            });
+        });
+    }
+
+    function refreshItemsStateAfterDelete() {
+        const hasRows = tbody.querySelectorAll('tr').length > 0;
+        itemsEmptyState.classList.toggle('d-none', hasRows);
+
+        if (!hasRows) {
+            showItemsWarning('همه ردیف‌ها حذف شده‌اند. برای ثبت، حداقل یک کالا باید در جدول باشد.');
+        }
+    }
+
+    function renderInvoiceItems(useOldQuantity = false) {
+        tbody.innerHTML = '';
+        showItemsWarning('');
+
+        const returnableItems = invoiceItems.filter(function (item) {
+            return Number(item.remaining_qty || 0) > 0;
+        });
+
+        itemsSection.classList.remove('d-none');
+
+        if (!invoiceItems.length) {
+            itemsEmptyState.classList.remove('d-none');
+            showItemsWarning('هیچ آیتمی از API فاکتور دریافت نشد. خروجی متد invoiceProducts را بررسی کن.');
+            return;
+        }
+
+        if (!returnableItems.length) {
+            itemsEmptyState.classList.remove('d-none');
+            showItemsWarning('همه کالاهای این فاکتور قبلاً برگشت خورده‌اند یا مانده قابل برگشت ندارند.');
+            return;
+        }
+
+        itemsEmptyState.classList.add('d-none');
+
+        returnableItems.forEach(function (item, index) {
+            tbody.insertAdjacentHTML('beforeend', itemRowTemplate(item, index, useOldQuantity));
+        });
+
+        bindItemRows();
+    }
+
+    async function loadInvoiceProducts(uuid, useOldQuantity = false) {
+        itemsSection.classList.remove('d-none');
+        tbody.innerHTML = '';
+        itemsEmptyState.classList.add('d-none');
+        showItemsWarning('در حال بارگذاری کالاهای خریداری‌شده فاکتور...');
+
+        try {
+            const url = endpoints.invoiceProductsBase + '/' + encodeURIComponent(uuid) + '/products';
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!response.ok) {
+                invoiceItems = [];
+                itemsEmptyState.classList.remove('d-none');
+                showItemsWarning('خطا در دریافت کالاهای فاکتور. route مربوط به invoiceProducts را بررسی کن.');
+                return;
+            }
+
+            const payload = await response.json();
+            invoiceItems = normalizeInvoiceProductsPayload(payload);
+            renderInvoiceItems(useOldQuantity);
+        } catch (error) {
+            invoiceItems = [];
+            itemsEmptyState.classList.remove('d-none');
+            showItemsWarning('ارتباط با سرور برای دریافت کالاهای فاکتور برقرار نشد.');
+        }
+    }
+
+    function initCustomerSelect2() {
+        if (!window.jQuery || !jQuery.fn || !jQuery.fn.select2) {
+            return;
+        }
+
+        const $customer = jQuery('#customerSelect');
+
+        $customer.select2({
+            dir: 'rtl',
+            width: '100%',
+            placeholder: 'جستجو با نام، نام خانوادگی یا شماره تماس...',
+            allowClear: true,
+            language: {
+                noResults: function () { return 'مشتری پیدا نشد'; },
+                searching: function () { return 'در حال جستجو...'; },
+                inputTooShort: function () { return 'برای جستجو تایپ کنید'; }
+            },
+            matcher: function (params, data) {
+                const term = normalizeDigits(jQuery.trim(params.term || '')).toLowerCase();
+
+                if (!term) return data;
+                if (!data.element) return null;
+
+                const option = data.element;
+                const searchText = normalizeDigits((option.getAttribute('data-search') || '') + ' ' + (data.text || '')).toLowerCase();
+
+                return searchText.includes(term) ? data : null;
+            },
+            templateResult: function (data) {
+                if (!data.id || !data.element) return data.text;
+
+                const option = data.element;
+                const name = option.getAttribute('data-name') || data.text || '';
+                const phone = option.getAttribute('data-phone') || '';
+
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML =
+                    '<div class="customer-result-name">' + escapeHtml(name) + '</div>' +
+                    (phone ? '<div class="customer-result-phone">' + escapeHtml(phone) + '</div>' : '');
+
+                return jQuery(wrapper);
+            },
+            templateSelection: function (data) {
+                if (!data.id || !data.element) return data.text;
+
+                const option = data.element;
+                const name = option.getAttribute('data-name') || data.text || '';
+                const phone = option.getAttribute('data-phone') || '';
+
+                return phone ? (name + ' | ' + phone) : name;
+            }
+        });
+    }
+
+    customerSelect.addEventListener('change', function () {
+        resetInvoiceSelection();
+        openInvoiceModalBtn.disabled = !customerSelect.value;
     });
 
-    if (!res.ok) {
-        invoiceProducts = [];
-        addItemBtn.disabled = true;
-        itemsSection.style.display = 'none';
-        return;
+    openInvoiceModalBtn.addEventListener('click', function () {
+        if (!customerSelect.value) {
+            alert('اول مشتری را انتخاب کن.');
+            return;
+        }
+
+        invoiceSearchInput.value = '';
+        modalController.show();
+        loadCustomerInvoices(customerSelect.value);
+    });
+
+    changeInvoiceBtn.addEventListener('click', function () {
+        openInvoiceModalBtn.click();
+    });
+
+    invoiceSearchInput.addEventListener('input', function () {
+        renderInvoiceCards(filteredInvoices(this.value || ''));
+    });
+
+    confirmInvoiceBtn.addEventListener('click', async function () {
+        if (!selectedInvoice) {
+            alert('یک فاکتور را انتخاب کن.');
+            return;
+        }
+
+        applySelectedInvoice(selectedInvoice);
+        modalController.hide();
+        await loadInvoiceProducts(selectedInvoice.uuid, false);
+    });
+
+    reloadItemsBtn.addEventListener('click', function () {
+        if (!relatedInvoiceUuid.value) {
+            alert('ابتدا فاکتور را انتخاب کنید.');
+            return;
+        }
+
+        loadInvoiceProducts(relatedInvoiceUuid.value, false);
+    });
+
+    returnForm.addEventListener('submit', function (event) {
+        if (!customerSelect.value) {
+            event.preventDefault();
+            alert('لطفاً مشتری را انتخاب کنید.');
+            return;
+        }
+
+        if (!relatedInvoiceUuid.value) {
+            event.preventDefault();
+            alert('لطفاً فاکتور مشتری را انتخاب کنید.');
+            return;
+        }
+
+        if (!warehouseSelect.value) {
+            event.preventDefault();
+            alert('لطفاً انبار مقصد برگشت را انتخاب کنید.');
+            return;
+        }
+
+        if (!returnReasonSelect.value) {
+            event.preventDefault();
+            alert('لطفاً علت برگشت از فروش را انتخاب کنید.');
+            return;
+        }
+
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        if (!rows.length) {
+            event.preventDefault();
+            alert('حداقل یک کالای برگشتی باید در جدول باشد.');
+            return;
+        }
+
+        const seenVariants = new Set();
+
+        for (const row of rows) {
+            const productId = row.querySelector('input[name$="[product_id]"]')?.value || '';
+            const variantId = row.querySelector('input[name$="[variant_id]"]')?.value || '';
+            const qtyInput = row.querySelector('.qty-input');
+            const qty = Number(qtyInput?.value || 0);
+            const maxQty = Number(qtyInput?.max || 0);
+            const dupKey = productId + ':' + variantId;
+
+            if (!productId || !variantId || qty <= 0) {
+                event.preventDefault();
+                alert('تعداد برگشتی همه ردیف‌ها باید حداقل ۱ باشد. اگر کالایی برگشت ندارد، ردیف آن را حذف کن.');
+                return;
+            }
+
+            if (seenVariants.has(dupKey)) {
+                event.preventDefault();
+                alert('این محصول/تنوع تکراری است. هر تنوع فقط یک‌بار می‌تواند ثبت شود.');
+                return;
+            }
+
+            seenVariants.add(dupKey);
+
+            if (maxQty > 0 && qty > maxQty) {
+                event.preventDefault();
+                alert('تعداد برگشتی نمی‌تواند بیشتر از مقدار قابل برگشت باشد.');
+                return;
+            }
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'در حال ثبت...';
+    });
+
+    initCustomerSelect2();
+
+    if (customerSelect.value) {
+        openInvoiceModalBtn.disabled = false;
     }
 
-    const payload = await res.json();
-    invoiceVariants = payload.products || [];
-    addItemBtn.disabled = invoiceVariants.length === 0;
-    tbody.innerHTML = '';
-    addItemBtn.disabled = invoiceProducts.filter(p => Number(p.remaining_qty || 0) > 0).length === 0;
-    itemsSection.style.display = 'block';
-    updateGrandTotal();
-}
+    if (oldRelatedInvoiceUuid) {
+        applySelectedInvoice({
+            uuid: oldRelatedInvoiceUuid,
+            invoice_date: '—',
+            created_at: '—',
+            total: 0
+        });
 
-customerSelect.addEventListener('change', function () {
-    resetInvoiceSelection();
-    openInvoiceModalBtn.disabled = !customerSelect.value;
-});
-
-openInvoiceModalBtn.addEventListener('click', async function () {
-    if (!customerSelect.value) {
-        alert('اول مشتری را انتخاب کن.');
-        return;
-    }
-
-    invoiceSearchInput.value = '';
-    await loadCustomerInvoices(customerSelect.value);
-    invoiceModal.show();
-});
-
-invoiceSearchInput.addEventListener('input', function () {
-    renderInvoiceCards(filteredInvoices(this.value || ''));
-});
-
-confirmInvoiceBtn.addEventListener('click', async function () {
-    if (!selectedInvoice) {
-        alert('یک فاکتور را انتخاب کن.');
-        return;
-    }
-
-    relatedInvoiceUuid.value = selectedInvoice.uuid;
-    selectedInvoiceUuid.textContent = selectedInvoice.uuid || '—';
-    selectedInvoiceDate.textContent = selectedInvoice.invoice_date || selectedInvoice.created_at || '—';
-    selectedInvoiceTotal.textContent = toMoney(selectedInvoice.total || 0);
-    selectedInvoiceText.textContent = 'فاکتور انتخاب شد. حالا کالاهای برگشتی را ثبت کن.';
-
-    invoiceModal.hide();
-    await loadInvoiceProducts(selectedInvoice.uuid);
-});
-
-addItemBtn.addEventListener('click', () => {
-    tbody.insertAdjacentHTML('beforeend', itemRow(tbody.querySelectorAll('tr').length));
-    bindRow(tbody.querySelector('tr:last-child'));
-});
-
-returnForm.addEventListener('submit', () => {
-    const btn = returnForm.querySelector('button[type="submit"]');
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'در حال ثبت...';
+        loadInvoiceProducts(oldRelatedInvoiceUuid, true);
     }
 });
 </script>
