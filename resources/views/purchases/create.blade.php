@@ -159,6 +159,7 @@
     const totalEl = document.getElementById('totalAmount');
     const invoiceDiscountTypeEl = document.getElementById('invoiceDiscountType');
     const invoiceDiscountValueEl = document.getElementById('invoiceDiscountValue');
+    const hasSelect2 = typeof window.jQuery !== 'undefined' && typeof window.jQuery.fn.select2 === 'function';
 
     function parseNumericInput(value) {
         const normalized = String(value || '')
@@ -193,6 +194,28 @@
         return `<option value="">انتخاب کالا</option>${filtered.map((p) =>
             `<option value="${p.id}" ${String(selected)===String(p.id)?'selected':''}>${p.name} (${p.code || '-'})</option>`
         ).join('')}`;
+    }
+
+
+
+    function initProductSelect2(selectEl) {
+        if (!hasSelect2 || !selectEl) return;
+
+        const $select = window.jQuery(selectEl);
+        if ($select.hasClass('select2-hidden-accessible')) {
+            $select.select2('destroy');
+        }
+
+        $select.select2({
+            dir: 'rtl',
+            width: '100%',
+            placeholder: 'جستجوی کالا...',
+            allowClear: true,
+            language: {
+                noResults: () => 'نتیجه‌ای پیدا نشد',
+                searching: () => 'در حال جستجو...',
+            },
+        });
     }
 
     function extractModelGroup(name) {
@@ -253,7 +276,7 @@
                 </div>
                 <div class="col-md-4">
                     <div class="label">۲) کالا (از همان دسته‌بندی)</div>
-                    <select class="form-select form-select-sm group-product-select" required>
+                    <select class="form-select form-select-sm group-product-select product-search-select" required>
                         ${productOptionsByCategory(categoryId, productId)}
                     </select>
                 </div>
@@ -550,6 +573,7 @@
 
         syncGroupFieldsToRows(groupEl);
         renderVariantPicker(groupEl);
+        initProductSelect2(groupEl.querySelector('.group-product-select'));
         reindexRows();
         recalc();
         return groupEl;
@@ -641,6 +665,7 @@
             const categoryId = e.target.value || '';
             const productSelect = groupEl.querySelector('.group-product-select');
             productSelect.innerHTML = productOptionsByCategory(categoryId, '');
+            initProductSelect2(productSelect);
             groupEl.querySelector('.group-product-code').value = '';
             groupEl.querySelector('[data-models]').innerHTML = '';
             syncGroupFieldsToRows(groupEl);
@@ -755,6 +780,8 @@
     } else {
         addProductGroup({}, false);
     }
+
+    itemsList.querySelectorAll('.group-product-select').forEach((el) => initProductSelect2(el));
 
     formatPriceInputs(document);
 })();
