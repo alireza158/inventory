@@ -773,7 +773,7 @@ class PreinvoiceController extends Controller
             return false;
         }
 
-        return $user->hasAnyRole(['Admin', 'warehouse', 'finance']) || $user->can('warehouse.approve');
+        return $user->hasAnyRole(['Admin', 'warehouse', 'StorageManager', 'finance']) || $user->can('warehouse.approve');
     }
 
     public function finance(string $uuid)
