@@ -249,9 +249,9 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
 
     Route::post('/customers/import', [CustomerController::class, 'import'])->name('customers.import');
-    Route::get('/archive', [ArchiveController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant|warehouse')->name('archive.index');
-    Route::get('/archive/preinvoices/{uuid}', [ArchiveController::class, 'showPreinvoice'])->middleware('role:admin|Admin|finance|Accountant|warehouse')->name('archive.preinvoices.show');
-    Route::get('/archive/invoices/{uuid}', [ArchiveController::class, 'showInvoice'])->middleware('role:admin|Admin|finance|Accountant|warehouse')->name('archive.invoices.show');
+    Route::get('/archive', [ArchiveController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant|Manager|warehouse')->name('archive.index');
+    Route::get('/archive/preinvoices/{uuid}', [ArchiveController::class, 'showPreinvoice'])->middleware('role:admin|Admin|finance|Accountant|Manager|warehouse')->name('archive.preinvoices.show');
+    Route::get('/archive/invoices/{uuid}', [ArchiveController::class, 'showInvoice'])->middleware('role:admin|Admin|finance|Accountant|Manager|warehouse')->name('archive.invoices.show');
     // Invoices
     Route::prefix('invoices')->group(function () {
         Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');

@@ -109,6 +109,8 @@ class PreinvoiceApiController extends Controller
                 'id' => $v->id,
                 'price' => (int) ($v->sell_price ?? 0),
                 'quantity' => (int) ($v->stock ?? 0),
+                'reserved' => (int) ($v->reserved ?? 0),
+                'sellable_stock' => max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0)),
                 'variant_name' => (string) ($v->variant_name ?? ''),
                 'variety_name' => (string) ($v->variety_name ?? ''),
                 'variety_code' => (string) ($v->variety_code ?? ''),
