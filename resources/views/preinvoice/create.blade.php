@@ -2022,6 +2022,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         wrap.innerHTML = rows.map(v => {
             const id = variantId(v);
             const stock = variantStock(v);
+            const reserved = Number(v?.reserved ?? 0) || 0;
+            const totalStock = Number(v?.stock ?? v?.quantity ?? 0) || 0;
             const max = modalMaxQty(v);
             const qty = Number(modalQuantities.get(id) || 0);
             const price = variantPrice(v, activeProduct);
@@ -2034,8 +2036,10 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 <div class="variant-title">${esc(buildVariantTitle(v))}</div>
                 <div class="variant-meta">
                     <span class="badge-soft ${stock > 0 ? 'badge-stock' : 'badge-no-stock'}">
-                        موجودی: ${stock > 0 ? formatNum(stock) : 'ناموجود'}
+                        موجودی قابل فروش: ${stock > 0 ? formatNum(stock) : 'ناموجود'}
                     </span>
+                    <span class="badge-soft">پیش‌فاکتور شده: ${formatNum(reserved)}</span>
+                    <span class="badge-soft">کل موجودی: ${formatNum(totalStock)}</span>
                     <span class="badge-soft">قیمت: ${formatMoney(price)}</span>
                     ${qty > 0 ? `<span class="badge-soft badge-brand">انتخاب: ${formatNum(qty)}</span>` : ''}
                 </div>

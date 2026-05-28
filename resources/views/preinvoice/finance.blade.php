@@ -268,6 +268,8 @@
 
 <script>
   (function () {
+    const defaultChequeCustomerName = @json($order->customer_name ?? '');
+    const defaultChequeCustomerCode = @json(!empty($order->customer_id) ? (string) $order->customer_id : '');
     const rowsWrap = document.getElementById('paymentRows');
     const addBtn = document.getElementById('addPaymentRow');
     const guide = document.getElementById('paymentGuide');
@@ -382,8 +384,8 @@
       const bankName = (document.getElementById('cashBankNameInput').value || '').trim();
       const note = (document.getElementById('cashNoteInput').value || '').trim();
 
-      if (!amount || !paidAt || !bankName || !note) {
-        return { error: 'برای پرداخت نقدی، مبلغ، تاریخ پرداخت، اسم بانک و توضیحات الزامی است.' };
+      if (!amount || !paidAt) {
+        return { error: 'برای پرداخت نقدی، مبلغ و تاریخ پرداخت الزامی است.' };
       }
 
       return {
@@ -414,23 +416,8 @@
         cheque_status: document.getElementById('chequeStatusInput').value || 'pending',
       };
 
-      const requiredFields = [
-        payload.amount,
-        payload.paid_at,
-        payload.note,
-        payload.cheque_number,
-        payload.cheque_amount,
-        payload.cheque_due_date,
-        payload.cheque_received_at,
-        payload.cheque_customer_name,
-        payload.cheque_customer_code,
-        payload.cheque_bank_name,
-        payload.cheque_branch_name,
-        payload.cheque_account_holder,
-      ];
-
-      if (requiredFields.some((v) => !v)) {
-        return { error: 'برای ثبت چک، همه فیلدهای اصلی چک و توضیحات را تکمیل کنید.' };
+      if (!payload.amount || !payload.paid_at) {
+        return { error: 'برای ثبت چک، مبلغ و تاریخ دریافت چک الزامی است.' };
       }
 
       return payload;
@@ -439,6 +426,8 @@
     function clearModalFields() {
       paymentModalEl.querySelectorAll('input, textarea').forEach((el) => el.value = '');
       document.getElementById('chequeStatusInput').value = 'unregistered';
+      document.getElementById('chequeCustomerNameInput').value = defaultChequeCustomerName;
+      document.getElementById('chequeCustomerCodeInput').value = defaultChequeCustomerCode;
       paymentModalError.classList.add('d-none');
       paymentModalError.textContent = '';
       paymentTypeInput.value = 'cash';

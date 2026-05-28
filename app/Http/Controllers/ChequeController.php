@@ -11,13 +11,19 @@ class ChequeController extends Controller
     {
         $query = Cheque::query()
             ->with(['payment.invoice'])
-            ->whereIn('status', ['registered', 'cleared']);
+            ->whereIn('status', ['registered', 'unregistered']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status')->toString());
         }
         if ($request->filled('customer_name')) {
-            $query->where('customer_name', 'like', '%' . $request->string('customer_name')->toString() . '%');
+            $customerName = $request->string('customer_name')->toString();
+            $query->where(function ($q) use ($customerName) {
+                $q->where('customer_name', 'like', '%' . $customerName . '%')
+                    ->orWhereHas('payment.invoice', function ($invoiceQ) use ($customerName) {
+                        $invoiceQ->where('customer_name', 'like', '%' . $customerName . '%');
+                    });
+            });
         }
         if ($request->filled('cheque_number')) {
             $query->where('cheque_number', 'like', '%' . $request->string('cheque_number')->toString() . '%');
