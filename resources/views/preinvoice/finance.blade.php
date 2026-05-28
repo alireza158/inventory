@@ -195,7 +195,7 @@
               <input type="text" id="cashBankNameInput" class="form-control" placeholder="مثال: ملی">
             </div>
             <div class="col-12">
-              <label class="form-label">توضیحات (الزامی)</label>
+              <label class="form-label">توضیحات (اختیاری)</label>
               <textarea id="cashNoteInput" class="form-control" rows="2"></textarea>
             </div>
           </div>
@@ -228,11 +228,11 @@
             </div>
             <div class="col-md-4">
               <label class="form-label">نام مشتری</label>
-              <input type="text" id="chequeCustomerNameInput" class="form-control">
+              <input type="text" id="chequeCustomerNameInput" class="form-control" value="{{ $order->customer_name ?: '' }}" readonly>
             </div>
             <div class="col-md-4">
               <label class="form-label">شناسه / کد مشتری</label>
-              <input type="text" id="chequeCustomerCodeInput" class="form-control">
+              <input type="text" id="chequeCustomerCodeInput" class="form-control" value="{{ $order->customer_id ?: '' }}" readonly>
             </div>
             <div class="col-md-4">
               <label class="form-label">نام بانک</label>
@@ -247,11 +247,11 @@
               <input type="text" id="chequeAccountNumberInput" class="form-control">
             </div>
             <div class="col-md-6">
-              <label class="form-label">صاحب حساب / صادرکننده چک</label>
+              <label class="form-label">صاحب حساب / صادرکننده چک (اختیاری)</label>
               <input type="text" id="chequeAccountHolderInput" class="form-control">
             </div>
             <div class="col-12">
-              <label class="form-label">توضیحات (الزامی)</label>
+              <label class="form-label">توضیحات (اختیاری)</label>
               <textarea id="chequeNoteInput" class="form-control" rows="2"></textarea>
             </div>
           </div>
