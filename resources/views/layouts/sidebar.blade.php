@@ -11,7 +11,7 @@
 
     $salesActive = $isRoute('preinvoice.create', 'preinvoice.my.*', 'customers.*', 'persons.*');
 
-    $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'archive.*');
+    $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'archive.*', 'finance.cheques.*');
 
     $configActive = $isRoute('shipping-methods.*', 'users.*', 'activity-logs.*', 'inventory-webhooks.*');
 
@@ -290,6 +290,7 @@
                     <a class="sidebar-sublink {{ $is('archive.*') }}" href="{{ route('archive.index') }}">بایگانی اسناد فروش</a>
                     <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
                     <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+                    <a class="sidebar-sublink {{ $is('finance.cheques.*') }}" href="{{ route('finance.cheques.registered') }}">چک‌های ثبت‌شده</a>
                 </div>
             </div>
         </div>
