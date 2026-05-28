@@ -783,7 +783,7 @@ class PreinvoiceController extends Controller
             ->firstOrFail();
         abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
 
-        $customerBalanceStatus = 'تسویه';
+        $customerBalanceStatus = 'تسویه شده';
         $customerBalanceAmount = 0;
 
         if (!empty($order->customer_id)) {
@@ -829,7 +829,7 @@ class PreinvoiceController extends Controller
             'payments.*.cheque_customer_code' => 'nullable|string|max:255',
             'payments.*.cheque_account_number' => 'nullable|string|max:255',
             'payments.*.cheque_account_holder' => 'nullable|string|max:255',
-            'payments.*.cheque_status' => 'nullable|in:pending,cleared,bounced',
+            'payments.*.cheque_status' => 'nullable|in:pending,cleared,bounced,registered,unregistered',
         ]);
 
         foreach (($validated['payments'] ?? []) as $index => $paymentRow) {
@@ -1015,5 +1015,25 @@ class PreinvoiceController extends Controller
 
         return redirect()->route('invoices.show', $invoice->uuid)
             ->with('success', '✅ تایید مالی انجام شد و پیش‌فاکتور به فاکتور/حواله انبار تبدیل شد.');
+    }
+
+    public function financeCancel(string $uuid, Request $request)
+    {
+        $order = PreinvoiceOrder::query()->where('uuid', $uuid)->firstOrFail();
+        abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
+
+        $data = $request->validate([
+            'reason' => 'required|string|max:2000',
+        ]);
+
+        DB::transaction(function () use ($order, $data) {
+            $order->update([
+                'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+                'warehouse_reject_reason' => $data['reason'],
+            ]);
+            $this->releaseReservedStock($order);
+        });
+
+        return redirect()->route('preinvoice.draft.index')->with('success', '✅ پیش‌فاکتور با دلیل کنسل شد.');
     }
 }

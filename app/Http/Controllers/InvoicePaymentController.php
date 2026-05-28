@@ -55,7 +55,7 @@ class InvoicePaymentController extends Controller
             'cheque_number' => 'required_if:method,cheque|nullable|string|max:255',
             'bank_name' => 'nullable|string|max:255',
             'due_date' => 'nullable|date',
-            'cheque_status' => 'nullable|in:pending,cleared,bounced',
+            'cheque_status' => 'nullable|in:pending,cleared,bounced,registered,unregistered',
             'cheque_image' => 'nullable|image|max:4096',
         ]);
 
@@ -90,7 +90,7 @@ class InvoicePaymentController extends Controller
             'cheque_customer_code' => 'required_if:method,cheque|nullable|string|max:255',
             'cheque_account_number' => 'nullable|string|max:255',
             'cheque_account_holder' => 'required_if:method,cheque|nullable|string|max:255',
-            'cheque_status' => 'nullable|in:pending,cleared,bounced',
+            'cheque_status' => 'nullable|in:pending,cleared,bounced,registered,unregistered',
             'cheque_image' => 'nullable|image|max:4096',
         ]);
 
@@ -120,7 +120,7 @@ class InvoicePaymentController extends Controller
             'cheque_customer_code' => 'required_if:method,cheque|nullable|string|max:255',
             'cheque_account_number' => 'nullable|string|max:255',
             'cheque_account_holder' => 'required_if:method,cheque|nullable|string|max:255',
-            'cheque_status' => 'nullable|in:pending,cleared,bounced',
+            'cheque_status' => 'nullable|in:pending,cleared,bounced,registered,unregistered',
             'cheque_image' => 'nullable|image|max:4096',
         ]);
 

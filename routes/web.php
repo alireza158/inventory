@@ -105,6 +105,7 @@ Route::get('/vouchers/sales/{uuid}/history', [InvoiceController::class, 'salesVo
 Route::put('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherUpdate'])->name('vouchers.sales.update');
 Route::post('/vouchers/sales/{uuid}/status', [InvoiceController::class, 'updateStatus'])->name('vouchers.sales.status');
 Route::get('/vouchers/sales/{uuid}/print', [InvoiceController::class, 'print'])->name('vouchers.sales.print');
+Route::get('/finance/registered-cheques', [ChequeController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant')->name('finance.cheques.registered');
 
 Route::get('/vouchers/section/{type}', [VoucherController::class, 'sectionIndex'])->name('vouchers.section.index');
 Route::get('/vouchers/section/{type}/create', [VoucherController::class, 'sectionCreate'])->name('vouchers.section.create');
@@ -226,6 +227,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.update');
     Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finance');
     Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finalize');
+    Route::post('/preinvoice/drafts/{uuid}/cancel', [PreinvoiceController::class, 'financeCancel'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.cancel');
     Route::get('/preinvoice/all', [PreinvoiceController::class, 'allIndex'])->middleware('role:admin|Admin|warehouse|finance|Accountant')->name('preinvoice.all.index');
     Route::get('/preinvoice/my', [PreinvoiceController::class, 'myIndex'])->name('preinvoice.my.index');
     Route::get('/preinvoice/my/{uuid}', [PreinvoiceController::class, 'myShow'])->name('preinvoice.my.show');
