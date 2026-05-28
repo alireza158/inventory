@@ -55,7 +55,7 @@
         <div class="col-md-3 col-sm-6">
           <div class="text-muted small mb-1">وضعیت حساب مشتری</div>
           <div class="fw-semibold {{ $customerBalanceStatus === 'بدهکار' ? 'text-danger' : ($customerBalanceStatus === 'بستانکار' ? 'text-success' : '') }}">
-            {{ $customerBalanceStatus }} {{ $customerBalanceStatus === 'تسویه' ? '' : number_format($customerBalanceAmount) . ' تومان' }}
+            {{ $customerBalanceStatus }} {{ $customerBalanceStatus === 'تسویه شده' ? '' : number_format($customerBalanceAmount) . ' تومان' }}
           </div>
         </div>
         <div class="col-md-3 col-sm-6">
@@ -87,6 +87,11 @@
               </div>
 
               <div id="paymentRows" class="d-grid gap-3"></div>
+              <div class="border rounded p-2 small mb-3 d-none" id="paymentTotals">
+                <div class="d-flex justify-content-between"><span>جمع نقدی</span><strong id="cashTotalLabel">0 تومان</strong></div>
+                <div class="d-flex justify-content-between"><span>جمع چکی</span><strong id="chequeTotalLabel">0 تومان</strong></div>
+                <div class="d-flex justify-content-between"><span>جمع کل پرداختی</span><strong id="allTotalLabel">0 تومان</strong></div>
+              </div>
               <div class="alert alert-light border mb-0 small text-muted" id="paymentGuide">
                 هنوز پرداختی اضافه نشده است. در صورت نیاز روی «افزودن پرداخت» بزنید.
               </div>
@@ -148,6 +153,11 @@
     </div>
 
     <div class="card-footer d-flex justify-content-end gap-2">
+      <form method="POST" action="{{ route('preinvoice.draft.cancel', $order->uuid) }}" onsubmit="return confirm('پیش‌فاکتور کنسل شود؟')" class="d-flex gap-2">
+        @csrf
+        <input name="reason" class="form-control" placeholder="دلیل کنسلی" required>
+        <button class="btn btn-outline-danger">کنسل پیش‌فاکتور</button>
+      </form>
       <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-outline-secondary">ویرایش فاکتور</a>
       <button class="btn btn-success" onclick="return confirm('تاییدیه نهایی مالی ثبت شود؟ با این کار، پیش‌فاکتور به فاکتور تبدیل می‌شود و در صف حواله فروش انبار قرار می‌گیرد.')">تاییدیه نهایی پیش‌فاکتور از سمت مالی</button>
     </div>
@@ -202,11 +212,10 @@
               <input type="text" inputmode="numeric" id="chequeAmountInput" class="form-control money">
             </div>
             <div class="col-md-4">
-              <label class="form-label">وضعیت</label>
+              <label class="form-label">وضعیت صیادی چک</label>
               <select id="chequeStatusInput" class="form-select">
-                <option value="pending">در انتظار وصول</option>
-                <option value="cleared">وصول شده</option>
-                <option value="bounced">برگشتی</option>
+                <option value="registered">ثبت‌شده</option>
+                <option value="unregistered">ثبت‌نشده</option>
               </select>
             </div>
             <div class="col-md-4">
@@ -223,7 +232,7 @@
             </div>
             <div class="col-md-4">
               <label class="form-label">شناسه / کد مشتری</label>
-              <input type="text" id="chequeCustomerCodeInput" class="form-control">
+              <input type="text" id="chequeCustomerCodeInput" class="form-control" value="{{ $order->customer_id ?: '' }}" readonly>
             </div>
             <div class="col-md-4">
               <label class="form-label">نام بانک</label>
@@ -238,11 +247,11 @@
               <input type="text" id="chequeAccountNumberInput" class="form-control">
             </div>
             <div class="col-md-6">
-              <label class="form-label">صاحب حساب / صادرکننده چک</label>
+              <label class="form-label">صاحب حساب / صادرکننده چک (اختیاری)</label>
               <input type="text" id="chequeAccountHolderInput" class="form-control">
             </div>
             <div class="col-12">
-              <label class="form-label">توضیحات (الزامی)</label>
+              <label class="form-label">توضیحات (اختیاری)</label>
               <textarea id="chequeNoteInput" class="form-control" rows="2"></textarea>
             </div>
           </div>
@@ -272,6 +281,10 @@
     const paymentTypeInput = document.getElementById('paymentTypeInput');
     const paymentModalError = document.getElementById('paymentModalError');
     const payments = [];
+    const paymentTotals = document.getElementById('paymentTotals');
+    const cashTotalLabel = document.getElementById('cashTotalLabel');
+    const chequeTotalLabel = document.getElementById('chequeTotalLabel');
+    const allTotalLabel = document.getElementById('allTotalLabel');
 
     function normalizeAmount(value) {
       return (value || '').toString().replace(/[^\d]/g, '');
@@ -323,11 +336,15 @@
       if (payments.length === 0) {
         rowsWrap.innerHTML = '';
         guide.classList.remove('d-none');
+        paymentTotals.classList.add('d-none');
         return;
       }
 
       guide.classList.add('d-none');
+      let cashTotal = 0, chequeTotal = 0;
       rowsWrap.innerHTML = payments.map((payment, idx) => {
+        const amount = Number(payment.amount || payment.cheque_amount || 0);
+        if (payment.method === 'cash') cashTotal += amount; else chequeTotal += amount;
         const title = payment.method === 'cash'
           ? `نقدی | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} تومان`
           : `چک | شماره: ${payment.cheque_number} | مبلغ: ${Number(payment.cheque_amount || 0).toLocaleString('en-US')} تومان`;
@@ -345,6 +362,11 @@
           </div>
         `;
       }).join('');
+      const allTotal = cashTotal + chequeTotal;
+      paymentTotals.classList.remove('d-none');
+      cashTotalLabel.textContent = `${cashTotal.toLocaleString('en-US')} تومان`;
+      chequeTotalLabel.textContent = `${chequeTotal.toLocaleString('en-US')} تومان`;
+      allTotalLabel.textContent = `${allTotal.toLocaleString('en-US')} تومان`;
 
       rowsWrap.querySelectorAll('.js-remove-payment').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -395,7 +417,6 @@
       const requiredFields = [
         payload.amount,
         payload.paid_at,
-        payload.note,
         payload.cheque_number,
         payload.cheque_amount,
         payload.cheque_due_date,
@@ -404,7 +425,6 @@
         payload.cheque_customer_code,
         payload.cheque_bank_name,
         payload.cheque_branch_name,
-        payload.cheque_account_holder,
       ];
 
       if (requiredFields.some((v) => !v)) {
@@ -416,7 +436,7 @@
 
     function clearModalFields() {
       paymentModalEl.querySelectorAll('input, textarea').forEach((el) => el.value = '');
-      document.getElementById('chequeStatusInput').value = 'pending';
+      document.getElementById('chequeStatusInput').value = 'unregistered';
       paymentModalError.classList.add('d-none');
       paymentModalError.textContent = '';
       paymentTypeInput.value = 'cash';
