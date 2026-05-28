@@ -55,6 +55,7 @@
             <th class="text-nowrap">مبلغ</th>
             <th class="text-nowrap">مانده</th>
             <th class="text-nowrap">تاریخ</th>
+            <th class="text-nowrap">ثبت‌کننده</th>
             <th></th>
           </tr>
         </thead>
@@ -79,6 +80,7 @@
               <td class="text-nowrap">
                 {{ $inv->created_at ? Jalalian::fromDateTime($inv->created_at)->format('Y/m/d') : '—' }}
               </td>
+              <td class="text-nowrap">{{ $inv->preinvoiceOrder?->creator?->name ?? '—' }}</td>
               <td class="text-nowrap">
                 <div class="d-flex gap-1">
                   <a class="btn btn-sm btn-outline-primary" href="{{ route('invoices.show', $inv->uuid) }}">جزئیات</a>
@@ -88,7 +90,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="9" class="text-center text-muted py-4">فاکتوری یافت نشد</td>
+              <td colspan="10" class="text-center text-muted py-4">فاکتوری یافت نشد</td>
             </tr>
           @endforelse
         </tbody>
