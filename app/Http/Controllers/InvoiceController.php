@@ -24,7 +24,7 @@ class InvoiceController extends Controller
         $reportDate = $this->resolveReportDate($dateInput);
 
         $baseQuery = Invoice::query()
-            ->with(['payments.cheque'])
+            ->with(['payments.cheque', 'preinvoiceOrder.creator:id,name'])
             ->withSum('payments as paid_total', 'amount')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
@@ -223,6 +223,7 @@ class InvoiceController extends Controller
                 'payments.cheque',
                 'payments.creator',
                 'notes',
+                'preinvoiceOrder.creator:id,name',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();
