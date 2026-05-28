@@ -124,6 +124,7 @@
         <div class="mt-3">
           <div class="kv"><div class="k">نام:</div><div class="v">{{ $invoice->customer_name ?: '—' }}</div></div>
           <div class="kv"><div class="k">موبایل:</div><div class="v">{{ $invoice->customer_mobile ?: '—' }}</div></div>
+          <div class="kv"><div class="k">ثبت‌کننده:</div><div class="v">{{ $invoice->preinvoiceOrder?->creator?->name ?? '—' }}</div></div>
           <div class="kv"><div class="k">آدرس:</div><div class="v fw-normal">{{ $invoice->customer_address ?: '—' }}</div></div>
         </div>
       </div>
