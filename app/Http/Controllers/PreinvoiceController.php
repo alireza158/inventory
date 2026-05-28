@@ -840,10 +840,8 @@ class PreinvoiceController extends Controller
                     empty($paymentRow['cheque_due_date']) ||
                     empty($paymentRow['cheque_received_at']) ||
                     empty($paymentRow['cheque_customer_name']) ||
-                    empty($paymentRow['cheque_customer_code']) ||
                     empty($paymentRow['cheque_bank_name']) ||
-                    empty($paymentRow['cheque_branch_name']) ||
-                    empty($paymentRow['cheque_account_holder'])
+                    empty($paymentRow['cheque_branch_name'])
                 ) {
                     throw ValidationException::withMessages([
                         "payments.{$index}.cheque_number" => 'برای پرداخت چکی، تکمیل اطلاعات اصلی چک الزامی است.',

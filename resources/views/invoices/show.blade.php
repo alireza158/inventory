@@ -298,14 +298,14 @@
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">کد/شناسه مشتری</label>
-                      <input name="cheque_customer_code" class="form-control">
+                      <input name="cheque_customer_code" class="form-control" value="{{ $invoice->customer_id ?: '' }}" readonly>
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">شماره حساب/شبا</label>
                       <input name="cheque_account_number" class="form-control">
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">صاحب حساب</label>
+                      <label class="form-label">صاحب حساب / صادرکننده چک (اختیاری)</label>
                       <input name="cheque_account_holder" class="form-control">
                     </div>
                     <div class="col-md-6">

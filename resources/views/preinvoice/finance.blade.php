@@ -232,7 +232,7 @@
             </div>
             <div class="col-md-4">
               <label class="form-label">شناسه / کد مشتری</label>
-              <input type="text" id="chequeCustomerCodeInput" class="form-control">
+              <input type="text" id="chequeCustomerCodeInput" class="form-control" value="{{ $order->customer_id ?: '' }}" readonly>
             </div>
             <div class="col-md-4">
               <label class="form-label">نام بانک</label>
@@ -247,11 +247,11 @@
               <input type="text" id="chequeAccountNumberInput" class="form-control">
             </div>
             <div class="col-md-6">
-              <label class="form-label">صاحب حساب / صادرکننده چک</label>
+              <label class="form-label">صاحب حساب / صادرکننده چک (اختیاری)</label>
               <input type="text" id="chequeAccountHolderInput" class="form-control">
             </div>
             <div class="col-12">
-              <label class="form-label">توضیحات (الزامی)</label>
+              <label class="form-label">توضیحات (اختیاری)</label>
               <textarea id="chequeNoteInput" class="form-control" rows="2"></textarea>
             </div>
           </div>
@@ -417,7 +417,6 @@
       const requiredFields = [
         payload.amount,
         payload.paid_at,
-        payload.note,
         payload.cheque_number,
         payload.cheque_amount,
         payload.cheque_due_date,
@@ -426,7 +425,6 @@
         payload.cheque_customer_code,
         payload.cheque_bank_name,
         payload.cheque_branch_name,
-        payload.cheque_account_holder,
       ];
 
       if (requiredFields.some((v) => !v)) {
