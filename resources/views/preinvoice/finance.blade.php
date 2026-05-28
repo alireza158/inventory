@@ -195,7 +195,7 @@
               <input type="text" id="cashBankNameInput" class="form-control" placeholder="مثال: ملی">
             </div>
             <div class="col-12">
-              <label class="form-label">توضیحات (الزامی)</label>
+              <label class="form-label">توضیحات (اختیاری)</label>
               <textarea id="cashNoteInput" class="form-control" rows="2"></textarea>
             </div>
           </div>
@@ -228,7 +228,7 @@
             </div>
             <div class="col-md-4">
               <label class="form-label">نام مشتری</label>
-              <input type="text" id="chequeCustomerNameInput" class="form-control">
+              <input type="text" id="chequeCustomerNameInput" class="form-control" value="{{ $order->customer_name ?: '' }}" readonly>
             </div>
             <div class="col-md-4">
               <label class="form-label">شناسه / کد مشتری</label>
@@ -421,14 +421,10 @@
         payload.cheque_amount,
         payload.cheque_due_date,
         payload.cheque_received_at,
-        payload.cheque_customer_name,
-        payload.cheque_customer_code,
-        payload.cheque_bank_name,
-        payload.cheque_branch_name,
       ];
 
       if (requiredFields.some((v) => !v)) {
-        return { error: 'برای ثبت چک، همه فیلدهای اصلی چک و توضیحات را تکمیل کنید.' };
+        return { error: 'برای ثبت چک، مبلغ، شماره چک، تاریخ سررسید و تاریخ دریافت را تکمیل کنید.' };
       }
 
       return payload;

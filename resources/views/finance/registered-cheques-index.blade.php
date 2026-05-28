@@ -7,10 +7,22 @@
     <div class="row g-2">
       <div class="col-md-3"><input class="form-control" name="customer_name" value="{{ request('customer_name') }}" placeholder="نام مشتری"></div>
       <div class="col-md-2"><input class="form-control" name="cheque_number" value="{{ request('cheque_number') }}" placeholder="شماره چک"></div>
-      <div class="col-md-2"><input type="date" class="form-control" name="received_from" value="{{ request('received_from') }}" title="از تاریخ وصول"></div>
-      <div class="col-md-2"><input type="date" class="form-control" name="received_to" value="{{ request('received_to') }}" title="تا تاریخ وصول"></div>
-      <div class="col-md-2"><input type="date" class="form-control" name="due_from" value="{{ request('due_from') }}" title="از تاریخ سررسید"></div>
-      <div class="col-md-2"><input type="date" class="form-control" name="due_to" value="{{ request('due_to') }}" title="تا تاریخ سررسید"></div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted mb-1">از تاریخ وصول</label>
+        <input type="date" class="form-control" name="received_from" value="{{ request('received_from') }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted mb-1">تا تاریخ وصول</label>
+        <input type="date" class="form-control" name="received_to" value="{{ request('received_to') }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted mb-1">از تاریخ سررسید</label>
+        <input type="date" class="form-control" name="due_from" value="{{ request('due_from') }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted mb-1">تا تاریخ سررسید</label>
+        <input type="date" class="form-control" name="due_to" value="{{ request('due_to') }}">
+      </div>
       <div class="col-md-2">
         <select class="form-select" name="status">
           <option value="">همه وضعیت‌ها</option>
@@ -18,7 +30,7 @@
           <option value="cleared" @selected(request('status')==='cleared')>وصول‌شده</option>
         </select>
       </div>
-      <div class="col-md-2"><button class="btn btn-primary w-100">جستجو</button></div>
+      <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">جستجو</button></div>
     </div>
   </form>
   <div class="card">

@@ -80,13 +80,13 @@ class InvoicePaymentController extends Controller
             'bank_name' => 'required_if:method,cash|nullable|string|max:255',
             'note' => 'nullable|string|max:2000',
             'receipt_image' => 'nullable|image|max:4096',
-            'cheque_bank_name' => 'required_if:method,cheque|nullable|string|max:255',
-            'cheque_branch_name' => 'required_if:method,cheque|nullable|string|max:255',
+            'cheque_bank_name' => 'nullable|string|max:255',
+            'cheque_branch_name' => 'nullable|string|max:255',
             'cheque_number' => 'required_if:method,cheque|nullable|string|max:255',
             'cheque_amount' => 'nullable|integer|min:1',
             'cheque_due_date' => 'required_if:method,cheque|nullable|date',
             'cheque_received_at' => 'required_if:method,cheque|nullable|date',
-            'cheque_customer_name' => 'required_if:method,cheque|nullable|string|max:255',
+            'cheque_customer_name' => 'nullable|string|max:255',
             'cheque_customer_code' => 'nullable|string|max:255',
             'cheque_account_number' => 'nullable|string|max:255',
             'cheque_account_holder' => 'nullable|string|max:255',
@@ -110,13 +110,13 @@ class InvoicePaymentController extends Controller
             'bank_name' => 'required_if:method,cash|nullable|string|max:255',
             'note' => 'nullable|string|max:2000',
             'receipt_image' => 'nullable|image|max:4096',
-            'cheque_bank_name' => 'required_if:method,cheque|nullable|string|max:255',
-            'cheque_branch_name' => 'required_if:method,cheque|nullable|string|max:255',
+            'cheque_bank_name' => 'nullable|string|max:255',
+            'cheque_branch_name' => 'nullable|string|max:255',
             'cheque_number' => 'required_if:method,cheque|nullable|string|max:255',
             'cheque_amount' => 'nullable|integer|min:1',
             'cheque_due_date' => 'required_if:method,cheque|nullable|date',
             'cheque_received_at' => 'required_if:method,cheque|nullable|date',
-            'cheque_customer_name' => 'required_if:method,cheque|nullable|string|max:255',
+            'cheque_customer_name' => 'nullable|string|max:255',
             'cheque_customer_code' => 'nullable|string|max:255',
             'cheque_account_number' => 'nullable|string|max:255',
             'cheque_account_holder' => 'nullable|string|max:255',
@@ -147,6 +147,9 @@ class InvoicePaymentController extends Controller
             $payload['paid_at'] = $paidAt;
             if (($payload['method'] ?? null) === 'cheque' && empty($payload['cheque_customer_code'])) {
                 $payload['cheque_customer_code'] = (string) ($customerId ?: ($invoice->customer_id ?: ''));
+            }
+            if (($payload['method'] ?? null) === 'cheque' && empty($payload['cheque_customer_name'])) {
+                $payload['cheque_customer_name'] = (string) ($invoice->customer_name ?: '');
             }
             if (($payload['method'] ?? null) === 'cheque') {
                 $payload['amount'] = (int) ($payload['cheque_amount'] ?? $payload['amount']);
