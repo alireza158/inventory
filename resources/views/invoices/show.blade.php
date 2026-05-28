@@ -207,7 +207,9 @@
         {{-- Payments --}}
         <div class="card-soft p-3 p-md-4 mb-3" id="invoicePayments">
           @php
-            $paidAmount = (int) $invoice->paid_amount;
+            $cashPaidAmount = (int) $invoice->payments->where('method', 'cash')->sum('amount');
+            $chequePaidAmount = (int) $invoice->payments->where('method', 'cheque')->sum('amount');
+            $paidAmount = $cashPaidAmount + $chequePaidAmount;
             $remainingAmount = max((int) $invoice->total - $paidAmount, 0);
             $paymentState = $remainingAmount <= 0 ? 'تسویه شده' : ($paidAmount > 0 ? 'پرداخت ناقص' : 'پرداخت نشده');
             $paymentStateClass = $remainingAmount <= 0 ? 'bg-success' : ($paidAmount > 0 ? 'bg-warning text-dark' : 'bg-danger');
@@ -220,6 +222,14 @@
           <div class="d-flex justify-content-between">
             <div class="hint">پرداخت شده</div>
             <div class="fw-bold">{{ $toman($paidAmount) }}</div>
+          </div>
+          <div class="d-flex justify-content-between">
+            <div class="hint">جمع نقدی</div>
+            <div class="fw-bold">{{ $toman($cashPaidAmount) }}</div>
+          </div>
+          <div class="d-flex justify-content-between">
+            <div class="hint">جمع چکی</div>
+            <div class="fw-bold">{{ $toman($chequePaidAmount) }}</div>
           </div>
           <div class="d-flex justify-content-between mb-3">
             <div class="hint">مانده</div>
@@ -266,11 +276,11 @@
                       <input name="cheque_number" class="form-control" placeholder="شماره سریال چک">
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">نام بانک</label>
+                      <label class="form-label">نام بانک (اختیاری)</label>
                       <input name="cheque_bank_name" class="form-control" placeholder="مثال: ملی">
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">نام شعبه</label>
+                      <label class="form-label">نام شعبه (اختیاری)</label>
                       <input name="cheque_branch_name" class="form-control">
                     </div>
                     <div class="col-md-4">
@@ -283,18 +293,18 @@
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">نام مشتری</label>
-                      <input name="cheque_customer_name" class="form-control" value="{{ $invoice->customer_name }}">
+                      <input name="cheque_customer_name" class="form-control" value="{{ $invoice->customer_name }}" readonly>
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">کد/شناسه مشتری</label>
-                      <input name="cheque_customer_code" class="form-control">
+                      <input name="cheque_customer_code" class="form-control" value="{{ $invoice->customer_id ?: '' }}" readonly>
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">شماره حساب/شبا</label>
                       <input name="cheque_account_number" class="form-control">
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">صاحب حساب</label>
+                      <label class="form-label">صاحب حساب / صادرکننده چک (اختیاری)</label>
                       <input name="cheque_account_holder" class="form-control">
                     </div>
                     <div class="col-md-6">
@@ -302,11 +312,10 @@
                       <input name="cheque_image" type="file" class="form-control" accept="image/*">
                     </div>
                     <div class="col-md-6">
-                      <label class="form-label">وضعیت چک</label>
+                      <label class="form-label">وضعیت صیادی چک</label>
                       <select name="cheque_status" class="form-select">
-                        <option value="pending">در انتظار وصول</option>
-                        <option value="cleared">وصول شده</option>
-                        <option value="bounced">برگشتی</option>
+                        <option value="registered">ثبت‌شده</option>
+                        <option value="unregistered">ثبت‌نشده</option>
                       </select>
                     </div>
                   </div>
@@ -339,7 +348,9 @@
           @forelse($invoice->payments as $p)
             @php
               $chequeStatusFa = match($p->cheque?->status){
-                'pending' => 'در انتظار وصول',
+                'pending' => 'ثبت‌نشده',
+                'unregistered' => 'ثبت‌نشده',
+                'registered' => 'ثبت‌شده',
                 'cleared' => 'وصول شده',
                 'bounced' => 'برگشتی',
                 default => '—',
