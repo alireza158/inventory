@@ -222,13 +222,13 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::put('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseSave'])->name('preinvoice.warehouse.save');
     Route::post('/preinvoice/warehouse/{uuid}/approve', [PreinvoiceController::class, 'warehouseApprove'])->name('preinvoice.warehouse.approve');
     Route::post('/preinvoice/warehouse/{uuid}/reject', [PreinvoiceController::class, 'warehouseReject'])->name('preinvoice.warehouse.reject');
-    Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.index');
-    Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.edit');
-    Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.update');
-    Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finance');
-    Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.finalize');
-    Route::post('/preinvoice/drafts/{uuid}/cancel', [PreinvoiceController::class, 'financeCancel'])->middleware('role:admin|Admin|finance|Accountant')->name('preinvoice.draft.cancel');
-    Route::get('/preinvoice/all', [PreinvoiceController::class, 'allIndex'])->middleware('role:admin|Admin|warehouse|finance|Accountant')->name('preinvoice.all.index');
+    Route::get('/preinvoice/drafts', [PreinvoiceController::class, 'draftIndex'])->middleware('role:admin|Admin|finance|Accountant|Manager')->name('preinvoice.draft.index');
+    Route::get('/preinvoice/drafts/{uuid}/edit', [PreinvoiceController::class, 'editDraft'])->middleware('role:admin|Admin|finance|Accountant|Manager')->name('preinvoice.draft.edit');
+    Route::put('/preinvoice/drafts/{uuid}', [PreinvoiceController::class, 'updateDraft'])->middleware('role:admin|Admin|finance|Accountant|Manager')->name('preinvoice.draft.update');
+    Route::get('/preinvoice/drafts/{uuid}/finance', [PreinvoiceController::class, 'finance'])->middleware('role:admin|Admin|finance|Accountant|Manager')->name('preinvoice.draft.finance');
+    Route::post('/preinvoice/drafts/{uuid}/finalize', [PreinvoiceController::class, 'finalize'])->middleware('role:admin|Admin|finance|Accountant|Manager')->name('preinvoice.draft.finalize');
+    Route::post('/preinvoice/drafts/{uuid}/cancel', [PreinvoiceController::class, 'financeCancel'])->middleware('role:admin|Admin|finance|Accountant|Manager')->name('preinvoice.draft.cancel');
+    Route::get('/preinvoice/all', [PreinvoiceController::class, 'allIndex'])->middleware('role:admin|Admin|warehouse|finance|Accountant|Manager')->name('preinvoice.all.index');
     Route::get('/preinvoice/my', [PreinvoiceController::class, 'myIndex'])->name('preinvoice.my.index');
     Route::get('/preinvoice/my/{uuid}', [PreinvoiceController::class, 'myShow'])->name('preinvoice.my.show');
 

@@ -818,7 +818,7 @@ class PreinvoiceController extends Controller
             'payments.*.amount' => 'required_with:payments|integer|min:1',
             'payments.*.paid_at' => 'required_with:payments|date',
             'payments.*.note' => 'nullable|string|max:2000',
-            'payments.*.bank_name' => 'required_if:payments.*.method,cash|nullable|string|max:255',
+            'payments.*.bank_name' => 'nullable|string|max:255',
             'payments.*.cheque_bank_name' => 'nullable|string|max:255',
             'payments.*.cheque_branch_name' => 'nullable|string|max:255',
             'payments.*.cheque_number' => 'nullable|string|max:255',
@@ -831,25 +831,6 @@ class PreinvoiceController extends Controller
             'payments.*.cheque_account_holder' => 'nullable|string|max:255',
             'payments.*.cheque_status' => 'nullable|in:pending,cleared,bounced,registered,unregistered',
         ]);
-
-        foreach (($validated['payments'] ?? []) as $index => $paymentRow) {
-            if (($paymentRow['method'] ?? null) === 'cheque') {
-                if (
-                    empty($paymentRow['cheque_number']) ||
-                    empty($paymentRow['amount']) ||
-                    empty($paymentRow['cheque_due_date']) ||
-                    empty($paymentRow['cheque_received_at'])
-                ) {
-                    throw ValidationException::withMessages([
-                        "payments.{$index}.cheque_number" => 'برای پرداخت چکی، تکمیل اطلاعات اصلی چک الزامی است.',
-                    ]);
-                }
-            } elseif (empty($paymentRow['bank_name'])) {
-                throw ValidationException::withMessages([
-                    "payments.{$index}.bank_name" => 'برای پرداخت نقدی، نام بانک الزامی است.',
-                ]);
-            }
-        }
 
         $invoice = DB::transaction(function () use ($order, $validated) {
             $lockedOrder = PreinvoiceOrder::query()
