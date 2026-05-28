@@ -277,11 +277,11 @@
                       <input name="cheque_number" class="form-control" placeholder="شماره سریال چک">
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">نام بانک</label>
+                      <label class="form-label">نام بانک (اختیاری)</label>
                       <input name="cheque_bank_name" class="form-control" placeholder="مثال: ملی">
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">نام شعبه</label>
+                      <label class="form-label">نام شعبه (اختیاری)</label>
                       <input name="cheque_branch_name" class="form-control">
                     </div>
                     <div class="col-md-4">
@@ -294,18 +294,18 @@
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">نام مشتری</label>
-                      <input name="cheque_customer_name" class="form-control" value="{{ $invoice->customer_name }}">
+                      <input name="cheque_customer_name" class="form-control" value="{{ $invoice->customer_name }}" readonly>
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">کد/شناسه مشتری</label>
-                      <input name="cheque_customer_code" class="form-control">
+                      <input name="cheque_customer_code" class="form-control" value="{{ $invoice->customer_id ?: '' }}" readonly>
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">شماره حساب/شبا</label>
                       <input name="cheque_account_number" class="form-control">
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">صاحب حساب</label>
+                      <label class="form-label">صاحب حساب / صادرکننده چک (اختیاری)</label>
                       <input name="cheque_account_holder" class="form-control">
                     </div>
                     <div class="col-md-6">

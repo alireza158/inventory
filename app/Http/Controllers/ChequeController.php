@@ -28,11 +28,17 @@ class ChequeController extends Controller
         if ($request->filled('cheque_number')) {
             $query->where('cheque_number', 'like', '%' . $request->string('cheque_number')->toString() . '%');
         }
-        if ($request->filled('date_from')) {
-            $query->whereDate('received_at', '>=', $request->string('date_from')->toString());
+        if ($request->filled('received_from')) {
+            $query->whereDate('received_at', '>=', $request->string('received_from')->toString());
         }
-        if ($request->filled('date_to')) {
-            $query->whereDate('received_at', '<=', $request->string('date_to')->toString());
+        if ($request->filled('received_to')) {
+            $query->whereDate('received_at', '<=', $request->string('received_to')->toString());
+        }
+        if ($request->filled('due_from')) {
+            $query->whereDate('due_date', '>=', $request->string('due_from')->toString());
+        }
+        if ($request->filled('due_to')) {
+            $query->whereDate('due_date', '<=', $request->string('due_to')->toString());
         }
 
         $cheques = $query->latest('received_at')->paginate(20)->withQueryString();

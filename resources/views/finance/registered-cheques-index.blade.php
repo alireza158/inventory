@@ -16,7 +16,7 @@
           <option value="unregistered" @selected(request('status')==='unregistered')>ثبت‌نشده</option>
         </select>
       </div>
-      <div class="col-md-1"><button class="btn btn-primary w-100">جستجو</button></div>
+      <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">جستجو</button></div>
     </div>
   </form>
   <div class="card">
@@ -34,7 +34,7 @@
             <td>{{ $cheque->payment?->invoice?->uuid ?: '—' }}</td>
           </tr>
         @empty
-          <tr><td colspan="6" class="text-center text-muted">چکی یافت نشد.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted">چکی یافت نشد.</td></tr>
         @endforelse
         </tbody>
       </table>
