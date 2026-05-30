@@ -29,6 +29,7 @@ if (!$initRows) { $initRows = []; }
 
 $oldCustomerTitle = trim((string) old('customer_name'));
 $oldCustomerMobile = trim((string) old('customer_mobile'));
+$oldPreinvoiceDescription = old('description', $order->description ?? '');
 @endphp
 
 <link rel="stylesheet" href="{{ asset('lib/select2.min.css') }}">
@@ -882,6 +883,215 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             font-size: 1rem;
         }
     }
+
+
+    /* Final mobile cleanup: simpler cards, safer modal height, and easier numeric typing */
+    .preinvoice-note-box textarea {
+        min-height: 72px;
+        resize: vertical;
+    }
+
+    input[type="number"] {
+        direction: ltr;
+    }
+
+    .qty-input {
+        -webkit-user-select: text;
+        user-select: text;
+        touch-action: manipulation;
+    }
+
+    #submitOrderBtn {
+        min-width: 150px;
+    }
+
+    @media (max-width: 575.98px) {
+        .page-shell {
+            padding-top: 8px !important;
+            padding-bottom: 12px !important;
+        }
+
+        .page-title {
+            font-size: 1.05rem;
+        }
+
+        .page-shell>.d-flex:first-child {
+            align-items: flex-start !important;
+            margin-bottom: 10px !important;
+        }
+
+        .page-shell>.d-flex:first-child>div:last-child {
+            width: 100%;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px !important;
+        }
+
+        #localDraftStatus {
+            grid-column: 1 / -1;
+            justify-content: center;
+            min-height: 34px;
+        }
+
+        #clearLocalDraftTopBtn,
+        .page-shell>.d-flex:first-child>div:last-child>a {
+            width: 100%;
+            min-height: 36px;
+        }
+
+        .soft-card,
+        .soft-card-lg {
+            border-radius: 14px;
+            box-shadow: 0 4px 16px rgba(8, 61, 80, .055);
+        }
+
+        .soft-card::before,
+        .soft-card-lg::before {
+            height: 2px;
+        }
+
+        .section-title {
+            font-size: .9rem;
+        }
+
+        .hint {
+            font-size: .76rem;
+        }
+
+        .quick-area {
+            padding: 10px;
+        }
+
+        .code-input {
+            height: 44px;
+            font-size: 1.25rem;
+            letter-spacing: 4px;
+        }
+
+        .find-btn {
+            height: 42px;
+        }
+
+        .group-main {
+            grid-template-columns: minmax(0, 1fr) auto 24px;
+            padding: 9px 10px;
+        }
+
+        .group-title,
+        .group-amount {
+            font-size: .82rem;
+        }
+
+        .final-card {
+            margin-bottom: 14px;
+        }
+
+        .final-grid {
+            gap: 9px;
+        }
+
+        #submitOrderBtn {
+            width: 100%;
+            min-height: 44px;
+        }
+
+        .submit-disabled-hint {
+            text-align: center;
+        }
+
+        .modal-dialog.modal-xl,
+        .modal-dialog {
+            width: 100%;
+            max-width: 100%;
+            height: 100dvh;
+            margin: 0;
+        }
+
+        .modal-dialog-scrollable .modal-content,
+        .modal-content {
+            height: 100dvh;
+            max-height: 100dvh;
+            min-height: 0;
+            border-radius: 0;
+        }
+
+        .picker-head {
+            flex: 0 0 auto;
+        }
+
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .variant-list {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .modal-discount-box,
+        .modal-summary-bar {
+            flex: 0 0 auto;
+        }
+
+        .modal-summary-bar {
+            padding: 8px 10px;
+        }
+
+        .modal-footer {
+            flex: 0 0 auto;
+            position: static;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.25fr;
+            gap: 7px;
+        }
+
+        .modal-footer .btn {
+            width: 100%;
+            margin: 0 !important;
+            min-height: 40px;
+            padding-left: 6px;
+            padding-right: 6px;
+            font-size: .82rem;
+        }
+
+        .variant-row {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .variant-meta {
+            gap: 4px;
+        }
+
+        .badge-soft {
+            font-size: .68rem;
+            padding: 3px 7px;
+        }
+
+        .qty-control {
+            display: grid;
+            grid-template-columns: 42px minmax(64px, 1fr) 42px;
+            gap: 7px;
+            width: 100%;
+        }
+
+        .qty-btn,
+        .qty-input {
+            height: 40px;
+            width: 100%;
+        }
+
+        .qty-input {
+            font-size: 1rem;
+        }
+    }
 </style>
 
 <div class="container page-shell py-3">
@@ -988,10 +1198,14 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             </div>
             <div class="mt-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="hint" id="shipping_mode_hint">روش ارسال را انتخاب کنید.</div>
-                <button class="btn btn-sm btn-light border rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#addressCollapse">آدرس / توضیحات</button>
+                <button class="btn btn-sm btn-light border rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#addressCollapse">آدرس ارسال</button>
             </div>
             <div id="addressCollapse" class="collapse mt-2 {{ old('customer_address') ? 'show' : '' }}">
-                <textarea id="customer_address" name="customer_address" class="form-control form-control-sm" rows="2" placeholder="آدرس یا توضیحات ارسال...">{{ old('customer_address') }}</textarea>
+                <textarea id="customer_address" name="customer_address" class="form-control form-control-sm" rows="2" placeholder="آدرس ارسال...">{{ old('customer_address') }}</textarea>
+            </div>
+            <div class="preinvoice-note-box mt-2">
+                <label class="label-sm">توضیحات پیش‌فاکتور</label>
+                <textarea id="preinvoice_description" name="description" class="form-control form-control-sm" rows="2" placeholder="توضیحات داخلی، نکته فروش، هماهنگی با انبار یا توضیح مخصوص این پیش‌فاکتور...">{{ $oldPreinvoiceDescription }}</textarea>
             </div>
         </div>
 
@@ -1033,10 +1247,6 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                     </div>
                 </div>
 
-                <div class="recent-wrap" id="recentProductsWrap">
-                    <span class="hint">آخرین:</span>
-                    <div class="step-chip-group" id="recentProductsList"></div>
-                </div>
             </div>
 
             <div>
@@ -1167,6 +1377,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         oldCustomerName: @json(old('customer_name', '')),
         oldCustomerMobile: @json(old('customer_mobile', '')),
         oldCustomerAddress: @json(old('customer_address', '')),
+        oldDescription: @json($oldPreinvoiceDescription),
         oldProvinceId: @json(old('province_id', '')),
         oldCityId: @json(old('city_id', '')),
         oldShippingId: @json(old('shipping_id', '')),
@@ -1336,6 +1547,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             normalize(document.getElementById('customer_name')?.value) ||
             normalize(document.getElementById('customer_mobile')?.value) ||
             normalize(document.getElementById('customer_address')?.value) ||
+            normalize(document.getElementById('preinvoice_description')?.value) ||
             normalize(document.getElementById('shipping_id')?.value) ||
             Object.keys(groupedSelections || {}).length ||
             toInt(document.getElementById('orderDiscountValue')?.value || 0) > 0
@@ -1412,6 +1624,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
                 city_id: document.getElementById('city_id')?.value || '',
                 address: document.getElementById('customer_address')?.value || ''
             },
+            description: document.getElementById('preinvoice_description')?.value || '',
             discount: {
                 type: document.getElementById('orderDiscountType')?.value || 'amount',
                 value: document.getElementById('orderDiscountValue')?.value || 0
@@ -1455,6 +1668,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
         document.getElementById('customer_name').value = '';
         document.getElementById('customer_mobile').value = '';
         document.getElementById('customer_address').value = '';
+        const noteEl = document.getElementById('preinvoice_description');
+        if (noteEl) noteEl.value = '';
         document.getElementById('selectedCustomerTitle').textContent = 'هنوز مشتری انتخاب نشده است';
         document.getElementById('customer_balance_hint').textContent = '';
         document.getElementById('customerSummaryBox').classList.remove('is-selected');
@@ -1503,6 +1718,8 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
 
         document.getElementById('shipping_id').value = draft.shipping?.shipping_id || '';
         document.getElementById('customer_address').value = draft.shipping?.address || '';
+        const noteEl = document.getElementById('preinvoice_description');
+        if (noteEl) noteEl.value = draft.description || '';
         document.getElementById('orderDiscountType').value = draft.discount?.type || 'amount';
         document.getElementById('orderDiscountValue').value = draft.discount?.value || 0;
 
@@ -1558,7 +1775,7 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             removeLocalDraft(true);
         });
 
-        ['customer_address', 'shipping_id', 'province_id', 'city_id', 'orderDiscountType', 'orderDiscountValue'].forEach(id => {
+        ['customer_address', 'preinvoice_description', 'shipping_id', 'province_id', 'city_id', 'orderDiscountType', 'orderDiscountValue'].forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
             el.addEventListener('change', scheduleLocalDraftSave);
@@ -1816,51 +2033,16 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
     }
 
     function getRecentProducts() {
-        try {
-            const raw = localStorage.getItem(RECENT_PRODUCTS_KEY);
-            const rows = JSON.parse(raw || '[]');
-            return Array.isArray(rows) ? rows : [];
-        } catch (e) {
-            return [];
-        }
+        return [];
     }
 
     function saveRecentProduct(product) {
-        if (!product) return;
-        const id = Number(product.id || 0);
-        if (!id) return;
-        const row = {
-            id,
-            title: productTitle(product),
-            code: productCode(product)
-        };
-        const rows = getRecentProducts().filter(item => Number(item.id) !== id);
-        rows.unshift(row);
-        localStorage.setItem(RECENT_PRODUCTS_KEY, JSON.stringify(rows.slice(0, 6)));
-        renderRecentProducts();
+        // حذف بخش «آخرین سرچ‌ها» برای خلوت‌تر شدن صفحه.
+        return;
     }
 
     function renderRecentProducts() {
-        const wrap = document.getElementById('recentProductsWrap');
-        const list = document.getElementById('recentProductsList');
-        const rows = getRecentProducts();
-        list.innerHTML = '';
-        if (!rows.length) {
-            wrap.style.display = 'none';
-            return;
-        }
-        rows.forEach(item => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'recent-chip';
-            btn.textContent = `${item.code || '—'} - ${item.title || 'محصول'}`;
-            btn.addEventListener('click', async function() {
-                selectedMotherProduct = item;
-                await openGroupPicker(item.id);
-            });
-            list.appendChild(btn);
-        });
-        wrap.style.display = 'flex';
+        document.getElementById('recentProductsWrap')?.remove();
     }
 
     async function findMotherProductByCode(autoOpen = false) {
@@ -2046,30 +2228,39 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             </div>
             <div class="qty-control">
                 <button type="button" class="qty-btn picker-minus" data-id="${id}" ${disabled}>−</button>
-                <input type="number" class="qty-input picker-qty" data-id="${id}" data-price="${price}" min="0" max="${max}" value="${qty}" inputmode="numeric" ${disabled}>
+                <input type="tel" class="qty-input picker-qty" data-id="${id}" data-price="${price}" min="0" max="${max}" value="${qty}" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${disabled}>
                 <button type="button" class="qty-btn picker-plus" data-id="${id}" data-step="1" ${disabled}>+</button>
             </div>
         </div>`;
         }).join('');
     }
 
-    function setModalQty(id, value) {
+    function setModalQty(id, value, shouldRender = false) {
         id = Number(id);
         const item = activeModalItems.find(v => variantId(v) === id);
         if (!item) return;
         const max = modalMaxQty(item);
-        let qty = parseInt(toEnglishDigits(value), 10);
+        const cleanedValue = toEnglishDigits(value).replace(/[^0-9]/g, '');
+        let qty = parseInt(cleanedValue || '0', 10);
         if (!Number.isFinite(qty)) qty = 0;
         if (qty < 0) qty = 0;
         if (qty > max) qty = max;
         modalQuantities.set(id, qty);
         updateModalSummary();
-        renderPickerRows();
+
+        // روی تایپ مستقیم ردیف‌ها را دوباره رندر نمی‌کنیم؛ چون در موبایل باعث از دست رفتن فوکوس input می‌شد.
+        if (shouldRender) {
+            renderPickerRows();
+            return;
+        }
+
+        const row = document.querySelector(`[data-row-variant="${id}"]`);
+        if (row) row.classList.toggle('row-selected', qty > 0);
     }
 
     function changeModalQty(id, delta) {
         const current = Number(modalQuantities.get(Number(id)) || 0);
-        setModalQty(id, current + Number(delta || 0));
+        setModalQty(id, current + Number(delta || 0), true);
     }
 
     function updateModalSummary() {
@@ -2489,7 +2680,13 @@ $oldCustomerMobile = trim((string) old('customer_mobile'));
             }
         });
         document.getElementById('groupPickerRows')?.addEventListener('input', function(e) {
-            if (e.target.classList.contains('picker-qty')) setModalQty(e.target.dataset.id, e.target.value);
+            if (e.target.classList.contains('picker-qty')) {
+                e.target.value = toEnglishDigits(e.target.value).replace(/[^0-9]/g, '');
+                setModalQty(e.target.dataset.id, e.target.value, false);
+            }
+        });
+        document.getElementById('groupPickerRows')?.addEventListener('focusout', function(e) {
+            if (e.target.classList.contains('picker-qty')) renderPickerRows();
         });
         document.getElementById('orderForm')?.addEventListener('submit', submitGuard, {
             capture: true
