@@ -122,6 +122,9 @@ class PreinvoiceApiController extends Controller
             ->where('product_id', $product->id)
             ->value('quantity');
 
+        $reservationToken = (string) $request->query('reservation_token', '');
+        $reservedByVariant = $this->activeReservationQuantities($reservationToken);
+
         $payload = [
             'id' => $product->id,
             'title' => $product->name,
