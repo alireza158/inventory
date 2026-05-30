@@ -59,8 +59,9 @@ class PurchaseController extends Controller
             ->get(['id', 'name', 'code', 'parent_id']);
 
         $products = Product::query()
+            ->with(['variants.modelList:id,model_name,code'])
             ->orderBy('name')
-            ->get(['id', 'name', 'category_id', 'code']);
+            ->get(['id', 'name', 'category_id', 'code', 'short_barcode']);
 
         $variants = ProductVariant::query()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
@@ -123,8 +124,9 @@ class PurchaseController extends Controller
             ->get(['id', 'name', 'code', 'parent_id']);
 
         $products = Product::query()
+            ->with(['variants.modelList:id,model_name,code'])
             ->orderBy('name')
-            ->get(['id', 'name', 'category_id', 'code']);
+            ->get(['id', 'name', 'category_id', 'code', 'short_barcode']);
 
         $variants = ProductVariant::query()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')

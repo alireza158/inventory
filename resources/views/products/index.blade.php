@@ -1092,8 +1092,8 @@
                     <div>
                         <label class="label-sm">بازه قیمت</label>
                         <div class="input-group">
-                            <input name="min_price" class="form-control money" value="{{ request('min_price') }}" placeholder="از">
-                            <input name="max_price" class="form-control money" value="{{ request('max_price') }}" placeholder="تا">
+                            <input name="min_price" class="form-control money" value="{{ request('min_price') !== null ? \App\Support\Currency::toRial(request('min_price')) : '' }}" placeholder="از">
+                            <input name="max_price" class="form-control money" value="{{ request('max_price') !== null ? \App\Support\Currency::toRial(request('max_price')) : '' }}" placeholder="تا">
                         </div>
                     </div>
 
@@ -1227,6 +1227,7 @@
                                                 'id' => (int) $v->id,
                                                 'name' => $v->variant_name,
                                                 'stock' => (int) $v->stock,
+                                                'reserved' => max(0, (int) ($v->reserved ?? 0)),
                                                 'is_active' => (bool) $v->is_active,
                                                 'warehouse_breakdown' => $variantBreakdown,
                                             ];
@@ -1254,6 +1255,9 @@
                                         ->values()
                                         ->all();
 
+                                    $reservedQty = $hasVariants
+                                        ? max(0, (int) $p->variants->sum(fn ($variant) => (int) ($variant->reserved ?? 0)))
+                                        : max(0, (int) ($p->reserved ?? 0));
                                     $buyPrice = $p->variants_min_buy_price;
                                     $isSellable = $p->is_sellable ?? true;
                                 @endphp
@@ -1277,6 +1281,7 @@
                                                 data-deactivation-history-url="{{ route('product-deactivation-documents.index', ['product_name' => $p->name]) }}"
                                                 data-is-sellable="{{ $isSellable ? '1' : '0' }}"
                                                 data-product-name="{{ $p->name }}"
+                                                data-reserved-qty="{{ $reservedQty }}"
                                                 data-variants='@json($variantsPayload)'
                                                 data-stock-breakdown='@json($stockBreakdownPayload)'>
 
@@ -1348,14 +1353,14 @@
 
                                     <td class="nowrap" data-label="قیمت خرید">
                                         @if(!is_null($buyPrice))
-                                            <span class="price-inline">{{ $toFa(number_format((int) $buyPrice) . ' تومان') }}</span>
+                                            <span class="price-inline">{{ $toFa(\App\Support\Currency::formatRial($buyPrice)) }}</span>
                                         @else
                                             <span class="buy-price-muted">—</span>
                                         @endif
                                     </td>
 
                                     <td class="nowrap" data-label="قیمت فروش">
-                                        <span class="price-inline">{{ $toFa(number_format((int) $p->price) . ' تومان') }}</span>
+                                        <span class="price-inline">{{ $toFa(\App\Support\Currency::formatRial($p->price)) }}</span>
                                     </td>
                                 </tr>
 
@@ -1395,11 +1400,11 @@
                                                                     </td>
 
                                                                     <td data-label="فروش">
-                                                                        {{ $toFa(number_format((int) $v->sell_price) . ' تومان') }}
+                                                                        {{ $toFa(\App\Support\Currency::formatRial($v->sell_price)) }}
                                                                     </td>
 
                                                                     <td data-label="خرید">
-                                                                        {{ $v->buy_price !== null ? $toFa(number_format((int) $v->buy_price) . ' تومان') : '—' }}
+                                                                        {{ $v->buy_price !== null ? $toFa(\App\Support\Currency::formatRial($v->buy_price)) : '—' }}
                                                                     </td>
 
                                                                     <td data-label="وضعیت">
@@ -1839,6 +1844,16 @@
                         hintRow.innerHTML = `<td colspan="2" class="small text-muted pt-2">جمع موجودی تنوع «${selectedVariant.name ?? 'انتخابی'}»: ${selectedVariant.stock ?? 0}</td>`;
                         stockBodyEl.appendChild(hintRow);
                     }
+                }
+
+                const reservedQty = selectedVariant
+                    ? Number(selectedVariant.reserved ?? 0)
+                    : Number(selected.dataset.reservedQty ?? 0);
+
+                if (reservedQty > 0) {
+                    const reservedRow = document.createElement('tr');
+                    reservedRow.innerHTML = `<td colspan="2" class="small text-warning fw-semibold pt-2">${faNumber(reservedQty)} تا در رزرو مشتری هست</td>`;
+                    stockBodyEl.appendChild(reservedRow);
                 }
 
                 modal.show();

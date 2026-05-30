@@ -81,6 +81,8 @@ class AriyajanebiSyncService
         $payload = ['_method' => 'PUT'];
         foreach ($variants->values() as $i => $variant) {
             $payload["varieties[{$i}][id]"] = (string) $variant->variety_id;
+            // The public site works in Toman. Internal web forms now show Rial, but monetary
+            // requests are normalized back to Toman before persistence, so the API payload stays Toman.
             $payload["varieties[{$i}][price]"] = (string) max(0, (int) $variant->sell_price);
             $payload["varieties[{$i}][balance]"] = (string) self::centralWarehouseQuantityForVariant($variant);
         }
@@ -199,10 +201,9 @@ class AriyajanebiSyncService
 
     private static function centralWarehouseQuantityForVariant($variant): int
     {
-        // For external storefront stock, we should send saleable quantity.
-        // During preinvoice freeze, `reserved` increases (temporary hold), so
-        // balance must drop immediately; on final approval, `stock` decreases too.
-        return max(0, ((int) ($variant->stock ?? 0)) - ((int) ($variant->reserved ?? 0)));
+        // Reserved preinvoice items are moved out of central stock immediately,
+        // so the variant stock field already represents saleable central stock.
+        return max(0, (int) ($variant->stock ?? 0));
     }
 
     private static function extractToken($json): ?string

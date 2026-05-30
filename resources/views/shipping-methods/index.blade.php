@@ -15,7 +15,7 @@
           </div>
 
           <div class="col-12">
-            <label class="form-label">هزینه ارسال (تومان)</label>
+            <label class="form-label">هزینه ارسال (ریال)</label>
             <input type="number" min="0" name="price" class="form-control" value="{{ old('price', 0) }}" required>
           </div>
 
@@ -49,11 +49,11 @@
                       @csrf
                       @method('PUT')
                       <input name="name" class="form-control" value="{{ $method->name }}" required>
-                      <input type="number" min="0" name="price" class="form-control" value="{{ (int) $method->price }}" style="max-width:170px" required>
+                      <input type="number" min="0" name="price" class="form-control" value="{{ \App\Support\Currency::toRial($method->price) }}" style="max-width:170px" required>
                       <button class="btn btn-outline-primary btn-sm">ذخیره</button>
                     </form>
                   </td>
-                  <td style="width:140px">{{ number_format((int) $method->price) }} تومان</td>
+                  <td style="width:140px">{{ \App\Support\Currency::formatRial($method->price) }}</td>
                   <td class="text-end" style="width:90px">
                     <form method="POST" action="{{ route('shipping-methods.destroy', $method) }}" onsubmit="return confirm('حذف شود؟')">
                       @csrf

@@ -159,7 +159,7 @@ $statusLabels = [
             <a href="{{ route('invoices.index') }}" class="dash-surface dash-soft p-3 h-100 text-decoration-none d-block">
                 <div class="dash-kpi-accent kpi-receipt"></div>
                 <div class="dash-muted small">جمع دریافتی امروز</div>
-                <div class="dash-kpi-number mt-1">{{ number_format($kpis['todayReceipts']) }} <span class="fs-6">تومان</span></div>
+                <div class="dash-kpi-number mt-1">{{ number_format($kpis['todayReceipts']) }} <span class="fs-6">ریال</span></div>
             </a>
         </div>
     </div>
@@ -285,7 +285,7 @@ $statusLabels = [
             <div class="col-md-4">
                 <div class="rounded-3 p-2" style="background:#EEF4FF;">
                     <div class="dash-muted small">مبلغ فروش</div>
-                    <div class="fw-bold" data-summary="sales_amount">{{ number_format($monthlyReport['summary']['sales_amount']) }} تومان</div>
+                    <div class="fw-bold" data-summary="sales_amount">{{ number_format($monthlyReport['summary']['sales_amount']) }} ریال</div>
                 </div>
             </div>
         </div>
@@ -380,7 +380,7 @@ $statusLabels = [
             rangeLabelEl.textContent = `بازه: ${report.range_label}`;
             if (summaryEls.preinvoices) summaryEls.preinvoices.textContent = formatNumber(report.summary.preinvoices);
             if (summaryEls.invoices) summaryEls.invoices.textContent = formatNumber(report.summary.invoices);
-            if (summaryEls.sales_amount) summaryEls.sales_amount.textContent = `${formatNumber(report.summary.sales_amount)} تومان`;
+            if (summaryEls.sales_amount) summaryEls.sales_amount.textContent = `${formatNumber(report.summary.sales_amount)} ریال`;
             renderChart(report);
         }
 

@@ -170,7 +170,7 @@
                     <div class="text-muted small mb-1">وضعیت نهایی حساب</div>
                     <div class="fs-5 fw-bold {{ $netBalance > 0 ? 'text-danger' : ($netBalance < 0 ? 'text-success' : 'text-muted') }}">
                         {{ $netBalance > 0 ? 'بدهکار' : ($netBalance < 0 ? 'بستانکار' : 'تسویه') }}
-                        {{ $netBalance === 0 ? '' : number_format(abs($netBalance)).' تومان' }}
+                        {{ $netBalance === 0 ? '' : \App\Support\Currency::formatRial(abs($netBalance)) }}
                     </div>
                 </div>
             </div>
@@ -213,7 +213,7 @@
                         $viewUrl = null;
 
                         if ($invoice) {
-                            $description = "فاکتور #{$invoice->id} | مبلغ فاکتور ".number_format((int) $invoice->total)." تومان | این شخص بدهکار شد";
+                            $description = "فاکتور #{$invoice->id} | مبلغ فاکتور ".\App\Support\Currency::formatRial($invoice->total)." | این شخص بدهکار شد";
                             $viewUrl = route('vouchers.sales.show', $invoice->uuid);
                         }
 
@@ -224,10 +224,10 @@
                             if ($payment->method === 'cheque') {
                                 $cheque = $payment->cheque;
                                 $chNumber = $cheque?->cheque_number ?: '—';
-                                $description = "پرداخت چکی شماره {$chNumber} | مبلغ ".number_format((int) $payment->amount)." تومان | ثبت‌کننده: {$creatorName}";
+                                $description = "پرداخت چکی شماره {$chNumber} | مبلغ ".\App\Support\Currency::formatRial($payment->amount)." | ثبت‌کننده: {$creatorName}";
                             } else {
                                 $bankName = $payment->bank_name ?: '—';
-                                $description = "پرداخت نقدی | مبلغ ".number_format((int) $payment->amount)." تومان | بانک {$bankName} | ثبت‌کننده: {$creatorName}";
+                                $description = "پرداخت نقدی | مبلغ ".\App\Support\Currency::formatRial($payment->amount)." | بانک {$bankName} | ثبت‌کننده: {$creatorName}";
                             }
 
                             if ($invoiceUuid) {
@@ -240,7 +240,7 @@
                         if ($transfer) {
                             $transferRef = $transfer->reference ?: ('TR-' . $transfer->id);
                             $transferTypeLabel = \App\Models\WarehouseTransfer::typeOptions()[$transfer->voucher_type] ?? $transfer->voucher_type;
-                            $description = "سند {$transferRef} | نوع: {$transferTypeLabel} | مبلغ " . number_format((int) $ledger->amount) . " تومان";
+                            $description = "سند {$transferRef} | نوع: {$transferTypeLabel} | مبلغ " . \App\Support\Currency::formatRial($ledger->amount);
 
                             if ($transfer->voucher_type === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
                                 $viewUrl = route('account-statements.documents.returns.show', $transfer->id);
@@ -306,7 +306,7 @@
                             <option value="">انتخاب فاکتور</option>
                             @foreach($customerInvoices as $invoiceOption)
                                 <option value="{{ $invoiceOption->id }}" @selected((string) old('invoice_id') === (string) $invoiceOption->id)>
-                                    {{ $invoiceOption->uuid }} | {{ number_format((int) $invoiceOption->total) }} تومان
+                                    {{ $invoiceOption->uuid }} | {{ \App\Support\Currency::formatRial($invoiceOption->total) }}
                                 </option>
                             @endforeach
                         </select>

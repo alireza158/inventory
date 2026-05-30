@@ -3,7 +3,7 @@
 @section('content')
 
 @php
-  $toman = fn($a) => number_format((int) $a) . ' تومان';
+  $toman = fn($a) => \App\Support\Currency::formatRial($a);
 
   $dateFa = function ($date) {
     if (!$date) return '---';
@@ -265,6 +265,16 @@
     color: #1e293b;
     font-size: .92rem;
     font-weight: 950;
+  }
+
+  .info-item.full-row {
+    grid-column: 1 / -1;
+  }
+
+  .info-item.description-text strong {
+    display: block;
+    white-space: pre-wrap;
+    line-height: 1.9;
   }
 
   .table-modern {
@@ -554,6 +564,11 @@
                   {{ $order->status_label }}
                 </span>
               </strong>
+            </div>
+
+            <div class="info-item full-row description-text">
+              <span>توضیحات پیش‌فاکتور</span>
+              <strong>{{ $order->description ?: 'توضیحی ثبت نشده است.' }}</strong>
             </div>
 
           </div>

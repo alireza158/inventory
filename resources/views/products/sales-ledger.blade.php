@@ -41,7 +41,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <div class="text-muted small">جمع مبلغ فروش در بازه</div>
-                    <div class="h5 mb-0 mt-1">{{ $toFa(number_format((int) ($summary->total_amount ?? 0))) }} تومان</div>
+                    <div class="h5 mb-0 mt-1">{{ $toFa(\App\Support\Currency::formatRial($summary->total_amount ?? 0)) }}</div>
                 </div>
             </div>
         </div>

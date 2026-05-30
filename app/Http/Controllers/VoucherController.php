@@ -1005,8 +1005,6 @@ class VoucherController extends Controller
                     (int) $item['variant_id']
                 );
 
-                $available = max(0, $available - (int) ($variant->reserved ?? 0));
-
                 if ((int) $item['quantity'] > $available) {
                     abort(422, 'ردیف ' . $rowNo . ': مقدار انتخابی از موجودی این مدل/تنوع در انبار مبدا بیشتر است. موجودی فعلی: ' . $available);
                 }
@@ -1114,8 +1112,6 @@ class VoucherController extends Controller
                     (int) $item['variant_id']
                 );
 
-                $available = max(0, $available - (int) ($variant->reserved ?? 0));
-
                 if ($qty > $available) {
                     abort(422, 'موجودی این مدل/تنوع برای ثبت ضایعات کافی نیست.');
                 }
@@ -1143,8 +1139,6 @@ class VoucherController extends Controller
                     (int) $item['product_id'],
                     (int) $item['variant_id']
                 );
-
-                $available = max(0, $available - (int) ($variant->reserved ?? 0));
 
                 if ($qty > $available) {
                     abort(422, 'موجودی این مدل/تنوع در انبار مبدا کافی نیست.');

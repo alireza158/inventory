@@ -2,7 +2,7 @@
 
 @section('content')
 @php
-    $toToman = fn($rial) => number_format((int) floor(((int) $rial) / 10));
+    $toToman = fn($toman) => \App\Support\Currency::formatRial($toman);
 @endphp
 
 <style>
@@ -254,7 +254,7 @@
                 <div class="col-md-4">
                     <div class="total-pill">
                         <div class="k">مبلغ کل</div>
-                        <div class="v">{{ $toToman($purchase->total_amount) }} تومان</div>
+                        <div class="v">{{ $toToman($purchase->total_amount) }}</div>
                     </div>
                 </div>
 
@@ -296,25 +296,25 @@
 
                             <td class="fw-bold">{{ $item->quantity }}</td>
 
-                            <td>{{ $toToman($item->buy_price) }} تومان</td>
+                            <td>{{ $toToman($item->buy_price) }}</td>
 
-                            <td>{{ $toToman($item->sell_price) }} تومان</td>
+                            <td>{{ $toToman($item->sell_price) }}</td>
 
                             <td>
                                 @if($item->discount_type === 'percent')
                                     <span class="disc-badge">{{ $item->discount_value }}٪</span>
                                 @elseif($item->discount_type === 'amount')
-                                    <span class="disc-badge is-amount">{{ $toToman($item->discount_value) }} تومان</span>
+                                    <span class="disc-badge is-amount">{{ $toToman($item->discount_value) }}</span>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
 
                                 <div class="disc-meta">
-                                    مبلغ تخفیف: {{ $toToman($item->discount_amount ?? 0) }} تومان
+                                    مبلغ تخفیف: {{ $toToman($item->discount_amount ?? 0) }}
                                 </div>
                             </td>
 
-                            <td class="line-total">{{ $toToman($item->line_total) }} تومان</td>
+                            <td class="line-total">{{ $toToman($item->line_total) }}</td>
                         </tr>
                     @endforeach
                     </tbody>
@@ -329,15 +329,15 @@
                             <ul class="list-group list-group-flush">
                                 <li class="list-group-item d-flex justify-content-between">
                                     <span>جمع قبل تخفیف</span>
-                                    <strong>{{ $toToman($purchase->subtotal_amount ?? 0) }} تومان</strong>
+                                    <strong>{{ $toToman($purchase->subtotal_amount ?? 0) }}</strong>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between">
                                     <span>تخفیف کل</span>
-                                    <strong>{{ $toToman($purchase->total_discount ?? 0) }} تومان</strong>
+                                    <strong>{{ $toToman($purchase->total_discount ?? 0) }}</strong>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between payable">
                                     <span>قابل پرداخت</span>
-                                    <strong>{{ $toToman($purchase->total_amount) }} تومان</strong>
+                                    <strong>{{ $toToman($purchase->total_amount) }}</strong>
                                 </li>
                             </ul>
                         </div>

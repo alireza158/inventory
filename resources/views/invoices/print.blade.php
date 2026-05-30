@@ -87,7 +87,7 @@
         return Jalalian::fromDateTime($value)->format($format);
     };
 
-    $money = fn($value) => number_format((int) ($value ?? 0)) . ' تومان';
+    $money = fn($value) => \App\Support\Currency::formatRial($value);
 
     $companyName = config('app.name', 'شرکت');
     $taxAmount = (int) ($invoice->tax_amount ?? 0);

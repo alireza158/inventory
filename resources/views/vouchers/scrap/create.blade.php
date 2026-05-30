@@ -447,7 +447,7 @@ function buildVariantOptions(productId, selected = '') {
     }
 
     return '<option value="">انتخاب تنوع...</option>' + list.map(v => {
-        const available = Math.max(0, Number(v.stock || 0) - Number(v.reserved || 0));
+        const available = Math.max(0, Number(v.stock || 0));
         const isSelected = String(v.id) === String(selected || '') ? 'selected' : '';
         const title = v.name || v.code || ('تنوع #' + v.id);
         const code = v.code ? ' [' + v.code + ']' : '';
@@ -568,7 +568,7 @@ function syncRow(row) {
 
     if (variantSelect.value) {
         const variant = variants.find(v => String(v.id) === String(variantSelect.value || ''));
-        max = Math.max(0, Number(variant?.stock || 0) - Number(variant?.reserved || 0));
+        max = Math.max(0, Number(variant?.stock || 0));
     }
 
     if (max <= 0) {
