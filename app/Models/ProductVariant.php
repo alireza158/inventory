@@ -59,7 +59,7 @@ class ProductVariant extends Model
 
     public function getAvailableStockAttribute(): int
     {
-        return max(0, ((int) ($this->stock ?? 0)) - ((int) ($this->reserved ?? 0)));
+        return max(0, (int) ($this->stock ?? 0));
     }
 
     public function scopeActive($query)

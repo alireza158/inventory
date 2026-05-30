@@ -1141,6 +1141,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         <input type="hidden" name="customer_name" id="customer_name" value="{{ old('customer_name') }}">
         <input type="hidden" name="customer_mobile" id="customer_mobile" value="{{ old('customer_mobile') }}">
         <input type="hidden" name="payment_status" value="pending">
+        <input type="hidden" name="reservation_token" id="reservation_token" value="{{ old('reservation_token') }}">
         <input type="hidden" name="discount_breakdown" id="discount_breakdown" value="">
 
         <div class="soft-card compact-card mb-3">
@@ -1367,6 +1368,8 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         api: {
             products: @json(url('/preinvoice/api/products')),
             product: @json(url('/preinvoice/api/products')),
+            reservationsSync: @json(route('preinvoice.api.reservations.sync')),
+            reservationsRelease: @json(route('preinvoice.api.reservations.release')),
             area: @json(url('/preinvoice/api/area')),
             customers: @json(url('/preinvoice/api/customers')),
             customer: @json(url('/preinvoice/api/customers'))
@@ -1420,6 +1423,86 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     const RECENT_PRODUCTS_KEY = 'aria_preinvoice_recent_mothers_v3';
     const LOCAL_DRAFT_VERSION = 1;
     const LOCAL_DRAFT_KEY = 'aria_preinvoice_local_draft_create_v1';
+    const RESERVATION_TOKEN_KEY = 'aria_preinvoice_reservation_token_v1';
+    let isSyncingReservation = false;
+
+
+    function cryptoRandomUuidFallback() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    function ensureReservationToken() {
+        let token = normalize(document.getElementById('reservation_token')?.value);
+        if (!token) token = normalize(localStorage.getItem(RESERVATION_TOKEN_KEY));
+        if (!token) token = window.crypto?.randomUUID ? window.crypto.randomUUID() : cryptoRandomUuidFallback();
+        localStorage.setItem(RESERVATION_TOKEN_KEY, token);
+        const input = document.getElementById('reservation_token');
+        if (input) input.value = token;
+        return token;
+    }
+
+    function reservationItemsFromGroups(sourceGroups = groupedSelections) {
+        const rows = [];
+        Object.values(sourceGroups || {}).forEach(group => {
+            const productId = Number(group?.product?.id || 0);
+            if (!productId) return;
+            (group.items || []).forEach(item => {
+                const variantId = Number(item.variant_id || 0);
+                const quantity = Number(item.quantity || 0);
+                if (variantId > 0 && quantity > 0) {
+                    rows.push({ product_id: productId, variant_id: variantId, quantity });
+                }
+            });
+        });
+        return rows;
+    }
+
+    async function postReservation(url, body) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
+            body: JSON.stringify(body)
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json?.ok === false) {
+            const message = Object.values(json?.errors || {}).flat().join('\n') || json?.message || 'خطا در فریز موجودی پیش‌فاکتور.';
+            throw new Error(message);
+        }
+        return json;
+    }
+
+    async function syncDraftReservation(sourceGroups = groupedSelections) {
+        const token = ensureReservationToken();
+        isSyncingReservation = true;
+        try {
+            const response = await postReservation(API.reservationsSync, {
+                reservation_token: token,
+                items: reservationItemsFromGroups(sourceGroups)
+            });
+            productCache.clear();
+            return response;
+        } finally {
+            isSyncingReservation = false;
+        }
+    }
+
+    async function releaseDraftReservation() {
+        const token = normalize(document.getElementById('reservation_token')?.value) || normalize(localStorage.getItem(RESERVATION_TOKEN_KEY));
+        if (!token) return;
+        await postReservation(API.reservationsRelease, { reservation_token: token });
+        localStorage.removeItem(RESERVATION_TOKEN_KEY);
+        const input = document.getElementById('reservation_token');
+        if (input) input.value = '';
+        productCache.clear();
+    }
 
     function toEnglishDigits(str) {
         return String(str || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
@@ -1512,8 +1595,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     function variantStock(v) {
         if (v?.sellable_stock !== undefined && v?.sellable_stock !== null) return Number(v.sellable_stock) || 0;
         const stock = Number(v?.stock ?? v?.quantity ?? 0) || 0;
-        const reserved = Number(v?.reserved ?? 0) || 0;
-        return Math.max(0, stock - reserved);
+        return Math.max(0, stock);
     }
 
     function buildVariantTitle(v) {
@@ -1577,9 +1659,16 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         }
     }
 
-    function removeLocalDraft(showMessage = true) {
+    async function removeLocalDraft(showMessage = true, releaseReservation = false) {
         localStorage.removeItem(LOCAL_DRAFT_KEY);
         hideLocalDraftBanner();
+        if (releaseReservation) {
+            try {
+                await releaseDraftReservation();
+            } catch (e) {
+                alert(e.message || 'خطا در آزادسازی موجودی فریز شده.');
+            }
+        }
         if (showMessage) updateLocalDraftStatus('پیش‌نویس پاک شد', false);
     }
 
@@ -1610,6 +1699,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         return {
             version: LOCAL_DRAFT_VERSION,
             saved_at: new Date().toISOString(),
+            reservation_token: ensureReservationToken(),
             customer: {
                 id: document.getElementById('customer_id')?.value || '',
                 name: document.getElementById('customer_name')?.value || '',
@@ -1737,6 +1827,16 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         }
 
         groupedSelections = draft.groupedSelections || {};
+        if (draft.reservation_token) {
+            document.getElementById('reservation_token').value = draft.reservation_token;
+            localStorage.setItem(RESERVATION_TOKEN_KEY, draft.reservation_token);
+        }
+        try {
+            await syncDraftReservation(groupedSelections);
+        } catch (e) {
+            alert(e.message || 'خطا در فریز موجودی پیش‌نویس.');
+            groupedSelections = {};
+        }
         renderGroupSummary();
         updateTotal();
         updateSubmitState();
@@ -1758,21 +1858,26 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             applyLocalDraft(draft);
         });
 
-        document.getElementById('discardLocalDraftBtn')?.addEventListener('click', function() {
+        document.getElementById('discardLocalDraftBtn')?.addEventListener('click', async function() {
             if (!confirm('پیش‌نویس ذخیره‌شده حذف شود؟')) return;
-            removeLocalDraft(true);
+            await removeLocalDraft(true, true);
         });
 
-        document.getElementById('clearLocalDraftTopBtn')?.addEventListener('click', function() {
+        document.getElementById('clearLocalDraftTopBtn')?.addEventListener('click', async function() {
             if (!confirm('پیش‌نویس محلی و فرم فعلی پاک شود؟')) return;
             isHydratingLocalDraft = true;
             clearVisibleFormOnly();
+            try {
+                await releaseDraftReservation();
+            } catch (e) {
+                alert(e.message || 'خطا در آزادسازی موجودی فریز شده.');
+            }
             renderGroupSummary();
             updateShippingMode();
             updateTotal();
             updateSubmitState();
             isHydratingLocalDraft = false;
-            removeLocalDraft(true);
+            await removeLocalDraft(true, false);
         });
 
         ['customer_address', 'preinvoice_description', 'shipping_id', 'province_id', 'city_id', 'orderDiscountType', 'orderDiscountValue'].forEach(id => {
@@ -1790,8 +1895,14 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     async function getProductDetails(productId, fresh = false) {
         const id = String(productId || '');
         if (!id) return null;
-        if (!fresh && productCache.has(id)) return productCache.get(id);
-        const url = API.product + '/' + encodeURIComponent(id) + (fresh ? '?_=' + Date.now() : '');
+        const token = ensureReservationToken();
+        const cacheKey = id + ':' + token;
+        if (!fresh && productCache.has(cacheKey)) return productCache.get(cacheKey);
+        const params = new URLSearchParams();
+        if (token) params.set('reservation_token', token);
+        if (fresh) params.set('_', Date.now());
+        const qs = params.toString();
+        const url = API.product + '/' + encodeURIComponent(id) + (qs ? '?' + qs : '');
         const res = await fetch(url, {
             headers: {
                 'Accept': 'application/json'
@@ -1799,7 +1910,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         });
         const json = await res.json();
         const product = json?.data?.product || null;
-        if (product) productCache.set(id, product);
+        if (product) productCache.set(cacheKey, product);
         return product;
     }
 
@@ -2295,7 +2406,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         updateModalSummary();
     }
 
-    function saveGroupSelection() {
+    async function saveGroupSelection() {
         if (!activeProductId || !activeProduct) return;
         const items = [];
         activeModalItems.forEach(v => {
@@ -2317,6 +2428,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         }
         const discountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
         const discountValue = safeDiscountValue(discountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
+        const previousSelections = JSON.parse(JSON.stringify(groupedSelections || {}));
         groupedSelections[activeProductId] = {
             product: {
                 id: activeProductId,
@@ -2327,6 +2439,31 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             discount_type: discountType,
             discount_value: discountValue
         };
+
+        const saveBtn = document.getElementById('saveGroupSelectionBtn');
+        const oldSaveText = saveBtn?.textContent || '';
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'در حال فریز...';
+        }
+
+        try {
+            await syncDraftReservation(groupedSelections);
+        } catch (e) {
+            groupedSelections = previousSelections;
+            alert(e.message || 'موجودی برای این انتخاب کافی نیست.');
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = oldSaveText;
+            }
+            return;
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = oldSaveText;
+            }
+        }
+
         renderGroupSummary();
         updateTotal();
         scheduleLocalDraftSave();
@@ -2339,11 +2476,19 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         setTimeout(() => document.getElementById('motherCodeInput').focus(), 100);
     }
 
-    function deleteGroup(productId) {
+    async function deleteGroup(productId) {
         const group = groupedSelections[productId];
         if (!group) return;
         if (!confirm(`محصول «${group.product.title}» حذف شود؟`)) return;
+        const previousSelections = JSON.parse(JSON.stringify(groupedSelections || {}));
         delete groupedSelections[productId];
+        try {
+            await syncDraftReservation(groupedSelections);
+        } catch (e) {
+            groupedSelections = previousSelections;
+            alert(e.message || 'خطا در آزادسازی موجودی محصول.');
+            return;
+        }
         renderGroupSummary();
         updateTotal();
         scheduleLocalDraftSave();
@@ -2582,6 +2727,15 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         const btn = document.getElementById('submitOrderBtn');
         const oldText = btn.textContent;
         btn.disabled = true;
+        btn.textContent = 'فریز نهایی موجودی...';
+        try {
+            await syncDraftReservation(groupedSelections);
+        } catch (err) {
+            alert(err.message || 'فریز موجودی کامل نشد.');
+            btn.disabled = false;
+            btn.textContent = oldText;
+            return false;
+        }
         btn.textContent = 'کنترل موجودی...';
         const stockOk = await validateSelectedStockBeforeSubmit();
         if (!stockOk) {
@@ -2592,12 +2746,15 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         normalizeBeforeSubmit();
         btn.textContent = 'در حال ثبت...';
         isSubmittingProgrammatically = true;
-        removeLocalDraft(false);
+        localStorage.removeItem(LOCAL_DRAFT_KEY);
+        localStorage.removeItem(RESERVATION_TOKEN_KEY);
+        hideLocalDraftBanner();
         document.getElementById('orderForm').submit();
         return true;
     }
 
     document.addEventListener('DOMContentLoaded', async function() {
+        ensureReservationToken();
         bindLocalDraftEvents();
 
         initSelect2Basic(document.getElementById('province_id'), 'انتخاب استان...');
