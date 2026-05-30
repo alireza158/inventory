@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\PreinvoiceDraftReservation;
 use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -307,7 +308,7 @@ class PreinvoiceController extends Controller
             ]);
 
             $this->syncItems($order, $validated['products']);
-            $this->reserveOrderStock($order);
+            $this->finalizeDraftReservations($order, $validated['reservation_token'] ?? null, $validated['products']);
             $order->update(['total_price' => $this->calculateOrderTotal($order)]);
 
             $this->notificationService->notifyRole(
@@ -388,6 +389,7 @@ class PreinvoiceController extends Controller
         $isInPerson = $this->isInPersonShippingId($shippingId);
 
         $validated = $request->validate([
+            'reservation_token' => 'nullable|uuid',
             'customer_id' => 'nullable|integer|exists:customers,id',
             'customer_name' => 'required|string|max:255',
             'customer_mobile' => 'required|string|max:20',
@@ -434,12 +436,12 @@ class PreinvoiceController extends Controller
             }
         }
 
-        $this->validateDraftItemsBusinessRules($validated['products'] ?? []);
+        $this->validateDraftItemsBusinessRules($validated['products'] ?? [], $validated['reservation_token'] ?? null);
 
         return $validated;
     }
 
-    private function validateDraftItemsBusinessRules(array $products): void
+    private function validateDraftItemsBusinessRules(array $products, ?string $reservationToken = null): void
     {
         $variantIds = collect($products)->pluck('variety_id')->map(fn($id) => (int) $id)->filter()->values();
         if ($variantIds->isEmpty()) {
@@ -475,9 +477,11 @@ class PreinvoiceController extends Controller
             $qtyByVariant[$variantId] = ($qtyByVariant[$variantId] ?? 0) + (int) ($row['quantity'] ?? 0);
         }
 
+        $draftReservations = $this->activeDraftReservationQuantities($reservationToken);
+
         foreach ($qtyByVariant as $variantId => $requiredQty) {
             $variant = $variants->get((int) $variantId);
-            $availableQty = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0));
+            $availableQty = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0) + (int) ($draftReservations[(int) $variantId] ?? 0));
 
             if ($requiredQty > $availableQty) {
                 throw ValidationException::withMessages([
@@ -708,6 +712,140 @@ class PreinvoiceController extends Controller
                 'quantity' => (int) $p['quantity'],
                 'price' => (int) ($variant->sell_price ?? 0),
             ]);
+        }
+    }
+
+
+    private function finalizeDraftReservations(PreinvoiceOrder $order, ?string $reservationToken, array $products): void
+    {
+        $required = [];
+        foreach ($products as $row) {
+            $productId = (int) ($row['id'] ?? 0);
+            $variantId = (int) ($row['variety_id'] ?? 0);
+            $quantity = (int) ($row['quantity'] ?? 0);
+            if ($productId <= 0 || $variantId <= 0 || $quantity <= 0) {
+                continue;
+            }
+
+            $key = $productId . ':' . $variantId;
+            if (! isset($required[$key])) {
+                $required[$key] = [
+                    'product_id' => $productId,
+                    'variant_id' => $variantId,
+                    'quantity' => 0,
+                ];
+            }
+            $required[$key]['quantity'] += $quantity;
+        }
+
+        $reservedRows = collect();
+        if ($reservationToken && auth()->check()) {
+            $reservedRows = PreinvoiceDraftReservation::query()
+                ->where('token', $reservationToken)
+                ->where('user_id', auth()->id())
+                ->whereNull('converted_at')
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->lockForUpdate()
+                ->get();
+        }
+
+        $reserved = [];
+        foreach ($reservedRows as $row) {
+            $key = ((int) $row->product_id) . ':' . ((int) $row->variant_id);
+            $reserved[$key] = ($reserved[$key] ?? 0) + (int) $row->quantity;
+        }
+
+        foreach ($required as $key => $row) {
+            $coveredQty = (int) ($reserved[$key] ?? 0);
+            $missingQty = max(0, (int) $row['quantity'] - $coveredQty);
+            if ($missingQty > 0) {
+                $this->reserveStockForItem((int) $row['product_id'], (int) $row['variant_id'], $missingQty);
+            }
+        }
+
+        foreach ($reservedRows as $row) {
+            $key = ((int) $row->product_id) . ':' . ((int) $row->variant_id);
+            $requiredQty = (int) ($required[$key]['quantity'] ?? 0);
+            $reservedQty = (int) $row->quantity;
+
+            if ($requiredQty <= 0) {
+                $this->releaseStockForItem((int) $row->product_id, (int) $row->variant_id, $reservedQty);
+                $row->delete();
+                continue;
+            }
+
+            if ($reservedQty > $requiredQty) {
+                $this->releaseStockForItem((int) $row->product_id, (int) $row->variant_id, $reservedQty - $requiredQty);
+                $row->quantity = $requiredQty;
+            }
+
+            $row->preinvoice_order_id = $order->id;
+            $row->converted_at = now();
+            $row->expires_at = null;
+            $row->save();
+        }
+    }
+
+    private function activeDraftReservationQuantities(?string $reservationToken): array
+    {
+        if (! $reservationToken || ! auth()->check()) {
+            return [];
+        }
+
+        return PreinvoiceDraftReservation::query()
+            ->where('token', $reservationToken)
+            ->where('user_id', auth()->id())
+            ->whereNull('converted_at')
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->pluck('quantity', 'variant_id')
+            ->mapWithKeys(fn ($quantity, $variantId) => [(int) $variantId => (int) $quantity])
+            ->all();
+    }
+
+    private function reserveStockForItem(int $productId, int $variantId, int $quantity): void
+    {
+        if ($quantity <= 0) {
+            return;
+        }
+
+        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
+        $availableQty = max(0, (int) $variant->stock - (int) $variant->reserved);
+        if ($quantity > $availableQty) {
+            throw ValidationException::withMessages([
+                'products' => "موجودی قابل فریز تنوع انتخابی کافی نیست. موجودی قابل فروش: {$availableQty} | درخواست: {$quantity}",
+            ]);
+        }
+
+        $variant->reserved = (int) $variant->reserved + $quantity;
+        $variant->save();
+
+        $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+        if ($product) {
+            $product->reserved = (int) $product->reserved + $quantity;
+            $product->save();
+        }
+    }
+
+    private function releaseStockForItem(int $productId, int $variantId, int $quantity): void
+    {
+        if ($quantity <= 0) {
+            return;
+        }
+
+        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->first();
+        if ($variant) {
+            $variant->reserved = max(0, (int) $variant->reserved - $quantity);
+            $variant->save();
+        }
+
+        $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+        if ($product) {
+            $product->reserved = max(0, (int) $product->reserved - $quantity);
+            $product->save();
         }
     }
 
