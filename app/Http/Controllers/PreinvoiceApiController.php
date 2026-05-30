@@ -88,9 +88,33 @@ class PreinvoiceApiController extends Controller
     public function product(Request $request, Product $product)
     {
         abort_unless((bool) $product->is_sellable, 404);
-        abort_unless($product->variants()->active()->where('stock', '>', 0)->exists(), 404);
 
-        $product->load(['variants' => fn ($q) => $q->active()->where('stock', '>', 0)->with('modelList')->orderBy('variant_name')]);
+        $reservationToken = (string) $request->query('reservation_token', '');
+        $reservedByVariant = $this->activeReservationQuantities($reservationToken);
+        $reservedVariantIds = array_keys($reservedByVariant);
+
+        $hasAvailableOrReservedVariant = $product->variants()
+            ->active()
+            ->where(function ($query) use ($reservedVariantIds) {
+                $query->where('stock', '>', 0);
+                if (! empty($reservedVariantIds)) {
+                    $query->orWhereIn('id', $reservedVariantIds);
+                }
+            })
+            ->exists();
+
+        abort_unless($hasAvailableOrReservedVariant, 404);
+
+        $product->load(['variants' => fn ($q) => $q
+            ->active()
+            ->where(function ($query) use ($reservedVariantIds) {
+                $query->where('stock', '>', 0);
+                if (! empty($reservedVariantIds)) {
+                    $query->orWhereIn('id', $reservedVariantIds);
+                }
+            })
+            ->with('modelList')
+            ->orderBy('variant_name')]);
 
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
         $centralStock = (int) WarehouseStock::query()
@@ -118,7 +142,7 @@ class PreinvoiceApiController extends Controller
                 'price' => (int) ($v->sell_price ?? 0),
                 'quantity' => (int) ($v->stock ?? 0),
                 'reserved' => (int) ($v->reserved ?? 0),
-                'sellable_stock' => max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)),
+                'sellable_stock' => max(0, (int) ($v->stock ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)),
                 'variant_name' => (string) ($v->variant_name ?? ''),
                 'variety_name' => (string) ($v->variety_name ?? ''),
                 'variety_code' => (string) ($v->variety_code ?? ''),
@@ -305,15 +329,22 @@ class PreinvoiceApiController extends Controller
 
     private function reserveVariantDelta(int $productId, int $variantId, int $delta): void
     {
+        if ($delta <= 0) {
+            return;
+        }
+
         $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
-        $available = max(0, (int) $variant->stock - (int) $variant->reserved);
+        $available = max(0, (int) $variant->stock);
 
         if ($delta > $available) {
             throw ValidationException::withMessages([
-                'items' => "موجودی قابل فریز برای تنوع انتخابی کافی نیست. موجودی قابل فریز: {$available} | درخواست جدید: {$delta}",
+                'items' => "موجودی قابل فریز برای تنوع انتخابی کافی نیست. موجودی انبار مرکزی: {$available} | درخواست جدید: {$delta}",
             ]);
         }
 
+        WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $productId, -$delta, $variantId);
+
+        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
         $variant->reserved = (int) $variant->reserved + $delta;
         $variant->save();
 
@@ -326,6 +357,10 @@ class PreinvoiceApiController extends Controller
 
     private function releaseVariantDelta(int $productId, int $variantId, int $delta): void
     {
+        if ($delta <= 0) {
+            return;
+        }
+
         $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->first();
         if ($variant) {
             $variant->reserved = max(0, (int) $variant->reserved - $delta);
@@ -337,6 +372,8 @@ class PreinvoiceApiController extends Controller
             $product->reserved = max(0, (int) $product->reserved - $delta);
             $product->save();
         }
+
+        WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $productId, $delta, $variantId);
     }
 
     private function releaseExpiredDraftReservations(): void

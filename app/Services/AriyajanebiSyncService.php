@@ -199,10 +199,9 @@ class AriyajanebiSyncService
 
     private static function centralWarehouseQuantityForVariant($variant): int
     {
-        // For external storefront stock, we should send saleable quantity.
-        // During preinvoice freeze, `reserved` increases (temporary hold), so
-        // balance must drop immediately; on final approval, `stock` decreases too.
-        return max(0, ((int) ($variant->stock ?? 0)) - ((int) ($variant->reserved ?? 0)));
+        // Reserved preinvoice items are moved out of central stock immediately,
+        // so the variant stock field already represents saleable central stock.
+        return max(0, (int) ($variant->stock ?? 0));
     }
 
     private static function extractToken($json): ?string

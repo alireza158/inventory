@@ -19,7 +19,7 @@
                 return [
                     'id' => (int) $variant->id,
                     'name' => $variant->variant_name,
-                    'stock' => max(0, ((int) $variant->stock - (int) $variant->reserved)),
+                    'stock' => max(0, (int) $variant->stock),
                     'price' => (int) ($variant->sell_price ?? 0),
                 ];
             })->values()->toArray(),

@@ -1595,8 +1595,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     function variantStock(v) {
         if (v?.sellable_stock !== undefined && v?.sellable_stock !== null) return Number(v.sellable_stock) || 0;
         const stock = Number(v?.stock ?? v?.quantity ?? 0) || 0;
-        const reserved = Number(v?.reserved ?? 0) || 0;
-        return Math.max(0, stock - reserved);
+        return Math.max(0, stock);
     }
 
     function buildVariantTitle(v) {
