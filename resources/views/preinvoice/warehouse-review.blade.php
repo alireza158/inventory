@@ -89,6 +89,16 @@
         </div>
     </div>
 
+    <div class="card border-info-subtle shadow-sm mb-3">
+        <div class="card-body">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">توضیحات پیش‌فاکتور</span>
+                <span class="text-muted small">یادداشت ثبت‌کننده برای هماهنگی انبار و مالی</span>
+            </div>
+            <div class="text-body" style="white-space: pre-wrap;">{{ $order->description ?: 'توضیحی برای این پیش‌فاکتور ثبت نشده است.' }}</div>
+        </div>
+    </div>
+
     <form method="POST"
           action="{{ route('preinvoice.warehouse.save', $order->uuid) }}"
           id="warehouseForm"

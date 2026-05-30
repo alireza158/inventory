@@ -17,7 +17,7 @@
   }
 </style>
 <div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="mb-0">✅ مشاهده و تایید مالی پیش‌فاکتور</h4>
     <a href="{{ route('preinvoice.draft.index') }}" class="btn btn-outline-secondary">بازگشت به صف مالی</a>
   </div>
@@ -67,6 +67,17 @@
           <div class="fw-bold">{{ number_format($grandTotal) }} تومان</div>
         </div>
       </div>
+    </div>
+  </div>
+
+
+  <div class="card border-info-subtle shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">توضیحات پیش‌فاکتور</span>
+        <span class="text-muted small">یادداشت ثبت‌کننده برای تصمیم‌گیری مالی و انبار</span>
+      </div>
+      <div class="text-body" style="white-space: pre-wrap;">{{ $order->description ?: 'توضیحی برای این پیش‌فاکتور ثبت نشده است.' }}</div>
     </div>
   </div>
 
@@ -152,15 +163,16 @@
       </div>
     </div>
 
-    <div class="card-footer d-flex justify-content-end gap-2">
-      <form method="POST" action="{{ route('preinvoice.draft.cancel', $order->uuid) }}" onsubmit="return confirm('پیش‌فاکتور کنسل شود؟')" class="d-flex gap-2">
-        @csrf
-        <input name="reason" class="form-control" placeholder="دلیل کنسلی" required>
-        <button class="btn btn-outline-danger">کنسل پیش‌فاکتور</button>
-      </form>
+    <div class="card-footer d-flex justify-content-end gap-2 flex-wrap">
+      <input name="reason" form="cancelPreinvoiceForm" class="form-control" style="max-width: 320px;" placeholder="دلیل کنسلی" required>
+      <button class="btn btn-outline-danger" form="cancelPreinvoiceForm">کنسل پیش‌فاکتور</button>
       <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-outline-secondary">ویرایش فاکتور</a>
       <button class="btn btn-success" onclick="return confirm('تاییدیه نهایی مالی ثبت شود؟ با این کار، پیش‌فاکتور به فاکتور تبدیل می‌شود و در صف حواله فروش انبار قرار می‌گیرد.')">تاییدیه نهایی پیش‌فاکتور از سمت مالی</button>
     </div>
+  </form>
+
+  <form id="cancelPreinvoiceForm" method="POST" action="{{ route('preinvoice.draft.cancel', $order->uuid) }}" onsubmit="return confirm('پیش‌فاکتور کنسل شود؟')" class="d-none">
+    @csrf
   </form>
 </div>
 

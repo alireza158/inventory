@@ -39,6 +39,7 @@
               <th>کد</th>
               <th>مشتری</th>
               <th>موبایل</th>
+              <th>توضیحات</th>
               <th>تعداد اقلام</th>
               <th>مبلغ نهایی</th>
               <th>وضعیت</th>
@@ -52,6 +53,9 @@
                 <td class="fw-semibold">{{ $order->uuid }}</td>
                 <td>{{ $order->customer_name }}</td>
                 <td>{{ $order->customer_mobile ?: '—' }}</td>
+                <td class="text-muted small" style="min-width: 220px; max-width: 320px; white-space: normal;">
+                  {{ $order->description ? \Illuminate\Support\Str::limit($order->description, 120) : '—' }}
+                </td>
                 <td>{{ number_format($order->items_count) }}</td>
                 <td>{{ number_format((int) $order->total_price) }} ریال</td>
                 <td>{{ $statusLabels[$order->status] ?? $order->status }}</td>
@@ -65,7 +69,7 @@
               </tr>
             @empty
               <tr>
-                <td colspan="8" class="text-center text-muted py-4">پیش‌فاکتوری توسط شما ثبت نشده است.</td>
+                <td colspan="9" class="text-center text-muted py-4">پیش‌فاکتوری توسط شما ثبت نشده است.</td>
               </tr>
             @endforelse
           </tbody>
