@@ -34,6 +34,25 @@
     z-index: 1180;
     background: rgba(255,255,255,.96) !important;
     backdrop-filter: blur(6px);
+    max-width: 100vw;
+    min-width: 0;
+  }
+  .app-main-shell{
+    min-width: 0;
+    width: 100%;
+  }
+  .app-topbar__brand,
+  .app-topbar__actions{
+    min-width: 0;
+  }
+  .app-topbar__brand{
+    flex: 1 1 auto;
+  }
+  .app-topbar__actions{
+    flex: 0 0 auto;
+  }
+  .app-notif-menu{
+    max-width: calc(100vw - 1.5rem);
   }
   @media (min-width: 992px){
     .app-topbar{ position: static; }
@@ -79,6 +98,26 @@
     font-weight:900;
   }
   @media (max-width:575.98px){
+    .app-topbar{
+      padding-inline: .5rem !important;
+      gap: .5rem;
+    }
+    .app-topbar__brand img{
+      width: 30px !important;
+      height: 30px !important;
+    }
+    .app-topbar__actions{
+      gap: .35rem !important;
+    }
+    .app-topbar__actions .dropdown-toggle{
+      max-width: 92px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .app-content{
+      padding-inline: .75rem !important;
+    }
     .app-back-btn{
       width:36px;
       min-width:36px;
@@ -96,7 +135,7 @@
     @include('layouts.sidebar')
 
     {{-- Main --}}
-    <div class="flex-grow-1">
+    <div class="flex-grow-1 app-main-shell">
         {{-- Topbar --}}
 @php
     $backFallbackUrl = url('/');
@@ -105,7 +144,7 @@
     }
 @endphp
 <div class="app-topbar bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
-    <div class="d-flex align-items-center gap-2 fw-bold text-muted">
+    <div class="app-topbar__brand d-flex align-items-center gap-2 fw-bold text-muted">
 
         {{-- Mobile Menu Button (فقط موبایل) --}}
         <button type="button" class="btn btn-sm btn-outline-secondary d-lg-none app-menu-btn"
@@ -120,13 +159,13 @@
         <span class="text-truncate">{{ config('app.name','سیستم انبار آریا جانبی') }}</span>
     </div>
 
-    <div class="d-flex align-items-center gap-2">
+    <div class="app-topbar__actions d-flex align-items-center gap-2">
         <div class="dropdown">
             <button class="btn btn-sm btn-outline-secondary position-relative" data-bs-toggle="dropdown" id="notifBell">
                 🔔
                 <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
             </button>
-            <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:320px">
+            <div class="dropdown-menu dropdown-menu-end p-2 app-notif-menu" style="min-width: min(320px, calc(100vw - 1.5rem))">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <strong>اعلان‌ها</strong>
                     <button class="btn btn-sm btn-link p-0" id="notifReadAllBtn">خواندن همه</button>
@@ -164,7 +203,7 @@
     </div>
 </div>
 
-        <main class="container py-4">
+        <main class="container py-4 app-content">
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     {{ session('success') }}

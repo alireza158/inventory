@@ -158,6 +158,12 @@
         <label class="form-label fw-semibold">آدرس</label>
         <textarea id="customer_address" name="customer_address" class="form-control" rows="3" required>{{ old('customer_address', $order->customer_address) }}</textarea>
       </div>
+
+      <div class="mt-3">
+        <label class="form-label fw-semibold">توضیحات پیش‌فاکتور</label>
+        <textarea id="preinvoice_description" name="description" class="form-control" rows="3" placeholder="توضیحات هماهنگی فروش، انبار یا مالی...">{{ old('description', $order->description) }}</textarea>
+        <div class="hint mt-2">این متن در صف انبار و صفحه تایید مالی نمایش داده می‌شود.</div>
+      </div>
     </div>
 
     {{-- Products --}}
