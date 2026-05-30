@@ -6,7 +6,7 @@
 
 @section('content')
 <div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="mb-0">💰 صف مالی پیش‌فاکتورها</h4>
     <a href="{{ route('preinvoice.create') }}" class="btn btn-primary">➕ ایجاد پیش‌فاکتور</a>
   </div>
@@ -36,6 +36,7 @@
             <th>مشتری</th>
             <th>ثبت‌کننده</th>
             <th>موبایل</th>
+            <th>توضیحات</th>
             <th class="text-nowrap">جمع کل (تومان)</th>
             <th class="text-nowrap">تاریخ ثبت</th>
             <th class="text-end"></th>
@@ -49,6 +50,9 @@
               <td>{{ $o->customer_name }}</td>
               <td>{{ $o->creator?->name ?? '—' }}</td>
               <td>{{ $o->customer_mobile }}</td>
+              <td class="text-muted small" style="min-width: 220px; max-width: 320px; white-space: normal;">
+                {{ $o->description ? \Illuminate\Support\Str::limit($o->description, 120) : '—' }}
+              </td>
               <td>{{ number_format((int)$o->total_price) }}</td>
               <td>{{ $o->created_at ? Jalalian::fromDateTime($o->created_at)->format('Y/m/d H:i') : '—' }}</td>
               <td class="text-end">
@@ -60,7 +64,7 @@
               </td>
             </tr>
           @empty
-            <tr><td colspan="8" class="text-center py-4">موردی نیست</td></tr>
+            <tr><td colspan="9" class="text-center py-4">موردی نیست</td></tr>
           @endforelse
         </tbody>
       </table>

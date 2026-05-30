@@ -267,6 +267,16 @@
     font-weight: 950;
   }
 
+  .info-item.full-row {
+    grid-column: 1 / -1;
+  }
+
+  .info-item.description-text strong {
+    display: block;
+    white-space: pre-wrap;
+    line-height: 1.9;
+  }
+
   .table-modern {
     margin-bottom: 0;
   }
@@ -554,6 +564,11 @@
                   {{ $order->status_label }}
                 </span>
               </strong>
+            </div>
+
+            <div class="info-item full-row description-text">
+              <span>توضیحات پیش‌فاکتور</span>
+              <strong>{{ $order->description ?: 'توضیحی ثبت نشده است.' }}</strong>
             </div>
 
           </div>
