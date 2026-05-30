@@ -330,4 +330,8 @@ Route::get('/auto-login', function (Request $request) {
 
     return redirect('/dashboard');
 });
+
+
+Route::get('/finance/cheques', [ChequeController::class, 'index'])
+    ->name('finance.cheques.index');
 require __DIR__ . '/auth.php';
