@@ -29,12 +29,16 @@
         return [
             'id' => $p->id,
             'name' => $p->name,
-            'code' => $p->code,
+            'code' => $p->code ?: $p->short_barcode,
+            'short_barcode' => $p->short_barcode,
             'category_id' => $p->category_id,
             'variants' => $p->variants->map(function ($v) {
                 return [
                     'id' => $v->id,
                     'name' => $v->variant_name,
+                    'model_name' => $v->modelList?->model_name,
+                    'model_code' => $v->modelList?->code,
+                    'variety_name' => $v->variety_name,
                     'code' => $v->variant_code,
                     'buy_price' => (int) ($v->buy_price ?? 0),
                     'sell_price' => (int) ($v->sell_price ?? 0),
@@ -192,7 +196,7 @@
         if (filtered.length === 0) return '<option value="">کالایی در این دسته‌بندی نیست</option>';
 
         return `<option value="">انتخاب کالا</option>${filtered.map((p) =>
-            `<option value="${p.id}" ${String(selected)===String(p.id)?'selected':''}>${p.name} (${p.code || '-'})</option>`
+            `<option value="${p.id}" data-code="${p.code || ''}" data-category-id="${p.category_id || ''}" ${String(selected)===String(p.id)?'selected':''}>${p.name} (${p.code || '-'})</option>`
         ).join('')}`;
     }
 
@@ -216,10 +220,18 @@
                 searching: () => 'در حال جستجو...',
             },
         });
+
+        $select.off('change.purchaseProduct').on('change.purchaseProduct', function () {
+            const groupEl = this.closest('[data-group-id]');
+            if (groupEl) handleProductChanged(groupEl);
+        });
     }
 
-    function extractModelGroup(name) {
-        const cleaned = String(name || '').trim();
+    function extractModelGroup(variant) {
+        const modelName = String(variant?.model_name || '').trim();
+        if (modelName) return modelName;
+
+        const cleaned = String(variant?.name || '').trim();
         if (!cleaned) return 'سایر';
 
         const byDash = cleaned.split(' - ');
@@ -236,8 +248,8 @@
         if (!product) return [];
 
         const map = new Map();
-        product.variants.forEach((v) => {
-            const key = extractModelGroup(v.name);
+        (product.variants || []).forEach((v) => {
+            const key = extractModelGroup(v);
             if (!map.has(key)) map.set(key, []);
             map.get(key).push(v);
         });
@@ -388,12 +400,33 @@
         }
     }
 
-    function syncGroupFieldsToRows(groupEl) {
-        const productId = groupEl.querySelector('.group-product-select')?.value || '';
-        const categoryId = groupEl.querySelector('.group-category-select')?.value || '';
+    function selectedProductPayload(groupEl) {
+        const productSelect = groupEl.querySelector('.group-product-select');
+        const productId = productSelect?.value || '';
         const product = products.find((p) => String(p.id) === String(productId));
-        const name = product?.name || '';
-        const code = product?.code || '';
+        const selectedOption = productSelect?.selectedOptions?.[0] || null;
+        const code = product?.code || selectedOption?.dataset?.code || '';
+        const categoryId = groupEl.querySelector('.group-category-select')?.value || product?.category_id || selectedOption?.dataset?.categoryId || '';
+
+        return {
+            productId,
+            categoryId,
+            product,
+            name: product?.name || selectedOption?.textContent?.replace(/\s*\([^)]*\)\s*$/, '').trim() || '',
+            code,
+        };
+    }
+
+    function handleProductChanged(groupEl) {
+        groupEl.querySelector('[data-models]').innerHTML = '';
+        syncGroupFieldsToRows(groupEl);
+        renderVariantPicker(groupEl);
+        reindexRows();
+        recalc();
+    }
+
+    function syncGroupFieldsToRows(groupEl) {
+        const { productId, categoryId, product, name, code } = selectedProductPayload(groupEl);
 
         const codeEl = groupEl.querySelector('.group-product-code');
         if (codeEl) codeEl.value = code;
@@ -676,11 +709,7 @@
         }
 
         if (e.target.classList.contains('group-product-select')) {
-            groupEl.querySelector('[data-models]').innerHTML = '';
-            syncGroupFieldsToRows(groupEl);
-            renderVariantPicker(groupEl);
-            reindexRows();
-            recalc();
+            handleProductChanged(groupEl);
             return;
         }
 
