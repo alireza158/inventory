@@ -11,9 +11,7 @@ class ChequeController extends Controller
     public function index(Request $request)
     {
         $query = Cheque::query()
-            ->with([
-                'payment.invoice',
-            ]);
+            ->with(['payment.invoice']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
@@ -36,18 +34,22 @@ class ChequeController extends Controller
             $query->where('cheque_number', 'like', "%{$chequeNumber}%");
         }
 
-        if ($request->filled('date_from')) {
-            $query->whereDate('received_at', '>=', $request->input('date_from'));
+        // از تاریخ دریافت
+        if ($request->filled('received_from')) {
+            $query->whereDate('received_at', '>=', $request->input('received_from'));
         }
 
-        if ($request->filled('date_to')) {
-            $query->whereDate('received_at', '<=', $request->input('date_to'));
+        // تا تاریخ دریافت
+        if ($request->filled('received_to')) {
+            $query->whereDate('received_at', '<=', $request->input('received_to'));
         }
 
+        // از تاریخ سررسید
         if ($request->filled('due_from')) {
             $query->whereDate('due_date', '>=', $request->input('due_from'));
         }
 
+        // تا تاریخ سررسید
         if ($request->filled('due_to')) {
             $query->whereDate('due_date', '<=', $request->input('due_to'));
         }

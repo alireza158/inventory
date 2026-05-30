@@ -7,7 +7,7 @@
         <h4 class="mb-0">چک‌های ثبت‌شده</h4>
     </div>
 
-    <form method="GET" action="{{ route('finance.cheques.index') }}" class="card card-body mb-3">
+    <form method="GET" action="{{ route('finance.cheques.index') }}" class="card card-body mb-3 shadow-sm">
         <div class="row g-2">
 
             <div class="col-md-3">
@@ -33,12 +33,39 @@
             </div>
 
             <div class="col-md-2">
+                <label class="form-label">وضعیت صیادی</label>
+                <select class="form-select" name="status">
+                    <option value="">همه وضعیت‌ها</option>
+
+                    <option value="registered" @selected(request('status') === 'registered')>
+                        ثبت‌شده
+                    </option>
+
+                    <option value="unregistered" @selected(request('status') === 'unregistered')>
+                        ثبت‌نشده
+                    </option>
+
+                    <option value="pending" @selected(request('status') === 'pending')>
+                        در انتظار
+                    </option>
+
+                    <option value="cleared" @selected(request('status') === 'cleared')>
+                        پاس‌شده
+                    </option>
+
+                    <option value="bounced" @selected(request('status') === 'bounced')>
+                        برگشتی
+                    </option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
                 <label class="form-label">از تاریخ دریافت</label>
                 <input
                     type="date"
                     class="form-control"
-                    name="date_from"
-                    value="{{ request('date_from') }}"
+                    name="received_from"
+                    value="{{ request('received_from') }}"
                 >
             </div>
 
@@ -47,37 +74,41 @@
                 <input
                     type="date"
                     class="form-control"
-                    name="date_to"
-                    value="{{ request('date_to') }}"
+                    name="received_to"
+                    value="{{ request('received_to') }}"
                 >
             </div>
 
             <div class="col-md-2">
-                <label class="form-label">وضعیت صیادی</label>
-                <select class="form-select" name="status">
-                    <option value="">همه وضعیت‌ها</option>
-                    <option value="registered" @selected(request('status') === 'registered')>
-                        ثبت‌شده
-                    </option>
-                    <option value="unregistered" @selected(request('status') === 'unregistered')>
-                        ثبت‌نشده
-                    </option>
-                    <option value="pending" @selected(request('status') === 'pending')>
-                        در انتظار
-                    </option>
-                    <option value="cleared" @selected(request('status') === 'cleared')>
-                        پاس‌شده
-                    </option>
-                    <option value="bounced" @selected(request('status') === 'bounced')>
-                        برگشتی
-                    </option>
-                </select>
+                <label class="form-label">از تاریخ سررسید</label>
+                <input
+                    type="date"
+                    class="form-control"
+                    name="due_from"
+                    value="{{ request('due_from') }}"
+                >
             </div>
 
-            <div class="col-md-1 d-flex align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">تا تاریخ سررسید</label>
+                <input
+                    type="date"
+                    class="form-control"
+                    name="due_to"
+                    value="{{ request('due_to') }}"
+                >
+            </div>
+
+            <div class="col-md-2 d-flex align-items-end">
                 <button class="btn btn-primary w-100">
                     جستجو
                 </button>
+            </div>
+
+            <div class="col-md-2 d-flex align-items-end">
+                <a href="{{ route('finance.cheques.index') }}" class="btn btn-outline-secondary w-100">
+                    حذف فیلترها
+                </a>
             </div>
 
         </div>
