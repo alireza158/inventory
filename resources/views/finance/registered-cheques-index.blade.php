@@ -151,15 +151,23 @@
                                 'bounced' => 'danger',
                                 default => 'dark',
                             };
+
+                            $receivedAtJalali = $cheque->received_at
+                                ? jdate($cheque->received_at)->format('Y/m/d')
+                                : '—';
+
+                            $dueDateJalali = $cheque->due_date
+                                ? jdate($cheque->due_date)->format('Y/m/d')
+                                : '—';
                         @endphp
 
                         <tr>
                             <td>
-                                {{ optional($cheque->received_at)->format('Y-m-d') ?? '—' }}
+                                {{ $receivedAtJalali }}
                             </td>
 
                             <td>
-                                {{ optional($cheque->due_date)->format('Y-m-d') ?? '—' }}
+                                {{ $dueDateJalali }}
                             </td>
 
                             <td>
