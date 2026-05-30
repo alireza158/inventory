@@ -1092,8 +1092,8 @@
                     <div>
                         <label class="label-sm">بازه قیمت</label>
                         <div class="input-group">
-                            <input name="min_price" class="form-control money" value="{{ request('min_price') }}" placeholder="از">
-                            <input name="max_price" class="form-control money" value="{{ request('max_price') }}" placeholder="تا">
+                            <input name="min_price" class="form-control money" value="{{ request('min_price') !== null ? \App\Support\Currency::toRial(request('min_price')) : '' }}" placeholder="از">
+                            <input name="max_price" class="form-control money" value="{{ request('max_price') !== null ? \App\Support\Currency::toRial(request('max_price')) : '' }}" placeholder="تا">
                         </div>
                     </div>
 
@@ -1353,14 +1353,14 @@
 
                                     <td class="nowrap" data-label="قیمت خرید">
                                         @if(!is_null($buyPrice))
-                                            <span class="price-inline">{{ $toFa(number_format((int) $buyPrice) . ' تومان') }}</span>
+                                            <span class="price-inline">{{ $toFa(\App\Support\Currency::formatRial($buyPrice)) }}</span>
                                         @else
                                             <span class="buy-price-muted">—</span>
                                         @endif
                                     </td>
 
                                     <td class="nowrap" data-label="قیمت فروش">
-                                        <span class="price-inline">{{ $toFa(number_format((int) $p->price) . ' تومان') }}</span>
+                                        <span class="price-inline">{{ $toFa(\App\Support\Currency::formatRial($p->price)) }}</span>
                                     </td>
                                 </tr>
 
@@ -1400,11 +1400,11 @@
                                                                     </td>
 
                                                                     <td data-label="فروش">
-                                                                        {{ $toFa(number_format((int) $v->sell_price) . ' تومان') }}
+                                                                        {{ $toFa(\App\Support\Currency::formatRial($v->sell_price)) }}
                                                                     </td>
 
                                                                     <td data-label="خرید">
-                                                                        {{ $v->buy_price !== null ? $toFa(number_format((int) $v->buy_price) . ' تومان') : '—' }}
+                                                                        {{ $v->buy_price !== null ? $toFa(\App\Support\Currency::formatRial($v->buy_price)) : '—' }}
                                                                     </td>
 
                                                                     <td data-label="وضعیت">

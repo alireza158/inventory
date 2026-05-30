@@ -18,7 +18,7 @@
         <div class="row g-3">
             <div class="col-md-4"><strong>شماره سند:</strong> {{ $voucher->reference ?: ('TR-' . $voucher->id) }}</div>
             <div class="col-md-4"><strong>تاریخ:</strong> {{ $voucher->transferred_at ? Jalalian::fromDateTime($voucher->transferred_at)->format('Y/m/d H:i') : '—' }}</div>
-            <div class="col-md-4"><strong>مبلغ کل:</strong> {{ number_format((int) $voucher->total_amount) }} تومان</div>
+            <div class="col-md-4"><strong>مبلغ کل:</strong> {{ \App\Support\Currency::formatRial($voucher->total_amount) }}</div>
             <div class="col-md-4"><strong>مشتری:</strong> {{ $voucher->customer?->display_name ?: ($voucher->beneficiary_name ?: '—') }}</div>
             <div class="col-md-4"><strong>فاکتور مرجع:</strong> {{ $voucher->relatedInvoice?->uuid ?: '—' }}</div>
             <div class="col-md-4"><strong>علت برگشت:</strong> {{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}</div>

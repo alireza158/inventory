@@ -287,7 +287,7 @@
 
                                 <div>
                                     <div class="muted mb-1">مبلغ کل</div>
-                                    <div class="fw-bold"><span id="selectedInvoiceTotal">—</span> تومان</div>
+                                    <div class="fw-bold"><span id="selectedInvoiceTotal">—</span> ریال</div>
                                 </div>
 
                                 <button type="button" class="btn btn-sm btn-outline-primary" id="changeInvoiceBtn">
@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                         <div class="text-start">
                             <div class="muted">مبلغ کل</div>
-                            <div class="fw-bold">${toMoney(invoice.total || 0)} تومان</div>
+                            <div class="fw-bold">${toMoney(invoice.total || 0)} ریال</div>
                         </div>
 
                         <div class="text-start">

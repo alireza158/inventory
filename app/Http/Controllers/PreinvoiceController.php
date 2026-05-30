@@ -318,7 +318,7 @@ class PreinvoiceController extends Controller
                 'warehouse',
                 'preinvoice_submitted_to_warehouse',
                 'پیش‌فاکتور جدید در انتظار تایید انبار',
-                "پیش‌فاکتور مشتری {$order->customer_name} با مبلغ " . number_format((int) $order->total_price) . " تومان ثبت شد و منتظر بررسی انبار است.",
+                "پیش‌فاکتور مشتری {$order->customer_name} با مبلغ " . Currency::formatRialNumber($order->total_price) . " ریال ثبت شد و منتظر بررسی انبار است.",
                 route('preinvoice.warehouse.review', $order->uuid),
                 ['level' => 'info', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "warehouse_preinvoice_submitted:{$order->id}"]
             );

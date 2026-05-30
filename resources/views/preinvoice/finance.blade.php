@@ -7,6 +7,7 @@
   $shipping = (int) $order->shipping_price;
   $discount = (int) $order->discount_amount;
   $grandTotal = max($subtotal + $shipping - $discount, 0);
+  $rial = fn ($value) => \App\Support\Currency::formatRial($value);
 @endphp
 
 @section('content')
@@ -55,7 +56,7 @@
         <div class="col-md-3 col-sm-6">
           <div class="text-muted small mb-1">وضعیت حساب مشتری</div>
           <div class="fw-semibold {{ $customerBalanceStatus === 'بدهکار' ? 'text-danger' : ($customerBalanceStatus === 'بستانکار' ? 'text-success' : '') }}">
-            {{ $customerBalanceStatus }} {{ $customerBalanceStatus === 'تسویه شده' ? '' : number_format($customerBalanceAmount) . ' تومان' }}
+            {{ $customerBalanceStatus }} {{ $customerBalanceStatus === 'تسویه شده' ? '' : \App\Support\Currency::formatRial($customerBalanceAmount) }}
           </div>
         </div>
         <div class="col-md-3 col-sm-6">
@@ -64,7 +65,7 @@
         </div>
         <div class="col-md-3 col-sm-6">
           <div class="text-muted small mb-1">جمع کل فاکتور</div>
-          <div class="fw-bold">{{ number_format($grandTotal) }} تومان</div>
+          <div class="fw-bold">{{ $rial($grandTotal) }}</div>
         </div>
       </div>
     </div>
@@ -99,9 +100,9 @@
 
               <div id="paymentRows" class="d-grid gap-3"></div>
               <div class="border rounded p-2 small mb-3 d-none" id="paymentTotals">
-                <div class="d-flex justify-content-between"><span>جمع نقدی</span><strong id="cashTotalLabel">0 تومان</strong></div>
-                <div class="d-flex justify-content-between"><span>جمع چکی</span><strong id="chequeTotalLabel">0 تومان</strong></div>
-                <div class="d-flex justify-content-between"><span>جمع کل پرداختی</span><strong id="allTotalLabel">0 تومان</strong></div>
+                <div class="d-flex justify-content-between"><span>جمع نقدی</span><strong id="cashTotalLabel">0 ریال</strong></div>
+                <div class="d-flex justify-content-between"><span>جمع چکی</span><strong id="chequeTotalLabel">0 ریال</strong></div>
+                <div class="d-flex justify-content-between"><span>جمع کل پرداختی</span><strong id="allTotalLabel">0 ریال</strong></div>
               </div>
               <div class="alert alert-light border mb-0 small text-muted" id="paymentGuide">
                 هنوز پرداختی اضافه نشده است. در صورت نیاز روی «افزودن پرداخت» بزنید.
@@ -142,20 +143,20 @@
             <div class="card-body border-top">
               <div class="d-flex justify-content-between mb-2">
                 <span class="text-muted">جمع اقلام</span>
-                <strong>{{ number_format($subtotal) }} تومان</strong>
+                <strong>{{ $rial($subtotal) }}</strong>
               </div>
               <div class="d-flex justify-content-between mb-2">
                 <span class="text-muted">هزینه ارسال</span>
-                <strong>{{ number_format($shipping) }} تومان</strong>
+                <strong>{{ $rial($shipping) }}</strong>
               </div>
               <div class="d-flex justify-content-between mb-2">
                 <span class="text-muted">تخفیف لحاظ شده</span>
-                <strong class="text-danger">- {{ number_format($discount) }} تومان</strong>
+                <strong class="text-danger">- {{ $rial($discount) }}</strong>
               </div>
               <hr>
               <div class="d-flex justify-content-between">
                 <span class="fw-semibold">مبلغ نهایی فاکتور</span>
-                <strong class="fs-5">{{ number_format($grandTotal) }} تومان</strong>
+                <strong class="fs-5">{{ $rial($grandTotal) }}</strong>
               </div>
             </div>
           </div>
@@ -360,8 +361,8 @@
         const amount = Number(payment.amount || payment.cheque_amount || 0);
         if (payment.method === 'cash') cashTotal += amount; else chequeTotal += amount;
         const title = payment.method === 'cash'
-          ? `نقدی | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} تومان`
-          : `چک | شماره: ${payment.cheque_number} | مبلغ: ${Number(payment.cheque_amount || 0).toLocaleString('en-US')} تومان`;
+          ? `نقدی | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} ریال`
+          : `چک | شماره: ${payment.cheque_number} | مبلغ: ${Number(payment.cheque_amount || 0).toLocaleString('en-US')} ریال`;
 
         const hiddenInputs = Object.entries(payment).map(([key, val]) => buildHiddenInput(`payments[${idx}][${key}]`, val)).join('');
 
@@ -378,9 +379,9 @@
       }).join('');
       const allTotal = cashTotal + chequeTotal;
       paymentTotals.classList.remove('d-none');
-      cashTotalLabel.textContent = `${cashTotal.toLocaleString('en-US')} تومان`;
-      chequeTotalLabel.textContent = `${chequeTotal.toLocaleString('en-US')} تومان`;
-      allTotalLabel.textContent = `${allTotal.toLocaleString('en-US')} تومان`;
+      cashTotalLabel.textContent = `${cashTotal.toLocaleString('en-US')} ریال`;
+      chequeTotalLabel.textContent = `${chequeTotal.toLocaleString('en-US')} ریال`;
+      allTotalLabel.textContent = `${allTotal.toLocaleString('en-US')} ریال`;
 
       rowsWrap.querySelectorAll('.js-remove-payment').forEach((btn) => {
         btn.addEventListener('click', () => {

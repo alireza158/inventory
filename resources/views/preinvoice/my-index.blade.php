@@ -57,7 +57,7 @@
                   {{ $order->description ? \Illuminate\Support\Str::limit($order->description, 120) : '—' }}
                 </td>
                 <td>{{ number_format($order->items_count) }}</td>
-                <td>{{ number_format((int) $order->total_price) }} ریال</td>
+                <td>{{ \App\Support\Currency::formatRial($order->total_price) }}</td>
                 <td>{{ $statusLabels[$order->status] ?? $order->status }}</td>
                 <td>{{ $toJalali($order->created_at) }}</td>
                 <td class="text-end">

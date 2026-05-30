@@ -37,7 +37,7 @@
             <th>ثبت‌کننده</th>
             <th>موبایل</th>
             <th>توضیحات</th>
-            <th class="text-nowrap">جمع کل (تومان)</th>
+            <th class="text-nowrap">جمع کل (ریال)</th>
             <th class="text-nowrap">تاریخ ثبت</th>
             <th class="text-end"></th>
           </tr>

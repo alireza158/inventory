@@ -17,10 +17,10 @@
                 'variant_name' => $it->variant_name,
                 'variant_code' => $it->variant?->variant_code,
                 'quantity' => $it->quantity,
-                'buy_price' => $it->buy_price,
-                'sell_price' => $it->sell_price,
+                'buy_price' => \App\Support\Currency::toRial($it->buy_price),
+                'sell_price' => \App\Support\Currency::toRial($it->sell_price),
                 'discount_type' => $it->discount_type,
-                'discount_value' => $it->discount_value,
+                'discount_value' => $it->discount_type === 'amount' ? \App\Support\Currency::toRial($it->discount_value) : $it->discount_value,
             ])->values()->all()
             : [];
     }
@@ -40,8 +40,8 @@
                     'model_code' => $v->modelList?->code,
                     'variety_name' => $v->variety_name,
                     'code' => $v->variant_code,
-                    'buy_price' => (int) ($v->buy_price ?? 0),
-                    'sell_price' => (int) ($v->sell_price ?? 0),
+                    'buy_price' => \App\Support\Currency::toRial($v->buy_price ?? 0),
+                    'sell_price' => \App\Support\Currency::toRial($v->sell_price ?? 0),
                 ];
             })->values()->all(),
         ];
@@ -131,7 +131,7 @@
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">مقدار</label>
-                        <input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number" id="invoiceDiscountValue" name="invoice_discount_value" value="{{ old('invoice_discount_value', $purchase->discount_value ?? 0) }}">
+                        <input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number" id="invoiceDiscountValue" name="invoice_discount_value" value="{{ old('invoice_discount_value', ($purchase->discount_type ?? null) === 'amount' ? \App\Support\Currency::toRial($purchase->discount_value ?? 0) : ($purchase->discount_value ?? 0)) }}">
                     </div>
                     <div class="col-md-7 text-end">
                         <div class="small text-muted">جمع کل قبل تخفیف: <span id="subtotalAmount">0</span> ریال</div>

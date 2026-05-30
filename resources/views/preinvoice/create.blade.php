@@ -1261,26 +1261,26 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         </div>
 
         <div class="soft-card final-card">
-            <input type="hidden" name="discount_amount" id="discount" value="{{ old('discount_amount', 0) }}">
+            <input type="hidden" name="discount_amount" id="discount" value="{{ \App\Support\Currency::toRial(old('discount_amount', 0)) }}">
             <div class="final-grid">
                 <div>
                     <label class="label-sm">تخفیف کلی</label>
                     <div class="discount-control">
                         <select id="orderDiscountType" class="form-select form-select-sm">
-                            <option value="amount">تومان</option>
+                            <option value="amount">ریال</option>
                             <option value="percent">درصد</option>
                         </select>
-                        <input type="number" id="orderDiscountValue" class="form-control form-control-sm" min="0" step="0.01" inputmode="decimal" value="{{ old('discount_amount', 0) }}" placeholder="مقدار">
+                        <input type="number" id="orderDiscountValue" class="form-control form-control-sm" min="0" step="0.01" inputmode="decimal" value="{{ \App\Support\Currency::toRial(old('discount_amount', 0)) }}" placeholder="مقدار">
                     </div>
-                    <div class="discount-line" id="orderDiscountPreview">تخفیف کلی: 0 تومان</div>
+                    <div class="discount-line" id="orderDiscountPreview">تخفیف کلی: 0 ریال</div>
                 </div>
                 <div>
                     <label class="label-sm">هزینه ارسال</label>
-                    <input type="text" id="shipping_price_view" class="form-control form-control-sm bg-light" readonly value="0 تومان">
+                    <input type="text" id="shipping_price_view" class="form-control form-control-sm bg-light" readonly value="0 ریال">
                 </div>
                 <div>
                     <label class="label-sm">مجموع تخفیف</label>
-                    <input type="text" id="totalDiscountView" class="form-control form-control-sm bg-light" readonly value="0 تومان">
+                    <input type="text" id="totalDiscountView" class="form-control form-control-sm bg-light" readonly value="0 ریال">
                 </div>
                 <div>
                     <label class="label-sm">جمع کل</label>
@@ -1326,12 +1326,12 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     <label class="label-sm">تخفیف این محصول</label>
                     <div class="discount-control">
                         <select id="modalGroupDiscountType" class="form-select form-select-sm">
-                            <option value="amount">تومان</option>
+                            <option value="amount">ریال</option>
                             <option value="percent">درصد</option>
                         </select>
                         <input type="number" id="modalGroupDiscountValue" class="form-control form-control-sm" min="0" step="0.01" inputmode="decimal" value="0" placeholder="مقدار تخفیف">
                     </div>
-                    <div class="discount-line">مبلغ تخفیف: <strong id="modalGroupDiscountPreview">0 تومان</strong></div>
+                    <div class="discount-line">مبلغ تخفیف: <strong id="modalGroupDiscountPreview">0 ریال</strong></div>
                 </div>
 
                 <div class="modal-summary-bar mt-2">
@@ -1345,11 +1345,11 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     </div>
                     <div class="summary-stat">
                         <div class="s-label">مبلغ قبل تخفیف</div>
-                        <div class="s-val" id="modalRawAmount">0 تومان</div>
+                        <div class="s-val" id="modalRawAmount">0 ریال</div>
                     </div>
                     <div class="summary-stat">
                         <div class="s-label">جمع نهایی</div>
-                        <div class="s-val" id="modalTotalAmount" style="color:var(--accent-dark)">0 تومان</div>
+                        <div class="s-val" id="modalTotalAmount" style="color:var(--accent-dark)">0 ریال</div>
                     </div>
                 </div>
             </div>
@@ -1515,7 +1515,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     }
 
     function formatMoney(val) {
-        return Number(val || 0).toLocaleString('fa-IR') + ' تومان';
+        return (Number(val || 0) * 10).toLocaleString('fa-IR') + ' ریال';
     }
 
     function formatNum(val) {
@@ -1541,6 +1541,17 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         if (n < 0) n = 0;
         if (type === 'percent' && n > 100) n = 100;
         return n;
+    }
+
+    function discountInputToToman(type, value) {
+        const safeType = type === 'percent' ? 'percent' : 'amount';
+        const safeValue = safeDiscountValue(safeType, value);
+        return safeType === 'percent' ? safeValue : Math.floor(safeValue / 10);
+    }
+
+    function discountValueForInput(type, value) {
+        const n = Number(value || 0);
+        return type === 'percent' ? n : n * 10;
     }
 
     function calcDiscount(baseAmount, type, value) {
@@ -2229,7 +2240,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             modalGroupDiscountType = groupedSelections[activeProductId]?.discount_type || 'amount';
             modalGroupDiscountValue = Number(groupedSelections[activeProductId]?.discount_value || 0);
             document.getElementById('modalGroupDiscountType').value = modalGroupDiscountType;
-            document.getElementById('modalGroupDiscountValue').value = modalGroupDiscountValue;
+            document.getElementById('modalGroupDiscountValue').value = discountValueForInput(modalGroupDiscountType, modalGroupDiscountValue);
             document.getElementById('pickerModalTitle').textContent = productTitle(product);
             document.getElementById('pickerModalSubTitle').textContent = 'کد: ' + (productCode(product) || '—') + ' | ' + formatNum(activeModalItems.length) + ' تنوع';
             saveRecentProduct(product);
@@ -2389,7 +2400,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             }
         });
         modalGroupDiscountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
-        modalGroupDiscountValue = safeDiscountValue(modalGroupDiscountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
+        modalGroupDiscountValue = discountInputToToman(modalGroupDiscountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
         const discount = calcDiscount(totalAmount, modalGroupDiscountType, modalGroupDiscountValue);
         document.getElementById('modalSelectedRows').textContent = formatNum(selectedRows);
         document.getElementById('modalTotalQty').textContent = formatNum(totalQty);
@@ -2427,7 +2438,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             return;
         }
         const discountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
-        const discountValue = safeDiscountValue(discountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
+        const discountValue = discountInputToToman(discountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
         const previousSelections = JSON.parse(JSON.stringify(groupedSelections || {}));
         groupedSelections[activeProductId] = {
             product: {
@@ -2593,11 +2604,11 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         });
         const afterGroupDiscount = Math.max(0, subtotal - groupDiscounts);
         const orderType = document.getElementById('orderDiscountType')?.value || 'amount';
-        const orderValue = safeDiscountValue(orderType, document.getElementById('orderDiscountValue')?.value || 0);
+        const orderValue = discountInputToToman(orderType, document.getElementById('orderDiscountValue')?.value || 0);
         const orderDiscount = calcDiscount(afterGroupDiscount, orderType, orderValue);
         const totalDiscount = Math.min(subtotal, groupDiscounts + orderDiscount);
         const total = Math.max(0, subtotal + shipping - totalDiscount);
-        document.getElementById('discount').value = String(totalDiscount);
+        document.getElementById('discount').value = String(totalDiscount * 10);
         document.getElementById('totalDiscountView').value = formatMoney(totalDiscount);
         document.getElementById('total_price').value = formatMoney(total);
         const preview = document.getElementById('orderDiscountPreview');
