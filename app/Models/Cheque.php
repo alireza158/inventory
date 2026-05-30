@@ -22,5 +22,14 @@ class Cheque extends Model
         'status',
     ];
 
-    public function payment(){ return $this->belongsTo(InvoicePayment::class, 'invoice_payment_id'); }
+    protected $casts = [
+        'amount' => 'integer',
+        'due_date' => 'date',
+        'received_at' => 'date',
+    ];
+
+    public function payment()
+    {
+        return $this->belongsTo(InvoicePayment::class, 'invoice_payment_id');
+    }
 }
