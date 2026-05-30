@@ -3,7 +3,7 @@
 @section('content')
 
 @php
-  $toman = fn($a) => number_format((int) $a) . ' تومان';
+  $toman = fn($a) => \App\Support\Currency::formatRial($a);
 
   $dateFa = function ($date) {
     if (!$date) return '---';

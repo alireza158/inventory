@@ -158,6 +158,12 @@
         <label class="form-label fw-semibold">آدرس</label>
         <textarea id="customer_address" name="customer_address" class="form-control" rows="3" required>{{ old('customer_address', $order->customer_address) }}</textarea>
       </div>
+
+      <div class="mt-3">
+        <label class="form-label fw-semibold">توضیحات پیش‌فاکتور</label>
+        <textarea id="preinvoice_description" name="description" class="form-control" rows="3" placeholder="توضیحات هماهنگی فروش، انبار یا مالی...">{{ old('description', $order->description) }}</textarea>
+        <div class="hint mt-2">این متن در صف انبار و صفحه تایید مالی نمایش داده می‌شود.</div>
+      </div>
     </div>
 
     {{-- Products --}}
@@ -192,7 +198,7 @@
         <div class="col-md-4">
           <label class="form-label fw-semibold">هزینه ارسال</label>
           <input type="text" id="shipping_price_view" class="form-control summary-input" readonly
-                 value="{{ number_format((int)$order->shipping_price) }} تومان">
+                 value="{{ \App\Support\Currency::formatRial($order->shipping_price) }}">
         </div>
 
         <div class="col-md-4">
@@ -259,7 +265,7 @@ function createEl(html){
 function formatPrice(val){
   const n = Number(val);
   if (!Number.isFinite(n)) return '';
-  return n.toLocaleString('fa-IR');
+  return (n * 10).toLocaleString('fa-IR');
 }
 function safeInt(v, def = 0){
   const n = parseInt(String(v ?? '').trim(), 10);
@@ -354,7 +360,7 @@ function fillProductSelect(selectEl){
   allProducts.forEach(p => {
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = `${(p.title ?? '').trim()} (${formatPrice(p.price)} تومان)`;
+    opt.textContent = `${(p.title ?? '').trim()} (${formatPrice(p.price)} ریال)`;
     selectEl.appendChild(opt);
   });
 }
@@ -641,9 +647,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (currentSid) shippingSelect.value = String(currentSid);
 
   const baseShip = safeInt(document.getElementById('shipping_price')?.value, 0);
-  document.getElementById('shipping_label').textContent = `هزینه ارسال: ${baseShip.toLocaleString()} تومان`;
+  document.getElementById('shipping_label').textContent = `هزینه ارسال: ${(baseShip * 10).toLocaleString()} ریال`;
   const view = document.getElementById('shipping_price_view');
-  if (view) view.value = `${baseShip.toLocaleString()} تومان`;
+  if (view) view.value = `${(baseShip * 10).toLocaleString()} ریال`;
 
   shippingSelect.addEventListener('change', () => {
     const sid = safeInt(shippingSelect.value, 0);
@@ -651,8 +657,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const price = ship ? safeInt(ship.price, 0) : 0;
 
     document.getElementById('shipping_price').value = String(price);
-    document.getElementById('shipping_label').textContent = `هزینه ارسال: ${price.toLocaleString()} تومان`;
-    if (view) view.value = `${price.toLocaleString()} تومان`;
+    document.getElementById('shipping_label').textContent = `هزینه ارسال: ${(price * 10).toLocaleString()} ریال`;
+    if (view) view.value = `${(price * 10).toLocaleString()} ریال`;
     updateTotal();
   });
 

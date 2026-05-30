@@ -42,7 +42,7 @@
       <div class="col-md-4"><b>کد سند:</b> {{ $invoice->uuid }}</div>
       <div class="col-md-4"><b>مشتری:</b> {{ $invoice->customer_name }}</div>
       <div class="col-md-4"><b>وضعیت:</b> {{ $statusLabels[$invoice->status] ?? $invoice->status }}</div>
-      <div class="col-md-4"><b>مبلغ کل:</b> {{ number_format((int)$invoice->total) }} تومان</div>
+      <div class="col-md-4"><b>مبلغ کل:</b> {{ \App\Support\Currency::formatRial($invoice->total) }}</div>
       <div class="col-md-8"><b>آدرس:</b> {{ $invoice->customer_address ?: '—' }}</div>
     </div>
   </div>

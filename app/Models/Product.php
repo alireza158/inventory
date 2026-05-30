@@ -76,7 +76,7 @@ class Product extends Model
 
     public function getAvailableStockAttribute(): int
     {
-        return max(0, ($this->stock ?? 0) - ($this->reserved ?? 0));
+        return max(0, (int) ($this->stock ?? 0));
     }
 
     public function scopeInStock($query)

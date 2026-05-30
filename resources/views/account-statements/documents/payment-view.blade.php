@@ -23,7 +23,7 @@
                     <span class="badge bg-success">نقدی</span>
                 @endif
             </div>
-            <div class="col-md-4"><strong>مبلغ:</strong> {{ number_format((int) $payment->amount) }} تومان</div>
+            <div class="col-md-4"><strong>مبلغ:</strong> {{ \App\Support\Currency::formatRial($payment->amount) }}</div>
             <div class="col-md-4"><strong>تاریخ پرداخت:</strong> {{ $payment->paid_at ? Jalalian::fromDateTime($payment->paid_at)->format('Y/m/d') : '—' }}</div>
             <div class="col-md-6"><strong>شناسه پرداخت:</strong> {{ $payment->payment_identifier ?: '—' }}</div>
             <div class="col-md-6"><strong>فاکتور:</strong> {{ $payment->invoice?->uuid ?: '—' }}</div>
@@ -39,7 +39,7 @@
                 <div class="col-md-4"><strong>شعبه:</strong> {{ $payment->cheque?->branch_name ?: '—' }}</div>
                 <div class="col-md-4"><strong>صاحب حساب:</strong> {{ $payment->cheque?->account_holder ?: '—' }}</div>
                 <div class="col-md-4"><strong>شماره حساب:</strong> {{ $payment->cheque?->account_number ?: '—' }}</div>
-                <div class="col-md-4"><strong>مبلغ چک:</strong> {{ number_format((int) ($payment->cheque?->amount ?: 0)) }} تومان</div>
+                <div class="col-md-4"><strong>مبلغ چک:</strong> {{ \App\Support\Currency::formatRial($payment->cheque?->amount ?: 0) }}</div>
                 <div class="col-md-4"><strong>تاریخ سررسید:</strong> {{ $payment->cheque?->due_date ? Jalalian::fromDateTime($payment->cheque->due_date)->format('Y/m/d') : '—' }}</div>
                 <div class="col-md-4"><strong>تاریخ دریافت:</strong> {{ $payment->cheque?->received_at ? Jalalian::fromDateTime($payment->cheque->received_at)->format('Y/m/d') : '—' }}</div>
                 <div class="col-md-4"><strong>وضعیت چک:</strong> {{ $payment->cheque?->status ?: '—' }}</div>

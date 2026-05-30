@@ -41,9 +41,9 @@
                         <tr>
                             <td>{{ $customer->display_name ?: '-' }}</td>
                             <td>{{ $customer->mobile ?: '-' }}</td>
-                            <td>{{ number_format((int) $customer->debt) }} تومان</td>
-                            <td>{{ number_format((int) $customer->credit) }} تومان</td>
-                            <td class="fw-semibold {{ $statusClass }}">{{ $statusLabel }} {{ $balance === 0 ? '' : number_format(abs($balance)).' تومان' }}</td>
+                            <td>{{ \App\Support\Currency::formatRial($customer->debt) }}</td>
+                            <td>{{ \App\Support\Currency::formatRial($customer->credit) }}</td>
+                            <td class="fw-semibold {{ $statusClass }}">{{ $statusLabel }} {{ $balance === 0 ? '' : \App\Support\Currency::formatRial(abs($balance)) }}</td>
                             <td class="text-end">
                                 <a href="{{ route('account-statements.show', $customer->id) }}" class="btn btn-sm btn-primary">مشاهده گردش حساب</a>
                             </td>
