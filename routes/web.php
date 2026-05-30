@@ -236,6 +236,8 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::prefix('preinvoice/api')->group(function () {
         Route::get('/products', [PreinvoiceApiController::class, 'products']);
         Route::get('/products/{product}', [PreinvoiceApiController::class, 'product']);
+        Route::post('/reservations/sync', [PreinvoiceApiController::class, 'syncDraftReservation'])->name('preinvoice.api.reservations.sync');
+        Route::post('/reservations/release', [PreinvoiceApiController::class, 'releaseDraftReservation'])->name('preinvoice.api.reservations.release');
         Route::get('/area', [PreinvoiceApiController::class, 'area']);
         Route::get('/customers', [CustomerApiController::class, 'search'])->name('api.customers.search');
         Route::post('/customers', [CustomerApiController::class, 'store'])->name('api.customers.store');
