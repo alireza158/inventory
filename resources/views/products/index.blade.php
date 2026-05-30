@@ -1227,6 +1227,7 @@
                                                 'id' => (int) $v->id,
                                                 'name' => $v->variant_name,
                                                 'stock' => (int) $v->stock,
+                                                'reserved' => max(0, (int) ($v->reserved ?? 0)),
                                                 'is_active' => (bool) $v->is_active,
                                                 'warehouse_breakdown' => $variantBreakdown,
                                             ];
@@ -1254,6 +1255,9 @@
                                         ->values()
                                         ->all();
 
+                                    $reservedQty = $hasVariants
+                                        ? max(0, (int) $p->variants->sum(fn ($variant) => (int) ($variant->reserved ?? 0)))
+                                        : max(0, (int) ($p->reserved ?? 0));
                                     $buyPrice = $p->variants_min_buy_price;
                                     $isSellable = $p->is_sellable ?? true;
                                 @endphp
@@ -1277,6 +1281,7 @@
                                                 data-deactivation-history-url="{{ route('product-deactivation-documents.index', ['product_name' => $p->name]) }}"
                                                 data-is-sellable="{{ $isSellable ? '1' : '0' }}"
                                                 data-product-name="{{ $p->name }}"
+                                                data-reserved-qty="{{ $reservedQty }}"
                                                 data-variants='@json($variantsPayload)'
                                                 data-stock-breakdown='@json($stockBreakdownPayload)'>
 
@@ -1839,6 +1844,16 @@
                         hintRow.innerHTML = `<td colspan="2" class="small text-muted pt-2">جمع موجودی تنوع «${selectedVariant.name ?? 'انتخابی'}»: ${selectedVariant.stock ?? 0}</td>`;
                         stockBodyEl.appendChild(hintRow);
                     }
+                }
+
+                const reservedQty = selectedVariant
+                    ? Number(selectedVariant.reserved ?? 0)
+                    : Number(selected.dataset.reservedQty ?? 0);
+
+                if (reservedQty > 0) {
+                    const reservedRow = document.createElement('tr');
+                    reservedRow.innerHTML = `<td colspan="2" class="small text-warning fw-semibold pt-2">${faNumber(reservedQty)} تا در رزرو مشتری هست</td>`;
+                    stockBodyEl.appendChild(reservedRow);
                 }
 
                 modal.show();

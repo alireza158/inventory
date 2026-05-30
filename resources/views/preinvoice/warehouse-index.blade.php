@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="mb-0">📦 پیش‌فاکتورهای در انتظار تایید انبار</h4>
     <a href="{{ route('preinvoice.create') }}" class="btn btn-primary">➕ ایجاد پیش‌فاکتور</a>
   </div>
@@ -21,6 +21,7 @@
             <th>شماره</th>
             <th>تاریخ</th>
             <th>مشتری</th>
+            <th>توضیحات</th>
             <th>تعداد آیتم</th>
             <th>مبلغ کل</th>
             <th>ثبت‌کننده</th>
@@ -34,6 +35,9 @@
               <td>{{ $order->uuid }}</td>
               <td>{{ $order->created_at ? Jalalian::fromDateTime($order->created_at)->format('Y/m/d H:i') : '—' }}</td>
               <td>{{ $order->customer_name }}</td>
+              <td class="text-muted small" style="min-width: 220px; max-width: 320px; white-space: normal;">
+                {{ $order->description ? \Illuminate\Support\Str::limit($order->description, 120) : '—' }}
+              </td>
               <td>{{ number_format((int) $order->items_count) }}</td>
               <td>{{ number_format((int) $order->total_price) }}</td>
               <td>{{ $order->creator?->name ?? '—' }}</td>
@@ -46,7 +50,7 @@
               </td>
             </tr>
           @empty
-            <tr><td colspan="8" class="text-center py-4">موردی برای بررسی انبار وجود ندارد.</td></tr>
+            <tr><td colspan="9" class="text-center py-4">موردی برای بررسی انبار وجود ندارد.</td></tr>
           @endforelse
         </tbody>
       </table>
