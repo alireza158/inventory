@@ -7,6 +7,7 @@
   $shipping = (int) $order->shipping_price;
   $discount = (int) $order->discount_amount;
   $grandTotal = max($subtotal + $shipping - $discount, 0);
+  $rial = fn ($value) => \App\Support\Currency::formatRial($value);
 @endphp
 
 @section('content')
@@ -17,7 +18,7 @@
   }
 </style>
 <div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="mb-0">✅ مشاهده و تایید مالی پیش‌فاکتور</h4>
     <a href="{{ route('preinvoice.draft.index') }}" class="btn btn-outline-secondary">بازگشت به صف مالی</a>
   </div>
@@ -55,7 +56,7 @@
         <div class="col-md-3 col-sm-6">
           <div class="text-muted small mb-1">وضعیت حساب مشتری</div>
           <div class="fw-semibold {{ $customerBalanceStatus === 'بدهکار' ? 'text-danger' : ($customerBalanceStatus === 'بستانکار' ? 'text-success' : '') }}">
-            {{ $customerBalanceStatus }} {{ $customerBalanceStatus === 'تسویه شده' ? '' : number_format($customerBalanceAmount) . ' تومان' }}
+            {{ $customerBalanceStatus }} {{ $customerBalanceStatus === 'تسویه شده' ? '' : \App\Support\Currency::formatRial($customerBalanceAmount) }}
           </div>
         </div>
         <div class="col-md-3 col-sm-6">
@@ -64,9 +65,20 @@
         </div>
         <div class="col-md-3 col-sm-6">
           <div class="text-muted small mb-1">جمع کل فاکتور</div>
-          <div class="fw-bold">{{ number_format($grandTotal) }} تومان</div>
+          <div class="fw-bold">{{ $rial($grandTotal) }}</div>
         </div>
       </div>
+    </div>
+  </div>
+
+
+  <div class="card border-info-subtle shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">توضیحات پیش‌فاکتور</span>
+        <span class="text-muted small">یادداشت ثبت‌کننده برای تصمیم‌گیری مالی و انبار</span>
+      </div>
+      <div class="text-body" style="white-space: pre-wrap;">{{ $order->description ?: 'توضیحی برای این پیش‌فاکتور ثبت نشده است.' }}</div>
     </div>
   </div>
 
@@ -88,9 +100,9 @@
 
               <div id="paymentRows" class="d-grid gap-3"></div>
               <div class="border rounded p-2 small mb-3 d-none" id="paymentTotals">
-                <div class="d-flex justify-content-between"><span>جمع نقدی</span><strong id="cashTotalLabel">0 تومان</strong></div>
-                <div class="d-flex justify-content-between"><span>جمع چکی</span><strong id="chequeTotalLabel">0 تومان</strong></div>
-                <div class="d-flex justify-content-between"><span>جمع کل پرداختی</span><strong id="allTotalLabel">0 تومان</strong></div>
+                <div class="d-flex justify-content-between"><span>جمع نقدی</span><strong id="cashTotalLabel">0 ریال</strong></div>
+                <div class="d-flex justify-content-between"><span>جمع چکی</span><strong id="chequeTotalLabel">0 ریال</strong></div>
+                <div class="d-flex justify-content-between"><span>جمع کل پرداختی</span><strong id="allTotalLabel">0 ریال</strong></div>
               </div>
               <div class="alert alert-light border mb-0 small text-muted" id="paymentGuide">
                 هنوز پرداختی اضافه نشده است. در صورت نیاز روی «افزودن پرداخت» بزنید.
@@ -131,20 +143,20 @@
             <div class="card-body border-top">
               <div class="d-flex justify-content-between mb-2">
                 <span class="text-muted">جمع اقلام</span>
-                <strong>{{ number_format($subtotal) }} تومان</strong>
+                <strong>{{ $rial($subtotal) }}</strong>
               </div>
               <div class="d-flex justify-content-between mb-2">
                 <span class="text-muted">هزینه ارسال</span>
-                <strong>{{ number_format($shipping) }} تومان</strong>
+                <strong>{{ $rial($shipping) }}</strong>
               </div>
               <div class="d-flex justify-content-between mb-2">
                 <span class="text-muted">تخفیف لحاظ شده</span>
-                <strong class="text-danger">- {{ number_format($discount) }} تومان</strong>
+                <strong class="text-danger">- {{ $rial($discount) }}</strong>
               </div>
               <hr>
               <div class="d-flex justify-content-between">
                 <span class="fw-semibold">مبلغ نهایی فاکتور</span>
-                <strong class="fs-5">{{ number_format($grandTotal) }} تومان</strong>
+                <strong class="fs-5">{{ $rial($grandTotal) }}</strong>
               </div>
             </div>
           </div>
@@ -152,15 +164,16 @@
       </div>
     </div>
 
-    <div class="card-footer d-flex justify-content-end gap-2">
-      <form method="POST" action="{{ route('preinvoice.draft.cancel', $order->uuid) }}" onsubmit="return confirm('پیش‌فاکتور کنسل شود؟')" class="d-flex gap-2">
-        @csrf
-        <input name="reason" class="form-control" placeholder="دلیل کنسلی" required>
-        <button class="btn btn-outline-danger">کنسل پیش‌فاکتور</button>
-      </form>
+    <div class="card-footer d-flex justify-content-end gap-2 flex-wrap">
+      <input name="reason" form="cancelPreinvoiceForm" class="form-control" style="max-width: 320px;" placeholder="دلیل کنسلی" required>
+      <button class="btn btn-outline-danger" form="cancelPreinvoiceForm">کنسل پیش‌فاکتور</button>
       <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-outline-secondary">ویرایش فاکتور</a>
       <button class="btn btn-success" onclick="return confirm('تاییدیه نهایی مالی ثبت شود؟ با این کار، پیش‌فاکتور به فاکتور تبدیل می‌شود و در صف حواله فروش انبار قرار می‌گیرد.')">تاییدیه نهایی پیش‌فاکتور از سمت مالی</button>
     </div>
+  </form>
+
+  <form id="cancelPreinvoiceForm" method="POST" action="{{ route('preinvoice.draft.cancel', $order->uuid) }}" onsubmit="return confirm('پیش‌فاکتور کنسل شود؟')" class="d-none">
+    @csrf
   </form>
 </div>
 
@@ -348,8 +361,8 @@
         const amount = Number(payment.amount || payment.cheque_amount || 0);
         if (payment.method === 'cash') cashTotal += amount; else chequeTotal += amount;
         const title = payment.method === 'cash'
-          ? `نقدی | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} تومان`
-          : `چک | شماره: ${payment.cheque_number} | مبلغ: ${Number(payment.cheque_amount || 0).toLocaleString('en-US')} تومان`;
+          ? `نقدی | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} ریال`
+          : `چک | شماره: ${payment.cheque_number} | مبلغ: ${Number(payment.cheque_amount || 0).toLocaleString('en-US')} ریال`;
 
         const hiddenInputs = Object.entries(payment).map(([key, val]) => buildHiddenInput(`payments[${idx}][${key}]`, val)).join('');
 
@@ -366,9 +379,9 @@
       }).join('');
       const allTotal = cashTotal + chequeTotal;
       paymentTotals.classList.remove('d-none');
-      cashTotalLabel.textContent = `${cashTotal.toLocaleString('en-US')} تومان`;
-      chequeTotalLabel.textContent = `${chequeTotal.toLocaleString('en-US')} تومان`;
-      allTotalLabel.textContent = `${allTotal.toLocaleString('en-US')} تومان`;
+      cashTotalLabel.textContent = `${cashTotal.toLocaleString('en-US')} ریال`;
+      chequeTotalLabel.textContent = `${chequeTotal.toLocaleString('en-US')} ریال`;
+      allTotalLabel.textContent = `${allTotal.toLocaleString('en-US')} ریال`;
 
       rowsWrap.querySelectorAll('.js-remove-payment').forEach((btn) => {
         btn.addEventListener('click', () => {

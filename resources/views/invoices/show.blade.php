@@ -32,7 +32,7 @@
 
   $toman = function($amount){
     $n = (int)($amount ?? 0);
-    return number_format($n).' تومان';
+    return \App\Support\Currency::formatRial($n);
   };
 
   $productTitle = function($it){
@@ -252,7 +252,7 @@
 
                 <div class="col-md-8">
                   <label class="form-label">مبلغ پرداخت</label>
-                  <input id="amount_view" type="text" inputmode="numeric" class="form-control" placeholder="مبلغ (تومان)" autocomplete="off" required>
+                  <input id="amount_view" type="text" inputmode="numeric" class="form-control" placeholder="مبلغ (ریال)" autocomplete="off" required>
                   <input name="amount" id="amount" type="hidden">
                 </div>
 

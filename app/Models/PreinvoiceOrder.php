@@ -28,6 +28,7 @@ class PreinvoiceOrder extends Model
         'customer_name',
         'customer_mobile',
         'customer_address',
+        'description',
         'province_id',
         'city_id',
         'shipping_id',

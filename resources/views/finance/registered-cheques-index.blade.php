@@ -29,7 +29,7 @@
             <td>{{ $cheque->received_at ?: '—' }}</td>
             <td>{{ $cheque->customer_name ?: ($cheque->payment?->invoice?->customer_name ?: '—') }}</td>
             <td>{{ $cheque->cheque_number ?: '—' }}</td>
-            <td>{{ number_format((int)$cheque->amount) }} تومان</td>
+            <td>{{ \App\Support\Currency::formatRial($cheque->amount) }}</td>
             <td>{{ $cheque->status === 'registered' ? 'ثبت‌شده' : ($cheque->status === 'unregistered' ? 'ثبت‌نشده' : ($cheque->status ?: '—')) }}</td>
             <td>{{ $cheque->payment?->invoice?->uuid ?: '—' }}</td>
           </tr>

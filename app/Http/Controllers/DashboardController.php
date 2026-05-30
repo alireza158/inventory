@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Morilog\Jalali\Jalalian;
+use App\Support\Currency;
 
 class DashboardController extends Controller
 {
@@ -34,7 +35,7 @@ class DashboardController extends Controller
             'financeQueue' => PreinvoiceOrder::query()->where('status', PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE)->count(),
             'warehousePending' => Invoice::query()->where('status', Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL)->count(),
             'lowStock' => Product::query()->where('stock', '>', 0)->where('stock', '<=', $lowStockThreshold)->count(),
-            'todayReceipts' => (int) InvoicePayment::query()->whereDate('paid_at', $today)->sum('amount'),
+            'todayReceipts' => Currency::toRial((int) InvoicePayment::query()->whereDate('paid_at', $today)->sum('amount')),
         ];
 
         $actionItems = [
@@ -268,9 +269,9 @@ class DashboardController extends Controller
         $end = $nextMonthJalali->toCarbon()->subSecond();
 
         $metrics = [
-            ['key' => 'sales', 'label' => 'مبلغ فروش', 'unit' => 'تومان', 'value' => (int) Invoice::query()->whereBetween('created_at', [$start, $end])->sum('total'), 'color' => 'primary'],
+            ['key' => 'sales', 'label' => 'مبلغ فروش', 'unit' => 'ریال', 'value' => Currency::toRial((int) Invoice::query()->whereBetween('created_at', [$start, $end])->sum('total')), 'color' => 'primary'],
             ['key' => 'warehouse_vouchers', 'label' => 'حواله‌های انبار', 'unit' => 'عدد', 'value' => Invoice::query()->whereBetween('created_at', [$start, $end])->count(), 'color' => 'info'],
-            ['key' => 'receipts', 'label' => 'دریافتی‌ها', 'unit' => 'تومان', 'value' => (int) InvoicePayment::query()->whereBetween('paid_at', [$start->toDateString(), $end->toDateString()])->sum('amount'), 'color' => 'success'],
+            ['key' => 'receipts', 'label' => 'دریافتی‌ها', 'unit' => 'ریال', 'value' => Currency::toRial((int) InvoicePayment::query()->whereBetween('paid_at', [$start->toDateString(), $end->toDateString()])->sum('amount')), 'color' => 'success'],
             ['key' => 'invoice_count', 'label' => 'تعداد فاکتورها', 'unit' => 'عدد', 'value' => Invoice::query()->whereBetween('created_at', [$start, $end])->count(), 'color' => 'secondary'],
             ['key' => 'pending_orders', 'label' => 'سفارش‌های در انتظار', 'unit' => 'عدد', 'value' => PreinvoiceOrder::query()->where('status', PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE)->whereBetween('created_at', [$start, $end])->count(), 'color' => 'warning'],
         ];
@@ -295,7 +296,7 @@ class DashboardController extends Controller
             'summary' => [
                 'preinvoices' => PreinvoiceOrder::query()->whereBetween('created_at', [$start, $end])->count(),
                 'invoices' => Invoice::query()->whereBetween('created_at', [$start, $end])->count(),
-                'sales_amount' => (int) Invoice::query()->whereBetween('created_at', [$start, $end])->sum('total'),
+                'sales_amount' => Currency::toRial((int) Invoice::query()->whereBetween('created_at', [$start, $end])->sum('total')),
             ],
             'metrics' => $metrics,
         ];

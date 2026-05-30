@@ -6,12 +6,12 @@ use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\PreinvoiceDraftReservation;
 use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
 use App\Models\StockMovement;
-use App\Models\WarehouseStock;
 use App\Support\DocumentCodeGenerator;
 use App\Services\WarehouseStockService;
 use App\Services\PaymentRegistrationService;
@@ -90,7 +90,7 @@ class PreinvoiceController extends Controller
             $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $this->replaceOrderItems($order, $data['items']);
             if ($stockLocked) {
-                $this->applyFrozenStockDelta($oldItems, $data['items']);
+                $this->applyFrozenStockDelta($oldItems, $data['items'], $this->hasCentralStockMovedToReserve($order));
             }
 
             $order->update([
@@ -139,7 +139,7 @@ class PreinvoiceController extends Controller
             $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $this->replaceOrderItems($order, $data['items']);
             if ($stockLocked) {
-                $this->applyFrozenStockDelta($oldItems, $data['items']);
+                $this->applyFrozenStockDelta($oldItems, $data['items'], $this->hasCentralStockMovedToReserve($order));
             }
 
             $order->refresh()->load('items');
@@ -307,14 +307,18 @@ class PreinvoiceController extends Controller
             ]);
 
             $this->syncItems($order, $validated['products']);
-            $this->reserveOrderStock($order);
-            $order->update(['total_price' => $this->calculateOrderTotal($order)]);
+            $this->finalizeDraftReservations($order, $validated['reservation_token'] ?? null, $validated['products']);
+            $order->update([
+                'total_price' => $this->calculateOrderTotal($order),
+                'stock_frozen_until' => now(),
+                'stock_released_at' => null,
+            ]);
 
             $this->notificationService->notifyRole(
                 'warehouse',
                 'preinvoice_submitted_to_warehouse',
                 'پیش‌فاکتور جدید در انتظار تایید انبار',
-                "پیش‌فاکتور مشتری {$order->customer_name} با مبلغ " . number_format((int) $order->total_price) . " تومان ثبت شد و منتظر بررسی انبار است.",
+                "پیش‌فاکتور مشتری {$order->customer_name} با مبلغ " . Currency::formatRialNumber($order->total_price) . " ریال ثبت شد و منتظر بررسی انبار است.",
                 route('preinvoice.warehouse.review', $order->uuid),
                 ['level' => 'info', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "warehouse_preinvoice_submitted:{$order->id}"]
             );
@@ -374,7 +378,7 @@ class PreinvoiceController extends Controller
                     'product_id' => (int) $p['id'],
                     'variant_id' => (int) $p['variety_id'],
                     'quantity' => (int) $p['quantity'],
-                ])->all());
+                ])->all(), $this->hasCentralStockMovedToReserve($order));
             }
             $order->update(['total_price' => $this->calculateOrderTotal($order)]);
         });
@@ -388,6 +392,7 @@ class PreinvoiceController extends Controller
         $isInPerson = $this->isInPersonShippingId($shippingId);
 
         $validated = $request->validate([
+            'reservation_token' => 'nullable|uuid',
             'customer_id' => 'nullable|integer|exists:customers,id',
             'customer_name' => 'required|string|max:255',
             'customer_mobile' => 'required|string|max:20',
@@ -434,12 +439,12 @@ class PreinvoiceController extends Controller
             }
         }
 
-        $this->validateDraftItemsBusinessRules($validated['products'] ?? []);
+        $this->validateDraftItemsBusinessRules($validated['products'] ?? [], $validated['reservation_token'] ?? null);
 
         return $validated;
     }
 
-    private function validateDraftItemsBusinessRules(array $products): void
+    private function validateDraftItemsBusinessRules(array $products, ?string $reservationToken = null): void
     {
         $variantIds = collect($products)->pluck('variety_id')->map(fn($id) => (int) $id)->filter()->values();
         if ($variantIds->isEmpty()) {
@@ -475,9 +480,11 @@ class PreinvoiceController extends Controller
             $qtyByVariant[$variantId] = ($qtyByVariant[$variantId] ?? 0) + (int) ($row['quantity'] ?? 0);
         }
 
+        $draftReservations = $this->activeDraftReservationQuantities($reservationToken);
+
         foreach ($qtyByVariant as $variantId => $requiredQty) {
             $variant = $variants->get((int) $variantId);
-            $availableQty = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0));
+            $availableQty = max(0, (int) ($variant->stock ?? 0) + (int) ($draftReservations[(int) $variantId] ?? 0));
 
             if ($requiredQty > $availableQty) {
                 throw ValidationException::withMessages([
@@ -561,29 +568,24 @@ class PreinvoiceController extends Controller
     private function assertOrderHasStock(PreinvoiceOrder $order): void
     {
         $order->loadMissing('items.product', 'items.variant');
-        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
         $requiredByVariant = $order->items
             ->groupBy('variant_id')
             ->map(fn($rows) => (int) $rows->sum('quantity'));
 
-        $requiredByProduct = $order->items
-            ->groupBy('product_id')
-            ->map(fn($rows) => (int) $rows->sum('quantity'));
-
-        $availableByProduct = WarehouseStock::query()
-            ->where('warehouse_id', $centralWarehouseId)
-            ->whereIn('product_id', $requiredByProduct->keys())
+        $reservedByVariant = ProductVariant::query()
+            ->whereIn('id', $requiredByVariant->keys())
             ->lockForUpdate()
-            ->pluck('quantity', 'product_id');
+            ->pluck('reserved', 'id');
 
-        foreach ($requiredByProduct as $productId => $requiredQty) {
-            $availableQty = (int) ($availableByProduct[(int) $productId] ?? 0);
+        foreach ($requiredByVariant as $variantId => $requiredQty) {
+            $reservedQty = (int) ($reservedByVariant[(int) $variantId] ?? 0);
 
-            if ($availableQty < $requiredQty) {
-                $productName = (string) Product::query()->whereKey((int) $productId)->value('name');
+            if ($reservedQty < $requiredQty) {
+                $variant = ProductVariant::query()->with('product:id,name')->whereKey((int) $variantId)->first();
+                $productName = (string) ($variant?->product?->name ?? 'نامشخص');
                 throw ValidationException::withMessages([
-                    'items' => "موجودی انبار مرکزی برای محصول «{$productName}» کافی نیست. موجودی: {$availableQty} | درخواست: {$requiredQty}",
+                    'items' => "موجودی رزروشده برای محصول «{$productName}» کافی نیست. رزروشده: {$reservedQty} | درخواست: {$requiredQty}",
                 ]);
             }
         }
@@ -711,22 +713,151 @@ class PreinvoiceController extends Controller
         }
     }
 
+
+    private function finalizeDraftReservations(PreinvoiceOrder $order, ?string $reservationToken, array $products): void
+    {
+        $required = [];
+        foreach ($products as $row) {
+            $productId = (int) ($row['id'] ?? 0);
+            $variantId = (int) ($row['variety_id'] ?? 0);
+            $quantity = (int) ($row['quantity'] ?? 0);
+            if ($productId <= 0 || $variantId <= 0 || $quantity <= 0) {
+                continue;
+            }
+
+            $key = $productId . ':' . $variantId;
+            if (! isset($required[$key])) {
+                $required[$key] = [
+                    'product_id' => $productId,
+                    'variant_id' => $variantId,
+                    'quantity' => 0,
+                ];
+            }
+            $required[$key]['quantity'] += $quantity;
+        }
+
+        $reservedRows = collect();
+        if ($reservationToken && auth()->check()) {
+            $reservedRows = PreinvoiceDraftReservation::query()
+                ->where('token', $reservationToken)
+                ->where('user_id', auth()->id())
+                ->whereNull('converted_at')
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->lockForUpdate()
+                ->get();
+        }
+
+        $reserved = [];
+        foreach ($reservedRows as $row) {
+            $key = ((int) $row->product_id) . ':' . ((int) $row->variant_id);
+            $reserved[$key] = ($reserved[$key] ?? 0) + (int) $row->quantity;
+        }
+
+        foreach ($required as $key => $row) {
+            $coveredQty = (int) ($reserved[$key] ?? 0);
+            $missingQty = max(0, (int) $row['quantity'] - $coveredQty);
+            if ($missingQty > 0) {
+                $this->reserveStockForItem((int) $row['product_id'], (int) $row['variant_id'], $missingQty);
+            }
+        }
+
+        foreach ($reservedRows as $row) {
+            $key = ((int) $row->product_id) . ':' . ((int) $row->variant_id);
+            $requiredQty = (int) ($required[$key]['quantity'] ?? 0);
+            $reservedQty = (int) $row->quantity;
+
+            if ($requiredQty <= 0) {
+                $this->releaseStockForItem((int) $row->product_id, (int) $row->variant_id, $reservedQty);
+                $row->delete();
+                continue;
+            }
+
+            if ($reservedQty > $requiredQty) {
+                $this->releaseStockForItem((int) $row->product_id, (int) $row->variant_id, $reservedQty - $requiredQty);
+                $row->quantity = $requiredQty;
+            }
+
+            $row->preinvoice_order_id = $order->id;
+            $row->converted_at = now();
+            $row->expires_at = null;
+            $row->save();
+        }
+    }
+
+    private function activeDraftReservationQuantities(?string $reservationToken): array
+    {
+        if (! $reservationToken || ! auth()->check()) {
+            return [];
+        }
+
+        return PreinvoiceDraftReservation::query()
+            ->where('token', $reservationToken)
+            ->where('user_id', auth()->id())
+            ->whereNull('converted_at')
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->pluck('quantity', 'variant_id')
+            ->mapWithKeys(fn ($quantity, $variantId) => [(int) $variantId => (int) $quantity])
+            ->all();
+    }
+
+    private function reserveStockForItem(int $productId, int $variantId, int $quantity): void
+    {
+        if ($quantity <= 0) {
+            return;
+        }
+
+        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
+        $availableQty = max(0, (int) $variant->stock);
+        if ($quantity > $availableQty) {
+            throw ValidationException::withMessages([
+                'products' => "موجودی انبار مرکزی برای فریز تنوع انتخابی کافی نیست. موجودی: {$availableQty} | درخواست: {$quantity}",
+            ]);
+        }
+
+        WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $productId, -$quantity, $variantId);
+
+        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
+        $variant->reserved = (int) $variant->reserved + $quantity;
+        $variant->save();
+
+        $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+        if ($product) {
+            $product->reserved = (int) $product->reserved + $quantity;
+            $product->save();
+        }
+    }
+
+    private function releaseStockForItem(int $productId, int $variantId, int $quantity): void
+    {
+        if ($quantity <= 0) {
+            return;
+        }
+
+        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->first();
+        if ($variant) {
+            $variant->reserved = max(0, (int) $variant->reserved - $quantity);
+            $variant->save();
+        }
+
+        $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+        if ($product) {
+            $product->reserved = max(0, (int) $product->reserved - $quantity);
+            $product->save();
+        }
+
+        WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $productId, $quantity, $variantId);
+    }
+
     private function reserveOrderStock(PreinvoiceOrder $order): void
     {
         $order->loadMissing('items');
 
         foreach ($order->items as $item) {
-            $variant = ProductVariant::query()->whereKey((int) $item->variant_id)->lockForUpdate()->first();
-            if (!$variant) {
-                continue;
-            }
-            $variant->reserved = (int) $variant->reserved + (int) $item->quantity;
-            $variant->save();
-
-            $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
-            if ($product) {
-                $product->update(['reserved' => ((int) $product->reserved) + ((int) $item->quantity)]);
-            }
+            $this->reserveStockForItem((int) $item->product_id, (int) $item->variant_id, (int) $item->quantity);
         }
     }
 
@@ -735,7 +866,7 @@ class PreinvoiceController extends Controller
         return is_null($order->stock_released_at);
     }
 
-    private function applyFrozenStockDelta(array $oldItems, array $newItems): void
+    private function applyFrozenStockDelta(array $oldItems, array $newItems, bool $centralStockMovedToReserve = true): void
     {
         $oldMap = [];
         foreach ($oldItems as $row) {
@@ -756,15 +887,18 @@ class PreinvoiceController extends Controller
             $delta = ($newMap[$key] ?? 0) - ($oldMap[$key] ?? 0);
             if ($delta === 0) continue;
 
-            $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->first();
-            if ($variant) {
-                $variant->reserved = max(0, (int) $variant->reserved + $delta);
-                $variant->save();
-            }
-            $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
-            if ($product) {
-                $product->reserved = max(0, (int) $product->reserved + $delta);
-                $product->save();
+            if ($delta > 0) {
+                if ($centralStockMovedToReserve) {
+                    $this->reserveStockForItem($productId, $variantId, $delta);
+                } else {
+                    $this->changeReservedOnly($productId, $variantId, $delta);
+                }
+            } else {
+                if ($centralStockMovedToReserve) {
+                    $this->releaseStockForItem($productId, $variantId, abs($delta));
+                } else {
+                    $this->changeReservedOnly($productId, $variantId, $delta);
+                }
             }
         }
     }
@@ -772,17 +906,38 @@ class PreinvoiceController extends Controller
     private function releaseReservedStock(PreinvoiceOrder $order): void
     {
         $order->loadMissing('items');
+        $centralStockMovedToReserve = $this->hasCentralStockMovedToReserve($order);
+
         foreach ($order->items as $item) {
-            $variant = ProductVariant::query()->whereKey((int) $item->variant_id)->lockForUpdate()->first();
-            if ($variant) {
-                $variant->reserved = max(0, (int) $variant->reserved - (int) $item->quantity);
-                $variant->save();
+            if ($centralStockMovedToReserve) {
+                $this->releaseStockForItem((int) $item->product_id, (int) $item->variant_id, (int) $item->quantity);
+            } else {
+                $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, -((int) $item->quantity));
             }
-            $product = Product::query()->whereKey((int) $item->product_id)->lockForUpdate()->first();
-            if ($product) {
-                $product->reserved = max(0, (int) $product->reserved - (int) $item->quantity);
-                $product->save();
-            }
+        }
+    }
+
+    private function hasCentralStockMovedToReserve(PreinvoiceOrder $order): bool
+    {
+        return ! is_null($order->stock_frozen_until);
+    }
+
+    private function changeReservedOnly(int $productId, int $variantId, int $delta): void
+    {
+        if ($delta === 0) {
+            return;
+        }
+
+        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->first();
+        if ($variant) {
+            $variant->reserved = max(0, (int) $variant->reserved + $delta);
+            $variant->save();
+        }
+
+        $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+        if ($product) {
+            $product->reserved = max(0, (int) $product->reserved + $delta);
+            $product->save();
         }
     }
 
@@ -871,6 +1026,7 @@ class PreinvoiceController extends Controller
             $order = $lockedOrder;
 
             $shouldDeductOnFinalize = true;
+            $centralStockMovedToReserve = $this->hasCentralStockMovedToReserve($order);
 
             foreach ($order->items as $it) {
                 $variant = ProductVariant::query()->whereKey((int) $it->variant_id)->lockForUpdate()->first();
@@ -883,26 +1039,24 @@ class PreinvoiceController extends Controller
 
             $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
 
-            $centralWarehouseId = WarehouseStockService::centralWarehouseId();
-
-            $requiredByProduct = $order->items
-                ->groupBy('product_id')
+            $requiredByVariant = $order->items
+                ->groupBy('variant_id')
                 ->map(fn($rows) => (int) $rows->sum('quantity'));
 
-            $availableByProduct = WarehouseStock::query()
-                ->where('warehouse_id', $centralWarehouseId)
-                ->whereIn('product_id', $requiredByProduct->keys())
+            $reservedByVariant = ProductVariant::query()
+                ->whereIn('id', $requiredByVariant->keys())
                 ->lockForUpdate()
-                ->pluck('quantity', 'product_id');
+                ->pluck('reserved', 'id');
 
-            foreach ($requiredByProduct as $productId => $requiredQty) {
-                $availableQty = (int) ($availableByProduct[(int) $productId] ?? 0);
+            foreach ($requiredByVariant as $variantId => $requiredQty) {
+                $reservedQty = (int) ($reservedByVariant[(int) $variantId] ?? 0);
 
-                if ($availableQty < $requiredQty) {
-                    $productName = (string) Product::query()->whereKey((int) $productId)->value('name');
+                if ($reservedQty < $requiredQty) {
+                    $variant = ProductVariant::query()->with('product:id,name')->whereKey((int) $variantId)->first();
+                    $productName = (string) ($variant?->product?->name ?? 'نامشخص');
 
                     throw ValidationException::withMessages([
-                        'products' => "موجودی انبار مرکزی برای محصول «{$productName}» کافی نیست. موجودی: {$availableQty} | درخواست: {$requiredQty}",
+                        'products' => "موجودی رزروشده برای محصول «{$productName}» کافی نیست. رزروشده: {$reservedQty} | درخواست: {$requiredQty}",
                     ]);
                 }
             }
@@ -937,14 +1091,17 @@ class PreinvoiceController extends Controller
                 ]);
 
                 if ($shouldDeductOnFinalize) {
-                    WarehouseStockService::change($centralWarehouseId, (int) $it->product_id, - ((int) $it->quantity));
-
                     $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
+                    $before = (int) ($product?->stock ?? 0);
+
+                    if (! $centralStockMovedToReserve) {
+                        WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $it->product_id, -((int) $it->quantity), (int) $it->variant_id);
+                        $product = Product::query()->whereKey((int) $it->product_id)->lockForUpdate()->first();
+                    }
+
                     if ($product) {
-                        $before = (int) $product->stock;
-                        $after = $before - (int) $it->quantity;
+                        $after = (int) $product->stock;
                         $product->update([
-                            'stock' => $after,
                             'reserved' => max(0, (int) $product->reserved - (int) $it->quantity),
                         ]);
 
@@ -957,14 +1114,13 @@ class PreinvoiceController extends Controller
                             'stock_before' => $before,
                             'stock_after' => $after,
                             'reference' => $invoice->uuid,
-                            'note' => 'خروج بابت حواله فروش',
+                            'note' => $centralStockMovedToReserve ? 'مصرف موجودی رزروشده بابت حواله فروش' : 'خروج از انبار مرکزی و مصرف رزرو بابت حواله فروش',
                         ]);
                     }
 
                     $variant = ProductVariant::query()->whereKey((int) $it->variant_id)->lockForUpdate()->first();
                     if ($variant) {
                         $variant->update([
-                            'stock' => max(0, (int) $variant->stock - (int) $it->quantity),
                             'reserved' => max(0, (int) $variant->reserved - (int) $it->quantity),
                         ]);
                     }

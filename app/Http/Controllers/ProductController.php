@@ -104,14 +104,7 @@ class ProductController extends Controller
 
     private function peekNextProductSeq4(): string
     {
-        $mx = DB::table('products')
-            ->selectRaw("MAX(CAST(COALESCE(NULLIF(short_barcode,''), SUBSTRING(code, 3, 4)) AS UNSIGNED)) as mx")
-            ->value('mx');
-
-        $next = ((int) $mx) + 1;
-        if ($next < 1) {
-            $next = 1;
-        }
+        $next = $this->nextProductSeqNumber(false);
         if ($next > 9999) {
             $next = 9999;
         }
@@ -502,17 +495,38 @@ class ProductController extends Controller
 
     private function nextProductSeq4(): string
     {
-        $mx = DB::table('products')
-            ->lockForUpdate()
-            ->selectRaw("MAX(CAST(COALESCE(NULLIF(short_barcode,''), SUBSTRING(code, 3, 4)) AS UNSIGNED)) as mx")
-            ->value('mx');
-
-        $next = ((int) $mx) + 1;
+        $next = $this->nextProductSeqNumber(true);
         if ($next > 9999) {
             abort(422, 'حداکثر 9999 کالا پشتیبانی می‌شود (PPPP چهار رقمی است).');
         }
 
         return str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function nextProductSeqNumber(bool $lockProducts): int
+    {
+        $productQuery = DB::table('products')
+            ->selectRaw("MAX(CAST(COALESCE(NULLIF(short_barcode,''), SUBSTRING(code, 3, 4)) AS UNSIGNED)) as mx");
+
+        if ($lockProducts) {
+            $productQuery->lockForUpdate();
+        }
+
+        $productMax = (int) $productQuery->value('mx');
+
+        $variantQuery = DB::table('product_variants')
+            ->whereNotNull('variant_code')
+            ->where('variant_code', '<>', '')
+            ->selectRaw("MAX(CAST(SUBSTRING(variant_code, 3, 4) AS UNSIGNED)) as mx");
+
+        if ($lockProducts) {
+            $variantQuery->lockForUpdate();
+        }
+
+        $variantMax = (int) $variantQuery->value('mx');
+        $next = max($productMax, $variantMax) + 1;
+
+        return max(1, $next);
     }
 
     private function buildVariantCode11(string $productCode6, string $model3, string $design2, ?int $ignoreId = null): string
@@ -525,7 +539,14 @@ class ProductController extends Controller
             ->exists();
 
         if ($exists) {
-            abort(422, "کد تنوع تکراری است: {$code} (مدل/طرح تکراری انتخاب شده).");
+            $existingVariant = ProductVariant::query()
+                ->with('product:id,name,code')
+                ->where('variant_code', $code)
+                ->first();
+            $productName = $existingVariant?->product?->name ?: 'کالای دیگر';
+            $productCode = $existingVariant?->product?->code ?: '---';
+
+            abort(422, "کد تنوع تکراری است: {$code}. این کد قبلاً برای «{$productName}» با کد کالا {$productCode} ثبت شده است؛ لطفاً دوباره ثبت را بزنید تا کد جدید ساخته شود.");
         }
 
         return $code;
