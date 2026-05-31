@@ -42,6 +42,7 @@ return [
     'crm' => [
         'base_url' => env('CRM_BASE_URL'),
         'users_endpoint' => env('CRM_USERS_ENDPOINT', '/external/users'),
+        'customers_endpoint' => env('CRM_CUSTOMERS_ENDPOINT', '/external/customers'),
         'api_token' => env('CRM_API_TOKEN'),
         'sync_enabled' => env('CRM_SYNC_ENABLED', true),
         'timeout' => env('CRM_SYNC_TIMEOUT', 30),

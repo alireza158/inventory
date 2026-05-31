@@ -14,6 +14,10 @@ Schedule::command('crm:sync-users')
     ->when(fn () => config('crm.sync_enabled'))
     ->everyFifteenMinutes();
 
+Schedule::command('crm:sync-customers')
+    ->when(fn () => config('crm.sync_enabled'))
+    ->everyThreeMinutes();
+
 Schedule::call(function () {
     InventoryWebhookService::processPending();
     AriyajanebiSyncService::processPending();
