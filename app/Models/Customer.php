@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class Customer extends Model
 {
     protected $fillable = [
+        'crm_customer_id',
+        'sync_source',
+        'synced_at',
+        'crm_updated_at',
+        'last_crm_payload',
         'first_name',
         'last_name',
         'mobile',
@@ -22,6 +27,9 @@ class Customer extends Model
         'province_id' => 'integer',
         'city_id' => 'integer',
         'opening_balance' => 'integer',
+        'synced_at' => 'datetime',
+        'crm_updated_at' => 'datetime',
+        'last_crm_payload' => 'array',
     ];
 
     public function ledgers()
