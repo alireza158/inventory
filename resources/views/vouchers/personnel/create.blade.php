@@ -26,7 +26,7 @@ $variantsJson = $variants->map(fn($v) => [
             <input type="hidden" name="voucher_type" value="personnel_asset">
             <div class="row g-3">
                 <div class="col-md-4"><label class="form-label">انبار مبدا</label><select name="from_warehouse_id" class="form-select" required><option value="">انتخاب...</option>@foreach($fromWarehouses as $warehouse)<option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>@endforeach</select></div>
-                <div class="col-md-4"><label class="form-label">پرسنل مقصد</label><select name="to_warehouse_id" class="form-select" required><option value="">انتخاب...</option>@foreach($personnelWarehouses as $warehouse)<option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>@endforeach</select></div>
+                <div class="col-md-4"><label class="form-label">انبار مقصد</label><select name="to_warehouse_id" class="form-select" required><option value="">انتخاب...</option>@foreach($personnelWarehouses as $warehouse)<option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>@endforeach</select></div>
                 <div class="col-md-4"><label class="form-label">نام تحویل‌گیرنده (اختیاری)</label><input name="beneficiary_name" class="form-control" value="{{ old('beneficiary_name') }}"></div>
                 <div class="col-md-6"><label class="form-label">شماره حواله (اختیاری)</label><input name="reference" class="form-control" value="{{ old('reference') }}"></div>
                 <div class="col-md-6"><label class="form-label">توضیحات (اختیاری)</label><input name="note" class="form-control" value="{{ old('note') }}"></div>

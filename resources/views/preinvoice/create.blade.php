@@ -1231,12 +1231,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     <div class="col-lg-6 col-sm-4">
                         <label class="label-sm d-lg-none mt-2">جستجوی نام محصول</label>
                         <select id="motherProductAjaxSelect" class="form-select mb-2" aria-label="جستجوی محصول"></select>
-                        <div id="motherSearchHint" class="customer-box d-flex align-items-center">
-                            <div>
-                                <div class="fw-bold" style="font-size:.88rem">آماده ثبت</div>
-                                <div class="hint">کد ۴ رقمی وارد کنید یا نام/کد محصول را جستجو کنید</div>
-                            </div>
-                        </div>
+                       
                         <div id="motherProductBox" style="display:none">
                             <div class="customer-box is-selected d-flex justify-content-between align-items-center gap-2">
                                 <div>
@@ -1964,7 +1959,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         $el.select2({
             width: '100%',
             dir: 'rtl',
-            placeholder: 'جستجوی اژاکس محصول با نام، کد، SKU یا بارکد...',
+            placeholder: 'جستجوی  محصول با نام، کد، SKU یا بارکد...',
             allowClear: true,
             minimumInputLength: 1,
             ajax: {
