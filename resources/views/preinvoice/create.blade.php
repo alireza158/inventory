@@ -1229,10 +1229,12 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                         <button type="button" id="findMotherBtn" class="find-btn w-100">مشاهده</button>
                     </div>
                     <div class="col-lg-6 col-sm-4">
+                        <label class="label-sm d-lg-none mt-2">جستجوی نام محصول</label>
+                        <select id="motherProductAjaxSelect" class="form-select mb-2" aria-label="جستجوی محصول"></select>
                         <div id="motherSearchHint" class="customer-box d-flex align-items-center">
                             <div>
                                 <div class="fw-bold" style="font-size:.88rem">آماده ثبت</div>
-                                <div class="hint">کد ۴ رقمی وارد کنید</div>
+                                <div class="hint">کد ۴ رقمی وارد کنید یا نام/کد محصول را جستجو کنید</div>
                             </div>
                         </div>
                         <div id="motherProductBox" style="display:none">
@@ -1935,6 +1937,66 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         return json?.data?.products?.data || [];
     }
 
+    function productAjaxText(product) {
+        if (!product) return '';
+        const code = productCode(product);
+        const stock = Number(product.quantity ?? product.stock ?? 0) || 0;
+        return [productTitle(product), code ? 'کد: ' + code : '', 'موجودی: ' + formatNum(stock)].filter(Boolean).join(' | ');
+    }
+
+    function applyMotherProduct(product, autoOpen = true) {
+        if (!product) return;
+        selectedMotherProduct = product;
+        document.getElementById('motherSearchHint').style.display = 'none';
+        document.getElementById('motherProductBox').style.display = 'block';
+        document.getElementById('motherProductTitle').textContent = productTitle(product);
+        document.getElementById('motherProductCode').textContent = 'کد: ' + (productCode(product) || '—');
+        const codeInput = document.getElementById('motherCodeInput');
+        if (codeInput && productCode(product)) codeInput.value = String(productCode(product)).replace(/\D/g, '').slice(-4);
+        saveRecentProduct(product);
+        if (autoOpen) openGroupPicker(product.id);
+    }
+
+    function initMotherAjaxSearch() {
+        const selectEl = document.getElementById('motherProductAjaxSelect');
+        if (!window.jQuery || !window.jQuery.fn?.select2 || !selectEl) return;
+        const $el = $(selectEl);
+        $el.select2({
+            width: '100%',
+            dir: 'rtl',
+            placeholder: 'جستجوی اژاکس محصول با نام، کد، SKU یا بارکد...',
+            allowClear: true,
+            minimumInputLength: 1,
+            ajax: {
+                url: API.products,
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ q: params.term || '' }),
+                processResults: resp => {
+                    const items = resp?.data?.products?.data || [];
+                    return {
+                        results: items.map(p => ({
+                            id: p.id,
+                            text: productAjaxText(p),
+                            product: p
+                        }))
+                    };
+                }
+            },
+            templateResult: item => item.loading ? item.text : $('<span>').text(item.text),
+            templateSelection: item => item.text || 'جستجوی محصول'
+        });
+        $el.on('select2:select', function(e) {
+            const product = e?.params?.data?.product || null;
+            applyMotherProduct(product, true);
+        });
+        $el.on('select2:clear', function() {
+            if (selectedMotherProduct) return;
+            document.getElementById('motherProductBox').style.display = 'none';
+            document.getElementById('motherSearchHint').style.display = '';
+        });
+    }
+
     function shippingById(id) {
         return shippings.find(s => Number(s.id) === Number(id)) || null;
     }
@@ -2482,6 +2544,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         document.getElementById('motherCodeInput').value = '';
         document.getElementById('motherProductBox').style.display = 'none';
         document.getElementById('motherSearchHint').style.display = '';
+        if (window.jQuery) $('#motherProductAjaxSelect').val(null).trigger('change');
         selectedMotherProduct = null;
         lastMotherAutoCode = '';
         setTimeout(() => document.getElementById('motherCodeInput').focus(), 100);
@@ -2788,6 +2851,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         if (OLD_SHIPPING_ID) document.getElementById('shipping_id').value = String(OLD_SHIPPING_ID);
 
         initCustomerSearch();
+        initMotherAjaxSearch();
         await loadOldCustomer();
         renderRecentProducts();
 
