@@ -41,12 +41,20 @@ class PreinvoiceApiController extends Controller
                     return;
                 }
 
-                // ✅ سرچ عمومی
+                // ✅ سرچ عمومی روی محصول و تنوع‌ها
                 $query->where(function ($qq) use ($q) {
                     $qq->where('name', 'like', "%{$q}%")
                         ->orWhere('short_barcode', 'like', "%{$q}%")
                         ->orWhere('code', 'like', "%{$q}%")
-                        ->orWhere('sku', 'like', "%{$q}%");
+                        ->orWhere('sku', 'like', "%{$q}%")
+                        ->orWhereHas('variants', function ($variantQuery) use ($q) {
+                            $variantQuery->where('variant_name', 'like', "%{$q}%")
+                                ->orWhere('variety_name', 'like', "%{$q}%")
+                                ->orWhere('variety_code', 'like', "%{$q}%")
+                                ->orWhere('variant_code', 'like', "%{$q}%")
+                                ->orWhere('sku', 'like', "%{$q}%")
+                                ->orWhere('barcode', 'like', "%{$q}%");
+                        });
                 });
             })
             ->orderBy('name')
@@ -54,8 +62,11 @@ class PreinvoiceApiController extends Controller
             ->get();
 
         $stockByProductId = WarehouseStock::query()
+            ->select('product_id', DB::raw('SUM(quantity) as quantity'))
             ->where('warehouse_id', $centralWarehouseId)
             ->whereIn('product_id', $products->pluck('id'))
+            ->whereNotNull('product_variant_id')
+            ->groupBy('product_id')
             ->pluck('quantity', 'product_id');
 
         $items = $products
