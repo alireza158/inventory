@@ -344,6 +344,7 @@
 
     .sheet col.col-check { width: 46px; }
     .sheet col.col-toggle { width: 46px; }
+    .sheet col.col-image { width: 90px; }
     .sheet col.col-code { width: 115px; }
     .sheet col.col-barcode { width: 165px; }
     .sheet col.col-stock { width: 110px; }
@@ -405,6 +406,30 @@
     .sort-arrow {
         color: #94A3B8;
         font-size: .72rem;
+    }
+
+    .product-thumb,
+    .product-thumb-placeholder {
+        width: 64px;
+        height: 64px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--soft);
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 1.25rem;
+    }
+
+    .product-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #fff;
+        padding: 4px;
+        display: block;
     }
 
     .product-name-wrap {
@@ -1125,6 +1150,7 @@
                         <colgroup>
                             <col class="col-check">
                             <col class="col-toggle">
+                            <col class="col-image">
                             <col class="col-code">
                             <col class="col-barcode">
                             <col class="col-name">
@@ -1140,6 +1166,8 @@
                                 </th>
 
                                 <th></th>
+
+                                <th>عکس</th>
 
                                 <th>
                                     <a href="{{ $sortLink('short_barcode') }}" class="sortable-link">
@@ -1319,6 +1347,16 @@
                                         @endif
                                     </td>
 
+                                    <td data-label="عکس">
+                                        @if($p->image_path)
+                                            <a href="{{ route('products.image', $p) }}" target="_blank" class="product-thumb" title="نمایش عکس کالا">
+                                                <img src="{{ route('products.image', $p) }}" alt="عکس {{ $p->name }}">
+                                            </a>
+                                        @else
+                                            <span class="product-thumb-placeholder" title="بدون عکس">📷</span>
+                                        @endif
+                                    </td>
+
                                     <td class="nowrap mono" data-label="کد کالا">
                                         <span class="pill pill-gray">{{ $short ?: '—' }}</span>
                                     </td>
@@ -1367,7 +1405,7 @@
                                 @if($hasVariants)
                                     <tr class="collapse" id="{{ $collapseId }}">
                                         <td></td>
-                                        <td colspan="7" class="variant-cell">
+                                        <td colspan="8" class="variant-cell">
                                             <div class="variant-inner">
                                                 <div class="table-responsive">
                                                     <table class="table table-sm variant-table">
@@ -1425,7 +1463,7 @@
                                 @endif
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center empty-row">هیچ کالایی ثبت نشده است.</td>
+                                    <td colspan="9" class="text-center empty-row">هیچ کالایی ثبت نشده است.</td>
                                 </tr>
                             @endforelse
                         </tbody>
