@@ -358,7 +358,7 @@
             <b>موجودی، قیمت خرید و قیمت فروش</b> بعداً در بخش <b>خرید کالا</b> ثبت می‌شوند.
         </div>
 
-        <form method="POST" action="{{ route('products.store') }}" id="productCreateForm" class="row g-3">
+        <form method="POST" action="{{ route('products.store') }}" id="productCreateForm" class="row g-3" enctype="multipart/form-data">
             @csrf
 
             {{-- hidden inputs برای model_list_ids - اینجا توسط JS مدیریت می‌شن --}}
@@ -395,6 +395,17 @@
                             </div>
 
                             <div class="col-lg-4">
+                                <label class="form-label">عکس کالا</label>
+                                <input
+                                    type="file"
+                                    name="image"
+                                    class="form-control"
+                                    accept="image/*"
+                                >
+                                <div class="muted mt-1">فرمت‌های تصویری مجاز؛ حداکثر حجم ۴ مگابایت.</div>
+                            </div>
+
+                            <div class="col-lg-3">
                                 <label class="form-label d-block">وضعیت فروش</label>
                                 <input type="hidden" name="is_sellable" value="0">
                                 <div class="form-check form-switch mt-2">
