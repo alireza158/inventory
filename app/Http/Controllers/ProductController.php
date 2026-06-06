@@ -11,6 +11,7 @@ use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -157,9 +158,7 @@ class ProductController extends Controller
 
         $isSellable = $request->boolean('is_sellable', true);
 
-        $imagePath = $request->hasFile('image')
-            ? $request->file('image')->store('products', 'public')
-            : null;
+        $imagePath = $this->storeProductImage($request);
 
         DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes, $isSellable, $imagePath) {
             $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
@@ -317,7 +316,6 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
-            'image' => ['nullable', 'image', 'max:4096'],
             'remove_image' => ['nullable', 'boolean'],
             'is_sellable' => ['nullable', 'boolean'],
 
@@ -341,9 +339,7 @@ class ProductController extends Controller
             'warehouse_bins.*' => ['integer', 'distinct', 'min:1', 'max:10'],
         ]);
 
-        $newImagePath = $request->hasFile('image')
-            ? $request->file('image')->store('products', 'public')
-            : null;
+        $newImagePath = $this->storeProductImage($request);
         $removeImage = $request->boolean('remove_image');
         $oldImagePath = null;
 
@@ -497,6 +493,35 @@ class ProductController extends Controller
                 'success',
                 "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']} | خطا: {$res['failed']}"
             );
+    }
+
+    private function storeProductImage(Request $request): ?string
+    {
+        $file = $request->file('image');
+
+        if (!$file) {
+            return null;
+        }
+
+        if (is_array($file) || !$file->isValid()) {
+            throw ValidationException::withMessages([
+                'image' => 'فایل عکس کالا معتبر نیست؛ لطفاً یک تصویر سالم با حجم حداکثر ۴ مگابایت انتخاب کنید.',
+            ]);
+        }
+
+        $request->validate([
+            'image' => ['file', 'image', 'max:4096'],
+        ]);
+
+        $path = $file->store('products', 'public');
+
+        if (!$path) {
+            throw ValidationException::withMessages([
+                'image' => 'ذخیره عکس کالا ناموفق بود؛ لطفاً دوباره تلاش کنید.',
+            ]);
+        }
+
+        return $path;
     }
 
     private function recalcProductSummary(Product $product): void
