@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class ProductController extends Controller
 {
@@ -503,25 +504,63 @@ class ProductController extends Controller
             return null;
         }
 
-        if (is_array($file) || !$file->isValid()) {
+        if (is_array($file) || !$file instanceof UploadedFile) {
             throw ValidationException::withMessages([
-                'image' => 'فایل عکس کالا معتبر نیست؛ لطفاً یک تصویر سالم با حجم حداکثر ۴ مگابایت انتخاب کنید.',
+                'image' => 'فایل عکس کالا معتبر نیست؛ لطفاً فقط یک تصویر انتخاب کنید.',
             ]);
         }
 
-        $request->validate([
-            'image' => ['file', 'image', 'max:4096'],
-        ]);
+        if (!$file->isValid()) {
+            throw ValidationException::withMessages([
+                'image' => $this->productImageUploadErrorMessage($file->getError()),
+            ]);
+        }
 
-        $path = $file->store('products', 'public');
+        $filePath = $file->getRealPath() ?: $file->getPathname();
 
-        if (!$path) {
+        if (!is_string($filePath) || trim($filePath) === '' || !is_file($filePath)) {
+            throw ValidationException::withMessages([
+                'image' => 'مسیر فایل آپلودشده خالی است؛ لطفاً عکس را دوباره انتخاب و ارسال کنید.',
+            ]);
+        }
+
+        if (($file->getSize() ?: 0) > 4096 * 1024) {
+            throw ValidationException::withMessages([
+                'image' => 'حجم عکس کالا نباید بیشتر از ۴ مگابایت باشد.',
+            ]);
+        }
+
+        if (@getimagesize($filePath) === false) {
+            throw ValidationException::withMessages([
+                'image' => 'فایل انتخاب‌شده تصویر معتبر نیست.',
+            ]);
+        }
+
+        $extension = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension() ?: 'jpg');
+        $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'jpg';
+        $filename = now()->format('YmdHis') . '-' . bin2hex(random_bytes(8)) . '.' . $extension;
+        $stored = Storage::disk('public')->putFileAs('products', $file, $filename);
+
+        if (!$stored) {
             throw ValidationException::withMessages([
                 'image' => 'ذخیره عکس کالا ناموفق بود؛ لطفاً دوباره تلاش کنید.',
             ]);
         }
 
-        return $path;
+        return $stored;
+    }
+
+    private function productImageUploadErrorMessage(int $errorCode): string
+    {
+        return match ($errorCode) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'حجم عکس کالا بیش از حد مجاز سرور است؛ لطفاً عکس کوچک‌تری انتخاب کنید.',
+            UPLOAD_ERR_PARTIAL => 'آپلود عکس کامل انجام نشد؛ لطفاً دوباره تلاش کنید.',
+            UPLOAD_ERR_NO_FILE => 'هیچ عکسی برای کالا انتخاب نشده است.',
+            UPLOAD_ERR_NO_TMP_DIR => 'پوشه موقت آپلود روی سرور در دسترس نیست.',
+            UPLOAD_ERR_CANT_WRITE => 'امکان نوشتن فایل آپلودشده روی سرور وجود ندارد.',
+            UPLOAD_ERR_EXTENSION => 'آپلود عکس توسط تنظیمات سرور متوقف شد.',
+            default => 'فایل عکس کالا معتبر نیست؛ لطفاً یک تصویر سالم با حجم حداکثر ۴ مگابایت انتخاب کنید.',
+        };
     }
 
     private function recalcProductSummary(Product $product): void
