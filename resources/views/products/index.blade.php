@@ -57,6 +57,9 @@
     }
 
     .inventory-page {
+        --sticky-top-offset: 12px;
+        --sticky-stack-gap: 12px;
+        --inventory-header-height: 0px;
         width: 100%;
         max-width: 1680px;
         margin: 0 auto;
@@ -71,6 +74,9 @@
     }
 
     .inventory-header {
+        position: sticky;
+        top: var(--sticky-top-offset);
+        z-index: 70;
         padding: 18px 20px;
         margin-bottom: 14px;
         border-right: 5px solid var(--brand);
@@ -154,8 +160,8 @@
 
     .toolbar-card {
         position: sticky;
-        top: 12px;
-        z-index: 40;
+        top: calc(var(--sticky-top-offset) + var(--inventory-header-height) + var(--sticky-stack-gap));
+        z-index: 60;
         padding: 15px;
         margin-bottom: 14px;
         background: var(--card);
@@ -681,10 +687,10 @@
 
     @media (min-width: 768px) {
         .products-workspace {
-            height: calc(100dvh - 174px);
-            max-height: 980px;
-            min-height: 560px;
-            overflow: hidden;
+            height: calc(100dvh - var(--inventory-header-height) - 42px);
+            max-height: none;
+            min-height: 680px;
+            overflow: visible;
         }
     }
 
@@ -713,6 +719,8 @@
         }
 
         .inventory-page {
+            --sticky-top-offset: 8px;
+            --sticky-stack-gap: 8px;
             padding: 10px 8px 24px;
         }
 
@@ -762,7 +770,7 @@
         }
 
         .toolbar-card {
-            top: 54px;
+            top: calc(var(--sticky-top-offset) + var(--inventory-header-height) + var(--sticky-stack-gap));
             padding: 10px;
             margin-bottom: 10px;
         }
@@ -1578,6 +1586,18 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const inventoryPage = document.querySelector('.inventory-page');
+        const inventoryHeader = document.querySelector('.inventory-header');
+
+        function updateStickyMetrics() {
+            if (!inventoryPage || !inventoryHeader) return;
+
+            inventoryPage.style.setProperty('--inventory-header-height', `${inventoryHeader.offsetHeight}px`);
+        }
+
+        updateStickyMetrics();
+        window.addEventListener('resize', updateStickyMetrics);
+
         const modalEl = document.getElementById('stockBreakdownModal');
         const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
         const stockNameEl = document.getElementById('stockBreakdownProductName');
@@ -1662,6 +1682,7 @@
                 }
 
                 area.innerHTML = incomingArea.innerHTML;
+                updateStickyMetrics();
 
                 if (pushState) {
                     history.pushState({}, '', url);
