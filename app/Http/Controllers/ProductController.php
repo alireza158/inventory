@@ -10,6 +10,8 @@ use App\Services\CrmProductSyncService;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -155,7 +157,9 @@ class ProductController extends Controller
 
         $isSellable = $request->boolean('is_sellable', true);
 
-        DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes, $isSellable) {
+        $imagePath = $this->storeProductImage($request);
+
+        DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes, $isSellable, $imagePath) {
             $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
 
             $cat2 = $this->normalizeCategory2($category->code);
@@ -169,6 +173,7 @@ class ProductController extends Controller
             $product = Product::create([
                 'category_id' => $category->id,
                 'name' => trim($data['name']),
+                'image_path' => $imagePath,
                 'sku' => 'AUTO-' . now()->format('YmdHis') . '-' . random_int(100, 999),
                 'code' => $productCode6,
                 'short_barcode' => $seq4,
@@ -310,6 +315,8 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
+            'remove_image' => ['nullable', 'boolean'],
+            'is_sellable' => ['nullable', 'boolean'],
 
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
@@ -331,16 +338,28 @@ class ProductController extends Controller
             'warehouse_bins.*' => ['integer', 'distinct', 'min:1', 'max:10'],
         ]);
 
-        DB::transaction(function () use ($data, $product) {
+        $newImagePath = $this->storeProductImage($request);
+        $removeImage = $request->boolean('remove_image');
+        $oldImagePath = null;
+
+        DB::transaction(function () use ($data, $product, $newImagePath, $removeImage, &$oldImagePath) {
             $product = Product::query()->lockForUpdate()->findOrFail($product->id);
 
-            $product->update([
+            $productUpdate = [
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
+                'is_sellable' => (bool) ($data['is_sellable'] ?? false),
                 'warehouse_zone' => isset($data['warehouse_zone']) ? (int) $data['warehouse_zone'] : null,
                 'warehouse_rows' => array_values(array_map('intval', $data['warehouse_rows'] ?? [])),
                 'warehouse_bins' => array_values(array_map('intval', $data['warehouse_bins'] ?? [])),
-            ]);
+            ];
+
+            if ($newImagePath || $removeImage) {
+                $oldImagePath = $product->image_path;
+                $productUpdate['image_path'] = $newImagePath;
+            }
+
+            $product->update($productUpdate);
 
             $keepIds = [];
             $centralWarehouseId = WarehouseStockService::centralWarehouseId();
@@ -423,12 +442,22 @@ class ProductController extends Controller
             $this->recalcProductSummary($product);
         });
 
+        if ($oldImagePath && ($newImagePath || $removeImage)) {
+            Storage::disk('public')->delete($oldImagePath);
+        }
+
         return redirect()->route('products.index')->with('success', 'کالا بروزرسانی شد.');
     }
 
     public function destroy(Product $product)
     {
+        $imagePath = $product->image_path;
+
         $product->delete();
+
+        if ($imagePath) {
+            Storage::disk('public')->delete($imagePath);
+        }
 
         return redirect()->route('products.index')->with('success', 'کالا حذف شد.');
     }
@@ -463,6 +492,35 @@ class ProductController extends Controller
                 'success',
                 "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']} | خطا: {$res['failed']}"
             );
+    }
+
+    private function storeProductImage(Request $request): ?string
+    {
+        $file = $request->file('image');
+
+        if (!$file) {
+            return null;
+        }
+
+        if (is_array($file) || !$file->isValid()) {
+            throw ValidationException::withMessages([
+                'image' => 'فایل عکس کالا معتبر نیست؛ لطفاً یک تصویر سالم با حجم حداکثر ۴ مگابایت انتخاب کنید.',
+            ]);
+        }
+
+        $request->validate([
+            'image' => ['file', 'image', 'max:4096'],
+        ]);
+
+        $path = $file->store('products', 'public');
+
+        if (!$path) {
+            throw ValidationException::withMessages([
+                'image' => 'ذخیره عکس کالا ناموفق بود؛ لطفاً دوباره تلاش کنید.',
+            ]);
+        }
+
+        return $path;
     }
 
     private function recalcProductSummary(Product $product): void
