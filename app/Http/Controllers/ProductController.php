@@ -120,6 +120,7 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
+            'image' => ['nullable', 'image', 'max:4096'],
 
             'use_models' => ['nullable'],
             'use_designs' => ['nullable'],
