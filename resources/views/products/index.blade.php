@@ -57,6 +57,7 @@
     }
 
     .inventory-page {
+        --sticky-top-offset: 12px;
         width: 100%;
         max-width: 1680px;
         margin: 0 auto;
@@ -154,11 +155,16 @@
 
     .toolbar-card {
         position: sticky;
-        top: 12px;
-        z-index: 40;
+        top: var(--sticky-top-offset);
+        z-index: 60;
         padding: 15px;
         margin-bottom: 14px;
         background: var(--card);
+        transition: box-shadow .18s ease;
+    }
+
+    .toolbar-card.filter-collapsed {
+        box-shadow: 0 14px 36px rgba(15, 23, 42, .13);
     }
 
     .toolbar-top {
@@ -168,6 +174,42 @@
         gap: 12px;
         flex-wrap: wrap;
         margin-bottom: 12px;
+    }
+
+    .toolbar-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .filter-toggle {
+        display: none;
+    }
+
+    .filter-panel {
+        transition: opacity .16s ease, transform .16s ease;
+    }
+
+    .toolbar-card.filter-collapsed .filter-toggle {
+        display: inline-flex;
+    }
+
+    .toolbar-card.filter-collapsed .filter-panel {
+        display: none;
+    }
+
+    .toolbar-card.filter-collapsed.filter-open .filter-panel {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 15px;
+        right: 15px;
+        display: block;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--card);
+        box-shadow: 0 18px 42px rgba(15, 23, 42, .16);
     }
 
     .section-title {
@@ -317,11 +359,8 @@
     }
 
     .product-card {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
-        overflow: hidden;
+        display: block;
+        overflow: visible;
     }
 
     .product-card-head {
@@ -337,18 +376,16 @@
     }
 
     .sheet-wrap {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
+        display: block;
+        min-height: calc(100dvh - 96px);
         padding: 12px;
     }
 
     .sheet-scroll {
         width: 100%;
-        flex: 1 1 auto;
-        min-height: 320px;
-        overflow: auto;
+        min-height: 640px;
+        overflow-x: auto;
+        overflow-y: visible;
         border: 1px solid var(--border);
         border-radius: 12px;
         background: #fff;
@@ -681,10 +718,8 @@
 
     @media (min-width: 768px) {
         .products-workspace {
-            height: calc(100dvh - 174px);
-            max-height: 980px;
-            min-height: 560px;
-            overflow: hidden;
+            min-height: calc(100dvh - 42px);
+            overflow: visible;
         }
     }
 
@@ -713,6 +748,7 @@
         }
 
         .inventory-page {
+            --sticky-top-offset: 8px;
             padding: 10px 8px 24px;
         }
 
@@ -762,9 +798,15 @@
         }
 
         .toolbar-card {
-            top: 54px;
+            top: var(--sticky-top-offset);
             padding: 10px;
             margin-bottom: 10px;
+        }
+
+        .toolbar-card.filter-collapsed.filter-open .filter-panel {
+            left: 10px;
+            right: 10px;
+            padding: 10px;
         }
 
         .toolbar-top {
@@ -1081,8 +1123,14 @@
                     <div class="subtle-text">برای عملیات سریع، فقط یک کالا را انتخاب کنید.</div>
                 </div>
 
-                <div class="count-badge">
-                    {{ $toFa($products->total() ?? 0) }} کالا
+                <div class="toolbar-meta">
+                    <button class="btn-soft btn-mini filter-toggle" type="button" id="filterToggleBtn" aria-controls="productFilterPanel" aria-expanded="false">
+                        نمایش جستجو و فیلترها
+                    </button>
+
+                    <div class="count-badge">
+                        {{ $toFa($products->total() ?? 0) }} کالا
+                    </div>
                 </div>
             </div>
 
@@ -1127,7 +1175,8 @@
                 </div>
             </div>
 
-            <form method="GET" action="{{ route('products.index') }}">
+            <div class="filter-panel" id="productFilterPanel">
+                <form method="GET" action="{{ route('products.index') }}">
                 @if(request('category_id'))
                     <input type="hidden" name="category_id" value="{{ request('category_id') }}">
                 @endif
@@ -1172,7 +1221,8 @@
                         <a class="btn btn-outline-secondary btn-mini px-3" href="{{ route('products.index') }}">پاک</a>
                     </div>
                 </div>
-            </form>
+                </form>
+            </div>
         </div>
 
         <div class="page-card product-card">
@@ -1346,7 +1396,7 @@
                                                 type="checkbox"
                                                 class="form-check-input product-checkbox"
                                                 value="{{ $p->id }}"
-                                                data-edit-url="{{ route('products.edit', $p) }}"
+                                                data-edit-url="{{ route('products.edit', ['product' => $p, 'return_to' => request()->fullUrl()]) }}"
                                                 data-delete-url="{{ route('products.destroy', $p) }}"
                                                 data-sales-ledger-url="{{ route('products.sales-ledger', $p) }}"
                                                 data-purchase-ledger-url="{{ route('products.purchase-ledger', $p) }}"
@@ -1578,6 +1628,37 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        let filterManuallyOpened = false;
+
+        function currentToolbar() {
+            return document.querySelector('#productsAjaxArea .toolbar-card');
+        }
+
+        function syncToolbarFilterState() {
+            const toolbar = currentToolbar();
+
+            if (!toolbar) return;
+
+            const shouldCollapse = window.scrollY > 140;
+            toolbar.classList.toggle('filter-collapsed', shouldCollapse);
+            toolbar.classList.toggle('filter-open', shouldCollapse && filterManuallyOpened);
+
+            if (!shouldCollapse) {
+                filterManuallyOpened = false;
+            }
+
+            const toggle = toolbar.querySelector('#filterToggleBtn');
+
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', toolbar.classList.contains('filter-open') ? 'true' : 'false');
+                toggle.textContent = toolbar.classList.contains('filter-open') ? 'بستن جستجو و فیلترها' : 'نمایش جستجو و فیلترها';
+            }
+        }
+
+        syncToolbarFilterState();
+        window.addEventListener('scroll', syncToolbarFilterState, { passive: true });
+        window.addEventListener('resize', syncToolbarFilterState);
+
         const modalEl = document.getElementById('stockBreakdownModal');
         const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
         const stockNameEl = document.getElementById('stockBreakdownProductName');
@@ -1662,6 +1743,8 @@
                 }
 
                 area.innerHTML = incomingArea.innerHTML;
+                filterManuallyOpened = false;
+                syncToolbarFilterState();
 
                 if (pushState) {
                     history.pushState({}, '', url);
@@ -1814,6 +1897,12 @@
             productCheckboxes.forEach(ch => ch.addEventListener('change', updateVariantSelectState));
 
             const form = document.querySelector('#productsAjaxArea form[method="GET"]');
+            const filterToggle = document.getElementById('filterToggleBtn');
+
+            filterToggle?.addEventListener('click', function() {
+                filterManuallyOpened = !filterManuallyOpened;
+                syncToolbarFilterState();
+            });
 
             form?.addEventListener('submit', function(e) {
                 e.preventDefault();

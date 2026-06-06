@@ -306,7 +306,7 @@ class ProductController extends Controller
         ]);
     }
 
-    public function edit(Product $product)
+    public function edit(Request $request, Product $product)
     {
         $product->load(['variants.warehouseStocks.warehouse']);
 
@@ -319,8 +319,9 @@ class ProductController extends Controller
 
         $modelLists = $modelListOptions;
         $previewSeq4 = $product->short_barcode ?: substr((string) $product->code, 2, 4);
+        $returnTo = $this->safeProductsReturnUrl($request->query('return_to'));
 
-        return view('products.edit', compact('product', 'categories', 'modelListOptions', 'modelLists', 'previewSeq4'));
+        return view('products.edit', compact('product', 'categories', 'modelListOptions', 'modelLists', 'previewSeq4', 'returnTo'));
     }
 
     public function update(Request $request, Product $product)
@@ -459,7 +460,31 @@ class ProductController extends Controller
             Storage::disk('public')->delete($oldImagePath);
         }
 
-        return redirect()->route('products.index')->with('success', 'کالا بروزرسانی شد.');
+        return redirect()->to($this->safeProductsReturnUrl($request->input('return_to')))->with('success', 'کالا بروزرسانی شد.');
+    }
+
+    private function safeProductsReturnUrl(?string $returnTo): string
+    {
+        if (!$returnTo) {
+            return route('products.index');
+        }
+
+        if (str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//')) {
+            return $returnTo;
+        }
+
+        $appHost = parse_url(config('app.url'), PHP_URL_HOST);
+        $returnHost = parse_url($returnTo, PHP_URL_HOST);
+
+        if ($returnHost && $appHost && $returnHost === $appHost) {
+            return $returnTo;
+        }
+
+        if ($returnHost && $returnHost === request()->getHost()) {
+            return $returnTo;
+        }
+
+        return route('products.index');
     }
 
     public function destroy(Product $product)
