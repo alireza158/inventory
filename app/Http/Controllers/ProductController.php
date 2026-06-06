@@ -539,7 +539,22 @@ class ProductController extends Controller
         $extension = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension() ?: 'jpg');
         $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'jpg';
         $filename = now()->format('YmdHis') . '-' . bin2hex(random_bytes(8)) . '.' . $extension;
-        $stored = Storage::disk('public')->putFileAs('products', $file, $filename);
+        $storedPath = 'products/' . $filename;
+        $stream = @fopen($filePath, 'rb');
+
+        if ($stream === false) {
+            throw ValidationException::withMessages([
+                'image' => 'خواندن فایل آپلودشده ناموفق بود؛ لطفاً عکس را دوباره انتخاب و ارسال کنید.',
+            ]);
+        }
+
+        try {
+            $stored = Storage::disk('public')->put($storedPath, $stream);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
 
         if (!$stored) {
             throw ValidationException::withMessages([
@@ -547,7 +562,7 @@ class ProductController extends Controller
             ]);
         }
 
-        return $stored;
+        return $storedPath;
     }
 
     private function productImageUploadErrorMessage(int $errorCode): string
