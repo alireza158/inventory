@@ -57,6 +57,9 @@
     }
 
     .inventory-page {
+        --sticky-top-offset: 12px;
+        --sticky-stack-gap: 12px;
+        --inventory-header-height: 0px;
         width: 100%;
         max-width: 1680px;
         margin: 0 auto;
@@ -71,6 +74,9 @@
     }
 
     .inventory-header {
+        position: sticky;
+        top: var(--sticky-top-offset);
+        z-index: 70;
         padding: 18px 20px;
         margin-bottom: 14px;
         border-right: 5px solid var(--brand);
@@ -154,8 +160,8 @@
 
     .toolbar-card {
         position: sticky;
-        top: 12px;
-        z-index: 40;
+        top: calc(var(--sticky-top-offset) + var(--inventory-header-height) + var(--sticky-stack-gap));
+        z-index: 60;
         padding: 15px;
         margin-bottom: 14px;
         background: var(--card);
@@ -317,11 +323,8 @@
     }
 
     .product-card {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
-        overflow: hidden;
+        display: block;
+        overflow: visible;
     }
 
     .product-card-head {
@@ -337,18 +340,16 @@
     }
 
     .sheet-wrap {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
+        display: block;
+        min-height: calc(100dvh - var(--inventory-header-height) - 96px);
         padding: 12px;
     }
 
     .sheet-scroll {
         width: 100%;
-        flex: 1 1 auto;
-        min-height: 320px;
-        overflow: auto;
+        min-height: 640px;
+        overflow-x: auto;
+        overflow-y: visible;
         border: 1px solid var(--border);
         border-radius: 12px;
         background: #fff;
@@ -681,10 +682,8 @@
 
     @media (min-width: 768px) {
         .products-workspace {
-            height: calc(100dvh - 174px);
-            max-height: 980px;
-            min-height: 560px;
-            overflow: hidden;
+            min-height: calc(100dvh - var(--inventory-header-height) - 42px);
+            overflow: visible;
         }
     }
 
@@ -713,6 +712,8 @@
         }
 
         .inventory-page {
+            --sticky-top-offset: 8px;
+            --sticky-stack-gap: 8px;
             padding: 10px 8px 24px;
         }
 
@@ -762,7 +763,7 @@
         }
 
         .toolbar-card {
-            top: 54px;
+            top: calc(var(--sticky-top-offset) + var(--inventory-header-height) + var(--sticky-stack-gap));
             padding: 10px;
             margin-bottom: 10px;
         }
@@ -1346,7 +1347,7 @@
                                                 type="checkbox"
                                                 class="form-check-input product-checkbox"
                                                 value="{{ $p->id }}"
-                                                data-edit-url="{{ route('products.edit', $p) }}"
+                                                data-edit-url="{{ route('products.edit', ['product' => $p, 'return_to' => request()->fullUrl()]) }}"
                                                 data-delete-url="{{ route('products.destroy', $p) }}"
                                                 data-sales-ledger-url="{{ route('products.sales-ledger', $p) }}"
                                                 data-purchase-ledger-url="{{ route('products.purchase-ledger', $p) }}"
@@ -1578,6 +1579,18 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const inventoryPage = document.querySelector('.inventory-page');
+        const inventoryHeader = document.querySelector('.inventory-header');
+
+        function updateStickyMetrics() {
+            if (!inventoryPage || !inventoryHeader) return;
+
+            inventoryPage.style.setProperty('--inventory-header-height', `${inventoryHeader.offsetHeight}px`);
+        }
+
+        updateStickyMetrics();
+        window.addEventListener('resize', updateStickyMetrics);
+
         const modalEl = document.getElementById('stockBreakdownModal');
         const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
         const stockNameEl = document.getElementById('stockBreakdownProductName');
@@ -1662,6 +1675,7 @@
                 }
 
                 area.innerHTML = incomingArea.innerHTML;
+                updateStickyMetrics();
 
                 if (pushState) {
                     history.pushState({}, '', url);
