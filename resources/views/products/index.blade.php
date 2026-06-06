@@ -72,7 +72,7 @@
     }
 
     .inventory-header {
-        position: sticky;
+     
         top: var(--sticky-top-offset);
         z-index: 70;
         padding: 18px 20px;
