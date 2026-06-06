@@ -145,6 +145,13 @@
         color: var(--brand-deep);
     }
 
+    .products-workspace {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        min-height: 0;
+    }
+
     .toolbar-card {
         position: sticky;
         top: 12px;
@@ -310,12 +317,17 @@
     }
 
     .product-card {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
         overflow: hidden;
     }
 
     .product-card-head {
         padding: 14px 16px;
         border-bottom: 1px solid var(--border);
+        flex: 0 0 auto;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -325,13 +337,18 @@
     }
 
     .sheet-wrap {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
         padding: 12px;
     }
 
     .sheet-scroll {
         width: 100%;
-        overflow-x: auto;
-        overflow-y: visible;
+        flex: 1 1 auto;
+        min-height: 320px;
+        overflow: auto;
         border: 1px solid var(--border);
         border-radius: 12px;
         background: #fff;
@@ -601,6 +618,10 @@
         margin-bottom: 0;
     }
 
+    .products-pagination {
+        flex: 0 0 auto;
+    }
+
     .offcanvas {
         border-top-left-radius: 18px;
         border-bottom-left-radius: 18px;
@@ -656,6 +677,15 @@
 
     .min-w-0 {
         min-width: 0;
+    }
+
+    @media (min-width: 768px) {
+        .products-workspace {
+            height: calc(100dvh - 174px);
+            max-height: 980px;
+            min-height: 560px;
+            overflow: hidden;
+        }
     }
 
     @media (max-width: 1199.98px) {
@@ -725,6 +755,10 @@
             width: 100%;
             min-height: 39px;
             font-size: .78rem;
+        }
+
+        .products-workspace {
+            display: block;
         }
 
         .toolbar-card {
@@ -811,6 +845,10 @@
             border-radius: 10px;
         }
 
+        .product-card {
+            display: block;
+        }
+
         .product-card-head {
             padding: 12px;
             align-items: flex-start;
@@ -821,10 +859,12 @@
         }
 
         .sheet-wrap {
+            display: block;
             padding: 9px;
         }
 
         .sheet-scroll {
+            min-height: 0;
             overflow: visible;
             border: 0;
             background: transparent;
@@ -1033,7 +1073,7 @@
         </div>
     </div>
 
-    <div id="productsAjaxArea">
+    <div id="productsAjaxArea" class="products-workspace">
         <div class="page-card toolbar-card">
             <div class="toolbar-top">
                 <div>
@@ -1475,7 +1515,7 @@
                     </table>
                 </div>
 
-                <div class="mt-3">
+                <div class="products-pagination mt-3">
                     {{ $products->links() }}
                 </div>
             </div>
