@@ -34,6 +34,11 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'ariya_crm' => [
+    'base_url' => env('ARIYA_CRM_BASE_URL', 'https://crm.ariyajanebi.ir/public'),
+    'token'    => env('ARIYA_CRM_TOKEN'),
+    ],
+
     'external_sync' => [
         'base_url' => env('EXTERNAL_SYNC_BASE_URL', 'https://crm.ariyajanebi.ir'),
         'token' => env('EXTERNAL_SYNC_TOKEN'),
@@ -42,7 +47,6 @@ return [
     'crm' => [
         'base_url' => env('CRM_BASE_URL'),
         'users_endpoint' => env('CRM_USERS_ENDPOINT', '/external/users'),
-        'customers_endpoint' => env('CRM_CUSTOMERS_ENDPOINT', '/external/customers'),
         'api_token' => env('CRM_API_TOKEN'),
         'sync_enabled' => env('CRM_SYNC_ENABLED', true),
         'timeout' => env('CRM_SYNC_TIMEOUT', 30),
@@ -53,9 +57,5 @@ return [
     'products_url'        => env('ARIYA_CRM_PRODUCTS_URL', 'https://api.ariyajanebi.ir/v1/front/products'),
     'token'               => env('ARIYA_CRM_TOKEN'),
     'default_category_id' => env('ARIYA_DEFAULT_CATEGORY_ID', 1),
-    'username' => env('ARIYA_ADMIN_USERNAME', 'admin'),
-    'password' => env('ARIYA_ADMIN_PASSWORD'),
-    'verify_ssl' => env('ARIYA_CRM_VERIFY_SSL', true),
-    'ssl_warning_ttl_seconds' => env('ARIYA_SSL_WARNING_TTL_SECONDS', 43200),
 ],
 ];
