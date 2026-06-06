@@ -398,7 +398,7 @@ if ($oldDesignNotes === null) {
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">ویرایش کالا</h5>
-            <a class="btn btn-outline-secondary" href="{{ route('products.index') }}">بازگشت</a>
+            <a class="btn btn-outline-secondary" href="{{ $returnTo }}">بازگشت</a>
         </div>
 
         @if ($errors->any())
@@ -423,6 +423,7 @@ if ($oldDesignNotes === null) {
             @method('PUT')
 
             {{-- hidden inputs برای model_list_ids - اینجا توسط JS مدیریت می‌شن --}}
+            <input type="hidden" name="return_to" value="{{ $returnTo }}">
             <div id="modelHiddenInputsContainer"></div>
             <div id="variantsHiddenInputsContainer"></div>
 
@@ -769,7 +770,7 @@ if ($oldDesignNotes === null) {
                     </div>
 
                     <div class="d-flex gap-2">
-                        <a href="{{ route('products.index') }}" class="btn btn-outline-secondary">انصراف</a>
+                        <a href="{{ $returnTo }}" class="btn btn-outline-secondary">انصراف</a>
 
                         <button type="submit" class="btn btn-primary">ثبت کالا</button>
                     </div>

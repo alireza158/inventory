@@ -323,11 +323,8 @@
     }
 
     .product-card {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
-        overflow: hidden;
+        display: block;
+        overflow: visible;
     }
 
     .product-card-head {
@@ -343,18 +340,16 @@
     }
 
     .sheet-wrap {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        min-height: 0;
+        display: block;
+        min-height: calc(100dvh - var(--inventory-header-height) - 96px);
         padding: 12px;
     }
 
     .sheet-scroll {
         width: 100%;
-        flex: 1 1 auto;
-        min-height: 320px;
-        overflow: auto;
+        min-height: 640px;
+        overflow-x: auto;
+        overflow-y: visible;
         border: 1px solid var(--border);
         border-radius: 12px;
         background: #fff;
@@ -687,9 +682,7 @@
 
     @media (min-width: 768px) {
         .products-workspace {
-            height: calc(100dvh - var(--inventory-header-height) - 42px);
-            max-height: none;
-            min-height: 680px;
+            min-height: calc(100dvh - var(--inventory-header-height) - 42px);
             overflow: visible;
         }
     }
@@ -1354,7 +1347,7 @@
                                                 type="checkbox"
                                                 class="form-check-input product-checkbox"
                                                 value="{{ $p->id }}"
-                                                data-edit-url="{{ route('products.edit', $p) }}"
+                                                data-edit-url="{{ route('products.edit', ['product' => $p, 'return_to' => request()->fullUrl()]) }}"
                                                 data-delete-url="{{ route('products.destroy', $p) }}"
                                                 data-sales-ledger-url="{{ route('products.sales-ledger', $p) }}"
                                                 data-purchase-ledger-url="{{ route('products.purchase-ledger', $p) }}"
