@@ -10,6 +10,9 @@ use App\Services\CrmProductSyncService;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class ProductController extends Controller
 {
@@ -155,7 +158,9 @@ class ProductController extends Controller
 
         $isSellable = $request->boolean('is_sellable', true);
 
-        DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes, $isSellable) {
+        $imagePath = $this->storeProductImage($request);
+
+        DB::transaction(function () use ($data, $useModels, $useDesigns, $designNotes, $isSellable, $imagePath) {
             $category = Category::query()->lockForUpdate()->findOrFail($data['category_id']);
 
             $cat2 = $this->normalizeCategory2($category->code);
@@ -169,6 +174,7 @@ class ProductController extends Controller
             $product = Product::create([
                 'category_id' => $category->id,
                 'name' => trim($data['name']),
+                'image_path' => $imagePath,
                 'sku' => 'AUTO-' . now()->format('YmdHis') . '-' . random_int(100, 999),
                 'code' => $productCode6,
                 'short_barcode' => $seq4,
@@ -310,6 +316,8 @@ class ProductController extends Controller
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
+            'remove_image' => ['nullable', 'boolean'],
+            'is_sellable' => ['nullable', 'boolean'],
 
             'variants' => ['required', 'array', 'min:1'],
             'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
@@ -331,16 +339,28 @@ class ProductController extends Controller
             'warehouse_bins.*' => ['integer', 'distinct', 'min:1', 'max:10'],
         ]);
 
-        DB::transaction(function () use ($data, $product) {
+        $newImagePath = $this->storeProductImage($request);
+        $removeImage = $request->boolean('remove_image');
+        $oldImagePath = null;
+
+        DB::transaction(function () use ($data, $product, $newImagePath, $removeImage, &$oldImagePath) {
             $product = Product::query()->lockForUpdate()->findOrFail($product->id);
 
-            $product->update([
+            $productUpdate = [
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
+                'is_sellable' => (bool) ($data['is_sellable'] ?? false),
                 'warehouse_zone' => isset($data['warehouse_zone']) ? (int) $data['warehouse_zone'] : null,
                 'warehouse_rows' => array_values(array_map('intval', $data['warehouse_rows'] ?? [])),
                 'warehouse_bins' => array_values(array_map('intval', $data['warehouse_bins'] ?? [])),
-            ]);
+            ];
+
+            if ($newImagePath || $removeImage) {
+                $oldImagePath = $product->image_path;
+                $productUpdate['image_path'] = $newImagePath;
+            }
+
+            $product->update($productUpdate);
 
             $keepIds = [];
             $centralWarehouseId = WarehouseStockService::centralWarehouseId();
@@ -423,12 +443,22 @@ class ProductController extends Controller
             $this->recalcProductSummary($product);
         });
 
+        if ($oldImagePath && ($newImagePath || $removeImage)) {
+            Storage::disk('public')->delete($oldImagePath);
+        }
+
         return redirect()->route('products.index')->with('success', 'کالا بروزرسانی شد.');
     }
 
     public function destroy(Product $product)
     {
+        $imagePath = $product->image_path;
+
         $product->delete();
+
+        if ($imagePath) {
+            Storage::disk('public')->delete($imagePath);
+        }
 
         return redirect()->route('products.index')->with('success', 'کالا حذف شد.');
     }
@@ -463,6 +493,88 @@ class ProductController extends Controller
                 'success',
                 "همگام‌سازی انجام شد. ایجاد: {$res['created']} | بروزرسانی: {$res['updated']} | خطا: {$res['failed']}"
             );
+    }
+
+    private function storeProductImage(Request $request): ?string
+    {
+        $file = $request->file('image');
+
+        if (!$file) {
+            return null;
+        }
+
+        if (is_array($file) || !$file instanceof UploadedFile) {
+            throw ValidationException::withMessages([
+                'image' => 'فایل عکس کالا معتبر نیست؛ لطفاً فقط یک تصویر انتخاب کنید.',
+            ]);
+        }
+
+        if (!$file->isValid()) {
+            throw ValidationException::withMessages([
+                'image' => $this->productImageUploadErrorMessage($file->getError()),
+            ]);
+        }
+
+        $filePath = $file->getRealPath() ?: $file->getPathname();
+
+        if (!is_string($filePath) || trim($filePath) === '' || !is_file($filePath)) {
+            throw ValidationException::withMessages([
+                'image' => 'مسیر فایل آپلودشده خالی است؛ لطفاً عکس را دوباره انتخاب و ارسال کنید.',
+            ]);
+        }
+
+        if (($file->getSize() ?: 0) > 4096 * 1024) {
+            throw ValidationException::withMessages([
+                'image' => 'حجم عکس کالا نباید بیشتر از ۴ مگابایت باشد.',
+            ]);
+        }
+
+        if (@getimagesize($filePath) === false) {
+            throw ValidationException::withMessages([
+                'image' => 'فایل انتخاب‌شده تصویر معتبر نیست.',
+            ]);
+        }
+
+        $extension = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension() ?: 'jpg');
+        $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'jpg';
+        $filename = now()->format('YmdHis') . '-' . bin2hex(random_bytes(8)) . '.' . $extension;
+        $storedPath = 'products/' . $filename;
+        $stream = @fopen($filePath, 'rb');
+
+        if ($stream === false) {
+            throw ValidationException::withMessages([
+                'image' => 'خواندن فایل آپلودشده ناموفق بود؛ لطفاً عکس را دوباره انتخاب و ارسال کنید.',
+            ]);
+        }
+
+        try {
+            $stored = Storage::disk('public')->put($storedPath, $stream);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        if (!$stored) {
+            throw ValidationException::withMessages([
+                'image' => 'ذخیره عکس کالا ناموفق بود؛ لطفاً دوباره تلاش کنید.',
+            ]);
+        }
+
+        return $storedPath;
+    }
+
+    private function productImageUploadErrorMessage(int $errorCode): string
+    {
+        return match ($errorCode) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'حجم عکس کالا بیش از حد مجاز سرور است؛ لطفاً عکس کوچک‌تری انتخاب کنید.',
+            UPLOAD_ERR_PARTIAL => 'آپلود عکس کامل انجام نشد؛ لطفاً دوباره تلاش کنید.',
+            UPLOAD_ERR_NO_FILE => 'هیچ عکسی برای کالا انتخاب نشده است.',
+            UPLOAD_ERR_NO_TMP_DIR => 'پوشه موقت آپلود روی سرور در دسترس نیست.',
+            UPLOAD_ERR_CANT_WRITE => 'امکان نوشتن فایل آپلودشده روی سرور وجود ندارد.',
+            UPLOAD_ERR_EXTENSION => 'آپلود عکس توسط تنظیمات سرور متوقف شد.',
+            default => 'فایل عکس کالا معتبر نیست؛ لطفاً یک تصویر سالم با حجم حداکثر ۴ مگابایت انتخاب کنید.',
+        };
     }
 
     private function recalcProductSummary(Product $product): void

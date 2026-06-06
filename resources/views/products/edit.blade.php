@@ -407,7 +407,7 @@ if ($oldDesignNotes === null) {
             <b>موجودی، قیمت خرید و قیمت فروش</b> بعداً در بخش <b>خرید کالا</b> ثبت می‌شوند.
         </div>
 
-        <form method="POST" action="{{ route('products.update', $product) }}" id="productEditForm" class="row g-3">
+        <form method="POST" action="{{ route('products.update', $product) }}" id="productEditForm" class="row g-3" enctype="multipart/form-data">
             @csrf
             @method('PUT')
 
@@ -446,6 +446,23 @@ if ($oldDesignNotes === null) {
                             </div>
 
                             <div class="col-lg-4">
+                                <label class="form-label">عکس کالا</label>
+                                <input type="file" name="image" class="form-control" accept="image/*">
+                                <div class="muted mt-1">در صورت انتخاب عکس جدید، عکس قبلی جایگزین می‌شود. حداکثر حجم ۴ مگابایت.</div>
+                                @if($product->image_path)
+                                    <div class="d-flex align-items-center gap-3 mt-2 flex-wrap">
+                                        <a href="{{ asset('storage/'.$product->image_path) }}" target="_blank" class="d-inline-block">
+                                            <img src="{{ asset('storage/'.$product->image_path) }}" alt="عکس {{ $product->name }}" class="rounded border" style="width:72px;height:72px;object-fit:cover;">
+                                        </a>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="removeProductImage" name="remove_image" value="1">
+                                            <label class="form-check-label" for="removeProductImage">حذف عکس فعلی</label>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="col-lg-3">
                                 <label class="form-label d-block">وضعیت فروش</label>
                                 <input type="hidden" name="is_sellable" value="0">
                                 <div class="form-check form-switch mt-2">
