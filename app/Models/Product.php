@@ -41,6 +41,9 @@ class Product extends Model
         'models',
         'has_colors',
         'is_sellable',
+        'warehouse_zone',
+        'warehouse_rows',
+        'warehouse_bins',
     ];
 
     protected $casts = [
@@ -56,6 +59,9 @@ class Product extends Model
         'models'     => 'array',
         'has_colors' => 'boolean',
         'is_sellable' => 'boolean',
+        'warehouse_zone' => 'integer',
+        'warehouse_rows' => 'array',
+        'warehouse_bins' => 'array',
         'synced_at'  => 'datetime',
     ];
 
