@@ -146,8 +146,12 @@
     }
 
     .toolbar-card {
+        position: sticky;
+        top: 12px;
+        z-index: 40;
         padding: 15px;
         margin-bottom: 14px;
+        background: var(--card);
     }
 
     .toolbar-top {
@@ -724,6 +728,7 @@
         }
 
         .toolbar-card {
+            top: 54px;
             padding: 10px;
             margin-bottom: 10px;
         }
