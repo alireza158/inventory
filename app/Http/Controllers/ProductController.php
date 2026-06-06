@@ -324,6 +324,11 @@ class ProductController extends Controller
             'variants.*.variety_id' => ['nullable', 'integer', 'min:1'],
             'variant_site_ids' => ['nullable', 'array'],
             'variant_site_ids.*' => ['nullable', 'integer', 'min:1'],
+            'warehouse_zone' => ['nullable', 'integer', 'min:1', 'max:7'],
+            'warehouse_rows' => ['nullable', 'array'],
+            'warehouse_rows.*' => ['integer', 'distinct', 'min:1', 'max:40'],
+            'warehouse_bins' => ['nullable', 'array'],
+            'warehouse_bins.*' => ['integer', 'distinct', 'min:1', 'max:10'],
         ]);
 
         DB::transaction(function () use ($data, $product) {
@@ -332,6 +337,9 @@ class ProductController extends Controller
             $product->update([
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
+                'warehouse_zone' => isset($data['warehouse_zone']) ? (int) $data['warehouse_zone'] : null,
+                'warehouse_rows' => array_values(array_map('intval', $data['warehouse_rows'] ?? [])),
+                'warehouse_bins' => array_values(array_map('intval', $data['warehouse_bins'] ?? [])),
             ]);
 
             $keepIds = [];
