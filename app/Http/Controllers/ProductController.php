@@ -295,6 +295,17 @@ class ProductController extends Controller
         return redirect()->route('products.index')->with('success', 'کالا و تنوع‌ها با موفقیت ساخته شدند.');
     }
 
+    public function image(Product $product)
+    {
+        if (!$product->image_path || !Storage::disk('public')->exists($product->image_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($product->image_path, null, [
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
     public function edit(Product $product)
     {
         $product->load(['variants.warehouseStocks.warehouse']);

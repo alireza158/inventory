@@ -377,6 +377,17 @@ if ($oldDesignNotes === null) {
         margin-top:8px;
     }
 
+
+    .product-image-preview{
+        width:120px;
+        height:120px;
+        object-fit:contain;
+        background:#fff;
+        border:1px solid var(--brd);
+        border-radius:16px;
+        padding:6px;
+    }
+
     .divider-soft{
         border-top:1px dashed #e5edf7;
         margin:12px 0;
@@ -451,8 +462,8 @@ if ($oldDesignNotes === null) {
                                 <div class="muted mt-1">در صورت انتخاب عکس جدید، عکس قبلی جایگزین می‌شود. حداکثر حجم ۴ مگابایت.</div>
                                 @if($product->image_path)
                                     <div class="d-flex align-items-center gap-3 mt-2 flex-wrap">
-                                        <a href="{{ asset('storage/'.$product->image_path) }}" target="_blank" class="d-inline-block">
-                                            <img src="{{ asset('storage/'.$product->image_path) }}" alt="عکس {{ $product->name }}" class="rounded border" style="width:72px;height:72px;object-fit:cover;">
+                                        <a href="{{ route('products.image', $product) }}" target="_blank" class="d-inline-block">
+                                            <img src="{{ route('products.image', $product) }}" alt="عکس {{ $product->name }}" class="product-image-preview">
                                         </a>
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="removeProductImage" name="remove_image" value="1">

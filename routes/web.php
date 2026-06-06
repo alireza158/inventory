@@ -51,6 +51,7 @@ Route::middleware('auth')->group(function () {
 
     // Products + categories
     Route::resource('products', ProductController::class)->except(['show', 'destroy']);
+    Route::get('/products/{product}/image', [ProductController::class, 'image'])->name('products.image');
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('role:admin|Admin')->name('products.destroy');
     Route::get('/products/{product}/sales-ledger', [ProductSalesLedgerController::class, 'index'])->name('products.sales-ledger');
     Route::get('/products/{product}/purchase-ledger', [ProductPurchaseLedgerController::class, 'purchaseLedger'])->name('products.purchase-ledger');

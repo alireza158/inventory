@@ -344,7 +344,7 @@
 
     .sheet col.col-check { width: 46px; }
     .sheet col.col-toggle { width: 46px; }
-    .sheet col.col-image { width: 78px; }
+    .sheet col.col-image { width: 90px; }
     .sheet col.col-code { width: 115px; }
     .sheet col.col-barcode { width: 165px; }
     .sheet col.col-stock { width: 110px; }
@@ -410,8 +410,8 @@
 
     .product-thumb,
     .product-thumb-placeholder {
-        width: 52px;
-        height: 52px;
+        width: 64px;
+        height: 64px;
         border-radius: 12px;
         border: 1px solid var(--border);
         display: inline-flex;
@@ -426,7 +426,9 @@
     .product-thumb img {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
+        background: #fff;
+        padding: 4px;
         display: block;
     }
 
@@ -1347,8 +1349,8 @@
 
                                     <td data-label="عکس">
                                         @if($p->image_path)
-                                            <a href="{{ asset('storage/'.$p->image_path) }}" target="_blank" class="product-thumb" title="نمایش عکس کالا">
-                                                <img src="{{ asset('storage/'.$p->image_path) }}" alt="عکس {{ $p->name }}">
+                                            <a href="{{ route('products.image', $p) }}" target="_blank" class="product-thumb" title="نمایش عکس کالا">
+                                                <img src="{{ route('products.image', $p) }}" alt="عکس {{ $p->name }}">
                                             </a>
                                         @else
                                             <span class="product-thumb-placeholder" title="بدون عکس">📷</span>
