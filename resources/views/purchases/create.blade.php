@@ -296,6 +296,11 @@
                     <div class="label">کد محصول</div>
                     <input class="form-control form-control-sm group-product-code" value="${data.code ?? ''}" required readonly>
                 </div>
+                <div class="col-12">
+                    <div class="small text-success d-none" data-product-lock-help>
+                        این کالا به لیست خرید اضافه شده است؛ برای جلوگیری از حذف اشتباهی ردیف‌ها، دسته‌بندی و کالا قفل شد. برای کالای بعدی از ردیف خالی پایین استفاده کنید.
+                    </div>
+                </div>
             </div>
 
             <div class="border rounded p-2 mb-2 bg-light-subtle variant-picker" data-variant-picker>
@@ -417,7 +422,44 @@
         };
     }
 
+    function groupHasRows(groupEl) {
+        return !!groupEl?.querySelector('[data-row]');
+    }
+
+    function setGroupProductFieldsLocked(groupEl) {
+        const locked = groupHasRows(groupEl);
+        const categorySelect = groupEl.querySelector('.group-category-select');
+        const productSelect = groupEl.querySelector('.group-product-select');
+        const helpEl = groupEl.querySelector('[data-product-lock-help]');
+
+        if (categorySelect) categorySelect.disabled = locked;
+        if (productSelect) {
+            productSelect.disabled = locked;
+            if (hasSelect2 && window.jQuery(productSelect).hasClass('select2-hidden-accessible')) {
+                window.jQuery(productSelect).prop('disabled', locked).trigger('change.select2');
+            }
+        }
+        if (helpEl) {
+            helpEl.classList.toggle('d-none', !locked);
+        }
+    }
+
+    function ensureEmptyProductGroupAfter(currentGroupEl) {
+        const hasEmptyGroup = Array.from(itemsList.querySelectorAll('[data-group-id]')).some((groupEl) => {
+            return groupEl !== currentGroupEl && !groupHasRows(groupEl);
+        });
+
+        if (!hasEmptyGroup) {
+            addProductGroup({}, false);
+        }
+    }
+
     function handleProductChanged(groupEl) {
+        if (groupHasRows(groupEl)) {
+            setGroupProductFieldsLocked(groupEl);
+            return;
+        }
+
         groupEl.querySelector('[data-models]').innerHTML = '';
         syncGroupFieldsToRows(groupEl);
         renderVariantPicker(groupEl);
@@ -607,6 +649,7 @@
         syncGroupFieldsToRows(groupEl);
         renderVariantPicker(groupEl);
         initProductSelect2(groupEl.querySelector('.group-product-select'));
+        setGroupProductFieldsLocked(groupEl);
         reindexRows();
         recalc();
         return groupEl;
@@ -659,6 +702,7 @@
 
         formatPriceInputs(row);
         syncGroupFieldsToRows(groupEl);
+        setGroupProductFieldsLocked(groupEl);
         reindexRows();
         recalc();
     }
@@ -695,6 +739,11 @@
         if (!groupEl) return;
 
         if (e.target.classList.contains('group-category-select')) {
+            if (groupHasRows(groupEl)) {
+                setGroupProductFieldsLocked(groupEl);
+                return;
+            }
+
             const categoryId = e.target.value || '';
             const productSelect = groupEl.querySelector('.group-product-select');
             productSelect.innerHTML = productOptionsByCategory(categoryId, '');
@@ -774,6 +823,7 @@
             });
 
             renderVariantPicker(groupEl, selectedModel, '');
+            ensureEmptyProductGroupAfter(groupEl);
             return;
         }
 
@@ -789,6 +839,7 @@
             if (!groupEl) return;
             const row = e.target.closest('[data-row]');
             row.remove();
+            setGroupProductFieldsLocked(groupEl);
 
             reindexRows();
             recalc();
