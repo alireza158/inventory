@@ -9,7 +9,7 @@
         'transfer' => 'حواله بین انباری',
     ];
 
-    $toToman = fn($toman) => \App\Support\Currency::formatRial($toman);
+    $toRial = fn($rial) => \App\Support\Currency::formatRial($rial);
 
     $isCustomerReturn = $voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN;
 
@@ -263,7 +263,7 @@
                         <span class="soft-chip">نوع: {{ $titles[$type] ?? 'حواله' }}</span>
                         <span class="soft-chip">تعداد در این صفحه: {{ number_format($pageCount) }}</span>
                         @if($isCustomerReturn)
-                            <span class="soft-chip">جمع مبلغ این صفحه: {{ $toToman($pageTotalAmount) }}</span>
+                            <span class="soft-chip">جمع مبلغ این صفحه: {{ $toRial($pageTotalAmount) }}</span>
                         @endif
                     </div>
                 </div>

@@ -3,7 +3,7 @@
 @section('content')
 
 @php
-  $toman = fn($a) => \App\Support\Currency::formatRial($a);
+  $rial = fn($a) => \App\Support\Currency::formatRial($a);
 
   $dateFa = function ($date) {
     if (!$date) return '---';
@@ -473,7 +473,7 @@
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
             <div class="summary-label">جمع پیش‌فاکتور</div>
-            <div class="summary-value big">{{ $toman($itemsTotal) }}</div>
+            <div class="summary-value big">{{ $rial($itemsTotal) }}</div>
           </div>
           <div class="summary-icon">💵</div>
         </div>
@@ -614,12 +614,12 @@
                   </td>
 
                   <td>
-                    {{ $toman($it->price) }}
+                    {{ $rial($it->price) }}
                   </td>
 
                   <td>
                     <span class="money-bold">
-                      {{ $toman((int) $it->quantity * (int) $it->price) }}
+                      {{ $rial((int) $it->quantity * (int) $it->price) }}
                     </span>
                   </td>
                 </tr>

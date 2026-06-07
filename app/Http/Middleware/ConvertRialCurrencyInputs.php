@@ -43,7 +43,7 @@ class ConvertRialCurrencyInputs
             }
 
             if ($this->isMoneyKey((string) $key, $payload)) {
-                $payload[$key] = Currency::rialInputToToman($value);
+                $payload[$key] = Currency::rialInput($value);
             }
         }
 

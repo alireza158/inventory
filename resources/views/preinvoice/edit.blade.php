@@ -265,7 +265,7 @@ function createEl(html){
 function formatPrice(val){
   const n = Number(val);
   if (!Number.isFinite(n)) return '';
-  return (n * 10).toLocaleString('fa-IR');
+  return n.toLocaleString('fa-IR');
 }
 function safeInt(v, def = 0){
   const n = parseInt(String(v ?? '').trim(), 10);
@@ -647,9 +647,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (currentSid) shippingSelect.value = String(currentSid);
 
   const baseShip = safeInt(document.getElementById('shipping_price')?.value, 0);
-  document.getElementById('shipping_label').textContent = `هزینه ارسال: ${(baseShip * 10).toLocaleString()} ریال`;
+  document.getElementById('shipping_label').textContent = `هزینه ارسال: ${baseShip.toLocaleString()} ریال`;
   const view = document.getElementById('shipping_price_view');
-  if (view) view.value = `${(baseShip * 10).toLocaleString()} ریال`;
+  if (view) view.value = `${baseShip.toLocaleString()} ریال`;
 
   shippingSelect.addEventListener('change', () => {
     const sid = safeInt(shippingSelect.value, 0);
@@ -657,8 +657,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const price = ship ? safeInt(ship.price, 0) : 0;
 
     document.getElementById('shipping_price').value = String(price);
-    document.getElementById('shipping_label').textContent = `هزینه ارسال: ${(price * 10).toLocaleString()} ریال`;
-    if (view) view.value = `${(price * 10).toLocaleString()} ریال`;
+    document.getElementById('shipping_label').textContent = `هزینه ارسال: ${price.toLocaleString()} ریال`;
+    if (view) view.value = `${price.toLocaleString()} ریال`;
     updateTotal();
   });
 

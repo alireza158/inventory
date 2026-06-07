@@ -81,8 +81,7 @@ class AriyajanebiSyncService
         $payload = ['_method' => 'PUT'];
         foreach ($variants->values() as $i => $variant) {
             $payload["varieties[{$i}][id]"] = (string) $variant->variety_id;
-            // The public site works in Toman. Internal web forms now show Rial, but monetary
-            // requests are normalized back to Toman before persistence, so the API payload stays Toman.
+            // Monetary values are stored and sent exactly as entered in Rial; do not apply unit conversion here.
             $payload["varieties[{$i}][price]"] = (string) max(0, (int) $variant->sell_price);
             $payload["varieties[{$i}][balance]"] = (string) self::centralWarehouseQuantityForVariant($variant);
         }

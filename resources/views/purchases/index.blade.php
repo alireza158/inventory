@@ -2,7 +2,7 @@
 
 @section('content')
 @php
-    $toToman = fn($toman) => \App\Support\Currency::formatRial($toman);
+    $toRial = fn($rial) => \App\Support\Currency::formatRial($rial);
 @endphp
 
 
@@ -21,7 +21,7 @@
                 <div class="card-body d-flex flex-wrap gap-4 justify-content-between align-items-center">
                     <div>
                         <div class="label">جمع کل خریدها تا الان (قیمت خرید)</div>
-                        <div class="value">{{ $toToman($totalAllAmount) }}</div>
+                        <div class="value">{{ $toRial($totalAllAmount) }}</div>
                     </div>
                     <div>
                         <div class="label">تعداد لیست خریدها</div>
@@ -86,8 +86,8 @@
                             </td>
                             <td>{{ $purchase->purchased_at?->format('Y/m/d H:i') }}</td>
                             <td>{{ $purchase->supplier?->name }}</td>
-                            <td>{{ $toToman($purchase->total_discount ?? 0) }}</td>
-                            <td class="amount-strong">{{ $toToman($purchase->total_amount) }}</td>
+                            <td>{{ $toRial($purchase->total_discount ?? 0) }}</td>
+                            <td class="amount-strong">{{ $toRial($purchase->total_amount) }}</td>
                             <td><span class="badge-items">{{ $purchase->items_count }}</span></td>
                             <td class="text-end action-btns">
                                 <a href="{{ route('purchases.show', $purchase) }}" class="btn btn-sm btn-outline-secondary">مشاهده</a>
