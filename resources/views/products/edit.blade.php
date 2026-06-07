@@ -427,6 +427,22 @@ if ($oldDesignNotes === null) {
             <div id="modelHiddenInputsContainer"></div>
             <div id="variantsHiddenInputsContainer"></div>
 
+            {{-- ثبت سریع بالای فرم --}}
+            <div class="col-12">
+                <div class="card-soft p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="section-title">ویرایش کالا</div>
+                        <div class="muted">برای ثبت تغییرات بدون رفتن به انتهای فرم، از این دکمه استفاده کن.</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <a href="{{ $returnTo }}" class="btn btn-outline-secondary">انصراف</a>
+
+                        <button type="submit" class="btn btn-primary">ثبت کالا</button>
+                    </div>
+                </div>
+            </div>
+
             {{-- اطلاعات پایه --}}
             <div class="col-12">
                 <div class="card-soft">
