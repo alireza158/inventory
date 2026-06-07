@@ -4,46 +4,53 @@ namespace App\Support;
 
 class Currency
 {
-    public const RIAL_PER_TOMAN = 10;
-
-    public static function toRial(int|float|string|null $toman): int
+    public static function toRial(int|float|string|null $rial): int
     {
-        return max(0, (int) $toman) * self::RIAL_PER_TOMAN;
+        return self::normalizeRial($rial);
     }
 
-    public static function formatRial(int|float|string|null $toman): string
+    public static function formatRial(int|float|string|null $rial): string
     {
-        return number_format(self::toRial($toman)) . ' ریال';
+        return number_format(self::normalizeRial($rial)) . ' ریال';
     }
 
-    public static function formatRialNumber(int|float|string|null $toman): string
+    public static function formatRialNumber(int|float|string|null $rial): string
     {
-        return number_format(self::toRial($toman));
+        return number_format(self::normalizeRial($rial));
     }
 
     public static function formatRawRial(int|float|string|null $rial): string
     {
-        return number_format(max(0, (int) $rial)) . ' ریال';
+        return self::formatRial($rial);
     }
 
     public static function formatRawRialNumber(int|float|string|null $rial): string
     {
-        return number_format(max(0, (int) $rial));
+        return self::formatRialNumber($rial);
     }
 
-    public static function rialToToman(int|float|string|null $rial): int
+    public static function rialInput(mixed $value): int
     {
-        return max(0, (int) floor(((int) $rial) / self::RIAL_PER_TOMAN));
+        return self::normalizeRialString((string) ($value ?? ''));
     }
 
-    public static function rialInputToToman(mixed $value): int
+    private static function normalizeRial(int|float|string|null $rial): int
     {
-        $digits = preg_replace('/[^0-9]/', '', self::englishDigits((string) ($value ?? '')));
+        if (is_string($rial)) {
+            return self::normalizeRialString($rial);
+        }
+
+        return max(0, (int) $rial);
+    }
+
+    private static function normalizeRialString(string $value): int
+    {
+        $digits = preg_replace('/[^0-9]/', '', self::englishDigits($value));
         if ($digits === '' || $digits === null) {
             return 0;
         }
 
-        return max(0, (int) floor(((int) $digits) / self::RIAL_PER_TOMAN));
+        return max(0, (int) $digits);
     }
 
     private static function englishDigits(string $value): string

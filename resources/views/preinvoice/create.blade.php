@@ -1512,7 +1512,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     }
 
     function formatMoney(val) {
-        return (Number(val || 0) * 10).toLocaleString('fa-IR') + ' ریال';
+        return Number(val || 0).toLocaleString('fa-IR') + ' ریال';
     }
 
     function formatNum(val) {
@@ -1540,15 +1540,15 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         return n;
     }
 
-    function discountInputToToman(type, value) {
+    function normalizeDiscountInput(type, value) {
         const safeType = type === 'percent' ? 'percent' : 'amount';
         const safeValue = safeDiscountValue(safeType, value);
-        return safeType === 'percent' ? safeValue : Math.floor(safeValue / 10);
+        return safeType === 'percent' ? safeValue : Math.floor(safeValue);
     }
 
     function discountValueForInput(type, value) {
         const n = Number(value || 0);
-        return type === 'percent' ? n : n * 10;
+        return type === 'percent' ? n : Math.floor(n);
     }
 
     function calcDiscount(baseAmount, type, value) {
@@ -2457,7 +2457,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             }
         });
         modalGroupDiscountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
-        modalGroupDiscountValue = discountInputToToman(modalGroupDiscountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
+        modalGroupDiscountValue = normalizeDiscountInput(modalGroupDiscountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
         const discount = calcDiscount(totalAmount, modalGroupDiscountType, modalGroupDiscountValue);
         document.getElementById('modalSelectedRows').textContent = formatNum(selectedRows);
         document.getElementById('modalTotalQty').textContent = formatNum(totalQty);
@@ -2495,7 +2495,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             return;
         }
         const discountType = document.getElementById('modalGroupDiscountType')?.value || 'amount';
-        const discountValue = discountInputToToman(discountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
+        const discountValue = normalizeDiscountInput(discountType, document.getElementById('modalGroupDiscountValue')?.value || 0);
         const previousSelections = JSON.parse(JSON.stringify(groupedSelections || {}));
         groupedSelections[activeProductId] = {
             product: {
@@ -2662,11 +2662,11 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         });
         const afterGroupDiscount = Math.max(0, subtotal - groupDiscounts);
         const orderType = document.getElementById('orderDiscountType')?.value || 'amount';
-        const orderValue = discountInputToToman(orderType, document.getElementById('orderDiscountValue')?.value || 0);
+        const orderValue = normalizeDiscountInput(orderType, document.getElementById('orderDiscountValue')?.value || 0);
         const orderDiscount = calcDiscount(afterGroupDiscount, orderType, orderValue);
         const totalDiscount = Math.min(subtotal, groupDiscounts + orderDiscount);
         const total = Math.max(0, subtotal + shipping - totalDiscount);
-        document.getElementById('discount').value = String(totalDiscount * 10);
+        document.getElementById('discount').value = String(totalDiscount);
         document.getElementById('totalDiscountView').value = formatMoney(totalDiscount);
         document.getElementById('total_price').value = formatMoney(total);
         const preview = document.getElementById('orderDiscountPreview');

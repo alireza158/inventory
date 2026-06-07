@@ -30,7 +30,7 @@
     return Jalalian::fromDateTime($dt)->format('Y/m/d H:i');
   };
 
-  $toman = function($amount){
+  $rial = function($amount){
     $n = (int)($amount ?? 0);
     return \App\Support\Currency::formatRial($n);
   };
@@ -156,8 +156,8 @@
                   <td class="fw-semibold">{{ $productTitle($it) }}</td>
                   <td>{{ $variantTitle($it) }}</td>
                   <td class="text-nowrap">{{ number_format($it->quantity) }}</td>
-                  <td class="text-nowrap">{{ $toman($it->price) }}</td>
-                  <td class="text-nowrap fw-bold">{{ $toman($line) }}</td>
+                  <td class="text-nowrap">{{ $rial($it->price) }}</td>
+                  <td class="text-nowrap fw-bold">{{ $rial($line) }}</td>
                 </tr>
               @endforeach
             </tbody>
@@ -166,10 +166,10 @@
 
         <div class="p-3 p-md-4 border-top">
           <div class="row g-2">
-            <div class="col-6"><span class="text-muted">جمع جزء:</span> <b>{{ $toman($invoice->subtotal) }}</b></div>
-            <div class="col-6"><span class="text-muted">هزینه ارسال:</span> <b>{{ $toman($invoice->shipping_price) }}</b></div>
-            <div class="col-6"><span class="text-muted">تخفیف:</span> <b>{{ $toman($invoice->discount_amount) }}</b></div>
-            <div class="col-6 fs-5"><span class="text-muted">مبلغ کل:</span> <b>{{ $toman($invoice->total) }}</b></div>
+            <div class="col-6"><span class="text-muted">جمع جزء:</span> <b>{{ $rial($invoice->subtotal) }}</b></div>
+            <div class="col-6"><span class="text-muted">هزینه ارسال:</span> <b>{{ $rial($invoice->shipping_price) }}</b></div>
+            <div class="col-6"><span class="text-muted">تخفیف:</span> <b>{{ $rial($invoice->discount_amount) }}</b></div>
+            <div class="col-6 fs-5"><span class="text-muted">مبلغ کل:</span> <b>{{ $rial($invoice->total) }}</b></div>
           </div>
         </div>
       </div>
@@ -222,19 +222,19 @@
 
           <div class="d-flex justify-content-between">
             <div class="hint">پرداخت شده</div>
-            <div class="fw-bold">{{ $toman($paidAmount) }}</div>
+            <div class="fw-bold">{{ $rial($paidAmount) }}</div>
           </div>
           <div class="d-flex justify-content-between">
             <div class="hint">جمع نقدی</div>
-            <div class="fw-bold">{{ $toman($cashPaidAmount) }}</div>
+            <div class="fw-bold">{{ $rial($cashPaidAmount) }}</div>
           </div>
           <div class="d-flex justify-content-between">
             <div class="hint">جمع چکی</div>
-            <div class="fw-bold">{{ $toman($chequePaidAmount) }}</div>
+            <div class="fw-bold">{{ $rial($chequePaidAmount) }}</div>
           </div>
           <div class="d-flex justify-content-between mb-3">
             <div class="hint">مانده</div>
-            <div class="fw-bold {{ $remainingAmount > 0 ? 'text-danger' : 'text-success' }}">{{ $toman($remainingAmount) }}</div>
+            <div class="fw-bold {{ $remainingAmount > 0 ? 'text-danger' : 'text-success' }}">{{ $rial($remainingAmount) }}</div>
           </div>
 
           @if($canFinanceApprove)
@@ -361,7 +361,7 @@
               <div class="d-flex justify-content-between align-items-center gap-2">
                 <div class="d-flex align-items-center gap-2">
                   <span class="badge {{ $badgeMethod($p->method) }}">{{ $methodFa($p->method) }}</span>
-                  <span class="fw-bold">{{ $toman($p->amount) }}</span>
+                  <span class="fw-bold">{{ $rial($p->amount) }}</span>
                 </div>
                 <div class="text-muted small">{{ $jalali($p->paid_at) }}</div>
               </div>
