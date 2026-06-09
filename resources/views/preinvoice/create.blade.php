@@ -1761,6 +1761,12 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         localDraftSaveTimer = setTimeout(saveLocalDraftNow, 350);
     }
 
+
+    function setMotherSearchHintVisible(visible = true) {
+        const hint = document.getElementById('motherSearchHint');
+        if (hint) hint.style.display = visible ? '' : 'none';
+    }
+
     function clearVisibleFormOnly() {
         document.getElementById('customer_id').value = '';
         document.getElementById('customer_name').value = '';
@@ -1787,7 +1793,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         selectedMotherProduct = null;
         document.getElementById('motherCodeInput').value = '';
         document.getElementById('motherProductBox').style.display = 'none';
-        document.getElementById('motherSearchHint').style.display = '';
+        setMotherSearchHintVisible(true);
     }
 
     async function applyLocalDraft(draft) {
@@ -1942,7 +1948,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     function applyMotherProduct(product, autoOpen = true) {
         if (!product) return;
         selectedMotherProduct = product;
-        document.getElementById('motherSearchHint').style.display = 'none';
+        setMotherSearchHintVisible(false);
         document.getElementById('motherProductBox').style.display = 'block';
         document.getElementById('motherProductTitle').textContent = productTitle(product);
         document.getElementById('motherProductCode').textContent = 'کد: ' + (productCode(product) || '—');
@@ -1988,7 +1994,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         $el.on('select2:clear', function() {
             if (selectedMotherProduct) return;
             document.getElementById('motherProductBox').style.display = 'none';
-            document.getElementById('motherSearchHint').style.display = '';
+            setMotherSearchHintVisible(true);
         });
     }
 
@@ -2244,14 +2250,14 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             selectedMotherProduct = rows.find(p => String(productCode(p)).trim() === code) || rows.find(p => String(p.code || '').trim() === code) || rows.find(p => String(p.sku || '').trim() === code) || rows[0] || null;
             if (!selectedMotherProduct) {
                 document.getElementById('motherProductBox').style.display = 'none';
-                document.getElementById('motherSearchHint').style.display = '';
+                setMotherSearchHintVisible(true);
                 if (!autoOpen) {
                     alert('محصول مادری با این کد پیدا نشد.');
                     input.select();
                 }
                 return;
             }
-            document.getElementById('motherSearchHint').style.display = 'none';
+            setMotherSearchHintVisible(false);
             document.getElementById('motherProductBox').style.display = 'block';
             document.getElementById('motherProductTitle').textContent = productTitle(selectedMotherProduct);
             document.getElementById('motherProductCode').textContent = 'کد: ' + (productCode(selectedMotherProduct) || code);
@@ -2538,7 +2544,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         bootstrap.Modal.getInstance(document.getElementById('groupPickerModal'))?.hide();
         document.getElementById('motherCodeInput').value = '';
         document.getElementById('motherProductBox').style.display = 'none';
-        document.getElementById('motherSearchHint').style.display = '';
+        setMotherSearchHintVisible(true);
         if (window.jQuery) $('#motherProductAjaxSelect').val(null).trigger('change');
         selectedMotherProduct = null;
         lastMotherAutoCode = '';
