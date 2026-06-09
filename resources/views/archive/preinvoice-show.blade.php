@@ -30,6 +30,8 @@
 
   $itemsCount = $order->items->sum('quantity');
   $itemsTotal = $order->items->sum(fn($it) => (int) $it->quantity * (int) $it->price);
+  $printSubtotal = $itemsTotal;
+  $printShippingName = $order->shippingMethod?->name ?? ($order->shipping_id ? ('روش ارسال #' . $order->shipping_id) : '---');
   $logLabels = ['attributes' => 'مقادیر ثبت‌شده', 'changes' => 'مقادیر جدید', 'old' => 'مقادیر قبلی', 'original' => 'مقادیر قبلی'];
 @endphp
 
@@ -397,6 +399,189 @@
     border-radius: 999px;
   }
 
+
+  .customer-print-page {
+    display: none;
+    direction: rtl;
+    color: #111827;
+    background: #fff;
+    font-family: Tahoma, "IRANSans", Arial, sans-serif;
+  }
+
+  .customer-print-page .print-sheet {
+    width: 190mm;
+    min-height: 277mm;
+    margin: 0 auto;
+    background: #fff;
+    padding: 9mm;
+  }
+
+  .customer-print-page .print-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: start;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #1f2937;
+  }
+
+  .customer-print-page .print-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 950;
+  }
+
+  .customer-print-page .print-brand img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+  }
+
+  .customer-print-page .print-title {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 950;
+    text-align: left;
+  }
+
+  .customer-print-page .print-meta {
+    color: #4b5563;
+    font-size: 10px;
+    line-height: 1.7;
+    text-align: left;
+  }
+
+  .customer-print-page .print-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-bottom: 9px;
+  }
+
+  .customer-print-page .print-info-box {
+    border: 1px solid #1f2937;
+    border-radius: 7px;
+    padding: 7px;
+    page-break-inside: avoid;
+  }
+
+  .customer-print-page .print-info-title {
+    font-weight: 950;
+    border-bottom: 1px dashed #9ca3af;
+    padding-bottom: 4px;
+    margin-bottom: 5px;
+  }
+
+  .customer-print-page .print-info-row {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 5px;
+    margin-bottom: 3px;
+    line-height: 1.6;
+    font-size: 10.5px;
+  }
+
+  .customer-print-page .print-info-label {
+    color: #374151;
+    font-weight: 850;
+  }
+
+  .customer-print-page .print-table,
+  .customer-print-page .print-summary {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .customer-print-page .print-table th,
+  .customer-print-page .print-table td,
+  .customer-print-page .print-summary td {
+    border: 1px solid #1f2937;
+    padding: 5px;
+    font-size: 10px;
+    line-height: 1.45;
+    vertical-align: middle;
+  }
+
+  .customer-print-page .print-table th {
+    background: #f8fafc;
+    text-align: center;
+    font-weight: 950;
+  }
+
+  .customer-print-page .print-col-index { width: 28px; text-align: center; }
+  .customer-print-page .print-col-model { width: 118px; text-align: center; }
+  .customer-print-page .print-col-qty { width: 46px; text-align: center; }
+  .customer-print-page .print-col-price,
+  .customer-print-page .print-col-total { width: 84px; text-align: left; direction: ltr; }
+  .customer-print-page .print-product-name { font-weight: 950; }
+  .customer-print-page .print-model-name { color: #374151; font-weight: 850; }
+
+  .customer-print-page .print-summary-wrap {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 9px;
+    page-break-inside: avoid;
+  }
+
+  .customer-print-page .print-summary {
+    width: 88mm;
+  }
+
+  .customer-print-page .print-summary .print-final-row td {
+    background: #eef2f7;
+    font-size: 11px;
+    font-weight: 950;
+  }
+
+  .customer-print-page .print-signatures {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+    page-break-inside: avoid;
+  }
+
+  .customer-print-page .print-signature-box {
+    height: 58px;
+    border: 1px solid #1f2937;
+    border-radius: 7px;
+    padding: 7px;
+    font-size: 10px;
+    font-weight: 950;
+  }
+
+  @page { size: A4 portrait; margin: 10mm; }
+
+  @media screen {
+    body.preinvoice-print-mode .preinvoice-show-page { display: none !important; }
+    body.preinvoice-print-mode .customer-print-page { display: block; }
+  }
+
+  @media print {
+    body * { visibility: hidden; }
+    .customer-print-page,
+    .customer-print-page * { visibility: visible; }
+    .customer-print-page {
+      display: block !important;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      background: #fff;
+    }
+    .customer-print-page .print-sheet {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+      padding: 0;
+    }
+    .customer-print-page thead { display: table-header-group; }
+    .customer-print-page tr { page-break-inside: avoid; }
+  }
+
   @media (max-width: 768px) {
     .preinvoice-hero {
       padding: 22px;
@@ -413,6 +598,87 @@
     }
   }
 </style>
+
+
+@if(request()->boolean('print'))
+  <script>document.body.classList.add('preinvoice-print-mode');</script>
+@endif
+
+<section class="customer-print-page" aria-label="نسخه چاپی مشتری">
+  <main class="print-sheet">
+    <header class="print-header">
+      <div class="print-brand">
+        <img src="{{ asset('logo.png') }}" alt="{{ config('app.name', 'شرکت') }}">
+        <div>{{ config('app.name', 'شرکت') }}</div>
+      </div>
+      <div>
+        <h1 class="print-title">پیش‌فاکتور فروش</h1>
+        <div class="print-meta">
+          <div>شماره: <strong>{{ $order->uuid }}</strong></div>
+          <div>تاریخ: {{ $dateFa($order->created_at ?? null) }}</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="print-info-grid">
+      <div class="print-info-box">
+        <div class="print-info-title">مشخصات مشتری</div>
+        <div class="print-info-row"><div class="print-info-label">نام:</div><div><strong>{{ $order->customer_name ?? '---' }}</strong></div></div>
+        <div class="print-info-row"><div class="print-info-label">موبایل:</div><div>{{ $order->customer_mobile ?? '---' }}</div></div>
+        <div class="print-info-row"><div class="print-info-label">آدرس:</div><div>{{ $order->customer_address ?: '---' }}</div></div>
+      </div>
+      <div class="print-info-box">
+        <div class="print-info-title">ارسال</div>
+        <div class="print-info-row"><div class="print-info-label">روش ارسال:</div><div>{{ $printShippingName }}</div></div>
+        <div class="print-info-row"><div class="print-info-label">هزینه ارسال:</div><div>{{ $rial($order->shipping_price) }}</div></div>
+      </div>
+    </section>
+
+    <section>
+      <table class="print-table">
+        <thead>
+          <tr>
+            <th class="print-col-index">ردیف</th>
+            <th>نام کالا</th>
+            <th class="print-col-model">مدل / لیست</th>
+            <th class="print-col-qty">تعداد</th>
+            <th class="print-col-price">قیمت واحد</th>
+            <th class="print-col-total">مبلغ کل</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($order->items as $it)
+            @php($lineTotal = (int) $it->quantity * (int) $it->price)
+            <tr>
+              <td class="print-col-index">{{ $loop->iteration }}</td>
+              <td><span class="print-product-name">{{ $it->product?->name ?? 'محصول نامشخص' }}</span></td>
+              <td class="print-col-model"><span class="print-model-name">{{ $it->variant?->variant_name ?? '---' }}</span></td>
+              <td class="print-col-qty">{{ number_format((int) $it->quantity) }}</td>
+              <td class="print-col-price">{{ number_format((int) $it->price) }}</td>
+              <td class="print-col-total">{{ number_format($lineTotal) }}</td>
+            </tr>
+          @empty
+            <tr><td colspan="6" class="text-center">آیتمی برای این پیش‌فاکتور ثبت نشده است.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </section>
+
+    <section class="print-summary-wrap">
+      <table class="print-summary">
+        <tr><td>جمع کالاها</td><td style="text-align:left;direction:ltr">{{ $rial($printSubtotal) }}</td></tr>
+        <tr><td>تخفیف</td><td style="text-align:left;direction:ltr">{{ $rial($order->discount_amount) }}</td></tr>
+        <tr><td>هزینه ارسال</td><td style="text-align:left;direction:ltr">{{ $rial($order->shipping_price) }}</td></tr>
+        <tr class="print-final-row"><td>مبلغ نهایی</td><td style="text-align:left;direction:ltr">{{ $rial($order->total_price) }}</td></tr>
+      </table>
+    </section>
+
+    <section class="print-signatures">
+      <div class="print-signature-box">امضا و مهر فروشنده</div>
+      <div class="print-signature-box">امضای مشتری / تحویل‌گیرنده</div>
+    </section>
+  </main>
+</section>
 
 <div class="container py-4 preinvoice-show-page">
 
