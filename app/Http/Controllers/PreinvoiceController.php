@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
 use App\Models\StockMovement;
+use App\Support\Currency;
 use App\Support\DocumentCodeGenerator;
 use App\Services\WarehouseStockService;
 use App\Services\PaymentRegistrationService;
