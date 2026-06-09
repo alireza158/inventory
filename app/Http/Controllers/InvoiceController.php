@@ -206,7 +206,7 @@ class InvoiceController extends Controller
                 'items.product',
                 'items.variant',
                 'preinvoiceOrder.creator',
-                'notes',
+                'shippingMethod:id,name,price',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();

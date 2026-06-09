@@ -18,6 +18,7 @@ class ArchiveController extends Controller
                 'items.variant:id,variant_name',
                 'creator:id,name',
                 'warehouseReviewer:id,name',
+                'shippingMethod:id,name,price',
                 'reviews.user:id,name',
                 'activityLogs.user:id,name',
             ])
@@ -51,6 +52,7 @@ class ArchiveController extends Controller
                 'items.variant:id,variant_name',
                 'creator:id,name',
                 'warehouseReviewer:id,name',
+                'shippingMethod:id,name,price',
                 'reviews.user:id,name',
                 'activityLogs.user:id,name',
             ])
