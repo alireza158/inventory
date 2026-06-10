@@ -12,7 +12,10 @@
 
     <div class="purchase-topbar d-flex justify-content-between align-items-center">
         <h4 class="page-title mb-0">خرید کالا</h4>
-        <a class="btn btn-light" href="{{ route('purchases.create') }}">+ ثبت خرید جدید</a>
+        <div class="d-flex gap-2 flex-wrap justify-content-end">
+            <a class="btn btn-outline-light" href="{{ route('purchases.export') }}">خروجی اکسل همه خریدها</a>
+            <a class="btn btn-light" href="{{ route('purchases.create') }}">+ ثبت خرید جدید</a>
+        </div>
     </div>
 
     <div class="row g-3 mb-3">
@@ -72,6 +75,7 @@
                             <th>#</th>
                             <th>تاریخ</th>
                             <th>تامین‌کننده</th>
+                            <th>توضیحات</th>
                             <th>تخفیف سند</th>
                             <th>مبلغ کل فاکتور</th>
                             <th>تعداد آیتم</th>
@@ -86,6 +90,7 @@
                             </td>
                             <td>{{ $purchase->purchased_at?->format('Y/m/d H:i') }}</td>
                             <td>{{ $purchase->supplier?->name }}</td>
+                            <td class="text-muted" style="min-width: 180px; max-width: 320px; white-space: normal;">{{ $purchase->note ?: '-' }}</td>
                             <td>{{ $toRial($purchase->total_discount ?? 0) }}</td>
                             <td class="amount-strong">{{ $toRial($purchase->total_amount) }}</td>
                             <td><span class="badge-items">{{ $purchase->items_count }}</span></td>
@@ -102,7 +107,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-5">
+                            <td colspan="8" class="text-center text-muted py-5">
                                 هیچ سند خریدی با این فیلتر ثبت نشده است.
                             </td>
                         </tr>

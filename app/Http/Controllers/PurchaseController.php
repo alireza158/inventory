@@ -12,6 +12,7 @@ use App\Models\Warehouse;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PurchaseController extends Controller
 {
@@ -42,6 +43,87 @@ class PurchaseController extends Controller
             'totalAllAmount',
             'totalAllCount'
         ));
+    }
+
+
+    public function exportExcel(): StreamedResponse
+    {
+        $filename = 'purchases-' . now()->format('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ];
+
+        return response()->streamDownload(function () {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'شناسه خرید',
+                'تاریخ خرید',
+                'تامین‌کننده',
+                'شماره تماس تامین‌کننده',
+                'توضیحات خرید',
+                'ثبت‌کننده',
+                'جمع قبل تخفیف سند (ریال)',
+                'نوع تخفیف سند',
+                'مقدار تخفیف سند',
+                'مبلغ تخفیف سند (ریال)',
+                'مبلغ نهایی سند (ریال)',
+                'نام کالا',
+                'کد کالا',
+                'مدل',
+                'تعداد',
+                'قیمت خرید واحد (ریال)',
+                'قیمت فروش واحد (ریال)',
+                'جمع ردیف قبل تخفیف (ریال)',
+                'نوع تخفیف ردیف',
+                'مقدار تخفیف ردیف',
+                'مبلغ تخفیف ردیف (ریال)',
+                'جمع نهایی ردیف (ریال)',
+            ]);
+
+            Purchase::query()
+                ->with(['supplier', 'user', 'items'])
+                ->orderBy('purchased_at')
+                ->orderBy('id')
+                ->chunk(200, function ($purchases) use ($handle) {
+                    foreach ($purchases as $purchase) {
+                        $items = $purchase->items->isNotEmpty()
+                            ? $purchase->items
+                            : collect([null]);
+
+                        foreach ($items as $item) {
+                            fputcsv($handle, [
+                                $purchase->id,
+                                $purchase->purchased_at?->format('Y/m/d H:i'),
+                                $purchase->supplier?->name,
+                                $purchase->supplier?->phone,
+                                $purchase->note,
+                                $purchase->user?->name,
+                                $purchase->subtotal_amount ?? 0,
+                                $this->discountTypeLabel($purchase->discount_type),
+                                $purchase->discount_value ?? 0,
+                                $purchase->total_discount ?? 0,
+                                $purchase->total_amount ?? 0,
+                                $item?->product_name,
+                                $item?->product_code,
+                                $item?->variant_name,
+                                $item?->quantity,
+                                $item?->buy_price,
+                                $item?->sell_price,
+                                $item?->line_subtotal,
+                                $this->discountTypeLabel($item?->discount_type),
+                                $item?->discount_value,
+                                $item?->discount_amount,
+                                $item?->line_total,
+                            ]);
+                        }
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, $headers);
     }
 
     public function show(Purchase $purchase)
@@ -238,6 +320,16 @@ class PurchaseController extends Controller
         });
 
         return redirect()->route('purchases.index')->with('success', 'سند خرید با موفقیت حذف شد.');
+    }
+
+
+    private function discountTypeLabel(?string $type): string
+    {
+        return match ($type) {
+            'amount' => 'مبلغی',
+            'percent' => 'درصدی',
+            default => '',
+        };
     }
 
     private function validatePayload(Request $request): array
