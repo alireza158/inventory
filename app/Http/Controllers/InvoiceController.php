@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Services\SalesHavalehStatusService;
 use App\Services\SalesHavalehService;
 use Carbon\Carbon;
+use Morilog\Jalali\Jalalian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -19,27 +20,60 @@ class InvoiceController extends Controller
 
     public function index(Request $request)
     {
-        $q = trim((string) $request->query('q', ''));
-        $dateInput = trim((string) $request->query('date', ''));
-        $reportDate = $this->resolveReportDate($dateInput);
+        $filters = [
+            'date' => trim((string) $request->query('date', '')),
+            'invoice_number' => trim((string) $request->query('invoice_number', $request->query('q', ''))),
+            'customer_code' => trim((string) $request->query('customer_code', '')),
+            'customer_name' => trim((string) $request->query('customer_name', '')),
+        ];
+
+        $reportDateInput = trim((string) $request->query('export_date', $filters['date']));
+        $reportDate = $this->parseInvoiceFilterDate($reportDateInput) ?? now()->startOfDay();
+        $filterDate = $this->parseInvoiceFilterDate($filters['date']);
 
         $baseQuery = Invoice::query()
-            ->with(['payments.cheque', 'preinvoiceOrder.creator:id,name'])
+            ->with(['payments.cheque', 'customer:id,crm_customer_id,first_name,last_name,mobile', 'preinvoiceOrder.creator:id,name'])
             ->withSum('payments as paid_total', 'amount')
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($qq) use ($q) {
-                    $qq->where('uuid', 'like', "%{$q}%")
-                        ->orWhere('customer_name', 'like', "%{$q}%")
-                        ->orWhere('customer_mobile', 'like', "%{$q}%");
+            ->when($filters['invoice_number'] !== '', function ($query) use ($filters) {
+                $query->where('uuid', 'like', '%' . $filters['invoice_number'] . '%');
+            })
+            ->when($filters['customer_name'] !== '', function ($query) use ($filters) {
+                $name = $filters['customer_name'];
+                $query->where(function ($qq) use ($name) {
+                    $qq->where('customer_name', 'like', "%{$name}%")
+                        ->orWhereHas('customer', function ($customerQuery) use ($name) {
+                            $customerQuery->where('first_name', 'like', "%{$name}%")
+                                ->orWhere('last_name', 'like', "%{$name}%")
+                                ->orWhereRaw("CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) LIKE ?", ["%{$name}%"]);
+                        });
+                });
+            })
+            ->when($filters['customer_code'] !== '', function ($query) use ($filters) {
+                $code = $this->normalizeDigits($filters['customer_code']);
+                $query->where(function ($qq) use ($code) {
+                    if (ctype_digit($code)) {
+                        $qq->where('customer_id', (int) $code);
+                    }
+
+                    $qq->orWhereHas('customer', function ($customerQuery) use ($code) {
+                        $customerQuery->where('id', 'like', "%{$code}%")
+                            ->orWhere('crm_customer_id', 'like', "%{$code}%")
+                            ->orWhere('mobile', 'like', "%{$code}%");
+                    });
                 });
             });
 
-        if ($reportDate) {
-            $baseQuery->whereDate('created_at', $reportDate->toDateString());
+        if ($filterDate) {
+            $baseQuery->whereDate('created_at', $filterDate->toDateString());
         }
 
-        if ($request->input('export') === 'daily_csv' && $reportDate) {
-            return $this->exportDailyCustomerFinanceCsv((clone $baseQuery)->orderBy('id')->get(), $reportDate);
+        if ($request->input('export') === 'daily_csv') {
+            $exportQuery = clone $baseQuery;
+            if ($filters['date'] === '') {
+                $exportQuery->whereDate('created_at', $reportDate->toDateString());
+            }
+
+            return $this->exportDailyCustomerFinanceCsv($exportQuery->orderBy('id')->get(), $reportDate);
         }
 
         $invoices = $baseQuery
@@ -48,8 +82,10 @@ class InvoiceController extends Controller
             ->withQueryString();
 
         $statusLabels = $this->statusService->labels();
+        $q = $filters['invoice_number'];
+        $dateInput = $filters['date'];
 
-        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput'));
+        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput', 'filters', 'reportDateInput'));
     }
 
     public function salesVouchers(Request $request)
@@ -266,17 +302,41 @@ class InvoiceController extends Controller
         return back()->with('success', '✅ فاکتور کنسل شد و موجودی به انبار برگشت.');
     }
 
-    private function resolveReportDate(string $dateInput): ?Carbon
+    private function parseInvoiceFilterDate(string $dateInput): ?Carbon
     {
+        $dateInput = $this->normalizeDigits($dateInput);
+
         if ($dateInput === '') {
-            return now();
+            return null;
         }
 
+        $dateInput = str_replace(['-', '.', ' '], '/', $dateInput);
+
         try {
-            return Carbon::createFromFormat('Y-m-d', $dateInput)->startOfDay();
+            if (preg_match('/^\d{4}\/\d{1,2}\/\d{1,2}$/', $dateInput) === 1) {
+                [$year, $month, $day] = array_map('intval', explode('/', $dateInput));
+
+                if ($year >= 1300 && $year <= 1600) {
+                    return (new Jalalian($year, $month, $day))->toCarbon()->startOfDay();
+                }
+
+                return Carbon::create($year, $month, $day)->startOfDay();
+            }
+
+            return Carbon::parse($dateInput)->startOfDay();
         } catch (\Throwable) {
-            return now();
+            return null;
         }
+    }
+
+    private function normalizeDigits(string $value): string
+    {
+        return trim(strtr($value, [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]));
     }
 
     private function exportDailyCustomerFinanceCsv($invoices, Carbon $reportDate): StreamedResponse

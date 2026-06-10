@@ -709,7 +709,7 @@
 
           <div class="d-flex flex-wrap gap-2 no-print justify-content-lg-end">
             <button type="button" onclick="window.print()" class="btn back-btn">پرینت</button>
-            <a href="{{ route('archive.index') }}" class="btn back-btn d-inline-flex align-items-center gap-2">
+            <a href="{{ route('preinvoice.all.index') }}" class="btn back-btn d-inline-flex align-items-center gap-2">
               <span>بازگشت</span>
               <span>↩</span>
             </a>

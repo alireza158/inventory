@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'پیش‌فاکتورهای من')
+@section('title', 'پیش‌فاکتورها و فاکتورهای من')
 
 @section('content')
 @php
@@ -14,7 +14,7 @@
 @endphp
 <div class="container py-4">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h4 class="mb-0">پیش‌فاکتورهای من</h4>
+    <h4 class="mb-0">پیش‌فاکتورها و فاکتورهای من</h4>
     <a href="{{ route('preinvoice.create') }}" class="btn btn-primary">➕ ثبت پیش‌فاکتور جدید</a>
   </div>
 
@@ -43,6 +43,7 @@
               <th>تعداد اقلام</th>
               <th>مبلغ نهایی</th>
               <th>وضعیت</th>
+              <th>شماره فاکتور نهایی</th>
               <th>تاریخ ثبت</th>
               <th class="text-end">عملیات</th>
             </tr>
@@ -58,7 +59,21 @@
                 </td>
                 <td>{{ number_format($order->items_count) }}</td>
                 <td>{{ \App\Support\Currency::formatRial($order->total_price) }}</td>
-                <td>{{ $statusLabels[$order->status] ?? $order->status }}</td>
+                <td>
+                  @if($order->invoice)
+                    <span class="badge bg-success">فاکتور شده</span>
+                  @else
+                    <span class="badge bg-secondary">پیش‌فاکتور</span>
+                  @endif
+                  <div class="small text-muted mt-1">{{ $statusLabels[$order->status] ?? $order->status }}</div>
+                </td>
+                <td class="fw-semibold text-nowrap">
+                  @if($order->invoice)
+                    <a href="{{ route('invoices.show', $order->invoice->uuid) }}">{{ $order->invoice->uuid }}</a>
+                  @else
+                    —
+                  @endif
+                </td>
                 <td>{{ $toJalali($order->created_at) }}</td>
                 <td class="text-end">
                   <div class="d-flex gap-1 justify-content-end">
@@ -69,7 +84,7 @@
               </tr>
             @empty
               <tr>
-                <td colspan="9" class="text-center text-muted py-4">پیش‌فاکتوری توسط شما ثبت نشده است.</td>
+                <td colspan="10" class="text-center text-muted py-4">پیش‌فاکتوری توسط شما ثبت نشده است.</td>
               </tr>
             @endforelse
           </tbody>
