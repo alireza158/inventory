@@ -72,6 +72,7 @@
                             <th>#</th>
                             <th>تاریخ</th>
                             <th>تامین‌کننده</th>
+                            <th>توضیحات</th>
                             <th>تخفیف سند</th>
                             <th>مبلغ کل فاکتور</th>
                             <th>تعداد آیتم</th>
@@ -86,6 +87,7 @@
                             </td>
                             <td>{{ $purchase->purchased_at?->format('Y/m/d H:i') }}</td>
                             <td>{{ $purchase->supplier?->name }}</td>
+                            <td class="text-muted" style="min-width: 180px; max-width: 320px; white-space: normal;">{{ $purchase->note ?: '-' }}</td>
                             <td>{{ $toRial($purchase->total_discount ?? 0) }}</td>
                             <td class="amount-strong">{{ $toRial($purchase->total_amount) }}</td>
                             <td><span class="badge-items">{{ $purchase->items_count }}</span></td>
@@ -102,7 +104,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-5">
+                            <td colspan="8" class="text-center text-muted py-5">
                                 هیچ سند خریدی با این فیلتر ثبت نشده است.
                             </td>
                         </tr>

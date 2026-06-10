@@ -240,7 +240,8 @@
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
                     <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
-                    <a class="sidebar-sublink {{ $is('purchases.create') }}" href="{{ route('purchases.create') }}">خرید زدن کالا</a>
+                    <a class="sidebar-sublink {{ $is('purchases.index', 'purchases.show', 'purchases.edit') }}" href="{{ route('purchases.index') }}">لیست خرید کالاها</a>
+                    <a class="sidebar-sublink {{ $is('purchases.create') }}" href="{{ route('purchases.create') }}">ثبت خرید کالا</a>
                     <a class="sidebar-sublink {{ $is('preinvoice.warehouse.*') }}" href="{{ route('preinvoice.warehouse.index') }}">در انتظار تایید انبار</a>
                     <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
                     <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
