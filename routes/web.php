@@ -187,6 +187,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
 
     // Purchases
     Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');
+    Route::get('/purchases/export', [PurchaseController::class, 'exportExcel'])->name('purchases.export');
     Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
     Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
     Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show');

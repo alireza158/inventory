@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PurchasesExport;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -12,6 +13,8 @@ use App\Models\Warehouse;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PurchaseController extends Controller
 {
@@ -42,6 +45,14 @@ class PurchaseController extends Controller
             'totalAllAmount',
             'totalAllCount'
         ));
+    }
+
+
+    public function exportExcel(): BinaryFileResponse
+    {
+        $filename = 'purchases-' . now()->format('Ymd-His') . '.xlsx';
+
+        return Excel::download(new PurchasesExport, $filename);
     }
 
     public function show(Purchase $purchase)
