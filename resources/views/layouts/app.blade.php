@@ -41,6 +41,11 @@
     min-width: 0;
     width: 100%;
   }
+  .app-content-wide{
+    max-width: none !important;
+    width: 100% !important;
+  }
+
   .app-topbar__brand,
   .app-topbar__actions{
     min-width: 0;
@@ -203,7 +208,7 @@
     </div>
 </div>
 
-        <main class="container py-4 app-content">
+        <main class="container py-4 app-content @yield('content_class')">
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     {{ session('success') }}

@@ -87,7 +87,9 @@ class InvoiceController extends Controller
         $q = $filters['invoice_number'];
         $dateInput = $filters['date'];
 
-        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput', 'filters', 'reportDateInput'));
+        $canRegisterPayments = $this->canHandleFinanceActions();
+
+        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput', 'filters', 'reportDateInput', 'canRegisterPayments'));
     }
 
     public function salesVouchers(Request $request)
@@ -261,7 +263,7 @@ class InvoiceController extends Controller
     {
         $user = auth()->user();
 
-        return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
+        return $user && ($user->hasAnyRole(['admin', 'Admin', 'Manager', 'manager', 'finance', 'Accountant']) || $user->can('finance.approve'));
     }
 
     public function updateStatus(string $uuid, Request $request)
