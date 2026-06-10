@@ -251,6 +251,16 @@ class PurchaseController extends Controller
         return redirect()->route('purchases.index')->with('success', 'سند خرید با موفقیت حذف شد.');
     }
 
+
+    private function discountTypeLabel(?string $type): string
+    {
+        return match ($type) {
+            'amount' => 'مبلغی',
+            'percent' => 'درصدی',
+            default => '',
+        };
+    }
+
     private function validatePayload(Request $request): array
     {
         $invoiceDiscountType = $request->input('invoice_discount_type', $request->input('discount_type'));
