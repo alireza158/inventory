@@ -19,7 +19,7 @@ class Invoice extends Model
         'customer_name','customer_mobile','customer_address',
         'province_id','city_id','shipping_id','shipping_price',
         'discount_amount','subtotal','total','status','status_changed_at','status_changed_by'
-        ,'external_order_id'
+        ,'external_order_id', 'items_updated_at', 'items_updated_by'
     ];
 
     public function items() { return $this->hasMany(InvoiceItem::class); }

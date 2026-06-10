@@ -1,0 +1,68 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Invoice;
+use App\Models\PreinvoiceOrder;
+use App\Models\User;
+
+class SalesDocumentAccessService
+{
+    public function isManager(?User $user): bool
+    {
+        if (! $user || ! method_exists($user, 'hasAnyRole')) {
+            return false;
+        }
+
+        return $user->hasAnyRole(['admin', 'Admin', 'Manager', 'manager', 'super-admin']);
+    }
+
+    public function isWarehouse(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        $hasRole = method_exists($user, 'hasAnyRole')
+            ? $user->hasAnyRole(['warehouse', 'StorageManager'])
+            : false;
+
+        return $hasRole || (method_exists($user, 'can') && $user->can('warehouse.approve'));
+    }
+
+    public function isFinance(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        $hasRole = method_exists($user, 'hasAnyRole')
+            ? $user->hasAnyRole(['finance', 'Accountant'])
+            : false;
+
+        return $hasRole || (method_exists($user, 'can') && $user->can('finance.approve'));
+    }
+
+    public function isPreinvoiceOwner(PreinvoiceOrder $order, ?User $user): bool
+    {
+        return $user && (int) $order->created_by > 0 && (int) $order->created_by === (int) $user->id;
+    }
+
+    public function isInvoiceOwner(Invoice $invoice, ?User $user): bool
+    {
+        $invoice->loadMissing('preinvoiceOrder:id,created_by');
+
+        return $invoice->preinvoiceOrder
+            && $this->isPreinvoiceOwner($invoice->preinvoiceOrder, $user);
+    }
+
+    public function canSellerEditPreinvoiceItems(PreinvoiceOrder $order, ?User $user): bool
+    {
+        return $this->isPreinvoiceOwner($order, $user) || $this->isManager($user);
+    }
+
+    public function canSellerEditInvoiceItems(Invoice $invoice, ?User $user): bool
+    {
+        return $this->isInvoiceOwner($invoice, $user) || $this->isManager($user);
+    }
+}

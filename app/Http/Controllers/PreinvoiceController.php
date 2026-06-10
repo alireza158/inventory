@@ -14,7 +14,10 @@ use App\Models\ShippingMethod;
 use App\Models\StockMovement;
 use App\Support\Currency;
 use App\Support\DocumentCodeGenerator;
+use App\Support\ActivityLogger;
 use App\Services\WarehouseStockService;
+use App\Services\CentralInventoryService;
+use App\Services\SalesDocumentAccessService;
 use App\Services\PaymentRegistrationService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -24,7 +27,12 @@ use Illuminate\Validation\ValidationException;
 
 class PreinvoiceController extends Controller
 {
-    public function __construct(private readonly PaymentRegistrationService $paymentService, private readonly NotificationService $notificationService) {}
+    public function __construct(
+        private readonly PaymentRegistrationService $paymentService,
+        private readonly NotificationService $notificationService,
+        private readonly CentralInventoryService $centralInventoryService,
+        private readonly SalesDocumentAccessService $accessService,
+    ) {}
 
     public function create()
     {
@@ -87,6 +95,10 @@ class PreinvoiceController extends Controller
         $data = $this->validateWarehouseReviewPayload($request);
 
         DB::transaction(function () use ($order, $data) {
+            $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
+            $this->assertWarehouseCanOnlyReduceOrDelete($order, $data['items']);
+
             $before = $this->snapshotItems($order);
             $stockLocked = $this->hasActiveFreeze($order);
             $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
@@ -136,6 +148,10 @@ class PreinvoiceController extends Controller
         $data = $this->validateWarehouseReviewPayload($request, true);
 
         DB::transaction(function () use ($order, $data) {
+            $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
+            $this->assertWarehouseCanOnlyReduceOrDelete($order, $data['items']);
+
             $before = $this->snapshotItems($order);
             $stockLocked = $this->hasActiveFreeze($order);
             $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
@@ -197,19 +213,31 @@ class PreinvoiceController extends Controller
             'warehouse_reject_reason' => 'required|string|max:2000',
         ]);
 
-        $order->update([
-            'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
-            'warehouse_reject_reason' => $data['warehouse_reject_reason'],
-            'warehouse_reviewed_by' => auth()->id(),
-            'warehouse_reviewed_at' => now(),
-        ]);
-        if ($this->hasActiveFreeze($order)) {
-            $this->releaseReservedStock($order);
-            $order->update(['stock_released_at' => now()]);
-        }
-        if (!empty($order->created_by)) {
-            $this->notificationService->notifyUser((int)$order->created_by, 'preinvoice_warehouse_rejected', 'پیش‌فاکتور شما توسط انبار برگشت خورد', 'علت: ' . $data['warehouse_reject_reason'], route('preinvoice.my.show', $order->uuid), ['level' => 'danger', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "operator_warehouse_rejected:{$order->id}:{$order->created_by}"]);
-        }
+        DB::transaction(function () use ($order, $data) {
+            $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
+
+            $order->update([
+                'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+                'warehouse_reject_reason' => $data['warehouse_reject_reason'],
+                'warehouse_reviewed_by' => auth()->id(),
+                'warehouse_reviewed_at' => now(),
+            ]);
+            if ($this->hasActiveFreeze($order)) {
+                $this->releaseReservedStock($order);
+                $order->update(['stock_released_at' => now()]);
+            }
+            $order->reviews()->create([
+                'user_id' => auth()->id(),
+                'action' => 'warehouse_rejected',
+                'reason' => $data['warehouse_reject_reason'],
+                'before_items' => $this->snapshotItems($order),
+                'after_items' => $this->snapshotItems($order),
+            ]);
+            if (!empty($order->created_by)) {
+                $this->notificationService->notifyUser((int)$order->created_by, 'preinvoice_warehouse_rejected', 'پیش‌فاکتور شما توسط انبار برگشت خورد', 'علت: ' . $data['warehouse_reject_reason'], route('preinvoice.my.show', $order->uuid), ['level' => 'danger', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "operator_warehouse_rejected:{$order->id}:{$order->created_by}"]);
+            }
+        });
 
         return redirect()->route('preinvoice.warehouse.index')->with('success', '✅ پیش‌فاکتور رد شد.');
     }
@@ -334,7 +362,8 @@ class PreinvoiceController extends Controller
 
     public function editDraft(string $uuid)
     {
-        $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
+        $order = PreinvoiceOrder::with(['items', 'invoice'])->where('uuid', $uuid)->firstOrFail();
+        abort_unless($this->accessService->canSellerEditPreinvoiceItems($order, auth()->user()) || $this->canHandleFinanceActions(), 403);
 
         $shippingMethods = ShippingMethod::query()
             ->select(['id', 'name', 'price'])
@@ -342,21 +371,41 @@ class PreinvoiceController extends Controller
             ->get();
 
         $canFinanceApprove = $this->canHandleFinanceActions();
+        $canEditItems = $this->accessService->canSellerEditPreinvoiceItems($order, auth()->user());
 
-        return view('preinvoice.edit', compact('order', 'shippingMethods', 'canFinanceApprove'));
+        return view('preinvoice.edit', compact('order', 'shippingMethods', 'canFinanceApprove', 'canEditItems'));
     }
 
     public function updateDraft(string $uuid, Request $request)
     {
         abort_unless(auth()->check(), 403);
-        $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
-        abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
+        $order = PreinvoiceOrder::with(['items', 'invoice.items'])->where('uuid', $uuid)->firstOrFail();
+        abort_unless($this->accessService->canSellerEditPreinvoiceItems($order, auth()->user()), 403);
 
-        $validated = $this->validateDraftPayload($request);
+        $validated = $this->validateDraftPayload($request, false);
 
         DB::transaction(function () use ($order, $validated) {
+            $order = PreinvoiceOrder::query()
+                ->with(['items', 'invoice.items'])
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($this->accessService->canSellerEditPreinvoiceItems($order, auth()->user()), 403);
+
             $customer = $this->resolveCustomer($validated);
             $shippingId = (int) $validated['shipping_id'];
+            $before = $this->snapshotItems($order);
+            $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
+            $newItems = collect($validated['products'])->map(fn($p) => [
+                'product_id' => (int) $p['id'],
+                'variant_id' => (int) $p['variety_id'],
+                'quantity' => (int) $p['quantity'],
+            ])->all();
+
+            $stockLocked = $this->hasActiveFreeze($order);
+            if ($stockLocked || ! $order->invoice) {
+                $this->assertCentralStockForPositiveDeltas($oldItems, $newItems);
+            }
 
             $order->update([
                 'customer_id' => $customer?->id,
@@ -373,24 +422,62 @@ class PreinvoiceController extends Controller
                 'total_price' => 0,
             ]);
 
-            $stockLocked = $this->hasActiveFreeze($order);
-            $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $order->items()->delete();
             $this->syncItems($order, $validated['products']);
+
             if ($stockLocked) {
-                $this->applyFrozenStockDelta($oldItems, collect($validated['products'])->map(fn($p) => [
-                    'product_id' => (int) $p['id'],
-                    'variant_id' => (int) $p['variety_id'],
-                    'quantity' => (int) $p['quantity'],
-                ])->all(), $this->hasCentralStockMovedToReserve($order));
+                $this->applyFrozenStockDelta($oldItems, $newItems, true);
+            } elseif ($order->invoice) {
+                $this->moveConsumedInvoiceStockBackToReservation($oldItems, $newItems);
             }
-            $order->update(['total_price' => $this->calculateOrderTotal($order)]);
+
+            $order->refresh()->load(['items.product', 'items.variant', 'invoice.items']);
+            $oldStatus = (string) $order->status;
+            $order->update([
+                'status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+                'warehouse_review_note' => null,
+                'warehouse_reject_reason' => null,
+                'warehouse_reviewed_by' => null,
+                'warehouse_reviewed_at' => null,
+                'total_price' => $this->calculateOrderTotal($order),
+                'stock_frozen_until' => now(),
+                'stock_released_at' => null,
+                'items_updated_at' => now(),
+                'items_updated_by' => auth()->id(),
+            ]);
+
+            $this->syncExistingInvoiceFromOrderForReapproval($order->fresh(['items', 'invoice.items']));
+
+            $order->reviews()->create([
+                'user_id' => auth()->id(),
+                'action' => 'seller_items_changed_reapproval_required',
+                'reason' => 'اقلام سند توسط فروشنده/مدیر تغییر کرد و تاییدهای قبلی باطل شد.',
+                'before_items' => $before,
+                'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
+            ]);
+
+            ActivityLogger::log('seller_items_changed_reapproval_required', $order->fresh(), 'اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.', [
+                'old_status' => $oldStatus,
+                'new_status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+                'user_id' => auth()->id(),
+            ]);
+
+            if (!empty($order->created_by)) {
+                $this->notificationService->notifyRole(
+                    'warehouse',
+                    'preinvoice_items_changed_reapproval_required',
+                    'پیش‌فاکتور نیازمند بررسی مجدد انبار است',
+                    "اقلام پیش‌فاکتور مشتری {$order->customer_name} تغییر کرد و دوباره به صف انبار برگشت.",
+                    route('preinvoice.warehouse.review', $order->uuid),
+                    ['level' => 'warning', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "warehouse_reapproval_required:{$order->id}:" . now()->timestamp]
+                );
+            }
         });
 
-        return back()->with('success', '✅ پیش‌فاکتور بروزرسانی شد.');
+        return back()->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');
     }
 
-    private function validateDraftPayload(Request $request): array
+    private function validateDraftPayload(Request $request, bool $checkCurrentStock = true): array
     {
         $shippingId = (int) $request->input('shipping_id');
         $isInPerson = $this->isInPersonShippingId($shippingId);
@@ -443,7 +530,9 @@ class PreinvoiceController extends Controller
             }
         }
 
-        $this->validateDraftItemsBusinessRules($validated['products'] ?? [], $validated['reservation_token'] ?? null);
+        if ($checkCurrentStock) {
+            $this->validateDraftItemsBusinessRules($validated['products'] ?? [], $validated['reservation_token'] ?? null);
+        }
 
         return $validated;
     }
@@ -488,7 +577,7 @@ class PreinvoiceController extends Controller
 
         foreach ($qtyByVariant as $variantId => $requiredQty) {
             $variant = $variants->get((int) $variantId);
-            $availableQty = max(0, (int) ($variant->stock ?? 0) + (int) ($draftReservations[(int) $variantId] ?? 0));
+            $availableQty = max(0, $this->centralInventoryService->availableForVariant((int) $variantId) + (int) ($draftReservations[(int) $variantId] ?? 0));
 
             if ($requiredQty > $availableQty) {
                 throw ValidationException::withMessages([
@@ -592,6 +681,123 @@ class PreinvoiceController extends Controller
                     'items' => "موجودی رزروشده برای محصول «{$productName}» کافی نیست. رزروشده: {$reservedQty} | درخواست: {$requiredQty}",
                 ]);
             }
+        }
+    }
+
+    private function assertWarehouseCanOnlyReduceOrDelete(PreinvoiceOrder $order, array $newItems): void
+    {
+        $oldMap = $this->itemQuantityMap($order->items->map(fn($item) => [
+            'product_id' => (int) $item->product_id,
+            'variant_id' => (int) $item->variant_id,
+            'quantity' => (int) $item->quantity,
+        ])->all());
+        $newMap = $this->itemQuantityMap($newItems);
+
+        foreach ($newMap as $key => $newQty) {
+            if (! array_key_exists($key, $oldMap)) {
+                abort(403, 'انبار مجاز به افزودن کالای جدید نیست.');
+            }
+
+            if ($newQty > (int) $oldMap[$key]) {
+                abort(422, 'انبار فقط مجاز به کاهش تعداد آیتم‌ها است.');
+            }
+        }
+    }
+
+    private function assertCentralStockForPositiveDeltas(array $oldItems, array $newItems): void
+    {
+        $oldMap = $this->itemQuantityMap($oldItems);
+        $newMap = $this->itemQuantityMap($newItems);
+
+        foreach ($newMap as $key => $newQty) {
+            $oldQty = (int) ($oldMap[$key] ?? 0);
+            $delta = (int) $newQty - $oldQty;
+            if ($delta <= 0) {
+                continue;
+            }
+
+            [, $variantId] = array_map('intval', explode(':', $key));
+            $this->centralInventoryService->assertVariantAvailable($variantId, $delta);
+        }
+    }
+
+    private function itemQuantityMap(array $items): array
+    {
+        $map = [];
+        foreach ($items as $row) {
+            $productId = (int) ($row['product_id'] ?? $row['id'] ?? 0);
+            $variantId = (int) ($row['variant_id'] ?? $row['variety_id'] ?? 0);
+            $qty = (int) ($row['quantity'] ?? 0);
+            if ($productId <= 0 || $variantId <= 0 || $qty <= 0) {
+                continue;
+            }
+            $key = $productId . ':' . $variantId;
+            $map[$key] = ($map[$key] ?? 0) + $qty;
+        }
+
+        return $map;
+    }
+
+    private function syncExistingInvoiceFromOrderForReapproval(PreinvoiceOrder $order): void
+    {
+        $invoice = $order->invoice;
+        if (! $invoice) {
+            return;
+        }
+
+        $subtotal = (int) $order->items->sum(fn($it) => ((int) $it->quantity) * ((int) $it->price));
+        $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
+
+        $invoice->items()->delete();
+        foreach ($order->items as $item) {
+            $invoice->items()->create([
+                'product_id' => (int) $item->product_id,
+                'variant_id' => (int) $item->variant_id,
+                'quantity' => (int) $item->quantity,
+                'price' => (int) $item->price,
+                'line_total' => (int) $item->quantity * (int) $item->price,
+            ]);
+        }
+
+        $oldStatus = (string) $invoice->status;
+        $invoice->update([
+            'customer_id' => $order->customer_id,
+            'customer_name' => $order->customer_name,
+            'customer_mobile' => $order->customer_mobile,
+            'customer_address' => $order->customer_address,
+            'province_id' => $order->province_id,
+            'city_id' => $order->city_id,
+            'shipping_id' => $order->shipping_id,
+            'shipping_price' => (int) $order->shipping_price,
+            'discount_amount' => (int) $order->discount_amount,
+            'subtotal' => $subtotal,
+            'total' => $total,
+            'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+            'status_changed_at' => now(),
+            'status_changed_by' => auth()->id(),
+            'items_updated_at' => now(),
+            'items_updated_by' => auth()->id(),
+        ]);
+
+        ActivityLogger::log('invoice_items_reset_for_reapproval', $invoice->fresh(), 'اقلام فاکتور تغییر کرد و فاکتور به وضعیت نیازمند تایید انبار برگشت.', [
+            'old_status' => $oldStatus,
+            'new_status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+            'preinvoice_order_id' => $order->id,
+        ]);
+
+        if (!empty($invoice->customer_id)) {
+            CustomerLedger::query()->updateOrCreate(
+                [
+                    'customer_id' => (int) $invoice->customer_id,
+                    'reference_type' => Invoice::class,
+                    'reference_id' => (int) $invoice->id,
+                    'type' => 'debit',
+                ],
+                [
+                    'amount' => (int) $total,
+                    'note' => 'بروزرسانی بدهکاری بابت تغییر اقلام فاکتور ' . $invoice->uuid,
+                ]
+            );
         }
     }
 
@@ -814,13 +1020,9 @@ class PreinvoiceController extends Controller
             return;
         }
 
+        $this->centralInventoryService->assertVariantAvailable($variantId, $quantity);
+
         $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
-        $availableQty = max(0, (int) $variant->stock);
-        if ($quantity > $availableQty) {
-            throw ValidationException::withMessages([
-                'products' => "موجودی انبار مرکزی برای فریز تنوع انتخابی کافی نیست. موجودی: {$availableQty} | درخواست: {$quantity}",
-            ]);
-        }
 
         WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $productId, -$quantity, $variantId);
 
@@ -868,6 +1070,17 @@ class PreinvoiceController extends Controller
     private function hasActiveFreeze(PreinvoiceOrder $order): bool
     {
         return is_null($order->stock_released_at);
+    }
+
+    private function moveConsumedInvoiceStockBackToReservation(array $oldItems, array $newItems): void
+    {
+        foreach ($oldItems as $row) {
+            $this->releaseStockForItem((int) $row['product_id'], (int) $row['variant_id'], (int) $row['quantity']);
+        }
+
+        foreach ($newItems as $row) {
+            $this->reserveStockForItem((int) $row['product_id'], (int) $row['variant_id'], (int) $row['quantity']);
+        }
     }
 
     private function applyFrozenStockDelta(array $oldItems, array $newItems, bool $centralStockMovedToReserve = true): void
@@ -949,7 +1162,7 @@ class PreinvoiceController extends Controller
     {
         $user = auth()->user();
 
-        return $user && ($user->hasAnyRole(['Admin', 'finance']) || $user->can('finance.approve'));
+        return $user && ($user->hasAnyRole(['Admin', 'finance', 'Accountant']) || $user->can('finance.approve'));
     }
 
     private function canHandleWarehouseActions(): bool
@@ -959,11 +1172,13 @@ class PreinvoiceController extends Controller
             return false;
         }
 
-        return $user->hasAnyRole(['Admin', 'warehouse', 'StorageManager', 'finance']) || $user->can('warehouse.approve');
+        return $user->hasAnyRole(['Admin', 'warehouse', 'StorageManager']) || $user->can('warehouse.approve');
     }
 
     public function finance(string $uuid)
     {
+        abort_unless($this->canHandleFinanceActions(), 403);
+
         $order = PreinvoiceOrder::with(['items.product', 'items.variant', 'creator:id,name'])
             ->where('uuid', $uuid)
             ->firstOrFail();
@@ -995,6 +1210,8 @@ class PreinvoiceController extends Controller
 
     public function finalize(string $uuid, Request $request)
     {
+        abort_unless($this->canHandleFinanceActions(), 403);
+
         $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
 
@@ -1065,24 +1282,49 @@ class PreinvoiceController extends Controller
                 }
             }
 
-            $invoice = Invoice::create([
-                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(Invoice::class),
-                'preinvoice_order_id' => $order->id,
+            $invoice = Invoice::query()
+                ->where('preinvoice_order_id', $order->id)
+                ->lockForUpdate()
+                ->first();
 
-                'customer_id' => $order->customer_id ?? null,
-                'customer_name' => $order->customer_name,
-                'customer_mobile' => $order->customer_mobile,
-                'customer_address' => $order->customer_address,
-                'province_id' => $order->province_id,
-                'city_id' => $order->city_id,
+            if ($invoice) {
+                $invoice->items()->delete();
+                $invoice->update([
+                    'customer_id' => $order->customer_id ?? null,
+                    'customer_name' => $order->customer_name,
+                    'customer_mobile' => $order->customer_mobile,
+                    'customer_address' => $order->customer_address,
+                    'province_id' => $order->province_id,
+                    'city_id' => $order->city_id,
+                    'shipping_id' => $order->shipping_id,
+                    'shipping_price' => (int) $order->shipping_price,
+                    'discount_amount' => (int) $order->discount_amount,
+                    'subtotal' => (int) $subtotal,
+                    'total' => (int) $total,
+                    'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+                    'status_changed_at' => now(),
+                    'status_changed_by' => auth()->id(),
+                ]);
+            } else {
+                $invoice = Invoice::create([
+                    'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(Invoice::class),
+                    'preinvoice_order_id' => $order->id,
 
-                'shipping_id' => $order->shipping_id,
-                'shipping_price' => (int) $order->shipping_price,
-                'discount_amount' => (int) $order->discount_amount,
-                'subtotal' => (int) $subtotal,
-                'total' => (int) $total,
-                'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
-            ]);
+                    'customer_id' => $order->customer_id ?? null,
+                    'customer_name' => $order->customer_name,
+                    'customer_mobile' => $order->customer_mobile,
+                    'customer_address' => $order->customer_address,
+                    'province_id' => $order->province_id,
+                    'city_id' => $order->city_id,
+
+                    'shipping_id' => $order->shipping_id,
+                    'shipping_price' => (int) $order->shipping_price,
+                    'discount_amount' => (int) $order->discount_amount,
+                    'subtotal' => (int) $subtotal,
+                    'total' => (int) $total,
+                    'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+                ]);
+            }
 
             foreach ($order->items as $it) {
                 InvoiceItem::create([
@@ -1132,14 +1374,18 @@ class PreinvoiceController extends Controller
             }
 
             if (!empty($invoice->customer_id)) {
-                CustomerLedger::create([
-                    'customer_id' => (int) $invoice->customer_id,
-                    'type' => 'debit',
-                    'amount' => (int) $invoice->total,
-                    'reference_type' => Invoice::class,
-                    'reference_id' => $invoice->id,
-                    'note' => 'ثبت بدهکاری بابت فاکتور فروش ' . $invoice->uuid,
-                ]);
+                CustomerLedger::query()->updateOrCreate(
+                    [
+                        'customer_id' => (int) $invoice->customer_id,
+                        'type' => 'debit',
+                        'reference_type' => Invoice::class,
+                        'reference_id' => $invoice->id,
+                    ],
+                    [
+                        'amount' => (int) $invoice->total,
+                        'note' => 'ثبت/بروزرسانی بدهکاری بابت فاکتور فروش ' . $invoice->uuid,
+                    ]
+                );
             }
 
             foreach (($validated['payments'] ?? []) as $paymentRow) {
@@ -1191,6 +1437,8 @@ class PreinvoiceController extends Controller
 
     public function financeCancel(string $uuid, Request $request)
     {
+        abort_unless($this->canHandleFinanceActions(), 403);
+
         $order = PreinvoiceOrder::query()->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
 
@@ -1199,11 +1447,24 @@ class PreinvoiceController extends Controller
         ]);
 
         DB::transaction(function () use ($order, $data) {
+            $oldStatus = (string) $order->status;
             $order->update([
                 'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
                 'warehouse_reject_reason' => $data['reason'],
             ]);
             $this->releaseReservedStock($order);
+            $order->reviews()->create([
+                'user_id' => auth()->id(),
+                'action' => 'finance_rejected',
+                'reason' => $data['reason'],
+                'before_items' => $this->snapshotItems($order),
+                'after_items' => $this->snapshotItems($order),
+            ]);
+            ActivityLogger::log('finance_rejected', $order->fresh(), 'پیش‌فاکتور توسط مالی رد شد.', [
+                'old_status' => $oldStatus,
+                'new_status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+                'reason' => $data['reason'],
+            ]);
         });
 
         return redirect()->route('preinvoice.draft.index')->with('success', '✅ پیش‌فاکتور با دلیل کنسل شد.');

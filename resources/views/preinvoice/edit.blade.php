@@ -11,7 +11,7 @@
   <script src="{{ asset('lib/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ asset('lib/select2.min.js') }}"></script>
 
-  <title>ویرایش پیش‌فاکتور ارجاع‌شده به مالی</title>
+  <title>ویرایش پیش‌فاکتور / ارسال مجدد برای تایید</title>
 
   <style>
     body {
@@ -79,9 +79,14 @@
     </div>
   @endif
 
+  @unless($canEditItems ?? true)
+    <div class="alert alert-warning">در این مرحله مالی فقط می‌تواند پرداخت را ثبت یا تایید/رد مالی انجام دهد و اجازه تغییر اقلام را ندارد.</div>
+  @endunless
+
   <form action="{{ route('preinvoice.draft.update', $order->uuid) }}" method="POST" id="orderForm">
     @csrf
     @method('PUT')
+    <fieldset @disabled(!($canEditItems ?? true))>
 {{-- Customer Picker --}}
 <div class="card-soft p-3 p-md-4 mb-4">
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -208,9 +213,12 @@
       </div>
     </div>
 
-    <div class="sticky-submit">
-      <button class="btn btn-primary w-100 fs-5 py-3 shadow-sm">💾 ذخیره تغییرات</button>
-    </div>
+    @if($canEditItems ?? true)
+      <div class="sticky-submit">
+        <button class="btn btn-primary w-100 fs-5 py-3 shadow-sm">💾 ذخیره تغییرات و ارسال مجدد به انبار</button>
+      </div>
+    @endif
+    </fieldset>
   </form>
   @if($canFinanceApprove)
   <form method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}" class="mt-3">

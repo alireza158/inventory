@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use App\Services\SalesHavalehStatusService;
 use App\Services\SalesHavalehService;
+use App\Services\SalesDocumentAccessService;
 use Carbon\Carbon;
 use Morilog\Jalali\Jalalian;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class InvoiceController extends Controller
     public function __construct(
         private readonly SalesHavalehStatusService $statusService,
         private readonly SalesHavalehService $salesHavalehService,
+        private readonly SalesDocumentAccessService $accessService,
     ) {}
 
     public function index(Request $request)
@@ -96,7 +98,7 @@ class InvoiceController extends Controller
         $allowedStatuses = $this->statusService->all();
 
         $invoices = Invoice::query()
-            ->with(['items.product', 'items.variant'])
+            ->with(['items.product', 'items.variant', 'preinvoiceOrder:id,created_by'])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('uuid', 'like', "%{$q}%")
@@ -184,12 +186,15 @@ class InvoiceController extends Controller
             ->where('uuid', $uuid)
             ->firstOrFail();
 
+        abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
+
         return view('invoices.edit', compact('invoice'));
     }
 
     public function update(string $uuid, Request $request)
     {
-        $invoice = Invoice::query()->with('items')->where('uuid', $uuid)->firstOrFail();
+        $invoice = Invoice::query()->with(['items', 'preinvoiceOrder:id,created_by'])->where('uuid', $uuid)->firstOrFail();
+        abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
 
         $data = $request->validate([
             'customer_name' => 'required|string|max:255',
@@ -202,37 +207,19 @@ class InvoiceController extends Controller
         ]);
 
         DB::transaction(function () use ($invoice, $data) {
-            $subtotal = 0;
-
-            foreach ($data['items'] as $row) {
-                $item = $invoice->items->firstWhere('id', (int) $row['id']);
-                if (!$item) {
-                    continue;
-                }
-
-                $lineTotal = (int) $row['quantity'] * (int) $row['price'];
-
-                $item->update([
-                    'quantity' => (int) $row['quantity'],
-                    'price' => (int) $row['price'],
-                    'line_total' => $lineTotal,
-                ]);
-
-                $subtotal += $lineTotal;
-            }
-
-            $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+            $invoice = Invoice::query()->with(['items', 'preinvoiceOrder'])->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+            abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
 
             $invoice->update([
                 'customer_name' => $data['customer_name'],
                 'customer_mobile' => $data['customer_mobile'],
                 'customer_address' => $data['customer_address'] ?? '',
-                'subtotal' => $subtotal,
-                'total' => $total,
             ]);
+
+            $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id());
         });
 
-        return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ فاکتور ویرایش شد.');
+        return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');
     }
 
     public function print(string $uuid)

@@ -78,6 +78,7 @@
                 <td class="text-end">
                   <div class="d-flex gap-1 justify-content-end">
                     <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده کامل</a>
+                    <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-sm btn-outline-warning">ویرایش اقلام</a>
                     <a href="{{ route('preinvoice.my.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
                   </div>
                 </td>

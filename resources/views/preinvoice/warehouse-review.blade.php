@@ -109,9 +109,7 @@
 
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0">اقلام پیش‌فاکتور</h6>
-            <button type="button" class="btn btn-sm btn-outline-primary" id="addRow">
-                افزودن ردیف
-            </button>
+            <span class="text-muted small">انبار فقط می‌تواند تعداد را کمتر کند یا ردیف را حذف کند.</span>
         </div>
 
         <div class="card-body">
@@ -213,22 +211,22 @@
 
         tr.innerHTML = `
             <td>
-                <select class="form-select product" required>
+                <select class="form-select product" required disabled>
                     <option value="">انتخاب...</option>
                 </select>
             </td>
             <td>
-                <select class="form-select variant" required>
+                <select class="form-select variant" required disabled>
                     <option value="">انتخاب...</option>
                 </select>
             </td>
             <td class="variant-stock">0</td>
             <td class="product-stock">0</td>
             <td>
-                <input type="number" class="form-control qty" min="1" value="${data.quantity || 1}" required>
+                <input type="number" class="form-control qty" min="1" max="${data.quantity || 1}" value="${data.quantity || 1}" required>
             </td>
             <td>
-                <input type="number" class="form-control price" min="0" value="${data.price || 0}" required>
+                <input type="number" class="form-control price" min="0" value="${data.price || 0}" required readonly>
             </td>
             <td>
                 <button type="button" class="btn btn-sm btn-outline-danger remove">حذف</button>
@@ -313,14 +311,8 @@
         });
     }
 
-    document.getElementById('addRow').addEventListener('click', function () {
-        addRow();
-    });
-
     if (initialItems.length) {
         initialItems.forEach(item => addRow(item));
-    } else {
-        addRow();
     }
 
     document.getElementById('warehouseForm').addEventListener('submit', function () {

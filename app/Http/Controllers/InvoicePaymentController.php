@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\InvoicePayment;
 use App\Services\PaymentRegistrationService;
+use App\Support\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -22,16 +23,17 @@ class InvoicePaymentController extends Controller
 
         $invoice = Invoice::query()->where('uuid', $uuid)->firstOrFail();
 
-        $payment = $this->createPaymentRecord($request, $invoice, $invoice->customer_id ? (int) $invoice->customer_id : null);
+        $payment = DB::transaction(function () use ($request, $invoice) {
+            $invoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
 
-        return back()->with('success', "✅ پرداخت {$this->methodLabel($payment->method)} با موفقیت ثبت شد.");
-    }
+            return $this->createPaymentRecord($request, $invoice, $invoice->customer_id ? (int) $invoice->customer_id : null);
+        });
 
-    public function storeForCustomer(Customer $customer, Request $request)
-    {
-        abort_unless($this->canHandleFinanceActions(), 403);
-
-        $payment = $this->createPaymentRecord($request, $invoice, $invoice->customer_id ? (int) $invoice->customer_id : null);
+        ActivityLogger::log('invoice_payment_added', $invoice->fresh(), 'پرداخت برای فاکتور ثبت شد.', [
+            'payment_id' => $payment->id,
+            'amount' => (int) $payment->amount,
+            'method' => $payment->method,
+        ]);
 
         return back()->with('success', "✅ پرداخت {$this->methodLabel($payment->method)} با موفقیت ثبت شد.");
     }
@@ -61,42 +63,17 @@ class InvoicePaymentController extends Controller
 
         $invoice = Invoice::query()->findOrFail((int) $data['invoice_id']);
 
-        $payment = $this->persistPayment($invoice, $data, $request, $customer->id);
+        $payment = DB::transaction(function () use ($invoice, $data, $request, $customer) {
+            $invoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
 
-        return back()->with('success', "✅ پرداخت {$this->methodLabel($payment->method)} برای مشتری ثبت شد.");
-    }
+            return $this->persistPayment($invoice, $data, $request, $customer->id);
+        });
 
-    private function createPaymentRecord(Request $request, Invoice $invoice, ?int $fallbackCustomerId = null): InvoicePayment
-    {
-        $data = $request->validate([
-            'invoice_id' => [
-                'required',
-                'integer',
-                Rule::exists('invoices', 'id')->where(fn ($q) => $q->where('customer_id', $customer->id)),
-            ],
-            'method' => 'required|in:cash,cheque',
-            'amount' => 'required|integer|min:1',
-            'paid_at' => 'required|date',
-            'bank_name' => 'required_if:method,cash|nullable|string|max:255',
-            'note' => 'nullable|string|max:2000',
-            'receipt_image' => 'nullable|image|max:4096',
-            'cheque_bank_name' => 'nullable|string|max:255',
-            'cheque_branch_name' => 'nullable|string|max:255',
-            'cheque_number' => 'required_if:method,cheque|nullable|string|max:255',
-            'cheque_amount' => 'nullable|integer|min:1',
-            'cheque_due_date' => 'required_if:method,cheque|nullable|date',
-            'cheque_received_at' => 'required_if:method,cheque|nullable|date',
-            'cheque_customer_name' => 'nullable|string|max:255',
-            'cheque_customer_code' => 'nullable|string|max:255',
-            'cheque_account_number' => 'nullable|string|max:255',
-            'cheque_account_holder' => 'nullable|string|max:255',
-            'cheque_status' => 'nullable|in:pending,cleared,bounced,registered,unregistered',
-            'cheque_image' => 'nullable|image|max:4096',
+        ActivityLogger::log('invoice_payment_added', $invoice->fresh(), 'پرداخت برای مشتری ثبت شد.', [
+            'payment_id' => $payment->id,
+            'amount' => (int) $payment->amount,
+            'method' => $payment->method,
         ]);
-
-        $invoice = Invoice::query()->findOrFail((int) $data['invoice_id']);
-
-        $payment = $this->persistPayment($invoice, $data, $request, $customer->id);
 
         return back()->with('success', "✅ پرداخت {$this->methodLabel($payment->method)} برای مشتری ثبت شد.");
     }
@@ -139,31 +116,14 @@ class InvoicePaymentController extends Controller
             $chequeImagePath = $request->file('cheque_image')->store('invoices/cheques', 'public');
         }
 
-        $paidAt = $data['paid_at'] ?? now()->toDateString();
-        $customerId = $invoice->customer_id ? (int) $invoice->customer_id : $fallbackCustomerId;
-
-        return DB::transaction(function () use ($invoice, $data, $path, $paidAt, $customerId, $chequeImagePath) {
-            $payload = $data;
-            $payload['paid_at'] = $paidAt;
-            if (($payload['method'] ?? null) === 'cheque' && empty($payload['cheque_customer_code'])) {
-                $payload['cheque_customer_code'] = (string) ($customerId ?: ($invoice->customer_id ?: ''));
-            }
-            if (($payload['method'] ?? null) === 'cheque' && empty($payload['cheque_customer_name'])) {
-                $payload['cheque_customer_name'] = (string) ($invoice->customer_name ?: '');
-            }
-            if (($payload['method'] ?? null) === 'cheque') {
-                $payload['amount'] = (int) ($payload['cheque_amount'] ?? $payload['amount']);
-            }
-
-            return $this->paymentService->registerForInvoice(
-                $invoice,
-                $payload,
-                $customerId,
-                auth()->id(),
-                $path,
-                $chequeImagePath
-            );
-        });
+        return $this->paymentService->registerForInvoice(
+            $invoice,
+            $data,
+            $fallbackCustomerId,
+            auth()->id(),
+            $path,
+            $chequeImagePath
+        );
     }
 
     private function methodLabel(string $method): string
@@ -175,6 +135,6 @@ class InvoicePaymentController extends Controller
     {
         $user = auth()->user();
 
-        return $user && ($user->hasAnyRole(['admin', 'finance']) || $user->can('finance.approve'));
+        return $user && ($user->hasAnyRole(['Admin', 'finance', 'Accountant']) || $user->can('finance.approve'));
     }
 }
