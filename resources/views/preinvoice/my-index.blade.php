@@ -1,87 +1,161 @@
 @extends('layouts.app')
 
-@section('title', 'پیش‌فاکتورهای من')
+@section('title', 'پیش‌فاکتورها و فاکتورهای من')
+@section('content_class', 'app-content-wide')
 
 @section('content')
 @php
+  use Illuminate\Support\Str;
   $toJalali = function ($date) {
       if (!$date) return '—';
-      if (class_exists(\Hekmatinasser\Verta\Verta::class)) {
-          return \Hekmatinasser\Verta\Verta::instance($date)->format('Y/m/d H:i');
+      if (class_exists(\Morilog\Jalali\Jalalian::class)) {
+          return \Morilog\Jalali\Jalalian::fromDateTime($date)->format('Y/m/d H:i');
       }
       return optional($date)->format('Y/m/d H:i') ?? '—';
   };
+  $statusBadge = fn($status) => match($status) {
+      \App\Models\PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE => 'text-bg-success',
+      \App\Models\PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+      \App\Models\PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING => 'text-bg-info',
+      \App\Models\PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+      \App\Models\PreinvoiceOrder::STATUS_FINANCE_REVIEWING => 'text-bg-warning',
+      \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+      \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE => 'text-bg-danger',
+      default => 'text-bg-secondary',
+  };
 @endphp
-<div class="container py-4">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h4 class="mb-0">پیش‌فاکتورهای من</h4>
+
+<style>
+  .my-sales-page{max-width:100%; overflow-x:hidden;}
+  .my-sales-head,.my-sales-card{border:0; border-radius:18px; box-shadow:0 10px 28px rgba(15,23,42,.06);}
+  .my-sales-head{background:linear-gradient(135deg,#fff,#f8fafc); padding:18px;}
+  .my-sales-table{table-layout:fixed; width:100%;}
+  .my-sales-table th{font-size:.78rem; color:#64748b; white-space:nowrap;}
+  .my-sales-table td{font-size:.88rem; vertical-align:middle;}
+  .code-cell{direction:ltr; unicode-bidi:plaintext; display:inline-block; max-width:112px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .desc-cell{max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#64748b;}
+  .customer-cell{max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .action-stack{display:flex; gap:.35rem; justify-content:flex-end; flex-wrap:wrap;}
+  .action-stack .btn{padding:.22rem .45rem; font-size:.76rem;}
+  .preinvoice-mobile-card{border:1px solid #e5e7eb; border-radius:16px; padding:14px; background:#fff; box-shadow:0 6px 18px rgba(15,23,42,.04);}
+  @media (min-width: 992px){.preinvoice-table-wrap{overflow-x:visible!important;}}
+</style>
+
+<div class="my-sales-page py-2">
+  <div class="my-sales-head mb-3 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+    <div>
+      <h4 class="fw-bold mb-1">پیش‌فاکتورها و فاکتورهای من</h4>
+      <div class="text-muted small">تاریخچه کامل فعالیت فروش شما، شامل پیش‌فاکتورهای باز و موارد فاکتور شده</div>
+    </div>
     <a href="{{ route('preinvoice.create') }}" class="btn btn-primary">➕ ثبت پیش‌فاکتور جدید</a>
   </div>
 
-  <div class="card border-0 shadow-sm">
+  <div class="card my-sales-card mb-3">
     <div class="card-body">
-      <form class="row g-2 mb-3" method="GET" action="{{ route('preinvoice.my.index') }}">
-        <div class="col-md-4">
-          <label class="form-label">وضعیت</label>
-          <select name="status" class="form-select" onchange="this.form.submit()">
+      <form class="row g-2 align-items-end" method="GET" action="{{ route('preinvoice.my.index') }}">
+        <div class="col-md-4 col-xl-3">
+          <label class="form-label fw-bold text-muted small">وضعیت</label>
+          <select name="status" class="form-select">
             <option value="">همه وضعیت‌ها</option>
             @foreach($statusLabels as $key => $label)
               <option value="{{ $key }}" @selected($status === $key)>{{ $label }}</option>
             @endforeach
           </select>
         </div>
+        <div class="col-md-auto d-flex gap-2">
+          <button class="btn btn-primary">اعمال فیلتر</button>
+          <a href="{{ route('preinvoice.my.index') }}" class="btn btn-outline-secondary">حذف فیلتر</a>
+        </div>
       </form>
-
-      <div class="table-responsive">
-        <table class="table table-striped align-middle mb-0">
-          <thead>
-            <tr>
-              <th>کد</th>
-              <th>مشتری</th>
-              <th>موبایل</th>
-              <th>توضیحات</th>
-              <th>تعداد اقلام</th>
-              <th>مبلغ نهایی</th>
-              <th>وضعیت</th>
-              <th>تاریخ ثبت</th>
-              <th class="text-end">عملیات</th>
-            </tr>
-          </thead>
-          <tbody>
-            @forelse($orders as $order)
-              <tr>
-                <td class="fw-semibold">{{ $order->uuid }}</td>
-                <td>{{ $order->customer_name }}</td>
-                <td>{{ $order->customer_mobile ?: '—' }}</td>
-                <td class="text-muted small" style="min-width: 220px; max-width: 320px; white-space: normal;">
-                  {{ $order->description ? \Illuminate\Support\Str::limit($order->description, 120) : '—' }}
-                </td>
-                <td>{{ number_format($order->items_count) }}</td>
-                <td>{{ \App\Support\Currency::formatRial($order->total_price) }}</td>
-                <td>{{ $statusLabels[$order->status] ?? $order->status }}</td>
-                <td>{{ $toJalali($order->created_at) }}</td>
-                <td class="text-end">
-                  <div class="d-flex gap-1 justify-content-end">
-                    <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده کامل</a>
-                    <a href="{{ route('preinvoice.my.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
-                  </div>
-                </td>
-              </tr>
-            @empty
-              <tr>
-                <td colspan="9" class="text-center text-muted py-4">پیش‌فاکتوری توسط شما ثبت نشده است.</td>
-              </tr>
-            @endforelse
-          </tbody>
-        </table>
-      </div>
     </div>
-
-    @if(method_exists($orders, 'links'))
-      <div class="card-footer bg-white">
-        {{ $orders->links() }}
-      </div>
-    @endif
   </div>
+
+  <div class="card my-sales-card d-none d-lg-block">
+    <div class="table-responsive preinvoice-table-wrap">
+      <table class="table table-hover align-middle mb-0 my-sales-table">
+        <colgroup>
+          <col style="width:8%"><col style="width:13%"><col style="width:9%"><col style="width:15%"><col style="width:6%"><col style="width:10%"><col style="width:12%"><col style="width:8%"><col style="width:8%"><col style="width:11%">
+        </colgroup>
+        <thead class="table-light">
+          <tr>
+            <th>کد</th><th>مشتری</th><th>موبایل</th><th>توضیحات</th><th>اقلام</th><th>مبلغ</th><th>وضعیت</th><th>فاکتور</th><th>تاریخ</th><th class="text-end">عملیات</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($orders as $order)
+            @php
+              $statusLabel = $statusLabels[$order->status] ?? $order->status_label ?? $order->status;
+              $invoiceUuid = $order->invoice?->uuid;
+            @endphp
+            <tr>
+              <td><span class="code-cell fw-bold" title="{{ $order->uuid }}">{{ Str::limit($order->uuid, 10, '…') }}</span></td>
+              <td><span class="customer-cell" title="{{ $order->customer_name }}">{{ $order->customer_name }}</span></td>
+              <td class="text-nowrap">{{ $order->customer_mobile ?: '—' }}</td>
+              <td><span class="desc-cell" title="{{ $order->description ?: '' }}">{{ $order->description ?: '—' }}</span></td>
+              <td>{{ number_format($order->items_count) }}</td>
+              <td class="text-nowrap">{{ \App\Support\Currency::formatRial($order->total_price) }}</td>
+              <td>
+                <span class="badge {{ $statusBadge($order->status) }}">{{ $order->invoice ? 'فاکتور شده' : 'پیش‌فاکتور' }}</span>
+                <div class="small text-muted mt-1">{{ $statusLabel }}</div>
+              </td>
+              <td>
+                @if($invoiceUuid)
+                  <a class="code-cell" href="{{ route('invoices.show', $invoiceUuid) }}" title="{{ $invoiceUuid }}">{{ Str::limit($invoiceUuid, 10, '…') }}</a>
+                @else
+                  —
+                @endif
+              </td>
+              <td class="text-nowrap">{{ $toJalali($order->created_at) }}</td>
+              <td>
+                <div class="action-stack">
+                  <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده</a>
+                  <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-sm btn-outline-warning">ویرایش</a>
+                  <a href="{{ route('preinvoice.my.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
+                </div>
+              </td>
+            </tr>
+          @empty
+            <tr><td colspan="10" class="text-center text-muted py-4">پیش‌فاکتوری توسط شما ثبت نشده است.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-lg-none vstack gap-2">
+    @forelse($orders as $order)
+      @php
+        $statusLabel = $statusLabels[$order->status] ?? $order->status_label ?? $order->status;
+        $invoiceUuid = $order->invoice?->uuid;
+      @endphp
+      <div class="preinvoice-mobile-card">
+        <div class="d-flex justify-content-between gap-2 mb-2">
+          <strong>{{ $order->customer_name }}</strong>
+          <span class="code-cell" title="{{ $order->uuid }}">{{ Str::limit($order->uuid, 12, '…') }}</span>
+        </div>
+        <div class="small text-muted mb-2">{{ $order->customer_mobile ?: '—' }}</div>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <span class="badge {{ $statusBadge($order->status) }}">{{ $order->invoice ? 'فاکتور شده' : 'پیش‌فاکتور' }}</span>
+          <span class="badge text-bg-light border">{{ $statusLabel }}</span>
+        </div>
+        <div class="small text-muted mb-2">{{ $order->description ? Str::limit($order->description, 120) : 'بدون توضیحات' }}</div>
+        <div class="small d-flex justify-content-between"><span>مبلغ</span><strong>{{ \App\Support\Currency::formatRial($order->total_price) }}</strong></div>
+        @if($invoiceUuid)
+          <div class="small d-flex justify-content-between"><span>فاکتور</span><a class="code-cell" href="{{ route('invoices.show', $invoiceUuid) }}">{{ Str::limit($invoiceUuid, 12, '…') }}</a></div>
+        @endif
+        <div class="action-stack mt-3 justify-content-start">
+          <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده</a>
+          <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-sm btn-outline-warning">ویرایش</a>
+          <a href="{{ route('preinvoice.my.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
+        </div>
+      </div>
+    @empty
+      <div class="preinvoice-mobile-card text-center text-muted">پیش‌فاکتوری توسط شما ثبت نشده است.</div>
+    @endforelse
+  </div>
+
+  @if(method_exists($orders, 'links'))
+    <div class="mt-3">{{ $orders->links() }}</div>
+  @endif
 </div>
 @endsection

@@ -449,7 +449,7 @@
             {{ $statusFa($invoice->status) }}
           </span>
 
-          <a href="{{ route('archive.index') }}" class="btn back-btn d-inline-flex align-items-center gap-2">
+          <a href="{{ route('invoices.index') }}" class="btn back-btn d-inline-flex align-items-center gap-2">
             <span>بازگشت</span>
             <span>↩</span>
           </a>

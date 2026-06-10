@@ -28,6 +28,7 @@ class PaymentRegistrationService
             'amount' => $amount,
             'paid_at' => $paidAt,
             'bank_name' => $method === 'cash' ? ($payload['bank_name'] ?? null) : null,
+            'payment_identifier' => $payload['payment_identifier'] ?? null,
             'receipt_image' => $receiptImagePath,
             'note' => $payload['note'] ?? null,
         ]);
