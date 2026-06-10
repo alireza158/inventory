@@ -83,6 +83,11 @@ class PreinvoiceOrder extends Model
         return $this->hasMany(PreinvoiceOrderReview::class);
     }
 
+    public function invoice()
+    {
+        return $this->hasOne(Invoice::class, 'preinvoice_order_id');
+    }
+
     public function activityLogs()
     {
         return $this->morphMany(ActivityLog::class, 'subject')->latest('occurred_at');
