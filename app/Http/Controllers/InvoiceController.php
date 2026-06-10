@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use App\Services\SalesHavalehStatusService;
 use App\Services\SalesHavalehService;
+use App\Services\SalesDocumentAccessService;
 use Carbon\Carbon;
+use Morilog\Jalali\Jalalian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,31 +17,65 @@ class InvoiceController extends Controller
     public function __construct(
         private readonly SalesHavalehStatusService $statusService,
         private readonly SalesHavalehService $salesHavalehService,
+        private readonly SalesDocumentAccessService $accessService,
     ) {}
 
     public function index(Request $request)
     {
-        $q = trim((string) $request->query('q', ''));
-        $dateInput = trim((string) $request->query('date', ''));
-        $reportDate = $this->resolveReportDate($dateInput);
+        $filters = [
+            'date' => trim((string) $request->query('date', '')),
+            'invoice_number' => trim((string) $request->query('invoice_number', $request->query('q', ''))),
+            'customer_code' => trim((string) $request->query('customer_code', '')),
+            'customer_name' => trim((string) $request->query('customer_name', '')),
+        ];
+
+        $reportDateInput = trim((string) $request->query('export_date', $filters['date']));
+        $reportDate = $this->parseInvoiceFilterDate($reportDateInput) ?? now()->startOfDay();
+        $filterDate = $this->parseInvoiceFilterDate($filters['date']);
 
         $baseQuery = Invoice::query()
-            ->with(['payments.cheque', 'preinvoiceOrder.creator:id,name'])
+            ->with(['payments.cheque', 'customer:id,crm_customer_id,first_name,last_name,mobile', 'preinvoiceOrder.creator:id,name'])
             ->withSum('payments as paid_total', 'amount')
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($qq) use ($q) {
-                    $qq->where('uuid', 'like', "%{$q}%")
-                        ->orWhere('customer_name', 'like', "%{$q}%")
-                        ->orWhere('customer_mobile', 'like', "%{$q}%");
+            ->when($filters['invoice_number'] !== '', function ($query) use ($filters) {
+                $query->where('uuid', 'like', '%' . $filters['invoice_number'] . '%');
+            })
+            ->when($filters['customer_name'] !== '', function ($query) use ($filters) {
+                $name = $filters['customer_name'];
+                $query->where(function ($qq) use ($name) {
+                    $qq->where('customer_name', 'like', "%{$name}%")
+                        ->orWhereHas('customer', function ($customerQuery) use ($name) {
+                            $customerQuery->where('first_name', 'like', "%{$name}%")
+                                ->orWhere('last_name', 'like', "%{$name}%")
+                                ->orWhereRaw("CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) LIKE ?", ["%{$name}%"]);
+                        });
+                });
+            })
+            ->when($filters['customer_code'] !== '', function ($query) use ($filters) {
+                $code = $this->normalizeDigits($filters['customer_code']);
+                $query->where(function ($qq) use ($code) {
+                    if (ctype_digit($code)) {
+                        $qq->where('customer_id', (int) $code);
+                    }
+
+                    $qq->orWhereHas('customer', function ($customerQuery) use ($code) {
+                        $customerQuery->where('id', 'like', "%{$code}%")
+                            ->orWhere('crm_customer_id', 'like', "%{$code}%")
+                            ->orWhere('mobile', 'like', "%{$code}%");
+                    });
                 });
             });
 
-        if ($reportDate) {
-            $baseQuery->whereDate('created_at', $reportDate->toDateString());
+        if ($filterDate) {
+            $baseQuery->whereDate('created_at', $filterDate->toDateString());
         }
 
-        if ($request->input('export') === 'daily_csv' && $reportDate) {
-            return $this->exportDailyCustomerFinanceCsv((clone $baseQuery)->orderBy('id')->get(), $reportDate);
+        if ($request->input('export') === 'daily_csv') {
+            $exportQuery = clone $baseQuery;
+            if ($filters['date'] === '') {
+                $exportQuery->whereDate('created_at', $reportDate->toDateString());
+            }
+
+            return $this->exportDailyCustomerFinanceCsv($exportQuery->orderBy('id')->get(), $reportDate);
         }
 
         $invoices = $baseQuery
@@ -48,8 +84,10 @@ class InvoiceController extends Controller
             ->withQueryString();
 
         $statusLabels = $this->statusService->labels();
+        $q = $filters['invoice_number'];
+        $dateInput = $filters['date'];
 
-        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput'));
+        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput', 'filters', 'reportDateInput'));
     }
 
     public function salesVouchers(Request $request)
@@ -60,7 +98,7 @@ class InvoiceController extends Controller
         $allowedStatuses = $this->statusService->all();
 
         $invoices = Invoice::query()
-            ->with(['items.product', 'items.variant'])
+            ->with(['items.product', 'items.variant', 'preinvoiceOrder:id,created_by'])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('uuid', 'like', "%{$q}%")
@@ -148,12 +186,15 @@ class InvoiceController extends Controller
             ->where('uuid', $uuid)
             ->firstOrFail();
 
+        abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
+
         return view('invoices.edit', compact('invoice'));
     }
 
     public function update(string $uuid, Request $request)
     {
-        $invoice = Invoice::query()->with('items')->where('uuid', $uuid)->firstOrFail();
+        $invoice = Invoice::query()->with(['items', 'preinvoiceOrder:id,created_by'])->where('uuid', $uuid)->firstOrFail();
+        abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
 
         $data = $request->validate([
             'customer_name' => 'required|string|max:255',
@@ -166,37 +207,19 @@ class InvoiceController extends Controller
         ]);
 
         DB::transaction(function () use ($invoice, $data) {
-            $subtotal = 0;
-
-            foreach ($data['items'] as $row) {
-                $item = $invoice->items->firstWhere('id', (int) $row['id']);
-                if (!$item) {
-                    continue;
-                }
-
-                $lineTotal = (int) $row['quantity'] * (int) $row['price'];
-
-                $item->update([
-                    'quantity' => (int) $row['quantity'],
-                    'price' => (int) $row['price'],
-                    'line_total' => $lineTotal,
-                ]);
-
-                $subtotal += $lineTotal;
-            }
-
-            $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+            $invoice = Invoice::query()->with(['items', 'preinvoiceOrder'])->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+            abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
 
             $invoice->update([
                 'customer_name' => $data['customer_name'],
                 'customer_mobile' => $data['customer_mobile'],
                 'customer_address' => $data['customer_address'] ?? '',
-                'subtotal' => $subtotal,
-                'total' => $total,
             ]);
+
+            $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id());
         });
 
-        return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ فاکتور ویرایش شد.');
+        return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');
     }
 
     public function print(string $uuid)
@@ -266,17 +289,41 @@ class InvoiceController extends Controller
         return back()->with('success', '✅ فاکتور کنسل شد و موجودی به انبار برگشت.');
     }
 
-    private function resolveReportDate(string $dateInput): ?Carbon
+    private function parseInvoiceFilterDate(string $dateInput): ?Carbon
     {
+        $dateInput = $this->normalizeDigits($dateInput);
+
         if ($dateInput === '') {
-            return now();
+            return null;
         }
 
+        $dateInput = str_replace(['-', '.', ' '], '/', $dateInput);
+
         try {
-            return Carbon::createFromFormat('Y-m-d', $dateInput)->startOfDay();
+            if (preg_match('/^\d{4}\/\d{1,2}\/\d{1,2}$/', $dateInput) === 1) {
+                [$year, $month, $day] = array_map('intval', explode('/', $dateInput));
+
+                if ($year >= 1300 && $year <= 1600) {
+                    return (new Jalalian($year, $month, $day))->toCarbon()->startOfDay();
+                }
+
+                return Carbon::create($year, $month, $day)->startOfDay();
+            }
+
+            return Carbon::parse($dateInput)->startOfDay();
         } catch (\Throwable) {
-            return now();
+            return null;
         }
+    }
+
+    private function normalizeDigits(string $value): string
+    {
+        return trim(strtr($value, [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]));
     }
 
     private function exportDailyCustomerFinanceCsv($invoices, Carbon $reportDate): StreamedResponse

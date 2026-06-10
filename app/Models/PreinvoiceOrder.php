@@ -41,6 +41,8 @@ class PreinvoiceOrder extends Model
         'warehouse_reviewed_at',
         'stock_frozen_until',
         'stock_released_at',
+        'items_updated_at',
+        'items_updated_by',
     ];
 
     protected $casts = [
@@ -56,6 +58,8 @@ class PreinvoiceOrder extends Model
         'warehouse_reviewed_at' => 'datetime',
         'stock_frozen_until' => 'datetime',
         'stock_released_at' => 'datetime',
+        'items_updated_at' => 'datetime',
+        'items_updated_by' => 'integer',
     ];
 
     public function items()
@@ -81,6 +85,11 @@ class PreinvoiceOrder extends Model
     public function reviews()
     {
         return $this->hasMany(PreinvoiceOrderReview::class);
+    }
+
+    public function invoice()
+    {
+        return $this->hasOne(Invoice::class, 'preinvoice_order_id');
     }
 
     public function activityLogs()
