@@ -12,7 +12,10 @@
 
     <div class="purchase-topbar d-flex justify-content-between align-items-center">
         <h4 class="page-title mb-0">خرید کالا</h4>
-        <a class="btn btn-light" href="{{ route('purchases.create') }}">+ ثبت خرید جدید</a>
+        <div class="d-flex gap-2 flex-wrap justify-content-end">
+            <a class="btn btn-outline-light" href="{{ route('purchases.export') }}">خروجی اکسل همه خریدها</a>
+            <a class="btn btn-light" href="{{ route('purchases.create') }}">+ ثبت خرید جدید</a>
+        </div>
     </div>
 
     <div class="row g-3 mb-3">
