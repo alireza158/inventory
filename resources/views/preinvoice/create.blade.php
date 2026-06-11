@@ -729,46 +729,6 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         outline: none;
     }
 
-    .model-filter-row {
-        display: none;
-        border: 1px solid rgba(12, 83, 103, .08);
-        border-radius: 12px;
-        background: linear-gradient(180deg, #fffefb, #f9f4eb);
-        padding: 8px 10px;
-        margin-bottom: 8px;
-    }
-
-    .model-filter-row.is-visible {
-        display: block;
-    }
-
-    .step-chip-group {
-        display: flex;
-        gap: 5px;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    .step-chip {
-        border: 1px solid rgba(12, 83, 103, .11);
-        background: #fff;
-        color: var(--text-soft);
-        border-radius: 999px;
-        padding: 4px 10px;
-        font-size: .76rem;
-        font-weight: 900;
-        cursor: pointer;
-        user-select: none;
-        transition: all .14s;
-    }
-
-    .step-chip.active {
-        color: #fff;
-        border-color: var(--brand-dark);
-        background: linear-gradient(135deg, var(--brand-dark), var(--brand));
-        box-shadow: 0 4px 12px rgba(12, 83, 103, .12);
-    }
-
     @media (max-width: 991.98px) {
         .page-shell {
             max-width: 100%;
@@ -1308,11 +1268,6 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     <input type="text" id="pickerSearchInput" class="picker-search" placeholder="جستجو در تنوع‌ها...">
                 </div>
 
-                <div class="model-filter-row" id="modalModelFilterWrap">
-                    <div class="hint mb-2 fw-bold" style="color:var(--text-soft)">فیلتر مدل‌لیست</div>
-                    <div class="step-chip-group" id="modalModelFilterChips"></div>
-                </div>
-
                 <div id="pickerLoading" class="empty-state d-none">در حال دریافت کالاها...</div>
 
                 <div class="variant-list" id="pickerTableWrap">
@@ -1405,7 +1360,6 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     let activeProduct = null;
     let activeModalItems = [];
     let modalQuantities = new Map();
-    let activeModalModelFilter = '__all__';
     let modalGroupDiscountType = 'amount';
     let modalGroupDiscountValue = 0;
 
@@ -2282,7 +2236,6 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         activeProductId = Number(targetId);
         activeProduct = groupedSelections[activeProductId]?.product || selectedMotherProduct || null;
-        activeModalModelFilter = '__all__';
         document.getElementById('pickerLoading').classList.remove('d-none');
         document.getElementById('pickerTableWrap').classList.add('d-none');
         document.getElementById('groupPickerRows').innerHTML = '';
@@ -2307,7 +2260,6 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             document.getElementById('pickerModalTitle').textContent = productTitle(product);
             document.getElementById('pickerModalSubTitle').textContent = 'کد: ' + (productCode(product) || '—') + ' | ' + formatNum(activeModalItems.length) + ' تنوع';
             saveRecentProduct(product);
-            renderModalModelFilters();
             renderPickerRows();
             updateModalSummary();
             document.getElementById('pickerLoading').classList.add('d-none');
@@ -2319,54 +2271,9 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         }
     }
 
-    function getModelFilterGroups() {
-        const groups = new Map();
-        activeModalItems.forEach(v => {
-            const model = variantModel(v);
-            if (isEmptyLabel(model)) return;
-            groups.set(model, (groups.get(model) || 0) + 1);
-        });
-        return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], 'fa'));
-    }
-
-    function renderModalModelFilters() {
-        const wrap = document.getElementById('modalModelFilterWrap');
-        const chips = document.getElementById('modalModelFilterChips');
-        const groups = getModelFilterGroups();
-        chips.innerHTML = '';
-        if (!groups.length) {
-            wrap.classList.remove('is-visible');
-            return;
-        }
-        wrap.classList.add('is-visible');
-        const allBtn = document.createElement('button');
-        allBtn.type = 'button';
-        allBtn.className = 'step-chip active';
-        allBtn.textContent = 'همه مدل‌ها';
-        allBtn.dataset.model = '__all__';
-        chips.appendChild(allBtn);
-        groups.forEach(([model, count]) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'step-chip';
-            btn.textContent = `${model} (${formatNum(count)})`;
-            btn.dataset.model = model;
-            chips.appendChild(btn);
-        });
-        chips.querySelectorAll('.step-chip').forEach(btn => {
-            btn.addEventListener('click', function() {
-                activeModalModelFilter = this.dataset.model || '__all__';
-                chips.querySelectorAll('.step-chip').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                renderPickerRows();
-            });
-        });
-    }
-
     function filteredModalItems() {
         const q = normalize(document.getElementById('pickerSearchInput').value).toLowerCase();
         return activeModalItems.filter(v => {
-            if (activeModalModelFilter !== '__all__' && variantModel(v) !== activeModalModelFilter) return false;
             if (!q) return true;
             const haystack = [variantModel(v), variantDesign(v), variantName(v)].join(' ').toLowerCase();
             return haystack.includes(q);
