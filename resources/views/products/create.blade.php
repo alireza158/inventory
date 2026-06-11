@@ -807,6 +807,49 @@ document.addEventListener('DOMContentLoaded', function () {
         return categoryById(categoryIdEl.value);
     }
 
+    function normalizePersianText(text) {
+        return String(text || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/‌/g, ' ').trim();
+    }
+
+    function isElectricCategorySelected() {
+        return getCategoryPath(categoryIdEl.value).some(function (id) {
+            var cat = categoryById(id);
+            return cat && normalizePersianText(cat.name) === 'برقیجات';
+        });
+    }
+
+    function ensureDefaultElectricDesignNotes() {
+        if (!isElectricCategorySelected()) return;
+
+        var required = ['مشکی', 'سفید'];
+        var existing = currentDesignNotesValues();
+        var normalizedExisting = existing.map(normalizePersianText);
+        var changed = false;
+
+        required.forEach(function (color) {
+            if (normalizedExisting.indexOf(normalizePersianText(color)) === -1) {
+                existing.push(color);
+                normalizedExisting.push(normalizePersianText(color));
+                changed = true;
+            }
+        });
+
+        if (!useDesignsEl.checked) {
+            useDesignsEl.checked = true;
+            changed = true;
+        }
+
+        if (parseInt(designCountEl.value || '0', 10) < existing.length) {
+            designCountEl.value = String(existing.length);
+            changed = true;
+        }
+
+        if (changed) {
+            oldDesignNotes = existing;
+            syncSections();
+        }
+    }
+
     function currentCategoryParentIdForQuickAdd() {
         var selected = selectedCategory();
         return selected ? parseInt(selected.id, 10) : null;
@@ -901,6 +944,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 categoryIdEl.value = this.value || '';
                 renderCategoryLevels(newPath);
                 updateCategoryPreview();
+                ensureDefaultElectricDesignNotes();
                 renderVariantPreview();
             });
 
@@ -1385,6 +1429,7 @@ document.addEventListener('DOMContentLoaded', function () {
     updateCategoryPreview();
     renderModelPicker();
     renderDesignNotes();
+    ensureDefaultElectricDesignNotes();
     syncSections();
 
     // اگر از old() مدل‌هایی برگشته، hidden inputها را از همان ابتدا بساز

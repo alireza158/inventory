@@ -7,6 +7,7 @@ use App\Models\ModelList;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\CrmProductSyncService;
+use App\Services\DefaultProductDesignService;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -223,7 +224,9 @@ class ProductController extends Controller
                     $variantCode = $this->buildVariantCode11($productCode6, '000', $design2);
 
                     $designNote = (string) ($designNotes->get($i - 1) ?? '');
-                    $designTitle = $designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i);
+                    $designTitle = in_array($designNote, ['مشکی', 'سفید'], true)
+                            ? $designNote
+                            : ($designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i));
 
                     ProductVariant::create([
                         'product_id' => $product->id,
@@ -271,7 +274,9 @@ class ProductController extends Controller
                         $variantCode = $this->buildVariantCode11($productCode6, $model3, $design2);
 
                         $designNote = (string) ($designNotes->get($i - 1) ?? '');
-                        $designTitle = $designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i);
+                        $designTitle = in_array($designNote, ['مشکی', 'سفید'], true)
+                            ? $designNote
+                            : ($designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i));
 
                         ProductVariant::create([
                             'product_id' => $product->id,
@@ -288,6 +293,8 @@ class ProductController extends Controller
                     }
                 }
             }
+
+            app(DefaultProductDesignService::class)->ensureElectricDefaultColors($product, $sellPrice, $buyPrice);
 
             $this->recalcProductSummary($product);
         });
@@ -439,6 +446,12 @@ class ProductController extends Controller
                 }
             }
 
+            $defaultDesignService = app(DefaultProductDesignService::class);
+            $keepIds = array_values(array_unique(array_merge(
+                $keepIds,
+                $defaultDesignService->electricDefaultColorVariantIds($product)
+            )));
+
             ProductVariant::where('product_id', $product->id)
                 ->when(count($keepIds) > 0, fn ($q) => $q->whereNotIn('id', $keepIds))
                 ->delete();
@@ -452,6 +465,8 @@ class ProductController extends Controller
                     ->where('id', (int) $variantId)
                     ->update(['variety_id' => (int) $siteVariantId]);
             }
+
+            $defaultDesignService->ensureElectricDefaultColors($product);
 
             $this->recalcProductSummary($product);
         });

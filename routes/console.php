@@ -4,6 +4,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\WarehouseStock;
 use App\Services\AriyajanebiSyncService;
+use App\Services\DefaultProductDesignService;
 use App\Services\InventoryWebhookService;
 use App\Services\WarehouseStockService;
 use Illuminate\Foundation\Inspiring;
@@ -11,6 +12,48 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
+
+
+Artisan::command('products:add-default-electric-colors', function () {
+    $service = app(DefaultProductDesignService::class);
+    $categoryIds = $service->electricCategoryIds();
+
+    if (empty($categoryIds)) {
+        $this->warn('Electric category not found. Expected slug "barghijat" or Persian name "برقیجات".');
+
+        return 0;
+    }
+
+    $checkedProducts = 0;
+    $createdVariants = 0;
+    $alreadyExistingColors = 0;
+
+    Product::query()
+        ->whereIn('category_id', $categoryIds)
+        ->with(['category.parent', 'variants'])
+        ->orderBy('id')
+        ->chunkById(100, function ($products) use ($service, &$checkedProducts, &$createdVariants, &$alreadyExistingColors) {
+            foreach ($products as $product) {
+                DB::transaction(function () use ($service, $product, &$checkedProducts, &$createdVariants, &$alreadyExistingColors) {
+                    $result = $service->ensureElectricDefaultColors($product, null, null, null);
+
+                    if (! $result['checked']) {
+                        return;
+                    }
+
+                    $checkedProducts++;
+                    $createdVariants += (int) $result['created'];
+                    $alreadyExistingColors += (int) $result['already_existing'];
+                });
+            }
+        });
+
+    $this->info("Checked products: {$checkedProducts}");
+    $this->info("Created default color variants: {$createdVariants}");
+    $this->info("Already existing default colors: {$alreadyExistingColors}");
+
+    return 0;
+})->purpose('Add missing black and white default variants to electric category products');
 
 Artisan::command('inventory:set-central-stock {quantity=500 : Quantity to set for every product variant}', function (int $quantity) {
     if ($quantity < 0) {
