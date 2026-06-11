@@ -13,6 +13,7 @@ use App\Models\Warehouse;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -290,26 +291,40 @@ class PurchaseController extends Controller
             'items.*.qty' => ['nullable', 'integer', 'min:1'],
             'items.*.quantity' => ['nullable', 'integer', 'min:1'],
 
-            'items.*.buy_price' => ['required'],
-            'items.*.sell_price' => ['required'],
+            'items.*.buy_price' => ['nullable'],
+            'items.*.sell_price' => ['nullable'],
+            'items.*.product_buy_price' => ['nullable'],
+            'items.*.product_sell_price' => ['nullable'],
 
             'items.*.discount_type' => ['nullable', 'in:amount,percent'],
             'items.*.discount_value' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        // ✅ اینجا فقط پرانتز اصلاح شد
-        $data['items'] = array_values(array_map(function ($item) {
+        $data['items'] = array_values(array_map(function ($item, $index) {
             $qty = (int) ($item['quantity'] ?? $item['qty'] ?? 0);
 
-            $buy = (int) preg_replace('/[^\d]/', '', (string) ($item['buy_price'] ?? 0));
-            $sell = (int) preg_replace('/[^\d]/', '', (string) ($item['sell_price'] ?? 0));
+            $buyRaw = $item['buy_price'] ?? null;
+            $sellRaw = $item['sell_price'] ?? null;
+            $productBuyRaw = $item['product_buy_price'] ?? null;
+            $productSellRaw = $item['product_sell_price'] ?? null;
+
+            $buySource = $this->filledPrice($buyRaw) ? $buyRaw : $productBuyRaw;
+            $sellSource = $this->filledPrice($sellRaw) ? $sellRaw : $productSellRaw;
+
+            if (! $this->filledPrice($buySource) || ! $this->filledPrice($sellSource)) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.buy_price" => 'برای این کالا باید قیمت خرید و قیمت فروش وارد شود.',
+                ]);
+            }
 
             $item['quantity'] = max(1, $qty);
-            $item['buy_price'] = max(0, $buy);
-            $item['sell_price'] = max(0, $sell);
+            $item['buy_price'] = max(0, $this->parsePrice($buySource));
+            $item['sell_price'] = max(0, $this->parsePrice($sellSource));
+            $item['product_buy_price'] = $this->filledPrice($productBuyRaw) ? max(0, $this->parsePrice($productBuyRaw)) : null;
+            $item['product_sell_price'] = $this->filledPrice($productSellRaw) ? max(0, $this->parsePrice($productSellRaw)) : null;
 
             return $item;
-        }, $data['items'])); // ✅ درست: فقط دو تا )
+        }, $data['items'], array_keys($data['items'])));
 
         if (($data['invoice_discount_type'] ?? null) === 'none') {
             $data['invoice_discount_type'] = null;
@@ -337,6 +352,40 @@ class PurchaseController extends Controller
         }
 
         return $data;
+    }
+
+
+    private function filledPrice(mixed $value): bool
+    {
+        return trim((string) ($value ?? '')) !== '';
+    }
+
+    private function parsePrice(mixed $value): int
+    {
+        $normalized = strtr((string) ($value ?? ''), [
+            '۰' => '0',
+            '۱' => '1',
+            '۲' => '2',
+            '۳' => '3',
+            '۴' => '4',
+            '۵' => '5',
+            '۶' => '6',
+            '۷' => '7',
+            '۸' => '8',
+            '۹' => '9',
+            '٠' => '0',
+            '١' => '1',
+            '٢' => '2',
+            '٣' => '3',
+            '٤' => '4',
+            '٥' => '5',
+            '٦' => '6',
+            '٧' => '7',
+            '٨' => '8',
+            '٩' => '9',
+        ]);
+
+        return (int) preg_replace('/[^\d]/', '', $normalized);
     }
 
     private function applyItems(Purchase $purchase, array $data, int $warehouseId): array
