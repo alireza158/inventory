@@ -295,7 +295,7 @@ class AriyajanebiOrderImportService
             $customerAddress = $this->normalizeAddressText($customerAddress);
 
             $preinvoice = PreinvoiceOrder::query()->create([
-                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(PreinvoiceOrder::class),
+                'uuid' => DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class),
                 'external_order_id' => $externalOrderId,
                 'status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
                 'customer_name' => $customerName,
