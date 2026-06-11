@@ -267,11 +267,27 @@ class PurchaseController extends Controller
     private function validatePayload(Request $request): array
     {
         $invoiceDiscountType = $request->input('invoice_discount_type', $request->input('discount_type'));
-        $invoiceDiscountValue = $request->input('invoice_discount_value', $request->input('discount_value'));
+        $invoiceDiscountRaw = $request->input('invoice_discount_value', $request->input('discount_value'));
+        $invoiceDiscountValue = $this->filledNumber($invoiceDiscountRaw) ? $this->normalizeNumber($invoiceDiscountRaw) : null;
         $note = $request->input('note', $request->input('notes'));
 
         $items = collect((array) $request->input('items', []))
-            ->filter(fn ($item) => (int) ($item['quantity'] ?? $item['qty'] ?? 0) > 0)
+            ->map(function ($item) {
+                if (array_key_exists('quantity', $item)) {
+                    $item['quantity'] = $this->normalizeNumber($item['quantity']);
+                }
+
+                if (array_key_exists('qty', $item)) {
+                    $item['qty'] = $this->normalizeNumber($item['qty']);
+                }
+
+                if (array_key_exists('discount_value', $item) && $this->filledNumber($item['discount_value'])) {
+                    $item['discount_value'] = $this->normalizeNumber($item['discount_value']);
+                }
+
+                return $item;
+            })
+            ->filter(fn ($item) => $this->normalizeNumber($item['quantity'] ?? $item['qty'] ?? 0) > 0)
             ->values()
             ->all();
 
@@ -312,7 +328,7 @@ class PurchaseController extends Controller
         ]);
 
         $data['items'] = array_values(array_map(function ($item, $index) {
-            $qty = (int) ($item['quantity'] ?? $item['qty'] ?? 0);
+            $qty = $this->normalizeNumber($item['quantity'] ?? $item['qty'] ?? 0);
 
             $buyRaw = $item['buy_price'] ?? null;
             $sellRaw = $item['sell_price'] ?? null;
@@ -333,6 +349,9 @@ class PurchaseController extends Controller
             $item['sell_price'] = max(0, $this->parsePrice($sellSource));
             $item['product_buy_price'] = $this->filledPrice($productBuyRaw) ? max(0, $this->parsePrice($productBuyRaw)) : null;
             $item['product_sell_price'] = $this->filledPrice($productSellRaw) ? max(0, $this->parsePrice($productSellRaw)) : null;
+            $item['discount_value'] = $this->filledNumber($item['discount_value'] ?? null)
+                ? max(0, $this->normalizeNumber($item['discount_value']))
+                : 0;
 
             return $item;
         }, $data['items'], array_keys($data['items'])));
@@ -368,6 +387,11 @@ class PurchaseController extends Controller
 
     private function filledPrice(mixed $value): bool
     {
+        return $this->filledNumber($value);
+    }
+
+    private function filledNumber(mixed $value): bool
+    {
         return trim((string) ($value ?? '')) !== '';
     }
 
@@ -377,6 +401,11 @@ class PurchaseController extends Controller
     }
 
     private function parsePrice(mixed $value): int
+    {
+        return $this->normalizeNumber($value);
+    }
+
+    private function normalizeNumber(mixed $value): int
     {
         $normalized = $this->normalizePriceDigits($value);
 
@@ -701,23 +730,17 @@ class PurchaseController extends Controller
 
     private function purchaseCanRefreshVariantPrice(Purchase $purchase, int $variantId): bool
     {
-        $newPurchasedAt = $purchase->purchased_at;
-
-        $latestOtherPurchase = PurchaseItem::query()
-            ->join('purchases', 'purchases.id', '=', 'purchase_items.purchase_id')
-            ->where('purchase_items.product_variant_id', $variantId)
-            ->where('purchase_items.purchase_id', '!=', $purchase->id)
-            ->orderByDesc('purchases.purchased_at')
-            ->orderByDesc('purchases.id')
-            ->select('purchases.id', 'purchases.purchased_at')
-            ->first();
-
-        if (!$latestOtherPurchase) {
-            return true;
-        }
-
-        return \Illuminate\Support\Carbon::parse($newPurchasedAt)
-            ->greaterThanOrEqualTo(\Illuminate\Support\Carbon::parse($latestOtherPurchase->purchased_at));
+        return PurchaseItem::query()
+            ->where('product_variant_id', $variantId)
+            ->where('purchase_id', '!=', $purchase->id)
+            ->whereHas('purchase', function ($query) use ($purchase) {
+                $query->where('purchased_at', '>', $purchase->purchased_at)
+                    ->orWhere(function ($nested) use ($purchase) {
+                        $nested->where('purchased_at', $purchase->purchased_at)
+                            ->where('id', '>', $purchase->id);
+                    });
+            })
+            ->doesntExist();
     }
 
     private function calculateDiscount(int $baseAmount, ?string $discountType, int $discountValue): int
