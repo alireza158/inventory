@@ -40,13 +40,12 @@
         .invoice-table td { font-size:10px; }
         .col-index { width:28px; text-align:center; }
         .col-code { width:72px; text-align:center; direction:ltr; }
-        .col-location { width:86px; text-align:center; direction:ltr; }
-        .col-model { width:96px; text-align:center; }
-        .col-qty { width:42px; text-align:center; }
-        .col-price,.col-total { width:74px; text-align:left; direction:ltr; }
+        .col-model { width:112px; text-align:center; }
+        .col-qty { width:46px; text-align:center; }
+        .col-price,.col-total { width:82px; text-align:left; direction:ltr; }
         .item-name { font-weight:900; color:#111827; }
         .item-model { color:#374151; font-weight:800; }
-        .item-code,.item-location { font-family: Tahoma, Arial, sans-serif; font-weight:900; direction:ltr; unicode-bidi:embed; }
+        .item-code { font-family: Tahoma, Arial, sans-serif; font-weight:900; direction:ltr; unicode-bidi:embed; }
         .summary-wrap { display:flex; justify-content:flex-start; margin-top:9px; page-break-inside:avoid; }
         .summary-table { width:88mm; border-collapse:collapse; }
         .summary-table td { border:1px solid var(--print-border); padding:5px 7px; font-size:10.5px; }
@@ -65,10 +64,9 @@
         body.print-a5 .info-grid, body.print-a5 .invoice-header { grid-template-columns:1fr; }
         body.print-a5 .doc-title, body.print-a5 .doc-meta { text-align:right; }
         body.print-a5 .invoice-table th, body.print-a5 .invoice-table td { font-size:8.2px; padding:2px; }
-        body.print-a5 .col-code { width:50px; }
-        body.print-a5 .col-location { width:58px; }
-        body.print-a5 .col-model { width:68px; }
-        body.print-a5 .col-price, body.print-a5 .col-total { width:54px; }
+        body.print-a5 .col-code { width:52px; }
+        body.print-a5 .col-model { width:76px; }
+        body.print-a5 .col-price, body.print-a5 .col-total { width:58px; }
         body.print-a5 .summary-table { width:100%; }
     </style>
 </head>
@@ -88,23 +86,6 @@
         return $item->product?->code
             ?: ($item->variant?->variant_code
                 ?: ($item->product?->sku ?: '—'));
-    };
-    $warehouseLocation = function ($product): string {
-        if (! $product) {
-            return '—';
-        }
-
-        $zone = $product->warehouse_zone ? 'Z' . (int) $product->warehouse_zone : null;
-        $rows = collect((array) ($product->warehouse_rows ?? []))
-            ->filter(fn ($row) => $row !== null && $row !== '')
-            ->map(fn ($row) => 'R' . (int) $row)
-            ->implode('/');
-        $bins = collect((array) ($product->warehouse_bins ?? []))
-            ->filter(fn ($bin) => $bin !== null && $bin !== '')
-            ->map(fn ($bin) => 'B' . (int) $bin)
-            ->implode('/');
-
-        return collect([$zone, $rows ?: null, $bins ?: null])->filter()->implode(' | ') ?: '—';
     };
     $companyName = config('app.name', 'شرکت');
     $shippingName = $invoice->shippingMethod?->name ?? ($invoice->shipping_id ? ('روش ارسال #' . $invoice->shipping_id) : '—');
@@ -155,7 +136,6 @@
                 <th class="col-index">ردیف</th>
                 <th>نام کالا</th>
                 <th class="col-code">کد کالا</th>
-                <th class="col-location">Z/R/B</th>
                 <th class="col-model">مدل / لیست</th>
                 <th class="col-qty">تعداد</th>
                 <th class="col-price">قیمت واحد</th>
@@ -167,20 +147,18 @@
                 @php
                     $lineTotal = (int) ($item->line_total ?: ((int) $item->quantity * (int) $item->price));
                     $itemProductCode = $productCode($item);
-                    $itemWarehouseLocation = $warehouseLocation($item->product);
                 @endphp
                 <tr>
                     <td class="col-index">{{ $loop->iteration }}</td>
                     <td><div class="item-name">{{ $item->product?->name ?? ('#' . $item->product_id) }}</div></td>
                     <td class="col-code"><span class="item-code">{{ $itemProductCode }}</span></td>
-                    <td class="col-location"><span class="item-location">{{ $itemWarehouseLocation }}</span></td>
                     <td class="col-model"><span class="item-model">{{ $item->variant?->variant_name ?? '—' }}</span></td>
                     <td class="col-qty">{{ number_format((int) $item->quantity) }}</td>
                     <td class="col-price">{{ number_format((int) $item->price) }}</td>
                     <td class="col-total">{{ number_format($lineTotal) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="col-index">آیتمی برای این فاکتور ثبت نشده است.</td></tr>
+                <tr><td colspan="7" class="col-index">آیتمی برای این فاکتور ثبت نشده است.</td></tr>
             @endforelse
             </tbody>
         </table>
