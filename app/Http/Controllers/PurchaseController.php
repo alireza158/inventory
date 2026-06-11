@@ -73,7 +73,7 @@ class PurchaseController extends Controller
         $products = Product::query()
             ->with(['variants.modelList:id,model_name,code'])
             ->orderBy('name')
-            ->get(['id', 'name', 'category_id', 'code', 'short_barcode']);
+            ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
 
         $variants = ProductVariant::query()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
@@ -138,7 +138,7 @@ class PurchaseController extends Controller
         $products = Product::query()
             ->with(['variants.modelList:id,model_name,code'])
             ->orderBy('name')
-            ->get(['id', 'name', 'category_id', 'code', 'short_barcode']);
+            ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
 
         $variants = ProductVariant::query()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
@@ -268,11 +268,17 @@ class PurchaseController extends Controller
         $invoiceDiscountValue = $request->input('invoice_discount_value', $request->input('discount_value'));
         $note = $request->input('note', $request->input('notes'));
 
+        $items = collect((array) $request->input('items', []))
+            ->filter(fn ($item) => (int) ($item['quantity'] ?? $item['qty'] ?? 0) > 0)
+            ->values()
+            ->all();
+
         $request->merge([
             'invoice_discount_type' => $invoiceDiscountType,
             'invoice_discount_value' => $invoiceDiscountValue,
             'note' => $note,
             'warehouse_id' => WarehouseStockService::centralWarehouseId(),
+            'items' => $items,
         ]);
 
         $data = $request->validate([
@@ -298,6 +304,9 @@ class PurchaseController extends Controller
 
             'items.*.discount_type' => ['nullable', 'in:amount,percent'],
             'items.*.discount_value' => ['nullable', 'integer', 'min:0'],
+        ], [
+            'items.required' => 'حداقل یک قلم با تعداد معتبر باید برای خرید وارد شود.',
+            'items.min' => 'حداقل یک قلم با تعداد معتبر باید برای خرید وارد شود.',
         ]);
 
         $data['items'] = array_values(array_map(function ($item, $index) {
@@ -311,9 +320,9 @@ class PurchaseController extends Controller
             $buySource = $this->filledPrice($buyRaw) ? $buyRaw : $productBuyRaw;
             $sellSource = $this->filledPrice($sellRaw) ? $sellRaw : $productSellRaw;
 
-            if (! $this->filledPrice($buySource) || ! $this->filledPrice($sellSource)) {
+            if (! $this->validPrice($buySource) || ! $this->validPrice($sellSource)) {
                 throw ValidationException::withMessages([
-                    "items.{$index}.buy_price" => 'برای این کالا باید قیمت خرید و قیمت فروش وارد شود.',
+                    "items.{$index}.buy_price" => 'برای همه اقلام خرید باید قیمت خرید و قیمت فروش مشخص شود.',
                 ]);
             }
 
@@ -360,9 +369,21 @@ class PurchaseController extends Controller
         return trim((string) ($value ?? '')) !== '';
     }
 
+    private function validPrice(mixed $value): bool
+    {
+        return $this->filledPrice($value) && preg_match('/\d/', $this->normalizePriceDigits($value)) === 1;
+    }
+
     private function parsePrice(mixed $value): int
     {
-        $normalized = strtr((string) ($value ?? ''), [
+        $normalized = $this->normalizePriceDigits($value);
+
+        return (int) preg_replace('/[^\d]/', '', $normalized);
+    }
+
+    private function normalizePriceDigits(mixed $value): string
+    {
+        return strtr((string) ($value ?? ''), [
             '۰' => '0',
             '۱' => '1',
             '۲' => '2',
@@ -384,8 +405,6 @@ class PurchaseController extends Controller
             '٨' => '8',
             '٩' => '9',
         ]);
-
-        return (int) preg_replace('/[^\d]/', '', $normalized);
     }
 
     private function applyItems(Purchase $purchase, array $data, int $warehouseId): array
