@@ -19,6 +19,9 @@
                 'quantity' => $it->quantity,
                 'buy_price' => \App\Support\Currency::toRial($it->buy_price),
                 'sell_price' => \App\Support\Currency::toRial($it->sell_price),
+                'product_buy_price' => \App\Support\Currency::toRial($it->buy_price),
+                'product_sell_price' => \App\Support\Currency::toRial($it->sell_price),
+                'price_overridden' => true,
                 'discount_type' => $it->discount_type,
                 'discount_value' => $it->discount_type === 'amount' ? \App\Support\Currency::toRial($it->discount_value) : $it->discount_value,
             ])->values()->all()
@@ -174,6 +177,7 @@
     }
 
     function formatNumericInput(value) {
+        if (String(value ?? '').trim() === '') return '';
         return parseNumericInput(value).toLocaleString('en-US');
     }
 
@@ -303,6 +307,26 @@
                 </div>
             </div>
 
+            <div class="border rounded p-2 mb-2 bg-white product-default-prices" data-product-default-prices>
+                <div class="small fw-semibold mb-2">قیمت کلی محصول</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <div class="label">قیمت خرید کلی محصول</div>
+                        <input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number group-buy-price" value="${data.product_buy_price ?? ''}" placeholder="مثلاً 200,000">
+                    </div>
+                    <div class="col-md-3">
+                        <div class="label">قیمت فروش کلی محصول</div>
+                        <input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number group-sell-price" value="${data.product_sell_price ?? ''}" placeholder="مثلاً 250,000">
+                    </div>
+                    <div class="col-md-3 d-grid">
+                        <button type="button" class="btn btn-sm btn-outline-primary apply-default-prices-btn">اعمال قیمت روی همه تنوع‌ها</button>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="small text-muted">این قیمت به‌صورت پیش‌فرض روی همه تنوع‌های این محصول اعمال می‌شود.</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="border rounded p-2 mb-2 bg-light-subtle variant-picker" data-variant-picker>
                 <div class="small fw-semibold mb-2">۳) انتخاب مدل لیست و طرح (ردیفی)</div>
                 <div class="row g-2 align-items-end">
@@ -342,12 +366,15 @@
                 <input type="hidden" class="category-id-input" name="items[][category_id]" value="${item.category_id || ''}">
                 <input type="hidden" class="product-name-input" name="items[][name]" value="${item.name || ''}">
                 <input type="hidden" class="product-code-input" name="items[][code]" value="${item.code || ''}">
+                <input type="hidden" class="row-product-buy-price" name="items[][product_buy_price]" value="${item.product_buy_price || ''}">
+                <input type="hidden" class="row-product-sell-price" name="items[][product_sell_price]" value="${item.product_sell_price || ''}">
 
                 <div class="col-md-3">
                     <div class="label">مدل / طرح</div>
                     <input type="hidden" class="variant-id" name="items[][variant_id]" value="${item.variant_id || ''}">
                     <input type="text" class="form-control form-control-sm variant-name-display" value="${item.variant_name || ''}" readonly>
                     <div class="small text-muted mt-1 variant-code-tooltip" title="کد ۱۱ رقمی تنوع">کد ۱۱ رقمی: ${item.variant_code || '—'}</div>
+                    <span class="badge text-bg-warning mt-1 price-override-badge d-none">قیمت اختصاصی</span>
                 </div>
                 <div class="col-md-1">
                     <div class="label">تعداد</div>
@@ -400,8 +427,8 @@
         }
 
         if (variant) {
-            row.querySelector('.buy').value = formatNumericInput(variant.buy_price || 0);
-            row.querySelector('.sell').value = formatNumericInput(variant.sell_price || 0);
+            row.querySelector('.buy').value = variant.buy_price ? formatNumericInput(variant.buy_price) : '';
+            row.querySelector('.sell').value = variant.sell_price ? formatNumericInput(variant.sell_price) : '';
         }
     }
 
@@ -488,6 +515,50 @@
                 }
             }
         });
+    }
+
+    function groupDefaultPrices(groupEl) {
+        return {
+            buy: groupEl.querySelector('.group-buy-price')?.value || '',
+            sell: groupEl.querySelector('.group-sell-price')?.value || '',
+        };
+    }
+
+    function syncRowProductDefaultPrices(groupEl, row) {
+        const defaults = groupDefaultPrices(groupEl);
+        const buyHidden = row.querySelector('.row-product-buy-price');
+        const sellHidden = row.querySelector('.row-product-sell-price');
+        if (buyHidden) buyHidden.value = defaults.buy;
+        if (sellHidden) sellHidden.value = defaults.sell;
+    }
+
+    function updatePriceOverrideBadge(row) {
+        const badge = row.querySelector('.price-override-badge');
+        if (!badge) return;
+        const overridden = row.dataset.buyOverridden === '1' || row.dataset.sellOverridden === '1';
+        badge.classList.toggle('d-none', !overridden);
+    }
+
+    function applyGroupDefaultPrices(groupEl, force = false) {
+        const defaults = groupDefaultPrices(groupEl);
+
+        groupEl.querySelectorAll('[data-row]').forEach((row) => {
+            syncRowProductDefaultPrices(groupEl, row);
+
+            if (defaults.buy !== '' && (force || row.dataset.buyOverridden !== '1')) {
+                row.querySelector('.buy').value = formatNumericInput(defaults.buy);
+                row.dataset.buyOverridden = force ? '0' : (row.dataset.buyOverridden || '0');
+            }
+
+            if (defaults.sell !== '' && (force || row.dataset.sellOverridden !== '1')) {
+                row.querySelector('.sell').value = formatNumericInput(defaults.sell);
+                row.dataset.sellOverridden = force ? '0' : (row.dataset.sellOverridden || '0');
+            }
+
+            updatePriceOverrideBadge(row);
+        });
+
+        recalc();
     }
 
     function designLabelForVariant(modelLabel, variantName) {
@@ -593,6 +664,8 @@
             setName(row.querySelector('.category-id-input'), `items[${idx}][category_id]`);
             setName(row.querySelector('.product-name-input'), `items[${idx}][name]`);
             setName(row.querySelector('.product-code-input'), `items[${idx}][code]`);
+            setName(row.querySelector('.row-product-buy-price'), `items[${idx}][product_buy_price]`);
+            setName(row.querySelector('.row-product-sell-price'), `items[${idx}][product_sell_price]`);
             setName(row.querySelector('.variant-id'), `items[${idx}][variant_id]`);
             setName(row.querySelector('.qty'), `items[${idx}][quantity]`);
             setName(row.querySelector('.buy'), `items[${idx}][buy_price]`);
@@ -641,6 +714,7 @@
         const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         itemsList.insertAdjacentHTML('beforeend', productGroupTemplate(groupId, data));
         const groupEl = itemsList.querySelector(`[data-group-id="${groupId}"]`);
+        formatPriceInputs(groupEl);
 
         if (withInitialRows && data.variant_id) {
             addModelRow(groupEl, data);
@@ -687,6 +761,9 @@
         const row = modelsWrap.querySelector('[data-row]:last-child');
 
         setRowVariant(row, productId, item.variant_id, item.variant_name || '');
+        row.dataset.buyOverridden = item.price_overridden ? '1' : '0';
+        row.dataset.sellOverridden = item.price_overridden ? '1' : '0';
+        syncRowProductDefaultPrices(groupEl, row);
         const codeEl = row.querySelector('.variant-code-tooltip');
         if (codeEl && item.variant_code) {
             codeEl.textContent = `کد ۱۱ رقمی: ${item.variant_code}`;
@@ -700,6 +777,11 @@
             row.querySelector('.sell').value = formatNumericInput(item.sell_price);
         }
 
+        if (!item.price_overridden) {
+            applyGroupDefaultPrices(groupEl, false);
+        }
+
+        updatePriceOverrideBadge(row);
         formatPriceInputs(row);
         syncGroupFieldsToRows(groupEl);
         setGroupProductFieldsLocked(groupEl);
@@ -718,6 +800,8 @@
                     category_id: item.category_id || '',
                     name: item.name || '',
                     code: item.code || '',
+                    product_buy_price: item.product_buy_price || item.buy_price || '',
+                    product_sell_price: item.product_sell_price || item.sell_price || '',
                     rows: [],
                 });
             }
@@ -783,19 +867,44 @@
             e.target.classList.contains('qty') ||
             e.target.classList.contains('buy') ||
             e.target.classList.contains('sell') ||
-            e.target.classList.contains('discount-value')
+            e.target.classList.contains('discount-value') ||
+            e.target.classList.contains('group-buy-price') ||
+            e.target.classList.contains('group-sell-price')
         ) {
             if (e.target.classList.contains('formatted-number')) {
                 const atEnd = e.target.selectionStart === e.target.value.length;
                 e.target.value = formatNumericInput(e.target.value);
                 if (atEnd) e.target.setSelectionRange(e.target.value.length, e.target.value.length);
             }
+
+            if (e.target.classList.contains('buy') || e.target.classList.contains('sell')) {
+                const row = e.target.closest('[data-row]');
+                if (row) {
+                    if (e.target.classList.contains('buy')) row.dataset.buyOverridden = '1';
+                    if (e.target.classList.contains('sell')) row.dataset.sellOverridden = '1';
+                    updatePriceOverrideBadge(row);
+                }
+            }
+
+            if (e.target.classList.contains('group-buy-price') || e.target.classList.contains('group-sell-price')) {
+                const targetGroup = e.target.closest('[data-group-id]');
+                if (targetGroup) applyGroupDefaultPrices(targetGroup, false);
+            }
+
             recalc();
         }
     });
 
     itemsList.addEventListener('click', (e) => {
         const groupEl = e.target.closest('[data-group-id]');
+
+        if (e.target.classList.contains('apply-default-prices-btn')) {
+            if (!groupEl) return;
+            if (confirm('قیمت همه تنوع‌های این محصول با قیمت کلی جایگزین شود؟')) {
+                applyGroupDefaultPrices(groupEl, true);
+            }
+            return;
+        }
 
         if (e.target.classList.contains('add-selected-variant-btn')) {
             if (!groupEl) return;
@@ -816,8 +925,6 @@
                 variant_name: variant.name,
                 variant_code: variant.code || '',
                 quantity: 1,
-                buy_price: parseNumericInput(variant.buy_price || 0),
-                sell_price: parseNumericInput(variant.sell_price || 0),
                 discount_type: '',
                 discount_value: 0,
             });
@@ -851,7 +958,7 @@
 
     purchaseForm.addEventListener('submit', () => {
         purchaseForm.querySelectorAll('.formatted-number').forEach((el) => {
-            el.value = parseNumericInput(el.value);
+            el.value = String(el.value || '').trim() === '' ? '' : parseNumericInput(el.value);
         });
     });
 
