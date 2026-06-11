@@ -1,5 +1,25 @@
 @extends('layouts.app')
 
+@php
+  $formatWarehouseLocation = function ($product): string {
+      if (! $product) {
+          return '—';
+      }
+
+      $zone = $product->warehouse_zone ? 'Z' . (int) $product->warehouse_zone : null;
+      $rows = collect((array) ($product->warehouse_rows ?? []))
+          ->filter(fn ($row) => $row !== null && $row !== '')
+          ->map(fn ($row) => 'R' . (int) $row)
+          ->implode('/');
+      $bins = collect((array) ($product->warehouse_bins ?? []))
+          ->filter(fn ($bin) => $bin !== null && $bin !== '')
+          ->map(fn ($bin) => 'B' . (int) $bin)
+          ->implode('/');
+
+      return collect([$zone, $rows ?: null, $bins ?: null])->filter()->implode(' | ') ?: '—';
+  };
+@endphp
+
 @section('content')
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -51,11 +71,19 @@
     <div class="card-header bg-white">اقلام حواله</div>
     <div class="table-responsive">
       <table class="table mb-0">
-        <thead><tr><th>محصول</th><th>مدل</th><th>تعداد</th><th>قیمت</th><th>جمع</th></tr></thead>
+        <thead><tr><th>محصول</th><th>کد کالا</th><th>Z/R/B</th><th>مدل</th><th>تعداد</th><th>قیمت</th><th>جمع</th></tr></thead>
         <tbody>
           @foreach($invoice->items as $it)
+            @php
+              $itemProductCode = $it->product?->code
+                  ?: ($it->variant?->variant_code
+                      ?: ($it->product?->sku ?: '—'));
+              $itemWarehouseLocation = $formatWarehouseLocation($it->product);
+            @endphp
             <tr>
               <td>{{ $it->product?->name ?? '#'.$it->product_id }}</td>
+              <td dir="ltr" class="text-nowrap">{{ $itemProductCode }}</td>
+              <td dir="ltr" class="text-nowrap">{{ $itemWarehouseLocation }}</td>
               <td>{{ $it->variant?->variant_name ?? '—' }}</td>
               <td>{{ number_format((int)$it->quantity) }}</td>
               <td>{{ number_format((int)$it->price) }}</td>

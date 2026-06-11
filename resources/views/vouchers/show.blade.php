@@ -1,5 +1,25 @@
 @extends('layouts.app')
 
+@php
+  $formatWarehouseLocation = function ($product): string {
+      if (! $product) {
+          return '—';
+      }
+
+      $zone = $product->warehouse_zone ? 'Z' . (int) $product->warehouse_zone : null;
+      $rows = collect((array) ($product->warehouse_rows ?? []))
+          ->filter(fn ($row) => $row !== null && $row !== '')
+          ->map(fn ($row) => 'R' . (int) $row)
+          ->implode(' / ');
+      $bins = collect((array) ($product->warehouse_bins ?? []))
+          ->filter(fn ($bin) => $bin !== null && $bin !== '')
+          ->map(fn ($bin) => 'B' . (int) $bin)
+          ->implode(' / ');
+
+      return collect([$zone, $rows ?: null, $bins ?: null])->filter()->implode(' | ') ?: '—';
+  };
+@endphp
+
 @section('content')
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -33,6 +53,8 @@
           <tr>
             <th>#</th>
             <th>نام کالا</th>
+            <th>کد محصول</th>
+            <th>موقعیت Z/R/B</th>
             <th>تنوع/مدل/سریال</th>
             <th>تعداد</th>
             <th>واحد</th>
@@ -41,16 +63,25 @@
         </thead>
         <tbody>
           @forelse($voucher->items as $item)
+            @php
+              $productCode = $item->product?->code
+                  ?: ($item->variant_code
+                      ?: ($item->variant?->variant_code
+                          ?: ($item->product?->sku ?: '—')));
+              $warehouseLocation = $formatWarehouseLocation($item->product);
+            @endphp
             <tr>
               <td>{{ $loop->iteration }}</td>
               <td>{{ $item->product?->name ?? '—' }}</td>
+              <td dir="ltr" class="text-nowrap">{{ $productCode }}</td>
+              <td dir="ltr" class="text-nowrap">{{ $warehouseLocation }}</td>
               <td>{{ $item->variant_name ?: ($item->variant?->variant_name ?? '—') }}{{ $item->personnel_asset_code ? ' | کد اموال: '.$item->personnel_asset_code : '' }}</td>
               <td>{{ number_format((int) $item->quantity) }}</td>
               <td>عدد</td>
               <td>{{ $item->line_total ? 'مبلغ ردیف: '.number_format((int)$item->line_total) : '—' }}</td>
             </tr>
           @empty
-            <tr><td colspan="6" class="text-center text-muted py-4">آیتمی ثبت نشده است.</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">آیتمی ثبت نشده است.</td></tr>
           @endforelse
         </tbody>
       </table>
