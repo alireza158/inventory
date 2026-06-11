@@ -318,7 +318,7 @@ class PreinvoiceController extends Controller
             $shippingId = (int) $validated['shipping_id'];
 
             $order = PreinvoiceOrder::create([
-                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(PreinvoiceOrder::class),
+                'uuid' => DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class),
                 'created_by' => auth()->id(),
                 'status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
 
@@ -1307,7 +1307,7 @@ class PreinvoiceController extends Controller
                 ]);
             } else {
                 $invoice = Invoice::create([
-                    'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(Invoice::class),
+                    'uuid' => DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class),
                     'preinvoice_order_id' => $order->id,
 
                     'customer_id' => $order->customer_id ?? null,

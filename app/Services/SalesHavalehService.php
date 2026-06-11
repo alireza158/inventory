@@ -166,7 +166,7 @@ class SalesHavalehService
             $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
 
             $invoice = Invoice::query()->create([
-                'uuid' => DocumentCodeGenerator::generateUnique4DigitCode(Invoice::class),
+                'uuid' => DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class),
                 'preinvoice_order_id' => $order->id,
                 'customer_id' => $order->customer_id,
                 'customer_name' => $order->customer_name,
