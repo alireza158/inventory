@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
+use App\Models\PurchaseItem;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Warehouse;
@@ -222,8 +223,9 @@ class PurchaseController extends Controller
         $data = $this->validatePayload($request);
 
         DB::transaction(function () use ($purchase, $data) {
-
-            $this->rollbackPurchase($purchase);
+            $purchase = Purchase::whereKey($purchase->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $purchase->update([
                 'supplier_id' => $data['supplier_id'],
@@ -235,7 +237,7 @@ class PurchaseController extends Controller
                 'discount_value' => (int) ($data['invoice_discount_value'] ?? 0),
             ]);
 
-            $summary = $this->applyItems($purchase, $data, (int) $data['warehouse_id']);
+            $summary = $this->syncPurchaseItems($purchase, $data, (int) $data['warehouse_id']);
             $purchase->update($summary);
         });
 
@@ -265,11 +267,27 @@ class PurchaseController extends Controller
     private function validatePayload(Request $request): array
     {
         $invoiceDiscountType = $request->input('invoice_discount_type', $request->input('discount_type'));
-        $invoiceDiscountValue = $request->input('invoice_discount_value', $request->input('discount_value'));
+        $invoiceDiscountRaw = $request->input('invoice_discount_value', $request->input('discount_value'));
+        $invoiceDiscountValue = $this->filledNumber($invoiceDiscountRaw) ? $this->normalizeNumber($invoiceDiscountRaw) : null;
         $note = $request->input('note', $request->input('notes'));
 
         $items = collect((array) $request->input('items', []))
-            ->filter(fn ($item) => (int) ($item['quantity'] ?? $item['qty'] ?? 0) > 0)
+            ->map(function ($item) {
+                if (array_key_exists('quantity', $item)) {
+                    $item['quantity'] = $this->normalizeNumber($item['quantity']);
+                }
+
+                if (array_key_exists('qty', $item)) {
+                    $item['qty'] = $this->normalizeNumber($item['qty']);
+                }
+
+                if (array_key_exists('discount_value', $item) && $this->filledNumber($item['discount_value'])) {
+                    $item['discount_value'] = $this->normalizeNumber($item['discount_value']);
+                }
+
+                return $item;
+            })
+            ->filter(fn ($item) => $this->normalizeNumber($item['quantity'] ?? $item['qty'] ?? 0) > 0)
             ->values()
             ->all();
 
@@ -310,7 +328,7 @@ class PurchaseController extends Controller
         ]);
 
         $data['items'] = array_values(array_map(function ($item, $index) {
-            $qty = (int) ($item['quantity'] ?? $item['qty'] ?? 0);
+            $qty = $this->normalizeNumber($item['quantity'] ?? $item['qty'] ?? 0);
 
             $buyRaw = $item['buy_price'] ?? null;
             $sellRaw = $item['sell_price'] ?? null;
@@ -331,6 +349,9 @@ class PurchaseController extends Controller
             $item['sell_price'] = max(0, $this->parsePrice($sellSource));
             $item['product_buy_price'] = $this->filledPrice($productBuyRaw) ? max(0, $this->parsePrice($productBuyRaw)) : null;
             $item['product_sell_price'] = $this->filledPrice($productSellRaw) ? max(0, $this->parsePrice($productSellRaw)) : null;
+            $item['discount_value'] = $this->filledNumber($item['discount_value'] ?? null)
+                ? max(0, $this->normalizeNumber($item['discount_value']))
+                : 0;
 
             return $item;
         }, $data['items'], array_keys($data['items'])));
@@ -366,6 +387,11 @@ class PurchaseController extends Controller
 
     private function filledPrice(mixed $value): bool
     {
+        return $this->filledNumber($value);
+    }
+
+    private function filledNumber(mixed $value): bool
+    {
         return trim((string) ($value ?? '')) !== '';
     }
 
@@ -375,6 +401,11 @@ class PurchaseController extends Controller
     }
 
     private function parsePrice(mixed $value): int
+    {
+        return $this->normalizeNumber($value);
+    }
+
+    private function normalizeNumber(mixed $value): int
     {
         $normalized = $this->normalizePriceDigits($value);
 
@@ -493,6 +524,223 @@ class PurchaseController extends Controller
             'total_discount' => $totalDiscount,
             'total_amount' => $totalAmount,
         ];
+    }
+
+    private function syncPurchaseItems(Purchase $purchase, array $data, int $warehouseId): array
+    {
+        $purchase->load('items');
+
+        $oldItemGroups = $purchase->items
+            ->filter(fn ($item) => (int) $item->product_variant_id > 0)
+            ->groupBy(fn ($item) => (int) $item->product_variant_id);
+
+        $newItems = collect($data['items'])
+            ->keyBy(fn ($item) => (int) $item['variant_id']);
+
+        $variantIds = $oldItemGroups->keys()
+            ->merge($newItems->keys())
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+
+        $variants = ProductVariant::query()
+            ->whereIn('id', $variantIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        $productIds = $variants->pluck('product_id')
+            ->merge($newItems->pluck('product_id'))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+
+        $products = Product::query()
+            ->whereIn('id', $productIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        $subtotalAmount = 0;
+        $itemsDiscountTotal = 0;
+        $affectedProductIds = [];
+
+        foreach ($variantIds as $variantId) {
+            $variant = $variants->get($variantId);
+            if (!$variant) {
+                continue;
+            }
+
+            $oldGroup = $oldItemGroups->get($variantId, collect());
+            $oldItem = $oldGroup->first();
+            $newItem = $newItems->get($variantId);
+
+            $oldQty = (int) $oldGroup->sum('quantity');
+            $newQty = $newItem ? (int) $newItem['quantity'] : 0;
+            $delta = $newQty - $oldQty;
+
+            if ($delta < 0 && (int) $variant->stock < abs($delta)) {
+                $message = $newItem
+                    ? 'امکان کاهش تعداد این آیتم وجود ندارد، چون بخشی از موجودی قبلاً مصرف یا فروخته شده است.'
+                    : 'امکان حذف این آیتم وجود ندارد، چون بخشی از موجودی آن قبلاً فروخته یا مصرف شده است.';
+
+                abort(422, $message);
+            }
+
+            if ($newItem) {
+                $product = $products->get((int) $newItem['product_id']);
+                if (!$product) {
+                    abort(422, 'کالای انتخاب‌شده معتبر نیست.');
+                }
+
+                $buyPrice = (int) $newItem['buy_price'];
+                $sellPrice = (int) $newItem['sell_price'];
+                $quantity = (int) $newItem['quantity'];
+                $lineSubtotal = $quantity * $buyPrice;
+                $itemDiscountType = $newItem['discount_type'] ?? null;
+                $itemDiscountValue = (int) ($newItem['discount_value'] ?? 0);
+                $itemDiscountAmount = $this->calculateDiscount($lineSubtotal, $itemDiscountType, $itemDiscountValue);
+                $lineTotal = max(0, $lineSubtotal - $itemDiscountAmount);
+
+                $variantPayload = [
+                    'buy_price' => $buyPrice,
+                    'sell_price' => $sellPrice,
+                ];
+
+                if ($delta !== 0) {
+                    $before = (int) $variant->stock;
+                    $after = $before + $delta;
+                    $variantPayload['stock'] = $after;
+                }
+
+                if ($this->purchaseCanRefreshVariantPrice($purchase, $variantId)) {
+                    $variant->update($variantPayload);
+                } elseif ($delta !== 0) {
+                    $variant->update(['stock' => $variantPayload['stock']]);
+                }
+
+                if ($delta !== 0) {
+                    StockMovement::create([
+                        'product_id' => $product->id,
+                        'warehouse_id' => $warehouseId,
+                        'user_id' => auth()->id(),
+                        'type' => $delta > 0 ? 'in' : 'out',
+                        'reason' => 'adjustment',
+                        'transaction_type' => 'purchase_adjustment',
+                        'quantity' => abs($delta),
+                        'stock_before' => $before,
+                        'stock_after' => $after,
+                        'reference' => 'PUR-ADJ-' . $purchase->id,
+                        'reference_type' => Purchase::class,
+                        'reference_id' => $purchase->id,
+                        'note' => 'اصلاح تعداد خرید کالا - مدل: ' . $variant->variant_name,
+                    ]);
+
+                    WarehouseStockService::change($warehouseId, $product->id, $delta, (int) $variant->id);
+                }
+
+                $payload = [
+                    'product_id' => $product->id,
+                    'product_variant_id' => $variant->id,
+                    'product_name' => $product->name,
+                    'product_code' => $product->code,
+                    'variant_name' => $variant->variant_name,
+                    'quantity' => $quantity,
+                    'buy_price' => $buyPrice,
+                    'sell_price' => $sellPrice,
+                    'line_subtotal' => $lineSubtotal,
+                    'discount_type' => $itemDiscountType,
+                    'discount_value' => $itemDiscountValue,
+                    'discount_amount' => $itemDiscountAmount,
+                    'line_total' => $lineTotal,
+                ];
+
+                if ($oldItem) {
+                    $oldItem->update($payload);
+                    $oldGroup->slice(1)->each->delete();
+                } else {
+                    $purchase->items()->create($payload);
+                }
+
+                $subtotalAmount += $lineSubtotal;
+                $itemsDiscountTotal += $itemDiscountAmount;
+                $affectedProductIds[] = $product->id;
+            } elseif ($oldItem) {
+                if ($delta !== 0) {
+                    $before = (int) $variant->stock;
+                    $after = $before + $delta;
+
+                    $variant->update([
+                        'stock' => $after,
+                    ]);
+
+                    StockMovement::create([
+                        'product_id' => $variant->product_id,
+                        'warehouse_id' => $warehouseId,
+                        'user_id' => auth()->id(),
+                        'type' => 'out',
+                        'reason' => 'adjustment',
+                        'transaction_type' => 'purchase_adjustment',
+                        'quantity' => abs($delta),
+                        'stock_before' => $before,
+                        'stock_after' => $after,
+                        'reference' => 'PUR-ADJ-' . $purchase->id,
+                        'reference_type' => Purchase::class,
+                        'reference_id' => $purchase->id,
+                        'note' => 'حذف آیتم از سند خرید - مدل: ' . $variant->variant_name,
+                    ]);
+
+                    WarehouseStockService::change($warehouseId, (int) $variant->product_id, $delta, (int) $variant->id);
+                }
+
+                $affectedProductIds[] = (int) $variant->product_id;
+                $oldGroup->each->delete();
+            }
+        }
+
+        foreach (array_unique($affectedProductIds) as $productId) {
+            $product = $products->get((int) $productId) ?: Product::find($productId);
+            if ($product) $this->recalcProductSummary($product);
+        }
+
+        $baseAfterItemDiscount = max(0, $subtotalAmount - $itemsDiscountTotal);
+
+        $invoiceDiscountType = $data['invoice_discount_type'] ?? null;
+        $invoiceDiscountValue = (int) ($data['invoice_discount_value'] ?? 0);
+
+        $invoiceDiscountAmount = $this->calculateDiscount($baseAfterItemDiscount, $invoiceDiscountType, $invoiceDiscountValue);
+
+        $totalDiscount = $itemsDiscountTotal + $invoiceDiscountAmount;
+        $totalAmount = max(0, $subtotalAmount - $totalDiscount);
+
+        return [
+            'subtotal_amount' => $subtotalAmount,
+            'discount_type' => $invoiceDiscountType,
+            'discount_value' => $invoiceDiscountValue,
+            'total_discount' => $totalDiscount,
+            'total_amount' => $totalAmount,
+        ];
+    }
+
+    private function purchaseCanRefreshVariantPrice(Purchase $purchase, int $variantId): bool
+    {
+        return PurchaseItem::query()
+            ->where('product_variant_id', $variantId)
+            ->where('purchase_id', '!=', $purchase->id)
+            ->whereHas('purchase', function ($query) use ($purchase) {
+                $query->where('purchased_at', '>', $purchase->purchased_at)
+                    ->orWhere(function ($nested) use ($purchase) {
+                        $nested->where('purchased_at', $purchase->purchased_at)
+                            ->where('id', '>', $purchase->id);
+                    });
+            })
+            ->doesntExist();
     }
 
     private function calculateDiscount(int $baseAmount, ?string $discountType, int $discountValue): int

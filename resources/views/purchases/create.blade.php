@@ -384,20 +384,22 @@
         };
     }
 
-    function applyDefaultsToCard(card, force = false) {
+    function applyDefaultsToCard(card, force = false, includeActiveRows = false, fields = ['buy', 'sell']) {
         const defaults = cardDefaults(card);
         card.querySelectorAll('[data-variant-row]').forEach((row) => {
             const buyEl = row.querySelector('[data-buy]');
             const sellEl = row.querySelector('[data-sell]');
+            const isActiveRow = parseNumericInput(row.querySelector('[data-qty]')?.value || 0) > 0;
+            const shouldApplyToActiveRow = includeActiveRows && isActiveRow;
 
-            if (force || row.dataset.buyOverridden !== '1') {
+            if (fields.includes('buy') && (force || shouldApplyToActiveRow || row.dataset.buyOverridden !== '1')) {
                 buyEl.value = defaults.buy === '' ? '' : formatNumericInput(defaults.buy);
-                row.dataset.buyOverridden = force ? '0' : (row.dataset.buyOverridden || '0');
+                row.dataset.buyOverridden = (force || shouldApplyToActiveRow) ? '0' : (row.dataset.buyOverridden || '0');
             }
 
-            if (force || row.dataset.sellOverridden !== '1') {
+            if (fields.includes('sell') && (force || shouldApplyToActiveRow || row.dataset.sellOverridden !== '1')) {
                 sellEl.value = defaults.sell === '' ? '' : formatNumericInput(defaults.sell);
-                row.dataset.sellOverridden = force ? '0' : (row.dataset.sellOverridden || '0');
+                row.dataset.sellOverridden = (force || shouldApplyToActiveRow) ? '0' : (row.dataset.sellOverridden || '0');
             }
 
             updatePriceBadge(row);
@@ -629,7 +631,7 @@
         }
 
         if (target.matches('[data-product-buy], [data-product-sell]')) {
-            applyDefaultsToCard(card, false);
+            applyDefaultsToCard(card, false, true, [target.matches('[data-product-buy]') ? 'buy' : 'sell']);
             return;
         }
 
