@@ -13,6 +13,7 @@ use App\Models\Warehouse;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -72,7 +73,7 @@ class PurchaseController extends Controller
         $products = Product::query()
             ->with(['variants.modelList:id,model_name,code'])
             ->orderBy('name')
-            ->get(['id', 'name', 'category_id', 'code', 'short_barcode']);
+            ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
 
         $variants = ProductVariant::query()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
@@ -137,7 +138,7 @@ class PurchaseController extends Controller
         $products = Product::query()
             ->with(['variants.modelList:id,model_name,code'])
             ->orderBy('name')
-            ->get(['id', 'name', 'category_id', 'code', 'short_barcode']);
+            ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
 
         $variants = ProductVariant::query()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
@@ -267,11 +268,17 @@ class PurchaseController extends Controller
         $invoiceDiscountValue = $request->input('invoice_discount_value', $request->input('discount_value'));
         $note = $request->input('note', $request->input('notes'));
 
+        $items = collect((array) $request->input('items', []))
+            ->filter(fn ($item) => (int) ($item['quantity'] ?? $item['qty'] ?? 0) > 0)
+            ->values()
+            ->all();
+
         $request->merge([
             'invoice_discount_type' => $invoiceDiscountType,
             'invoice_discount_value' => $invoiceDiscountValue,
             'note' => $note,
             'warehouse_id' => WarehouseStockService::centralWarehouseId(),
+            'items' => $items,
         ]);
 
         $data = $request->validate([
@@ -290,26 +297,43 @@ class PurchaseController extends Controller
             'items.*.qty' => ['nullable', 'integer', 'min:1'],
             'items.*.quantity' => ['nullable', 'integer', 'min:1'],
 
-            'items.*.buy_price' => ['required'],
-            'items.*.sell_price' => ['required'],
+            'items.*.buy_price' => ['nullable'],
+            'items.*.sell_price' => ['nullable'],
+            'items.*.product_buy_price' => ['nullable'],
+            'items.*.product_sell_price' => ['nullable'],
 
             'items.*.discount_type' => ['nullable', 'in:amount,percent'],
             'items.*.discount_value' => ['nullable', 'integer', 'min:0'],
+        ], [
+            'items.required' => 'حداقل یک قلم با تعداد معتبر باید برای خرید وارد شود.',
+            'items.min' => 'حداقل یک قلم با تعداد معتبر باید برای خرید وارد شود.',
         ]);
 
-        // ✅ اینجا فقط پرانتز اصلاح شد
-        $data['items'] = array_values(array_map(function ($item) {
+        $data['items'] = array_values(array_map(function ($item, $index) {
             $qty = (int) ($item['quantity'] ?? $item['qty'] ?? 0);
 
-            $buy = (int) preg_replace('/[^\d]/', '', (string) ($item['buy_price'] ?? 0));
-            $sell = (int) preg_replace('/[^\d]/', '', (string) ($item['sell_price'] ?? 0));
+            $buyRaw = $item['buy_price'] ?? null;
+            $sellRaw = $item['sell_price'] ?? null;
+            $productBuyRaw = $item['product_buy_price'] ?? null;
+            $productSellRaw = $item['product_sell_price'] ?? null;
+
+            $buySource = $this->filledPrice($buyRaw) ? $buyRaw : $productBuyRaw;
+            $sellSource = $this->filledPrice($sellRaw) ? $sellRaw : $productSellRaw;
+
+            if (! $this->validPrice($buySource) || ! $this->validPrice($sellSource)) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.buy_price" => 'برای همه اقلام خرید باید قیمت خرید و قیمت فروش مشخص شود.',
+                ]);
+            }
 
             $item['quantity'] = max(1, $qty);
-            $item['buy_price'] = max(0, $buy);
-            $item['sell_price'] = max(0, $sell);
+            $item['buy_price'] = max(0, $this->parsePrice($buySource));
+            $item['sell_price'] = max(0, $this->parsePrice($sellSource));
+            $item['product_buy_price'] = $this->filledPrice($productBuyRaw) ? max(0, $this->parsePrice($productBuyRaw)) : null;
+            $item['product_sell_price'] = $this->filledPrice($productSellRaw) ? max(0, $this->parsePrice($productSellRaw)) : null;
 
             return $item;
-        }, $data['items'])); // ✅ درست: فقط دو تا )
+        }, $data['items'], array_keys($data['items'])));
 
         if (($data['invoice_discount_type'] ?? null) === 'none') {
             $data['invoice_discount_type'] = null;
@@ -337,6 +361,50 @@ class PurchaseController extends Controller
         }
 
         return $data;
+    }
+
+
+    private function filledPrice(mixed $value): bool
+    {
+        return trim((string) ($value ?? '')) !== '';
+    }
+
+    private function validPrice(mixed $value): bool
+    {
+        return $this->filledPrice($value) && preg_match('/\d/', $this->normalizePriceDigits($value)) === 1;
+    }
+
+    private function parsePrice(mixed $value): int
+    {
+        $normalized = $this->normalizePriceDigits($value);
+
+        return (int) preg_replace('/[^\d]/', '', $normalized);
+    }
+
+    private function normalizePriceDigits(mixed $value): string
+    {
+        return strtr((string) ($value ?? ''), [
+            '۰' => '0',
+            '۱' => '1',
+            '۲' => '2',
+            '۳' => '3',
+            '۴' => '4',
+            '۵' => '5',
+            '۶' => '6',
+            '۷' => '7',
+            '۸' => '8',
+            '۹' => '9',
+            '٠' => '0',
+            '١' => '1',
+            '٢' => '2',
+            '٣' => '3',
+            '٤' => '4',
+            '٥' => '5',
+            '٦' => '6',
+            '٧' => '7',
+            '٨' => '8',
+            '٩' => '9',
+        ]);
     }
 
     private function applyItems(Purchase $purchase, array $data, int $warehouseId): array

@@ -19,6 +19,9 @@
                 'quantity' => $it->quantity,
                 'buy_price' => \App\Support\Currency::toRial($it->buy_price),
                 'sell_price' => \App\Support\Currency::toRial($it->sell_price),
+                'product_buy_price' => \App\Support\Currency::toRial($it->buy_price),
+                'product_sell_price' => \App\Support\Currency::toRial($it->sell_price),
+                'price_overridden' => true,
                 'discount_type' => $it->discount_type,
                 'discount_value' => $it->discount_type === 'amount' ? \App\Support\Currency::toRial($it->discount_value) : $it->discount_value,
             ])->values()->all()
@@ -27,53 +30,135 @@
 
     $productsPayload = $products->map(function ($p) {
         return [
-            'id' => $p->id,
-            'name' => $p->name,
-            'code' => $p->code ?: $p->short_barcode,
-            'short_barcode' => $p->short_barcode,
-            'category_id' => $p->category_id,
+            'id' => (int) $p->id,
+            'name' => (string) $p->name,
+            'code' => (string) ($p->code ?: $p->short_barcode),
+            'short_barcode' => (string) ($p->short_barcode ?? ''),
+            'sku' => (string) ($p->sku ?? ''),
+            'category_id' => $p->category_id ? (int) $p->category_id : null,
             'variants' => $p->variants->map(function ($v) {
                 return [
-                    'id' => $v->id,
-                    'name' => $v->variant_name,
-                    'model_name' => $v->modelList?->model_name,
-                    'model_code' => $v->modelList?->code,
-                    'variety_name' => $v->variety_name,
-                    'code' => $v->variant_code,
+                    'id' => (int) $v->id,
+                    'name' => (string) $v->variant_name,
+                    'model_name' => (string) ($v->modelList?->model_name ?? ''),
+                    'model_code' => (string) ($v->modelList?->code ?? ''),
+                    'variety_name' => (string) ($v->variety_name ?? ''),
+                    'code' => (string) ($v->variant_code ?? ''),
                     'buy_price' => \App\Support\Currency::toRial($v->buy_price ?? 0),
                     'sell_price' => \App\Support\Currency::toRial($v->sell_price ?? 0),
+                    'stock' => (int) ($v->stock ?? 0),
+                    'reserved' => (int) ($v->reserved ?? 0),
                 ];
             })->values()->all(),
         ];
     })->values()->all();
 
-    $categoriesPayload = ($categories ?? collect())->map(function ($category) {
-        return [
-            'id' => $category->id,
-            'name' => $category->name,
-        ];
-    })->values()->all();
+    $categoriesPayload = ($categories ?? collect())->map(fn ($category) => [
+        'id' => (int) $category->id,
+        'name' => (string) $category->name,
+    ])->values()->all();
 @endphp
 
+<style>
+    .purchase-fast-page .purchase-main-card,
+    .purchase-fast-page .purchase-quick-card,
+    .purchase-fast-page .purchase-summary-card,
+    .purchase-fast-page .purchase-product-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+    }
 
+    .purchase-fast-page .section-title {
+        font-weight: 800;
+        color: #0f172a;
+    }
 
-<div class="purchase-page-wrap">
+    .purchase-fast-page .purchase-product-card {
+        background: #fff;
+        overflow: hidden;
+    }
 
+    .purchase-fast-page .product-card-head {
+        background: linear-gradient(90deg, #f8fafc, #eef6ff);
+        border-bottom: 1px solid #e5e7eb;
+        padding: 12px 14px;
+    }
+
+    .purchase-fast-page .product-code-chip,
+    .purchase-fast-page .product-stat-chip {
+        border: 1px solid #dbeafe;
+        background: #eff6ff;
+        color: #1e40af;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .purchase-fast-page .price-panel {
+        background: #fbfdff;
+        border: 1px dashed #cbd5e1;
+        border-radius: 14px;
+        padding: 10px;
+    }
+
+    .purchase-fast-page .variants-table th {
+        white-space: nowrap;
+        font-size: 12px;
+        color: #475569;
+    }
+
+    .purchase-fast-page .variants-table td {
+        vertical-align: middle;
+    }
+
+    .purchase-fast-page .variant-title {
+        font-weight: 700;
+        color: #1f2937;
+    }
+
+    .purchase-fast-page .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .purchase-fast-page .summary-sticky {
+        position: sticky;
+        bottom: 0;
+        z-index: 20;
+        background: rgba(255, 255, 255, .96);
+        backdrop-filter: blur(8px);
+    }
+
+    .purchase-fast-page .qty-input { max-width: 95px; }
+    .purchase-fast-page .price-input { min-width: 130px; }
+</style>
+
+<div class="purchase-page-wrap purchase-fast-page">
     <div class="purchase-topbar d-flex justify-content-between align-items-center mb-3">
         <h4 class="page-title mb-0">{{ $isEdit ? 'ویرایش سند خرید' : 'ثبت خرید جدید' }}</h4>
         <a class="btn btn-sm btn-outline-light" href="{{ route('purchases.index') }}">بازگشت</a>
     </div>
 
-    <div class="card purchase-form">
-        <div class="card-body">
-            <form method="POST" action="{{ $formAction }}" id="purchaseForm">
-                @csrf
-                @if($isEdit)
-                    @method('PUT')
-                @endif
-                <input type="hidden" name="warehouse_id" value="{{ old('warehouse_id', $purchase->warehouse_id ?? '') }}">
+    <form method="POST" action="{{ $formAction }}" id="purchaseForm">
+        @csrf
+        @if($isEdit)
+            @method('PUT')
+        @endif
+        <input type="hidden" name="warehouse_id" value="{{ old('warehouse_id', $purchase->warehouse_id ?? '') }}">
+        <div id="itemsPayload"></div>
 
-                <div class="row g-2 mb-2">
+        <div class="card purchase-main-card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div>
+                        <div class="section-title">اطلاعات اصلی خرید</div>
+                        <div class="small text-muted">تأمین‌کننده، انبار مقصد و توضیحات سند را وارد کنید.</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" type="submit">{{ $isEdit ? 'ذخیره تغییرات سند خرید' : 'ثبت نهایی خرید' }}</button>
+                </div>
+
+                <div class="row g-2 align-items-end">
                     <div class="col-md-4">
                         <label class="form-label">تامین‌کننده</label>
                         <div class="d-flex gap-2">
@@ -85,44 +170,81 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <a href="{{ route('persons.index') }}" class="btn btn-sm btn-outline-dark">مدیریت اشخاص</a>
+                            <a href="{{ route('persons.index') }}" class="btn btn-sm btn-outline-dark">اشخاص</a>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">انبار مقصد</label>
                         <input class="form-control form-control-sm" value="انبار مرکزی" readonly>
                     </div>
-                    <div class="col-md-{{ $isEdit ? '2' : '5' }}">
-                        <label class="form-label">توضیحات (اختیاری)</label>
-                        <input class="form-control form-control-sm" name="note" value="{{ old('note', $purchase->note ?? '') }}">
+                    <div class="col-md-{{ $isEdit ? '3' : '6' }}">
+                        <label class="form-label">توضیحات خرید</label>
+                        <input class="form-control form-control-sm" name="note" value="{{ old('note', $purchase->note ?? '') }}" placeholder="اختیاری">
                     </div>
                     @if($isEdit)
                         <div class="col-md-3">
                             <label class="form-label">تاریخ خرید</label>
-                            <input
-                                type="datetime-local"
-                                class="form-control form-control-sm"
-                                name="purchased_at"
-                                value="{{ old('purchased_at', optional($purchase->purchased_at)->format('Y-m-d\\TH:i')) }}"
-                            >
+                            <input type="datetime-local" class="form-control form-control-sm" name="purchased_at" value="{{ old('purchased_at', optional($purchase->purchased_at)->format('Y-m-d\TH:i')) }}">
                         </div>
                     @endif
                 </div>
+            </div>
+        </div>
 
-
-
-                <div id="itemsList" class="mt-2"></div>
-
-                <div class="d-flex gap-2 flex-wrap mt-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="addRowBtn">+ افزودن کالا از لیست محصولات</button>
+        <div class="card purchase-quick-card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div>
+                        <div class="section-title">افزودن سریع محصول به خرید</div>
+                        <div class="small text-muted">محصول را با نام، کد، بارکد یا SKU جستجو کنید؛ دسته‌بندی فقط فیلتر اختیاری است.</div>
+                    </div>
                 </div>
-
-
-                <hr>
 
                 <div class="row g-2 align-items-end">
                     <div class="col-md-3">
-                        <label class="form-label">تخفیف کلی فاکتور</label>
+                        <label class="form-label">فیلتر دسته‌بندی</label>
+                        <select class="form-select form-select-sm" id="quickCategoryFilter">
+                            <option value="">همه دسته‌بندی‌ها</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}">{{ $category->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">جستجوی محصول</label>
+                        <input type="search" class="form-control form-control-sm" id="quickProductSearch" placeholder="نام کالا، کد، بارکد یا SKU...">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">انتخاب کالا</label>
+                        <select class="form-select form-select-sm" id="quickProductSelect"></select>
+                    </div>
+                    <div class="col-md-1 d-grid">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="addProductBtn">افزودن</button>
+                    </div>
+                </div>
+                <div class="small text-muted mt-2" id="quickProductHelp">بعد از افزودن محصول، همه تنوع‌های آن به صورت خودکار در کارت محصول نمایش داده می‌شوند.</div>
+            </div>
+        </div>
+
+        <div id="purchaseProducts" class="d-flex flex-column gap-3"></div>
+
+        <div class="card purchase-summary-card summary-sticky mt-3">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-2">
+                        <div class="small text-muted">محصولات انتخاب‌شده</div>
+                        <div class="fw-bold"><span id="summaryProductCount">0</span> محصول</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="small text-muted">تنوع‌های دارای تعداد</div>
+                        <div class="fw-bold"><span id="summaryVariantCount">0</span> ردیف</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="small text-muted">جمع قبل تخفیف</div>
+                        <div class="fw-bold"><span id="subtotalAmount">0</span> ریال</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">نوع تخفیف کلی</label>
                         <select class="form-select form-select-sm" name="invoice_discount_type" id="invoiceDiscountType">
                             <option value="">بدون تخفیف</option>
                             <option value="amount" @selected(old('invoice_discount_type', $purchase->discount_type ?? '')==='amount')>مبلغی</option>
@@ -130,22 +252,18 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">مقدار</label>
+                        <label class="form-label small mb-1">مقدار تخفیف</label>
                         <input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number" id="invoiceDiscountValue" name="invoice_discount_value" value="{{ old('invoice_discount_value', ($purchase->discount_type ?? null) === 'amount' ? \App\Support\Currency::toRial($purchase->discount_value ?? 0) : ($purchase->discount_value ?? 0)) }}">
                     </div>
-                    <div class="col-md-7 text-end">
-                        <div class="small text-muted">جمع کل قبل تخفیف: <span id="subtotalAmount">0</span> ریال</div>
+                    <div class="col-md-2 text-end">
                         <div class="small text-muted">جمع تخفیف: <span id="totalDiscountAmount">0</span> ریال</div>
-                        <div class="fw-bold fs-5" style="color: var(--ink);">قیمت کل خرید: <span id="totalAmount">0</span> ریال</div>
+                        <div class="fw-bold fs-5" style="color: var(--ink);">نهایی: <span id="totalAmount">0</span> ریال</div>
+                        <button class="btn btn-sm btn-primary mt-2" type="submit">{{ $isEdit ? 'ذخیره تغییرات' : 'ثبت نهایی خرید' }}</button>
                     </div>
                 </div>
-
-                <div class="mt-4">
-                    <button class="btn btn-sm btn-primary">{{ $isEdit ? 'ذخیره تغییرات سند خرید' : 'ثبت نهایی خرید' }}</button>
-                </div>
-            </form>
+            </div>
         </div>
-    </div>
+    </form>
 </div>
 
 <script>
@@ -155,26 +273,47 @@
     const initialItems = @json($initialItems);
 
     const purchaseForm = document.getElementById('purchaseForm');
-    const itemsList = document.getElementById('itemsList');
-    const addBtn = document.getElementById('addRowBtn');
+    const productCardsEl = document.getElementById('purchaseProducts');
+    const payloadEl = document.getElementById('itemsPayload');
+    const quickCategoryEl = document.getElementById('quickCategoryFilter');
+    const quickSearchEl = document.getElementById('quickProductSearch');
+    const quickProductEl = document.getElementById('quickProductSelect');
+    const addProductBtn = document.getElementById('addProductBtn');
+    const invoiceDiscountTypeEl = document.getElementById('invoiceDiscountType');
+    const invoiceDiscountValueEl = document.getElementById('invoiceDiscountValue');
 
+    const summaryProductCountEl = document.getElementById('summaryProductCount');
+    const summaryVariantCountEl = document.getElementById('summaryVariantCount');
     const subtotalEl = document.getElementById('subtotalAmount');
     const totalDiscountEl = document.getElementById('totalDiscountAmount');
     const totalEl = document.getElementById('totalAmount');
-    const invoiceDiscountTypeEl = document.getElementById('invoiceDiscountType');
-    const invoiceDiscountValueEl = document.getElementById('invoiceDiscountValue');
-    const hasSelect2 = typeof window.jQuery !== 'undefined' && typeof window.jQuery.fn.select2 === 'function';
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function normalizeDigits(value) {
+        return String(value ?? '')
+            .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+            .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0));
+    }
 
     function parseNumericInput(value) {
-        const normalized = String(value || '')
-            .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
-            .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
-            .replace(/[^\d]/g, '');
+        const normalized = normalizeDigits(value).replace(/[^\d]/g, '');
         return Number(normalized || 0);
     }
 
     function formatNumericInput(value) {
+        if (String(value ?? '').trim() === '') return '';
         return parseNumericInput(value).toLocaleString('en-US');
+    }
+
+    function formatFa(value) {
+        return Number(value || 0).toLocaleString('fa-IR');
     }
 
     function calculateDiscount(base, type, value) {
@@ -184,686 +323,384 @@
         return Math.min(v, base);
     }
 
-    function categoryOptions(selected = '') {
-        return `<option value="">انتخاب دسته‌بندی</option>${categories.map((category) =>
-            `<option value="${category.id}" ${String(selected)===String(category.id)?'selected':''}>${category.name}</option>`
-        ).join('')}`;
+    function productById(productId) {
+        return products.find((p) => String(p.id) === String(productId)) || null;
     }
 
-    function productOptionsByCategory(categoryId, selected = '') {
-        if (!categoryId) return '<option value="">ابتدا دسته‌بندی را انتخاب کنید</option>';
-        const filtered = products.filter((p) => String(p.category_id) === String(categoryId));
-        if (filtered.length === 0) return '<option value="">کالایی در این دسته‌بندی نیست</option>';
-
-        return `<option value="">انتخاب کالا</option>${filtered.map((p) =>
-            `<option value="${p.id}" data-code="${p.code || ''}" data-category-id="${p.category_id || ''}" ${String(selected)===String(p.id)?'selected':''}>${p.name} (${p.code || '-'})</option>`
-        ).join('')}`;
+    function categoryName(categoryId) {
+        return categories.find((c) => String(c.id) === String(categoryId))?.name || 'بدون دسته';
     }
 
+    function variantLabel(variant) {
+        const parts = [];
+        if (variant.model_name) parts.push(variant.model_name);
+        if (variant.variety_name && variant.variety_name !== '—') parts.push(variant.variety_name);
+        return parts.join(' / ') || variant.name || 'تنوع عمومی';
+    }
 
+    function filteredProducts() {
+        const categoryId = quickCategoryEl.value || '';
+        const term = normalizeDigits(quickSearchEl.value).trim().toLowerCase();
 
-    function initProductSelect2(selectEl) {
-        if (!hasSelect2 || !selectEl) return;
+        return products.filter((product) => {
+            if (categoryId && String(product.category_id) !== String(categoryId)) return false;
+            if (!term) return true;
 
-        const $select = window.jQuery(selectEl);
-        if ($select.hasClass('select2-hidden-accessible')) {
-            $select.select2('destroy');
-        }
+            const haystack = [product.name, product.code, product.short_barcode, product.sku]
+                .concat((product.variants || []).flatMap((variant) => [variant.name, variant.code]))
+                .map((v) => normalizeDigits(v).toLowerCase())
+                .join(' ');
 
-        $select.select2({
-            dir: 'rtl',
-            width: '100%',
-            placeholder: 'جستجوی کالا...',
-            allowClear: true,
-            language: {
-                noResults: () => 'نتیجه‌ای پیدا نشد',
-                searching: () => 'در حال جستجو...',
-            },
-        });
-
-        $select.off('change.purchaseProduct').on('change.purchaseProduct', function () {
-            const groupEl = this.closest('[data-group-id]');
-            if (groupEl) handleProductChanged(groupEl);
+            return haystack.includes(term);
         });
     }
 
-    function extractModelGroup(variant) {
-        const modelName = String(variant?.model_name || '').trim();
-        if (modelName) return modelName;
-
-        const cleaned = String(variant?.name || '').trim();
-        if (!cleaned) return 'سایر';
-
-        const byDash = cleaned.split(' - ');
-        if (byDash.length > 1) return byDash[0].trim() || 'سایر';
-
-        const m = cleaned.match(/^(.*?)\s+طرح\s+\d+/u);
-        if (m && m[1]) return m[1].trim();
-
-        return 'عمومی';
-    }
-
-    function groupedVariants(productId) {
-        const product = products.find((p) => String(p.id) === String(productId));
-        if (!product) return [];
-
-        const map = new Map();
-        (product.variants || []).forEach((v) => {
-            const key = extractModelGroup(v);
-            if (!map.has(key)) map.set(key, []);
-            map.get(key).push(v);
-        });
-
-        return Array.from(map.entries()).map(([label, variants]) => ({ label, variants }));
-    }
-
-    function findVariant(productId, variantId) {
-        const product = products.find((p) => String(p.id) === String(productId));
-        if (!product) return null;
-        return product.variants.find((v) => String(v.id) === String(variantId)) || null;
-    }
-
-    function productGroupTemplate(groupId, data = {}) {
-        const categoryId = data.category_id || '';
-        const productId = data.product_id || '';
-
-        return `
-        <div class="purchase-product-group" data-group-id="${groupId}">
-            <div class="group-head">
-                <div class="group-title">
-                    <span class="group-index-badge">1</span>
-                    <span class="group-title-text">محصول 1</span>
-                </div>
-                <div class="group-actions d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-product-group">حذف محصول</button>
-                </div>
-            </div>
-
-            <div class="row g-2 mb-2 group-product-fields">
-                <div class="col-md-4">
-                    <div class="label">۱) دسته‌بندی</div>
-                    <select class="form-select form-select-sm group-category-select" required>
-                        ${categoryOptions(categoryId)}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <div class="label">۲) کالا (از همان دسته‌بندی)</div>
-                    <select class="form-select form-select-sm group-product-select product-search-select" required>
-                        ${productOptionsByCategory(categoryId, productId)}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <div class="label">کد محصول</div>
-                    <input class="form-control form-control-sm group-product-code" value="${data.code ?? ''}" required readonly>
-                </div>
-                <div class="col-12">
-                    <div class="small text-success d-none" data-product-lock-help>
-                        این کالا به لیست خرید اضافه شده است؛ برای جلوگیری از حذف اشتباهی ردیف‌ها، دسته‌بندی و کالا قفل شد. برای کالای بعدی از ردیف خالی پایین استفاده کنید.
-                    </div>
-                </div>
-            </div>
-
-            <div class="border rounded p-2 mb-2 bg-light-subtle variant-picker" data-variant-picker>
-                <div class="small fw-semibold mb-2">۳) انتخاب مدل لیست و طرح (ردیفی)</div>
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-5">
-                        <div class="label">مدل لیست</div>
-                        <select class="form-select form-select-sm model-select" data-model-select>
-                            <option value="">ابتدا دسته‌بندی و کالا را انتخاب کنید</option>
-                        </select>
-                    </div>
-                    <div class="col-md-5">
-                        <div class="label">طرح‌بندی</div>
-                        <select class="form-select form-select-sm design-select" data-design-select disabled>
-                            <option value="">ابتدا مدل لیست را انتخاب کنید</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 d-grid">
-                        <button type="button" class="btn btn-sm btn-outline-primary add-selected-variant-btn" data-add-selected-variant disabled>
-                            افزودن
-                        </button>
-                    </div>
-                </div>
-                <div class="small text-muted mt-2" data-variant-picker-help>ابتدا دسته‌بندی و کالا را انتخاب کنید.</div>
-            </div>
-
-            <div class="group-models" data-models></div>
-        </div>`;
-    }
-
-    function modelRowTemplate(item = {}) {
-        const rowDiscountType = item.discount_type || '';
-        const rowDiscountValue = item.discount_value || 0;
-
-        return `
-        <div class="purchase-model-row" data-row>
-            <div class="row g-2 align-items-end">
-                <input type="hidden" class="product-id-input" name="items[][product_id]" value="${item.product_id || ''}">
-                <input type="hidden" class="category-id-input" name="items[][category_id]" value="${item.category_id || ''}">
-                <input type="hidden" class="product-name-input" name="items[][name]" value="${item.name || ''}">
-                <input type="hidden" class="product-code-input" name="items[][code]" value="${item.code || ''}">
-
-                <div class="col-md-3">
-                    <div class="label">مدل / طرح</div>
-                    <input type="hidden" class="variant-id" name="items[][variant_id]" value="${item.variant_id || ''}">
-                    <input type="text" class="form-control form-control-sm variant-name-display" value="${item.variant_name || ''}" readonly>
-                    <div class="small text-muted mt-1 variant-code-tooltip" title="کد ۱۱ رقمی تنوع">کد ۱۱ رقمی: ${item.variant_code || '—'}</div>
-                </div>
-                <div class="col-md-1">
-                    <div class="label">تعداد</div>
-                    <input type="number" min="1" class="form-control form-control-sm qty" name="items[][quantity]" value="${item.quantity ?? 1}" required>
-                </div>
-                <div class="col-md-2">
-                    <div class="label">قیمت خرید</div>
-                    <input type="text" inputmode="numeric" class="form-control form-control-sm buy formatted-number" name="items[][buy_price]" value="${item.buy_price ?? 0}" required>
-                </div>
-                <div class="col-md-2">
-                    <div class="label">قیمت فروش</div>
-                    <input type="text" inputmode="numeric" class="form-control form-control-sm sell formatted-number" name="items[][sell_price]" value="${item.sell_price ?? 0}" required>
-                </div>
-                <div class="col-md-1">
-                    <div class="label">نوع تخفیف</div>
-                    <select class="form-select form-select-sm row-discount-type" name="items[][discount_type]">
-                        <option value="">—</option>
-                        <option value="amount" ${rowDiscountType==='amount'?'selected':''}>مبلغی</option>
-                        <option value="percent" ${rowDiscountType==='percent'?'selected':''}>درصدی</option>
-                    </select>
-                </div>
-                <div class="col-md-1">
-                    <div class="label">مقدار تخفیف</div>
-                    <input type="text" inputmode="numeric" class="form-control form-control-sm discount-value formatted-number" name="items[][discount_value]" value="${rowDiscountValue}">
-                </div>
-                <div class="col-md-1">
-                    <div class="label">جمع نهایی</div>
-                    <div class="line-total">0</div>
-                </div>
-                <div class="col-md-2 text-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-row">حذف</button>
-                </div>
-            </div>
-        </div>`;
-    }
-
-    function setName(el, newName) {
-        if (el && el.getAttribute('name')) el.setAttribute('name', newName);
-    }
-
-    function setRowVariant(row, productId, variantId, explicitName = '') {
-        const variant = findVariant(productId, variantId);
-        row.querySelector('.variant-id').value = variantId || '';
-        row.querySelector('.variant-name-display').value = explicitName || variant?.name || '';
-        const codeEl = row.querySelector('.variant-code-tooltip');
-        if (codeEl) {
-            const code = variant?.code || '';
-            codeEl.textContent = `کد ۱۱ رقمی: ${code || '—'}`;
-            codeEl.setAttribute('title', code ? `کد ۱۱ رقمی: ${code}` : 'کد ۱۱ رقمی ثبت نشده');
+    function renderProductOptions() {
+        const list = filteredProducts().slice(0, 200);
+        if (!list.length) {
+            quickProductEl.innerHTML = '<option value="">محصولی پیدا نشد</option>';
+            return;
         }
 
-        if (variant) {
-            row.querySelector('.buy').value = formatNumericInput(variant.buy_price || 0);
-            row.querySelector('.sell').value = formatNumericInput(variant.sell_price || 0);
-        }
+        quickProductEl.innerHTML = '<option value="">انتخاب محصول...</option>' + list.map((product) => {
+            const code = product.code || product.sku || '-';
+            return `<option value="${product.id}">${escapeHtml(product.name)} (${escapeHtml(code)})</option>`;
+        }).join('');
     }
 
-    function selectedProductPayload(groupEl) {
-        const productSelect = groupEl.querySelector('.group-product-select');
-        const productId = productSelect?.value || '';
-        const product = products.find((p) => String(p.id) === String(productId));
-        const selectedOption = productSelect?.selectedOptions?.[0] || null;
-        const code = product?.code || selectedOption?.dataset?.code || '';
-        const categoryId = groupEl.querySelector('.group-category-select')?.value || product?.category_id || selectedOption?.dataset?.categoryId || '';
+    function rowPriceOverridden(row) {
+        return row.dataset.buyOverridden === '1' || row.dataset.sellOverridden === '1';
+    }
 
+    function updatePriceBadge(row) {
+        const badge = row.querySelector('[data-price-badge]');
+        if (badge) badge.classList.toggle('d-none', !rowPriceOverridden(row));
+    }
+
+    function cardDefaults(card) {
         return {
-            productId,
-            categoryId,
-            product,
-            name: product?.name || selectedOption?.textContent?.replace(/\s*\([^)]*\)\s*$/, '').trim() || '',
-            code,
+            buy: card.querySelector('[data-product-buy]')?.value || '',
+            sell: card.querySelector('[data-product-sell]')?.value || '',
         };
     }
 
-    function groupHasRows(groupEl) {
-        return !!groupEl?.querySelector('[data-row]');
-    }
+    function applyDefaultsToCard(card, force = false) {
+        const defaults = cardDefaults(card);
+        card.querySelectorAll('[data-variant-row]').forEach((row) => {
+            const buyEl = row.querySelector('[data-buy]');
+            const sellEl = row.querySelector('[data-sell]');
 
-    function setGroupProductFieldsLocked(groupEl) {
-        const locked = groupHasRows(groupEl);
-        const categorySelect = groupEl.querySelector('.group-category-select');
-        const productSelect = groupEl.querySelector('.group-product-select');
-        const helpEl = groupEl.querySelector('[data-product-lock-help]');
-
-        if (categorySelect) categorySelect.disabled = locked;
-        if (productSelect) {
-            productSelect.disabled = locked;
-            if (hasSelect2 && window.jQuery(productSelect).hasClass('select2-hidden-accessible')) {
-                window.jQuery(productSelect).prop('disabled', locked).trigger('change.select2');
+            if (force || row.dataset.buyOverridden !== '1') {
+                buyEl.value = defaults.buy === '' ? '' : formatNumericInput(defaults.buy);
+                row.dataset.buyOverridden = force ? '0' : (row.dataset.buyOverridden || '0');
             }
-        }
-        if (helpEl) {
-            helpEl.classList.toggle('d-none', !locked);
-        }
-    }
 
-    function ensureEmptyProductGroupAfter(currentGroupEl) {
-        const hasEmptyGroup = Array.from(itemsList.querySelectorAll('[data-group-id]')).some((groupEl) => {
-            return groupEl !== currentGroupEl && !groupHasRows(groupEl);
+            if (force || row.dataset.sellOverridden !== '1') {
+                sellEl.value = defaults.sell === '' ? '' : formatNumericInput(defaults.sell);
+                row.dataset.sellOverridden = force ? '0' : (row.dataset.sellOverridden || '0');
+            }
+
+            updatePriceBadge(row);
         });
-
-        if (!hasEmptyGroup) {
-            addProductGroup({}, false);
-        }
-    }
-
-    function handleProductChanged(groupEl) {
-        if (groupHasRows(groupEl)) {
-            setGroupProductFieldsLocked(groupEl);
-            return;
-        }
-
-        groupEl.querySelector('[data-models]').innerHTML = '';
-        syncGroupFieldsToRows(groupEl);
-        renderVariantPicker(groupEl);
-        reindexRows();
         recalc();
     }
 
-    function syncGroupFieldsToRows(groupEl) {
-        const { productId, categoryId, product, name, code } = selectedProductPayload(groupEl);
+    function productCardTemplate(product) {
+        const variants = product.variants || [];
+        const variantsRows = variants.length ? variants.map((variant) => `
+            <tr data-variant-row data-variant-id="${variant.id}" data-buy-overridden="0" data-sell-overridden="0">
+                <td>
+                    <div class="variant-title">${escapeHtml(variantLabel(variant))}</div>
+                    <div class="small text-muted">${escapeHtml(variant.name || '')}</div>
+                </td>
+                <td class="mono small">${escapeHtml(variant.code || '—')}</td>
+                <td>${formatFa(variant.stock || 0)}</td>
+                <td><input type="number" min="0" class="form-control form-control-sm qty-input" data-qty value=""></td>
+                <td><input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number price-input" data-buy value=""></td>
+                <td><input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number price-input" data-sell value=""></td>
+                <td><span class="badge text-bg-warning d-none" data-price-badge>قیمت اختصاصی</span></td>
+                <td><button type="button" class="btn btn-sm btn-outline-secondary" data-clear-row>خالی</button></td>
+            </tr>
+        `).join('') : `
+            <tr>
+                <td colspan="8" class="text-center text-muted py-3">برای این محصول تنوعی ثبت نشده است؛ ابتدا برای محصول یک تنوع عمومی تعریف کنید.</td>
+            </tr>
+        `;
 
-        const codeEl = groupEl.querySelector('.group-product-code');
-        if (codeEl) codeEl.value = code;
+        return `
+            <div class="purchase-product-card" data-product-card data-product-id="${product.id}">
+                <div class="product-card-head d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                    <div>
+                        <div class="h6 mb-1">${escapeHtml(product.name)}</div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <span class="product-code-chip mono">کد: ${escapeHtml(product.code || product.sku || '—')}</span>
+                            <span class="product-stat-chip">${escapeHtml(categoryName(product.category_id))}</span>
+                            <span class="product-stat-chip">${formatFa(variants.length)} تنوع</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-remove-product>حذف کل محصول</button>
+                </div>
 
-        groupEl.querySelectorAll('[data-row]').forEach((row) => {
-            row.querySelector('.product-id-input').value = productId;
-            row.querySelector('.category-id-input').value = categoryId;
-            row.querySelector('.product-name-input').value = name;
-            row.querySelector('.product-code-input').value = code;
+                <div class="p-3">
+                    <div class="price-panel mb-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">قیمت خرید کلی محصول</label>
+                                <input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number" data-product-buy placeholder="مثلاً 200,000">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">قیمت فروش کلی محصول</label>
+                                <input type="text" inputmode="numeric" class="form-control form-control-sm formatted-number" data-product-sell placeholder="مثلاً 250,000">
+                            </div>
+                            <div class="col-md-3 d-grid">
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-apply-all>اعمال قیمت روی همه تنوع‌ها</button>
+                            </div>
+                            <div class="col-md-3 small text-muted">این قیمت به‌صورت پیش‌فرض روی همه تنوع‌های این محصول اعمال می‌شود.</div>
+                        </div>
+                    </div>
 
-            const variantId = row.querySelector('.variant-id').value || '';
-            if (variantId) {
-                const found = findVariant(productId, variantId);
-                if (!found) {
-                    row.querySelector('.variant-id').value = '';
-                    row.querySelector('.variant-name-display').value = '';
-                }
-            }
-        });
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle variants-table mb-2">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>نام مدل / طرح / تنوع</th>
+                                    <th>کد تنوع / بارکد</th>
+                                    <th>موجودی فعلی</th>
+                                    <th>تعداد خرید</th>
+                                    <th>قیمت خرید</th>
+                                    <th>قیمت فروش</th>
+                                    <th>وضعیت قیمت</th>
+                                    <th>عملیات</th>
+                                </tr>
+                            </thead>
+                            <tbody>${variantsRows}</tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-3 small text-muted">
+                        <div>جمع تعداد این محصول: <strong data-card-qty>0</strong></div>
+                        <div>جمع مبلغ خرید این محصول: <strong data-card-total>0</strong> ریال</div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
-    function designLabelForVariant(modelLabel, variantName) {
-        const full = String(variantName || '').trim();
-        const model = String(modelLabel || '').trim();
-        if (!full) return 'نامشخص';
-        if (!model) return full;
+    function addProductCard(productId, initialRows = []) {
+        const product = productById(productId);
+        if (!product) return null;
 
-        if (full === model) return '— بدون طرح —';
-
-        const escaped = model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const matcher = new RegExp(`^${escaped}\\s*[-–—]?\\s*`, 'u');
-        const trimmed = full.replace(matcher, '').trim();
-
-        return trimmed || full;
-    }
-
-    function modelOptionsHtml(groups, selected = '') {
-        if (!groups.length) return '<option value="">برای این کالا مدل/طرحی ثبت نشده است</option>';
-
-        return `<option value="">انتخاب مدل لیست</option>${groups.map((g) =>
-            `<option value="${g.label}" ${g.label===selected?'selected':''}>${g.label}</option>`
-        ).join('')}`;
-    }
-
-    function designOptionsHtml(variants, modelLabel, selected = '') {
-        if (!variants.length) return '<option value="">طرحی برای این مدل ثبت نشده است</option>';
-
-        return `<option value="">انتخاب طرح‌بندی</option>${variants.map((v) => {
-            const title = designLabelForVariant(modelLabel, v.name);
-            return `<option value="${v.id}" ${String(v.id)===String(selected)?'selected':''}>${title}</option>`;
-        }).join('')}`;
-    }
-
-    function renderVariantPicker(groupEl, selectedModel = '', selectedVariantId = '') {
-        const productId = groupEl.querySelector('.group-product-select')?.value || '';
-        const modelSelect = groupEl.querySelector('[data-model-select]');
-        const designSelect = groupEl.querySelector('[data-design-select]');
-        const helpEl = groupEl.querySelector('[data-variant-picker-help]');
-        const addBtnEl = groupEl.querySelector('[data-add-selected-variant]');
-
-        if (!productId) {
-            modelSelect.innerHTML = '<option value="">ابتدا دسته‌بندی و کالا را انتخاب کنید</option>';
-            designSelect.innerHTML = '<option value="">ابتدا مدل لیست را انتخاب کنید</option>';
-            designSelect.disabled = true;
-            addBtnEl.disabled = true;
-            helpEl.textContent = 'ابتدا دسته‌بندی و کالا را انتخاب کنید.';
-            return;
+        const existing = productCardsEl.querySelector(`[data-product-card][data-product-id="${product.id}"]`);
+        if (existing) {
+            existing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            existing.classList.add('border-primary');
+            setTimeout(() => existing.classList.remove('border-primary'), 1200);
+            alert('این محصول قبلاً به لیست خرید اضافه شده است.');
+            return existing;
         }
 
-        const groups = groupedVariants(productId);
-        if (groups.length === 0) {
-            modelSelect.innerHTML = '<option value="">برای این کالا مدل/طرحی ثبت نشده است</option>';
-            designSelect.innerHTML = '<option value="">طرحی برای انتخاب وجود ندارد</option>';
-            designSelect.disabled = true;
-            addBtnEl.disabled = true;
-            helpEl.textContent = 'برای این کالا مدل/طرحی ثبت نشده است.';
-            return;
+        productCardsEl.insertAdjacentHTML('beforeend', productCardTemplate(product));
+        const card = productCardsEl.querySelector(`[data-product-card][data-product-id="${product.id}"]`);
+
+        if (initialRows.length) {
+            const first = initialRows[0];
+            card.querySelector('[data-product-buy]').value = formatNumericInput(first.product_buy_price || first.buy_price || '');
+            card.querySelector('[data-product-sell]').value = formatNumericInput(first.product_sell_price || first.sell_price || '');
+
+            initialRows.forEach((item) => {
+                const row = card.querySelector(`[data-variant-row][data-variant-id="${item.variant_id}"]`);
+                if (!row) return;
+
+                row.querySelector('[data-qty]').value = item.quantity || '';
+                row.querySelector('[data-buy]').value = formatNumericInput(item.buy_price || '');
+                row.querySelector('[data-sell]').value = formatNumericInput(item.sell_price || '');
+                row.dataset.buyOverridden = item.price_overridden ? '1' : '0';
+                row.dataset.sellOverridden = item.price_overridden ? '1' : '0';
+                updatePriceBadge(row);
+            });
         }
 
-        const currentModel = groups.find((g) => g.label === selectedModel)?.label || selectedModel;
-        modelSelect.innerHTML = modelOptionsHtml(groups, currentModel);
-
-        const targetGroup = groups.find((g) => g.label === currentModel);
-        if (!targetGroup) {
-            designSelect.innerHTML = '<option value="">ابتدا مدل لیست را انتخاب کنید</option>';
-            designSelect.disabled = true;
-            addBtnEl.disabled = true;
-            helpEl.textContent = 'مدل لیست را انتخاب کنید تا طرح‌بندی‌های همان مدل نمایش داده شود.';
-            return;
-        }
-
-        designSelect.innerHTML = designOptionsHtml(targetGroup.variants, targetGroup.label, selectedVariantId);
-        designSelect.disabled = false;
-        const hasSelectedVariant = !!(designSelect.value || selectedVariantId);
-        addBtnEl.disabled = !hasSelectedVariant;
-        helpEl.textContent = 'طرح‌بندی موردنظر را انتخاب کنید و روی «افزودن» بزنید تا ردیف خرید اضافه شود.';
-    }
-
-    function formatPriceInputs(scope = document) {
-        scope.querySelectorAll('.formatted-number').forEach((el) => {
-            el.value = formatNumericInput(el.value);
-        });
-    }
-
-    function reindexGroups() {
-        const groups = Array.from(itemsList.querySelectorAll('[data-group-id]'));
-        groups.forEach((groupEl, idx) => {
-            const humanIndex = (idx + 1).toLocaleString('fa-IR');
-            const badge = groupEl.querySelector('.group-index-badge');
-            const title = groupEl.querySelector('.group-title-text');
-            if (badge) badge.textContent = humanIndex;
-            if (title) title.textContent = `محصول ${humanIndex}`;
-        });
-    }
-
-    function reindexRows() {
-        const rows = Array.from(itemsList.querySelectorAll('[data-row]'));
-        reindexGroups();
-
-        rows.forEach((row, idx) => {
-            setName(row.querySelector('.product-id-input'), `items[${idx}][product_id]`);
-            setName(row.querySelector('.category-id-input'), `items[${idx}][category_id]`);
-            setName(row.querySelector('.product-name-input'), `items[${idx}][name]`);
-            setName(row.querySelector('.product-code-input'), `items[${idx}][code]`);
-            setName(row.querySelector('.variant-id'), `items[${idx}][variant_id]`);
-            setName(row.querySelector('.qty'), `items[${idx}][quantity]`);
-            setName(row.querySelector('.buy'), `items[${idx}][buy_price]`);
-            setName(row.querySelector('.sell'), `items[${idx}][sell_price]`);
-            setName(row.querySelector('.row-discount-type'), `items[${idx}][discount_type]`);
-            setName(row.querySelector('.discount-value'), `items[${idx}][discount_value]`);
-        });
+        recalc();
+        return card;
     }
 
     function recalc() {
         let subtotal = 0;
-        let itemDiscountTotal = 0;
+        let activeVariantCount = 0;
 
-        itemsList.querySelectorAll('[data-row]').forEach((row) => {
-            const qty = Number(row.querySelector('.qty')?.value || 0);
-            const buy = parseNumericInput(row.querySelector('.buy')?.value || 0);
-            const lineSubtotal = qty * buy;
+        productCardsEl.querySelectorAll('[data-product-card]').forEach((card) => {
+            let cardQty = 0;
+            let cardTotal = 0;
 
-            const discountType = row.querySelector('.row-discount-type')?.value || '';
-            const discountValue = parseNumericInput(row.querySelector('.discount-value')?.value || 0);
-            const rowDiscount = calculateDiscount(lineSubtotal, discountType, discountValue);
+            card.querySelectorAll('[data-variant-row]').forEach((row) => {
+                const qty = Number(row.querySelector('[data-qty]')?.value || 0);
+                const buy = parseNumericInput(row.querySelector('[data-buy]')?.value || 0);
+                const lineTotal = qty > 0 ? qty * buy : 0;
 
-            const lineTotal = Math.max(0, lineSubtotal - rowDiscount);
-            subtotal += lineSubtotal;
-            itemDiscountTotal += rowDiscount;
+                if (qty > 0) {
+                    activeVariantCount++;
+                    cardQty += qty;
+                    cardTotal += lineTotal;
+                }
+            });
 
-            row.querySelector('.line-total').textContent = lineTotal.toLocaleString('fa-IR');
+            card.querySelector('[data-card-qty]').textContent = formatFa(cardQty);
+            card.querySelector('[data-card-total]').textContent = formatFa(cardTotal);
+            subtotal += cardTotal;
         });
 
-        const baseAfterRows = Math.max(0, subtotal - itemDiscountTotal);
         const invoiceDiscount = calculateDiscount(
-            baseAfterRows,
+            subtotal,
             invoiceDiscountTypeEl.value,
             parseNumericInput(invoiceDiscountValueEl.value || 0)
         );
+        const total = Math.max(0, subtotal - invoiceDiscount);
 
-        const totalDiscount = itemDiscountTotal + invoiceDiscount;
-        const total = Math.max(0, subtotal - totalDiscount);
-
-        subtotalEl.textContent = subtotal.toLocaleString('fa-IR');
-        totalDiscountEl.textContent = totalDiscount.toLocaleString('fa-IR');
-        totalEl.textContent = total.toLocaleString('fa-IR');
+        summaryProductCountEl.textContent = formatFa(productCardsEl.querySelectorAll('[data-product-card]').length);
+        summaryVariantCountEl.textContent = formatFa(activeVariantCount);
+        subtotalEl.textContent = formatFa(subtotal);
+        totalDiscountEl.textContent = formatFa(invoiceDiscount);
+        totalEl.textContent = formatFa(total);
     }
 
-    function addProductGroup(data = {}, withInitialRows = true) {
-        const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        itemsList.insertAdjacentHTML('beforeend', productGroupTemplate(groupId, data));
-        const groupEl = itemsList.querySelector(`[data-group-id="${groupId}"]`);
-
-        if (withInitialRows && data.variant_id) {
-            addModelRow(groupEl, data);
-        }
-
-        syncGroupFieldsToRows(groupEl);
-        renderVariantPicker(groupEl);
-        initProductSelect2(groupEl.querySelector('.group-product-select'));
-        setGroupProductFieldsLocked(groupEl);
-        reindexRows();
-        recalc();
-        return groupEl;
+    function formatInputElement(input) {
+        const atEnd = input.selectionStart === input.value.length;
+        input.value = formatNumericInput(input.value);
+        if (atEnd) input.setSelectionRange(input.value.length, input.value.length);
     }
 
-    function addModelRow(groupEl, item = {}) {
-        if (!groupEl) return;
 
-        const productId = groupEl.querySelector('.group-product-select')?.value || item.product_id || '';
-        const categoryId = groupEl.querySelector('.group-category-select')?.value || item.category_id || '';
-        if (!productId || !item.variant_id) return;
-
-        const duplicateRow = Array.from(groupEl.querySelectorAll('[data-row]')).find((row) => {
-            const rowProductId = row.querySelector('.product-id-input')?.value || '';
-            const rowVariantId = row.querySelector('.variant-id')?.value || '';
-            return String(rowProductId) === String(productId) && String(rowVariantId) === String(item.variant_id);
-        });
-        if (duplicateRow) {
-            alert('این مدل/طرح قبلاً برای این کالا اضافه شده است.');
-            return;
-        }
-
-        const product = products.find((p) => String(p.id) === String(productId));
-        const modelsWrap = groupEl.querySelector('[data-models]');
-
-        const rowData = {
-            ...item,
-            product_id: productId,
-            category_id: categoryId,
-            name: product?.name || item.name || '',
-            code: product?.code || item.code || '',
-        };
-
-        modelsWrap.insertAdjacentHTML('beforeend', modelRowTemplate(rowData));
-        const row = modelsWrap.querySelector('[data-row]:last-child');
-
-        setRowVariant(row, productId, item.variant_id, item.variant_name || '');
-        const codeEl = row.querySelector('.variant-code-tooltip');
-        if (codeEl && item.variant_code) {
-            codeEl.textContent = `کد ۱۱ رقمی: ${item.variant_code}`;
-            codeEl.setAttribute('title', `کد ۱۱ رقمی: ${item.variant_code}`);
-        }
-
-        if (item.buy_price !== undefined && item.buy_price !== null) {
-            row.querySelector('.buy').value = formatNumericInput(item.buy_price);
-        }
-        if (item.sell_price !== undefined && item.sell_price !== null) {
-            row.querySelector('.sell').value = formatNumericInput(item.sell_price);
-        }
-
-        formatPriceInputs(row);
-        syncGroupFieldsToRows(groupEl);
-        setGroupProductFieldsLocked(groupEl);
-        reindexRows();
-        recalc();
+    function numericPayloadValue(value) {
+        return String(value ?? '').trim() === '' ? '' : parseNumericInput(value);
     }
 
-    function buildGroupsFromInitialItems(items) {
-        const groupsMap = new Map();
+    function appendHidden(index, name, value) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = `items[${index}][${name}]`;
+        input.value = value ?? '';
+        payloadEl.appendChild(input);
+    }
 
-        items.forEach((item) => {
-            const key = [item.product_id || '', item.category_id || ''].join('||');
-            if (!groupsMap.has(key)) {
-                groupsMap.set(key, {
-                    product_id: item.product_id || '',
-                    category_id: item.category_id || '',
-                    name: item.name || '',
-                    code: item.code || '',
-                    rows: [],
-                });
-            }
-            groupsMap.get(key).rows.push(item);
-        });
+    function buildPayload() {
+        payloadEl.innerHTML = '';
+        let index = 0;
 
-        groupsMap.forEach((group) => {
-            const groupEl = addProductGroup(group, false);
-            group.rows.forEach((rowItem) => {
-                addModelRow(groupEl, rowItem);
+        productCardsEl.querySelectorAll('[data-product-card]').forEach((card) => {
+            const productId = card.dataset.productId;
+            const product = productById(productId);
+            const defaults = cardDefaults(card);
+
+            card.querySelectorAll('[data-variant-row]').forEach((row) => {
+                const qty = Number(row.querySelector('[data-qty]')?.value || 0);
+                if (qty <= 0) return;
+
+                appendHidden(index, 'product_id', productId);
+                appendHidden(index, 'variant_id', row.dataset.variantId);
+                appendHidden(index, 'quantity', qty);
+                appendHidden(index, 'buy_price', numericPayloadValue(row.querySelector('[data-buy]')?.value || ''));
+                appendHidden(index, 'sell_price', numericPayloadValue(row.querySelector('[data-sell]')?.value || ''));
+                appendHidden(index, 'product_buy_price', numericPayloadValue(defaults.buy || ''));
+                appendHidden(index, 'product_sell_price', numericPayloadValue(defaults.sell || ''));
+                appendHidden(index, 'name', product?.name || '');
+                appendHidden(index, 'code', product?.code || product?.sku || '');
+                index++;
             });
         });
+
+        return index;
     }
 
-    addBtn.addEventListener('click', () => addProductGroup({}, false));
+    quickCategoryEl.addEventListener('change', renderProductOptions);
+    quickSearchEl.addEventListener('input', renderProductOptions);
 
-    itemsList.addEventListener('change', (e) => {
-        const groupEl = e.target.closest('[data-group-id]');
-        if (!groupEl) return;
-
-        if (e.target.classList.contains('group-category-select')) {
-            if (groupHasRows(groupEl)) {
-                setGroupProductFieldsLocked(groupEl);
-                return;
-            }
-
-            const categoryId = e.target.value || '';
-            const productSelect = groupEl.querySelector('.group-product-select');
-            productSelect.innerHTML = productOptionsByCategory(categoryId, '');
-            initProductSelect2(productSelect);
-            groupEl.querySelector('.group-product-code').value = '';
-            groupEl.querySelector('[data-models]').innerHTML = '';
-            syncGroupFieldsToRows(groupEl);
-            renderVariantPicker(groupEl);
-            reindexRows();
-            recalc();
-            return;
-        }
-
-        if (e.target.classList.contains('group-product-select')) {
-            handleProductChanged(groupEl);
-            return;
-        }
-
-        if (e.target.classList.contains('model-select')) {
-            renderVariantPicker(groupEl, e.target.value || '', '');
-            return;
-        }
-
-        if (e.target.classList.contains('design-select')) {
-            const addSelectedBtn = groupEl.querySelector('[data-add-selected-variant]');
-            if (addSelectedBtn) addSelectedBtn.disabled = !e.target.value;
-            return;
-        }
-
-        if (e.target.classList.contains('row-discount-type')) {
-            recalc();
-        }
+    addProductBtn.addEventListener('click', () => {
+        if (!quickProductEl.value) return;
+        addProductCard(quickProductEl.value, []);
     });
 
-    itemsList.addEventListener('input', (e) => {
-        if (
-            e.target.classList.contains('qty') ||
-            e.target.classList.contains('buy') ||
-            e.target.classList.contains('sell') ||
-            e.target.classList.contains('discount-value')
-        ) {
-            if (e.target.classList.contains('formatted-number')) {
-                const atEnd = e.target.selectionStart === e.target.value.length;
-                e.target.value = formatNumericInput(e.target.value);
-                if (atEnd) e.target.setSelectionRange(e.target.value.length, e.target.value.length);
-            }
-            recalc();
+    productCardsEl.addEventListener('input', (event) => {
+        const target = event.target;
+        const card = target.closest('[data-product-card]');
+        if (!card) return;
+
+        if (target.classList.contains('formatted-number')) {
+            formatInputElement(target);
         }
+
+        if (target.matches('[data-product-buy], [data-product-sell]')) {
+            applyDefaultsToCard(card, false);
+            return;
+        }
+
+        if (target.matches('[data-buy], [data-sell]')) {
+            const row = target.closest('[data-variant-row]');
+            if (row) {
+                if (target.matches('[data-buy]')) row.dataset.buyOverridden = '1';
+                if (target.matches('[data-sell]')) row.dataset.sellOverridden = '1';
+                updatePriceBadge(row);
+            }
+        }
+
+        recalc();
     });
 
-    itemsList.addEventListener('click', (e) => {
-        const groupEl = e.target.closest('[data-group-id]');
+    productCardsEl.addEventListener('click', (event) => {
+        const card = event.target.closest('[data-product-card]');
+        if (!card) return;
 
-        if (e.target.classList.contains('add-selected-variant-btn')) {
-            if (!groupEl) return;
-
-            const modelSelect = groupEl.querySelector('[data-model-select]');
-            const designSelect = groupEl.querySelector('[data-design-select]');
-            const selectedModel = modelSelect?.value || '';
-            const variantId = designSelect?.value || '';
-            const productId = groupEl.querySelector('.group-product-select')?.value || '';
-            if (!selectedModel || !variantId || !productId) return;
-
-            const selectedGroup = groupedVariants(productId).find((g) => g.label === selectedModel);
-            const variant = selectedGroup?.variants.find((v) => String(v.id) === String(variantId));
-            if (!variant) return;
-
-            addModelRow(groupEl, {
-                variant_id: variant.id,
-                variant_name: variant.name,
-                variant_code: variant.code || '',
-                quantity: 1,
-                buy_price: parseNumericInput(variant.buy_price || 0),
-                sell_price: parseNumericInput(variant.sell_price || 0),
-                discount_type: '',
-                discount_value: 0,
-            });
-
-            renderVariantPicker(groupEl, selectedModel, '');
-            ensureEmptyProductGroupAfter(groupEl);
-            return;
-        }
-
-        if (e.target.classList.contains('remove-product-group')) {
-            if (!groupEl) return;
-            groupEl.remove();
-            reindexRows();
+        if (event.target.matches('[data-remove-product]')) {
+            card.remove();
             recalc();
             return;
         }
 
-        if (e.target.classList.contains('remove-row')) {
-            if (!groupEl) return;
-            const row = e.target.closest('[data-row]');
-            row.remove();
-            setGroupProductFieldsLocked(groupEl);
+        if (event.target.matches('[data-apply-all]')) {
+            if (confirm('قیمت همه تنوع‌های این محصول با قیمت کلی جایگزین شود؟')) {
+                applyDefaultsToCard(card, true);
+            }
+            return;
+        }
 
-            reindexRows();
+        if (event.target.matches('[data-clear-row]')) {
+            const row = event.target.closest('[data-variant-row]');
+            if (!row) return;
+            row.querySelector('[data-qty]').value = '';
             recalc();
         }
     });
 
     invoiceDiscountTypeEl.addEventListener('change', recalc);
-    invoiceDiscountValueEl.addEventListener('input', recalc);
-
-    purchaseForm.addEventListener('submit', () => {
-        purchaseForm.querySelectorAll('.formatted-number').forEach((el) => {
-            el.value = parseNumericInput(el.value);
-        });
+    invoiceDiscountValueEl.addEventListener('input', () => {
+        formatInputElement(invoiceDiscountValueEl);
+        recalc();
     });
 
-    if (Array.isArray(initialItems) && initialItems.length > 0) {
-        buildGroupsFromInitialItems(initialItems);
-    } else {
-        addProductGroup({}, false);
+    purchaseForm.addEventListener('submit', (event) => {
+        const count = buildPayload();
+        invoiceDiscountValueEl.value = String(invoiceDiscountValueEl.value || '').trim() === '' ? '' : parseNumericInput(invoiceDiscountValueEl.value);
+
+        if (count === 0) {
+            event.preventDefault();
+            alert('حداقل برای یک تنوع تعداد خرید بزرگ‌تر از صفر وارد کنید.');
+        }
+    });
+
+    function hydrateInitialItems() {
+        if (!Array.isArray(initialItems) || !initialItems.length) return;
+
+        const groups = new Map();
+        initialItems.forEach((item) => {
+            if (!groups.has(String(item.product_id))) groups.set(String(item.product_id), []);
+            groups.get(String(item.product_id)).push(item);
+        });
+
+        groups.forEach((items, productId) => addProductCard(productId, items));
     }
 
-    itemsList.querySelectorAll('.group-product-select').forEach((el) => initProductSelect2(el));
-
-    formatPriceInputs(document);
+    renderProductOptions();
+    hydrateInitialItems();
+    recalc();
 })();
 </script>
 @endsection
