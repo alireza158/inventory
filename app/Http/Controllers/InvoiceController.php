@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Services\SalesHavalehStatusService;
 use App\Services\SalesHavalehService;
 use App\Services\SalesDocumentAccessService;
+use App\Services\SalesPrintDocumentService;
 use Carbon\Carbon;
 use Morilog\Jalali\Jalalian;
 use Illuminate\Http\Request;
@@ -224,7 +225,7 @@ class InvoiceController extends Controller
         return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');
     }
 
-    public function print(string $uuid)
+    public function print(string $uuid, Request $request, SalesPrintDocumentService $printService)
     {
         $invoice = Invoice::query()
             ->with([
@@ -236,7 +237,9 @@ class InvoiceController extends Controller
             ->where('uuid', $uuid)
             ->firstOrFail();
 
-        return view('invoices.print', compact('invoice'));
+        $printData = $printService->invoiceData($invoice, (string) $request->query('mode', $request->query('print', 'warehouse')));
+
+        return view('prints.invoice', compact('printData'));
     }
 
     public function show(string $uuid)
