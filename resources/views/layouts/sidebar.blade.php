@@ -225,7 +225,6 @@
         </div>
 
 
-@if($hasRole(['admin', 'Admin', 'Manager', 'manager', 'warehouse', 'StorageUser', 'StorageManager']))
         {{-- Warehouse --}}
         <div class="sidebar-accordion-item {{ $warehouseActive ? 'is-open' : '' }}" data-accordion-section="warehouse">
             <button type="button"
@@ -250,7 +249,6 @@
                 </div>
             </div>
         </div>
-@endif
 
 
         {{-- Commerce & Sales --}}

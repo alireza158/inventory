@@ -177,7 +177,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/payments/{payment}/view', [AccountStatementController::class, 'showPayment'])->name('payments.view');
 
     // Warehouse Map
-    Route::middleware('role:admin|Admin|Manager|manager|warehouse|StorageUser|StorageManager')->group(function () {
+    Route::middleware('role:admin|Admin|ادمین|Manager|manager|مدیر|warehouse|انباردار|StorageUser|StorageManager')->group(function () {
         Route::get('/warehouse-map', [WarehouseMapController::class, 'index'])->name('warehouse-map.index');
         Route::post('/warehouse-map/locations', [WarehouseMapController::class, 'storeLocation'])->name('warehouse-map.locations.store');
         Route::put('/warehouse-map/locations/{location}', [WarehouseMapController::class, 'updateLocation'])->name('warehouse-map.locations.update');
