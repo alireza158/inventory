@@ -66,4 +66,14 @@ class ProductVariant extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function locationStocks()
+    {
+        return $this->hasMany(WarehouseLocationStock::class, 'product_variant_id');
+    }
+
+    public function locationMovements()
+    {
+        return $this->hasMany(WarehouseLocationMovement::class, 'product_variant_id');
+    }
 }

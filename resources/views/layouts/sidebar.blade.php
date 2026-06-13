@@ -7,7 +7,7 @@
     $productsActive = $isRoute('products.*', 'product-deactivation-documents.*', 'categories.*', 'model-lists.*')
         && !$isRoute('products.create');
 
-    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*', 'preinvoice.warehouse.*', 'products.create');
+    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*', 'preinvoice.warehouse.*', 'products.create', 'warehouse-map.*');
 
     $salesActive = $isRoute('preinvoice.create', 'preinvoice.my.*', 'customers.*', 'persons.*');
 
@@ -243,6 +243,7 @@
                     <a class="sidebar-sublink {{ $is('purchases.index', 'purchases.show', 'purchases.edit') }}" href="{{ route('purchases.index') }}">لیست خرید کالاها</a>
                     <a class="sidebar-sublink {{ $is('purchases.create') }}" href="{{ route('purchases.create') }}">ثبت خرید کالا</a>
                     <a class="sidebar-sublink {{ $is('preinvoice.warehouse.*') }}" href="{{ route('preinvoice.warehouse.index') }}">در انتظار تایید انبار</a>
+                    <a class="sidebar-sublink {{ $is('warehouse-map.*') }}" href="{{ route('warehouse-map.index') }}">نقشه انبار</a>
                     <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
                     <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
                     <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
