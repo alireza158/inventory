@@ -67,6 +67,7 @@ class ProductExportService
         return [
             'id' => $product->id,
             'image_url' => $this->imageUrl($product),
+            'pdf_image_src' => $this->pdfImageSrc($product),
             'name' => $product->name,
             'sku' => $product->sku ?: ($product->code ?: '—'),
             'category' => $product->category?->name ?: 'بدون دسته‌بندی',
@@ -97,16 +98,71 @@ class ProductExportService
 
     public function imageUrl(Product $product): string
     {
-        if ($product->image_path) {
-            if (str_starts_with($product->image_path, 'http://') || str_starts_with($product->image_path, 'https://')) {
-                return $product->image_path;
-            }
+        $path = $this->localImagePath($product);
 
-            if (Storage::disk('public')->exists($product->image_path)) {
-                return asset(Storage::disk('public')->url($product->image_path));
+        if ($path) {
+            return route('products.image', $product);
+        }
+
+        if ($this->isRemoteImage($product->image_path)) {
+            return $product->image_path;
+        }
+
+        return $this->placeholderImage();
+    }
+
+    public function pdfImageSrc(Product $product): string
+    {
+        $path = $this->localImagePath($product);
+
+        if ($path) {
+            $absolutePath = Storage::disk('public')->path($path);
+            $mime = @mime_content_type($absolutePath) ?: 'image/jpeg';
+            $content = @file_get_contents($absolutePath);
+
+            if ($content !== false) {
+                return 'data:' . $mime . ';base64,' . base64_encode($content);
             }
         }
 
+        if ($this->isRemoteImage($product->image_path)) {
+            return $product->image_path;
+        }
+
+        return $this->placeholderImage();
+    }
+
+    private function localImagePath(Product $product): ?string
+    {
+        $imagePath = trim((string) ($product->image_path ?? ''));
+
+        if ($imagePath === '' || $this->isRemoteImage($imagePath)) {
+            return null;
+        }
+
+        $candidates = array_values(array_unique(array_filter([
+            ltrim($imagePath, '/'),
+            preg_replace('#^/?storage/#', '', $imagePath),
+            preg_replace('#^/?public/#', '', $imagePath),
+            basename($imagePath) ? 'products/' . basename($imagePath) : null,
+        ])));
+
+        foreach ($candidates as $candidate) {
+            if (Storage::disk('public')->exists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function isRemoteImage(?string $path): bool
+    {
+        return is_string($path) && (str_starts_with($path, 'http://') || str_starts_with($path, 'https://'));
+    }
+
+    private function placeholderImage(): string
+    {
         return 'data:image/svg+xml;charset=UTF-8,' . rawurlencode('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" rx="16" fill="#eef2ff"/><text x="40" y="48" font-size="28" text-anchor="middle">📦</text></svg>');
     }
 

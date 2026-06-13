@@ -304,13 +304,39 @@ class ProductController extends Controller
 
     public function image(Product $product)
     {
-        if (!$product->image_path || !Storage::disk('public')->exists($product->image_path)) {
+        $imagePath = $this->resolveProductImagePath($product);
+
+        if (!$imagePath) {
             abort(404);
         }
 
-        return Storage::disk('public')->response($product->image_path, null, [
+        return Storage::disk('public')->response($imagePath, null, [
             'Cache-Control' => 'public, max-age=86400',
         ]);
+    }
+
+    private function resolveProductImagePath(Product $product): ?string
+    {
+        $imagePath = trim((string) ($product->image_path ?? ''));
+
+        if ($imagePath === '' || str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')) {
+            return null;
+        }
+
+        $candidates = array_values(array_unique(array_filter([
+            ltrim($imagePath, '/'),
+            preg_replace('#^/?storage/#', '', $imagePath),
+            preg_replace('#^/?public/#', '', $imagePath),
+            basename($imagePath) ? 'products/' . basename($imagePath) : null,
+        ])));
+
+        foreach ($candidates as $candidate) {
+            if (Storage::disk('public')->exists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     public function edit(Request $request, Product $product)

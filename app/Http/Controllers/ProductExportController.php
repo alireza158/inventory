@@ -77,21 +77,18 @@ class ProductExportController extends Controller
             'meta' => $this->service->meta($filters),
         ])->render();
 
-        if (class_exists(\Dompdf\Dompdf::class)) {
-            $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true, 'defaultFont' => 'DejaVu Sans']);
-            $dompdf->loadHtml($html, 'UTF-8');
-            $dompdf->setPaper('A4', 'landscape');
-            $dompdf->render();
-
-            return response($dompdf->output(), 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => "attachment; filename=\"{$filename}.pdf\"",
-            ]);
+        if (! class_exists(\Dompdf\Dompdf::class)) {
+            abort(500, 'کتابخانه تولید PDF نصب نیست. لطفاً وابستگی dompdf/dompdf را نصب کنید.');
         }
 
-        return response($html, 200, [
-            'Content-Type' => 'text/html; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}.html\"",
+        $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true, 'defaultFont' => 'DejaVu Sans']);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$filename}.pdf\"",
         ]);
     }
 }

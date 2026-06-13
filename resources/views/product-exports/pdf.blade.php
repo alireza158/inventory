@@ -23,7 +23,7 @@
         <tbody>
         @foreach($rows as $row)
             <tr>
-                <td><img class="thumb" src="{{ $row['image_url'] }}" alt=""></td>
+                <td><img class="thumb" src="{{ $row['pdf_image_src'] }}" alt=""></td>
                 <td>{{ $row['name'] }}</td>
                 <td class="ltr">{{ $row['sku'] }}</td>
                 <td>{{ $row['category'] }}</td>
