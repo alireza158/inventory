@@ -41,6 +41,11 @@
                href="{{ route('products.pricelist') }}">
                 لیست قیمت
             </a>
+
+            <a class="list-group-item list-group-item-action"
+               href="{{ route('admin.product-exports.index') }}">
+                خروجی محصولات
+            </a>
         </div>
     </div>
 </div>
