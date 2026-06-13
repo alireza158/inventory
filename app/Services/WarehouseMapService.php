@@ -75,7 +75,7 @@ class WarehouseMapService
             $unmapped = $this->totalQuantity($variantId, $warehouseId, true) - $this->mappedQuantity($variantId, $warehouseId, true);
 
             if ($quantity > $unmapped) {
-                throw ValidationException::withMessages(['quantity' => 'تعداد وارد شده بیشتر از موجودی بدون نقشه این تنوع است.']);
+                throw ValidationException::withMessages(['quantity' => 'تعداد وارد شده بیشتر از موجودی بدون مکان این تنوع است.']);
             }
 
             $stock = $this->lockOrCreateLocationStock($variantId, $warehouseId, $location->id);
