@@ -559,17 +559,6 @@ if ($oldDesignNotes === null) {
                 </div>
             </div>
 
-            {{-- نقشه انبار --}}
-            <div class="col-12">
-                <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 mb-0">
-                    <div>
-                        <strong>نقشه انبار از محصول مادر جدا شده است.</strong>
-                        از این پس مکان فیزیکی و تعداد هر مکان در صفحه «نقشه انبار» و در سطح تنوع کالا مدیریت می‌شود؛ فیلدهای قدیمی محصول فقط برای انتقال امن داده نگه داشته شده‌اند.
-                    </div>
-                    <a class="btn btn-sm btn-primary" href="{{ route('warehouse-map.index', ['q' => $product->code]) }}">مدیریت نقشه تنوع‌ها</a>
-                </div>
-            </div>
-
             {{-- ساختار تنوع‌ها --}}
             <div class="col-12">
                 <div class="card-soft">

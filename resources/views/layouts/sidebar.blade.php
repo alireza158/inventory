@@ -216,7 +216,7 @@
                     <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
                 
                     <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
-                        @if($hasRole(['Admin']) || $hasRole(['StorageUser']) || $hasRole(['StorageManager']))
+                        @if($hasRole(['admin', 'Admin', 'Manager', 'manager', 'warehouse', 'StorageUser', 'StorageManager']))
                     <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست</a>
                     <a class="sidebar-sublink {{ $is('product-deactivation-documents.*') }}" href="{{ route('product-deactivation-documents.index') }}">غیرفعال‌سازی کالا</a>
                     @endif
@@ -225,7 +225,7 @@
         </div>
 
 
-@if($hasRole(['Admin']) || $hasRole(['StorageUser']) || $hasRole(['StorageManager']))
+@if($hasRole(['admin', 'Admin', 'Manager', 'manager', 'warehouse', 'StorageUser', 'StorageManager']))
         {{-- Warehouse --}}
         <div class="sidebar-accordion-item {{ $warehouseActive ? 'is-open' : '' }}" data-accordion-section="warehouse">
             <button type="button"
