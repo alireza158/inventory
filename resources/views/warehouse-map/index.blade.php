@@ -90,10 +90,129 @@
 
   @foreach($locations as $location)
     <div class="modal fade" id="locationModal{{ $location->id }}" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">مکان: <span dir="ltr">{{ $location->code }}</span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">
-      @if($canManage)<form method="POST" action="{{ route('warehouse-map.assign') }}" class="row g-2 border rounded-4 p-3 mb-3 bg-light">@csrf<input type="hidden" name="warehouse_id" value="{{ $warehouseId }}"><input type="hidden" name="warehouse_location_id" value="{{ $location->id }}"><div class="col-md-5"><label class="form-label">جستجوی کالا / انتخاب تنوع</label><select name="product_variant_id" class="form-select" required><option value="">انتخاب تنوع...</option>@foreach($variantRows as $row)<option value="{{ $row['variant']->id }}">{{ $variantLabel($row['variant']) }} | کل: {{ $fmt($row['total']) }} | دارای مکان: {{ $fmt($row['mapped']) }} | بدون مکان: {{ $fmt($row['unmapped']) }}</option>@endforeach</select></div><div class="col-md-2"><label class="form-label">تعداد برای افزودن</label><input type="number" name="quantity" min="1" class="form-control" required></div><div class="col-md-4"><label class="form-label">توضیحات</label><input name="note" class="form-control"></div><div class="col-md-1 d-flex align-items-end"><button class="btn btn-success w-100">افزودن</button></div><div class="col-12 small text-muted">فقط از موجودی بدون مکان همان تنوع در همین انبار قابل تخصیص است.</div></form>@endif
+      @if($canManage)
+      <form method="POST" action="{{ route('warehouse-map.assign') }}" class="row g-2 border rounded-4 p-3 mb-3 bg-light wm-location-assign-form"
+            data-children-url-template="{{ route('warehouse-map.categories.children', ['category' => '__ID__']) }}"
+            data-products-url-template="{{ route('warehouse-map.categories.products', ['category' => '__ID__']) }}"
+            data-variants-url-template="{{ route('warehouse-map.products.variants', ['product' => '__ID__']) }}"
+            data-warehouse-id="{{ $warehouseId }}">
+        @csrf
+        <input type="hidden" name="warehouse_id" value="{{ $warehouseId }}">
+        <input type="hidden" name="warehouse_location_id" value="{{ $location->id }}">
+        <div class="col-md-3"><label class="form-label">دسته‌بندی اصلی</label><select class="form-select wm-main-category" required><option value="">انتخاب دسته‌بندی...</option>@foreach($mainCategories as $category)<option value="{{ $category->id }}">{{ $category->name }}</option>@endforeach</select></div>
+        <div class="col-md-3"><label class="form-label">زیر‌دسته‌بندی</label><select class="form-select wm-sub-category" disabled><option value="">ابتدا دسته‌بندی را انتخاب کنید</option></select></div>
+        <div class="col-md-4"><label class="form-label">کالا</label><input type="search" class="form-control form-control-sm mb-1 wm-product-search" placeholder="جستجوی سریع کالا..." disabled><select class="form-select wm-product" disabled required><option value="">ابتدا دسته‌بندی را انتخاب کنید</option></select></div>
+        <div class="col-md-4"><label class="form-label">تنوع کالا</label><select name="product_variant_id" class="form-select wm-variant" disabled required><option value="">ابتدا کالا را انتخاب کنید</option></select></div>
+        <div class="col-md-4"><label class="form-label d-block">موجودی</label><div class="d-flex gap-2 flex-wrap"><span class="badge badge-soft">موجودی کل: <b class="wm-total">—</b></span><span class="badge badge-soft">دارای مکان: <b class="wm-mapped">—</b></span><span class="badge text-bg-warning">بدون مکان: <b class="wm-unmapped">—</b></span></div><div class="small mt-1 wm-stock-message text-muted">بعد از انتخاب تنوع، موجودی نمایش داده می‌شود.</div></div>
+        <div class="col-md-2"><label class="form-label">تعداد برای افزودن</label><input type="number" name="quantity" min="1" class="form-control wm-quantity" disabled required></div>
+        <div class="col-md-8"><label class="form-label">توضیحات</label><input name="note" class="form-control" placeholder="اختیاری"></div>
+        <div class="col-md-2 d-flex align-items-end"><button class="btn btn-success w-100 wm-submit" disabled>افزودن به مکان</button></div>
+        <div class="col-12 small text-muted">مسیر اصلی انتخاب: دسته‌بندی اصلی → زیر‌دسته‌بندی → کالا → تنوع کالا. فقط از موجودی بدون مکان همین انبار قابل تخصیص است.</div>
+      </form>
+      @endif
       <div class="wm-table-wrap"><table class="table align-middle"><thead class="table-light"><tr><th>کالا</th><th>تنوع</th><th>کد / SKU / بارکد</th><th>تعداد در این مکان</th><th>عملیات</th></tr></thead><tbody>@forelse($location->stocks->where('quantity','>',0) as $stock)<tr><td>{{ $stock->variant?->product?->name }}</td><td>{{ $stock->variant?->variant_name }}</td><td dir="ltr">{{ $variantCode($stock->variant) }}</td><td>{{ $fmt($stock->quantity) }}</td><td><span class="badge badge-soft">جابه‌جایی و تاریخچه از تب‌های مربوط انجام می‌شود</span></td></tr>@empty<tr><td colspan="5" class="text-center text-muted py-4">کالایی در این مکان ثبت نشده است.</td></tr>@endforelse</tbody></table></div>
     </div></div></div></div>
     @if($canManage)<div class="modal fade" id="editLocation{{ $location->id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">ویرایش مکان {{ $location->code }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form method="POST" action="{{ route('warehouse-map.locations.update', $location) }}"><div class="modal-body">@csrf @method('PUT')<label class="form-label">توضیحات</label><textarea name="description" class="form-control mb-3">{{ $location->description }}</textarea><label class="form-check"><input class="form-check-input" type="checkbox" name="is_active" value="1" @checked($location->is_active)> فعال</label><div class="small text-muted mt-2">غیرفعال کردن مکان فقط از تخصیص‌های جدید جلوگیری می‌کند.</div></div><div class="modal-footer"><button class="btn btn-primary">ثبت</button></div></form></div></div></div>@endif
   @endforeach
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const faToEn = (value) => String(value || '').replace(/[۰-۹٠-٩]/g, ch => '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩'.indexOf(ch) % 10);
+  const fillSelect = (select, placeholder, items, mapper) => {
+    select.innerHTML = `<option value="">${placeholder}</option>`;
+    items.forEach(item => {
+      const option = document.createElement('option');
+      const mapped = mapper(item);
+      option.value = mapped.value;
+      option.textContent = mapped.text;
+      if (mapped.dataset) Object.entries(mapped.dataset).forEach(([key, val]) => option.dataset[key] = val);
+      select.appendChild(option);
+    });
+  };
+  const setLoading = (select, text) => { select.disabled = true; select.innerHTML = `<option value="">${text}</option>`; };
+  const endpoint = (template, id) => template.replace('__ID__', id);
+
+  document.querySelectorAll('.wm-location-assign-form').forEach(form => {
+    const main = form.querySelector('.wm-main-category');
+    const sub = form.querySelector('.wm-sub-category');
+    const product = form.querySelector('.wm-product');
+    const productSearch = form.querySelector('.wm-product-search');
+    const variant = form.querySelector('.wm-variant');
+    const qty = form.querySelector('.wm-quantity');
+    const submit = form.querySelector('.wm-submit');
+    const total = form.querySelector('.wm-total');
+    const mapped = form.querySelector('.wm-mapped');
+    const unmapped = form.querySelector('.wm-unmapped');
+    const message = form.querySelector('.wm-stock-message');
+    let selectedCategory = null;
+
+    const resetStock = () => { total.textContent = mapped.textContent = unmapped.textContent = '—'; message.textContent = 'بعد از انتخاب تنوع، موجودی نمایش داده می‌شود.'; message.className = 'small mt-1 wm-stock-message text-muted'; qty.value = ''; qty.disabled = true; qty.removeAttribute('max'); submit.disabled = true; };
+    const resetVariant = () => { variant.disabled = true; variant.innerHTML = '<option value="">ابتدا کالا را انتخاب کنید</option>'; resetStock(); };
+    const resetProduct = () => { product.disabled = true; product.innerHTML = '<option value="">ابتدا دسته‌بندی را انتخاب کنید</option>'; productSearch.value = ''; productSearch.disabled = true; resetVariant(); };
+
+    async function fetchJson(url) { const response = await fetch(url, {headers: {'Accept': 'application/json'}}); if (!response.ok) throw new Error('request failed'); return response.json(); }
+    async function loadProducts(categoryId, term = '') {
+      if (!categoryId) return resetProduct();
+      setLoading(product, 'در حال دریافت کالاها...'); productSearch.disabled = false; resetVariant();
+      const url = new URL(endpoint(form.dataset.productsUrlTemplate, categoryId), window.location.origin);
+      if (term) url.searchParams.set('q', term);
+      const products = await fetchJson(url);
+      fillSelect(product, products.length ? 'انتخاب کالا...' : 'کالایی برای این دسته‌بندی یافت نشد.', products, item => ({value: item.id, text: `${item.name}${item.code ? ' - کد: ' + item.code : ''}`}));
+      product.disabled = products.length === 0;
+    }
+
+    main.addEventListener('change', async () => {
+      selectedCategory = main.value; sub.disabled = true; sub.innerHTML = '<option value="">در حال دریافت زیر‌دسته‌بندی‌ها...</option>'; resetProduct();
+      if (!selectedCategory) { sub.innerHTML = '<option value="">ابتدا دسته‌بندی را انتخاب کنید</option>'; return; }
+      const children = await fetchJson(endpoint(form.dataset.childrenUrlTemplate, selectedCategory));
+      if (children.length) {
+        fillSelect(sub, 'انتخاب زیر‌دسته‌بندی...', children, item => ({value: item.id, text: item.name}));
+        sub.disabled = false;
+      } else {
+        sub.innerHTML = '<option value="">زیر‌دسته‌بندی ندارد</option>'; sub.disabled = true; await loadProducts(selectedCategory);
+      }
+    });
+
+    sub.addEventListener('change', () => { selectedCategory = sub.value || main.value; loadProducts(selectedCategory); });
+    productSearch.addEventListener('input', () => { window.clearTimeout(productSearch._timer); productSearch._timer = window.setTimeout(() => loadProducts(selectedCategory, productSearch.value), 350); });
+    product.addEventListener('change', async () => {
+      resetVariant(); if (!product.value) return;
+      setLoading(variant, 'در حال دریافت تنوع‌ها...');
+      const url = new URL(endpoint(form.dataset.variantsUrlTemplate, product.value), window.location.origin);
+      url.searchParams.set('warehouse_id', form.dataset.warehouseId);
+      const variants = await fetchJson(url);
+      fillSelect(variant, variants.length ? 'انتخاب تنوع کالا...' : 'تنوعی برای این کالا یافت نشد.', variants, item => ({value: item.id, text: item.option_text, dataset: {total: item.total_stock, mapped: item.mapped_quantity, unmapped: item.unmapped_quantity, mismatch: item.has_mismatch ? 1 : 0}}));
+      variant.disabled = variants.length === 0;
+      if (variants.length === 1) { variant.value = variants[0].id; variant.dispatchEvent(new Event('change')); }
+    });
+
+    variant.addEventListener('change', () => {
+      resetStock(); const option = variant.selectedOptions[0]; if (!option || !option.value) return;
+      const unmappedQty = Number(option.dataset.unmapped || 0);
+      total.textContent = Number(option.dataset.total || 0).toLocaleString('en-US');
+      mapped.textContent = Number(option.dataset.mapped || 0).toLocaleString('en-US');
+      unmapped.textContent = unmappedQty.toLocaleString('en-US');
+      qty.max = String(Math.max(0, unmappedQty));
+      qty.disabled = unmappedQty <= 0;
+      submit.disabled = unmappedQty <= 0;
+      if (Number(option.dataset.mismatch || 0) === 1) { message.textContent = 'موجودی مکانی این تنوع بیشتر از موجودی کل ثبت‌شده است. لطفاً بررسی شود.'; message.className = 'small mt-1 wm-stock-message text-danger'; }
+      else if (unmappedQty <= 0) { message.textContent = 'برای این تنوع موجودی بدون مکان وجود ندارد.'; message.className = 'small mt-1 wm-stock-message text-warning'; }
+      else { message.textContent = `حداکثر مقدار قابل افزودن: ${unmappedQty.toLocaleString('en-US')}`; message.className = 'small mt-1 wm-stock-message text-success'; }
+    });
+
+    qty.addEventListener('input', () => {
+      qty.value = faToEn(qty.value);
+      const max = Number(qty.max || 0); const value = Number(qty.value || 0);
+      if (value > max) { message.textContent = 'تعداد وارد شده بیشتر از موجودی بدون مکان این تنوع است.'; message.className = 'small mt-1 wm-stock-message text-danger'; submit.disabled = true; }
+      else { submit.disabled = !variant.value || value <= 0; }
+    });
+
+    form.addEventListener('submit', event => {
+      const max = Number(qty.max || 0); const value = Number(qty.value || 0);
+      if (!variant.value || value <= 0 || value > max) { event.preventDefault(); message.textContent = value > max ? 'تعداد وارد شده بیشتر از موجودی بدون مکان این تنوع است.' : 'لطفاً تنوع و تعداد معتبر را انتخاب کنید.'; message.className = 'small mt-1 wm-stock-message text-danger'; }
+    });
+  });
+});
+</script>
+
 @endsection

@@ -180,6 +180,9 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::prefix('warehouse-map')->name('warehouse-map.')->group(function () {
         Route::get('/', [WarehouseMapController::class, 'index'])->name('index');
         Route::get('/locations/{location}', [WarehouseMapController::class, 'showLocation'])->name('locations.show');
+        Route::get('/categories/{category}/children', [WarehouseMapController::class, 'categoryChildren'])->name('categories.children');
+        Route::get('/categories/{category}/products', [WarehouseMapController::class, 'categoryProducts'])->name('categories.products');
+        Route::get('/products/{product}/variants', [WarehouseMapController::class, 'productVariants'])->name('products.variants');
         Route::get('/history', [WarehouseMapController::class, 'history'])->name('history');
 
         Route::middleware('role:admin|Admin|ادمین|Manager|manager|مدیر|warehouse|انباردار|StorageUser|StorageManager')->group(function () {

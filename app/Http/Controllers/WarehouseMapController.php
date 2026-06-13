@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -25,6 +26,7 @@ class WarehouseMapController extends Controller
 
         $warehouses = Warehouse::query()->where('is_active', true)->orderBy('name')->get();
         $categories = Category::query()->orderBy('name')->get();
+        $mainCategories = Category::query()->whereNull('parent_id')->orderBy('name')->get();
         $users = User::query()->orderBy('name')->get(['id', 'name']);
 
         $locations = WarehouseLocation::query()
@@ -65,9 +67,68 @@ class WarehouseMapController extends Controller
         $activeTab = $request->get('tab', 'locations');
 
         return view('warehouse-map.index', compact(
-            'warehouses', 'categories', 'users', 'locations', 'allLocations', 'warehouseId', 'variantRows',
+            'warehouses', 'categories', 'mainCategories', 'users', 'locations', 'allLocations', 'warehouseId', 'variantRows',
             'unmappedRows', 'summary', 'movements', 'recentTransfers', 'movementTypes', 'activeTab', 'canManage'
         ));
+    }
+
+
+    public function categoryChildren(Category $category)
+    {
+        return response()->json($category->children()->get(['id', 'name', 'code', 'parent_id']));
+    }
+
+    public function categoryProducts(Category $category, Request $request)
+    {
+        $query = Product::query()
+            ->where('category_id', $category->id)
+            ->where('is_sellable', true)
+            ->orderBy('name');
+
+        if ($request->filled('q')) {
+            $term = trim($this->normalizeFa($request->q));
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'like', "%{$term}%")
+                    ->orWhere('code', 'like', "%{$term}%")
+                    ->orWhere('sku', 'like', "%{$term}%")
+                    ->orWhere('barcode', 'like', "%{$term}%");
+            });
+        }
+
+        return response()->json($query->limit(100)->get(['id', 'name', 'code', 'sku', 'barcode']));
+    }
+
+    public function productVariants(Product $product, Request $request, WarehouseMapService $service)
+    {
+        $warehouseId = (int) $request->integer('warehouse_id', $this->selectedWarehouseId($request));
+
+        $variants = $product->variants()
+            ->active()
+            ->with(['modelList', 'color'])
+            ->orderBy('variant_name')
+            ->get()
+            ->map(function (ProductVariant $variant) use ($warehouseId, $service) {
+                $total = $service->totalQuantity((int) $variant->id, $warehouseId);
+                $mapped = $service->mappedQuantity((int) $variant->id, $warehouseId);
+                $unmapped = $total - $mapped;
+                $code = $variant->variant_code ?: ($variant->sku ?: ($variant->barcode ?: ($variant->variety_code ?: '')));
+                $parts = collect([$variant->variant_name, $variant->modelList?->name, $variant->color?->name, $variant->variety_name])->filter()->unique()->values();
+
+                return [
+                    'id' => $variant->id,
+                    'title' => $parts->implode(' / ') ?: 'تنوع اصلی',
+                    'code' => $code,
+                    'sku' => $variant->sku,
+                    'barcode' => $variant->barcode,
+                    'total_stock' => $total,
+                    'mapped_quantity' => $mapped,
+                    'unmapped_quantity' => $unmapped,
+                    'has_mismatch' => $mapped > $total,
+                    'option_text' => ($parts->implode(' / ') ?: 'تنوع اصلی') . ($code ? " - کد: {$code}" : '') . " - بدون مکان: {$unmapped}",
+                ];
+            });
+
+        return response()->json($variants);
     }
 
     public function storeLocation(Request $request)
