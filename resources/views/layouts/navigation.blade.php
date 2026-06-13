@@ -41,6 +41,13 @@
                href="{{ route('products.pricelist') }}">
                 لیست قیمت
             </a>
+
+            @can('export_products')
+                <a class="list-group-item list-group-item-action"
+                   href="{{ route('admin.product-exports.index') }}">
+                    خروجی محصولات
+                </a>
+            @endcan
         </div>
     </div>
 </div>
