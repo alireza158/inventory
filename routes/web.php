@@ -177,13 +177,17 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/payments/{payment}/view', [AccountStatementController::class, 'showPayment'])->name('payments.view');
 
     // Warehouse Map
-    Route::middleware('role:admin|Admin|ادمین|Manager|manager|مدیر|warehouse|انباردار|StorageUser|StorageManager')->group(function () {
-        Route::get('/warehouse-map', [WarehouseMapController::class, 'index'])->name('warehouse-map.index');
-        Route::post('/warehouse-map/locations', [WarehouseMapController::class, 'storeLocation'])->name('warehouse-map.locations.store');
-        Route::put('/warehouse-map/locations/{location}', [WarehouseMapController::class, 'updateLocation'])->name('warehouse-map.locations.update');
-        Route::post('/warehouse-map/assign', [WarehouseMapController::class, 'assign'])->name('warehouse-map.assign');
-        Route::post('/warehouse-map/transfer', [WarehouseMapController::class, 'transfer'])->name('warehouse-map.transfer');
-        Route::get('/warehouse-map/variants/{variant}/history', [WarehouseMapController::class, 'history'])->name('warehouse-map.history');
+    Route::prefix('warehouse-map')->name('warehouse-map.')->group(function () {
+        Route::get('/', [WarehouseMapController::class, 'index'])->name('index');
+        Route::get('/locations/{location}', [WarehouseMapController::class, 'showLocation'])->name('locations.show');
+        Route::get('/history', [WarehouseMapController::class, 'history'])->name('history');
+
+        Route::middleware('role:admin|Admin|ادمین|Manager|manager|مدیر|warehouse|انباردار|StorageUser|StorageManager')->group(function () {
+            Route::post('/locations', [WarehouseMapController::class, 'storeLocation'])->name('locations.store');
+            Route::put('/locations/{location}', [WarehouseMapController::class, 'updateLocation'])->name('locations.update');
+            Route::post('/assign', [WarehouseMapController::class, 'assign'])->name('assign');
+            Route::post('/transfer', [WarehouseMapController::class, 'transfer'])->name('transfer');
+        });
     });
 
     // Warehouses
