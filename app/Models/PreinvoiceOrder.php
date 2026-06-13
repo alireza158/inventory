@@ -82,6 +82,11 @@ class PreinvoiceOrder extends Model
         return $this->belongsTo(ShippingMethod::class, 'shipping_id');
     }
 
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
     public function reviews()
     {
         return $this->hasMany(PreinvoiceOrderReview::class);
