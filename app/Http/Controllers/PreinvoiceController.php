@@ -456,7 +456,7 @@ class PreinvoiceController extends Controller
                 'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
             ]);
 
-            ActivityLogger::log('seller_items_changed_reapproval_required', $order->fresh(), 'اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.', [
+            ActivityLogger::log('seller_items_reapproval', $order->fresh(), 'اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.', [
                 'old_status' => $oldStatus,
                 'new_status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
                 'user_id' => auth()->id(),
@@ -780,7 +780,7 @@ class PreinvoiceController extends Controller
             'items_updated_by' => auth()->id(),
         ]);
 
-        ActivityLogger::log('invoice_items_reset_for_reapproval', $invoice->fresh(), 'اقلام فاکتور تغییر کرد و فاکتور به وضعیت نیازمند تایید انبار برگشت.', [
+        ActivityLogger::log('invoice_items_reapproval', $invoice->fresh(), 'اقلام فاکتور تغییر کرد و فاکتور به وضعیت نیازمند تایید انبار برگشت.', [
             'old_status' => $oldStatus,
             'new_status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
             'preinvoice_order_id' => $order->id,
