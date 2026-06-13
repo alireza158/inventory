@@ -19,6 +19,7 @@ use App\Http\Controllers\ModelListController;
 use App\Http\Controllers\PreinvoiceApiController;
 use App\Http\Controllers\PreinvoiceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductSalesLedgerController;
 use App\Http\Controllers\ProductPurchaseLedgerController;
 use App\Http\Controllers\ProductDeactivationDocumentController;
@@ -61,6 +62,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
 
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
+
+    Route::prefix('admin/product-exports')->name('admin.product-exports.')->middleware('permission:export_products')->group(function () {
+        Route::get('/', [ProductExportController::class, 'index'])->name('index');
+        Route::get('/data', [ProductExportController::class, 'filter'])->name('data');
+        Route::get('/export', [ProductExportController::class, 'export'])->name('export');
+    });
 
     Route::post('/products/sync-crm', [ProductController::class, 'syncCrm'])->name('products.sync.crm');
     Route::get('/product-deactivation-documents', [ProductDeactivationDocumentController::class, 'index'])->name('product-deactivation-documents.index');
