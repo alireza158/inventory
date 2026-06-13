@@ -362,7 +362,7 @@ class PreinvoiceController extends Controller
 
     public function editDraft(string $uuid)
     {
-        $order = PreinvoiceOrder::with(['items', 'invoice'])->where('uuid', $uuid)->firstOrFail();
+        $order = PreinvoiceOrder::with(['items.product:id,name,code,sku', 'items.variant:id,variant_name', 'invoice'])->where('uuid', $uuid)->firstOrFail();
         abort_unless($this->accessService->canSellerEditPreinvoiceItems($order, auth()->user()) || $this->canHandleFinanceActions(), 403);
 
         $shippingMethods = ShippingMethod::query()
@@ -507,6 +507,7 @@ class PreinvoiceController extends Controller
             ],
             'products.*.quantity' => 'required|integer|min:1',
             'products.*.price' => 'nullable|integer|min:0',
+            'products.*.item_id' => 'nullable|integer',
         ], [
             'customer_name.required' => 'نام مشتری الزامی است.',
             'customer_mobile.required' => 'شماره موبایل مشتری الزامی است.',
@@ -918,7 +919,7 @@ class PreinvoiceController extends Controller
                 'product_id' => (int) $p['id'],
                 'variant_id' => (int) $p['variety_id'],
                 'quantity' => (int) $p['quantity'],
-                'price' => (int) ($variant->sell_price ?? 0),
+                'price' => (int) ($p['price'] ?? $variant->sell_price ?? 0),
             ]);
         }
     }
@@ -1020,13 +1021,21 @@ class PreinvoiceController extends Controller
             return;
         }
 
-        $this->centralInventoryService->assertVariantAvailable($variantId, $quantity);
+        $variant = ProductVariant::query()
+            ->whereKey($variantId)
+            ->where('is_active', true)
+            ->lockForUpdate()
+            ->firstOrFail();
 
-        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
+        $available = max(0, (int) $variant->stock);
+        if ($available < $quantity) {
+            throw ValidationException::withMessages([
+                'products' => "موجودی آزاد این کالا کافی نیست. موجودی: {$available} | درخواست: {$quantity}",
+            ]);
+        }
 
         WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $productId, -$quantity, $variantId);
 
-        $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
         $variant->reserved = (int) $variant->reserved + $quantity;
         $variant->save();
 

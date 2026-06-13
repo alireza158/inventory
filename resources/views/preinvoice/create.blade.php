@@ -21,14 +21,16 @@ return [
 'variant_name' => $variant->variant_name ?? null,
 'quantity' => (int) $it->quantity,
 'price' => (int) $it->price,
+'item_id' => (int) $it->id,
 ];
 })->values();
 }
 
 if (!$initRows) { $initRows = []; }
 
-$oldCustomerTitle = trim((string) old('customer_name'));
-$oldCustomerMobile = trim((string) old('customer_mobile'));
+$isEdit = (bool) ($isEdit ?? false);
+$oldCustomerTitle = trim((string) old('customer_name', $order->customer_name ?? ''));
+$oldCustomerMobile = trim((string) old('customer_mobile', $order->customer_mobile ?? ''));
 $oldPreinvoiceDescription = old('description', $order->description ?? '');
 @endphp
 
@@ -1058,12 +1060,19 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
 
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h1 class="page-title">🧾 ثبت پیش‌فاکتور</h1>
-            <div class="hint mt-1">ثبت سریع کالا با کد ۴ رقمی محصول مادر</div>
+            <h1 class="page-title">{{ $isEdit ? '📝 ویرایش پیش‌فاکتور' : '🧾 ثبت پیش‌فاکتور' }}</h1>
+            <div class="hint mt-1">{{ $isEdit ? 'کد سند: ' . $order->uuid . ' | وضعیت: ' . $order->status_label : 'ثبت سریع کالا با کد ۴ رقمی محصول مادر' }}</div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
+            @unless($isEdit)
             <span class="autosave-pill" id="localDraftStatus">ذخیره خودکار فعال</span>
             <button type="button" class="btn btn-sm btn-outline-danger rounded-3" id="clearLocalDraftTopBtn">پاک‌کردن پیش‌نویس</button>
+            @else
+            <span class="autosave-pill is-saved">{{ $order->status_label }}</span>
+            @if($order->invoice)
+            <span class="autosave-pill">فاکتور: {{ $order->invoice->uuid }}</span>
+            @endif
+            @endunless
             <a class="btn btn-sm btn-outline-secondary rounded-3" href="{{ route('preinvoice.warehouse.index') }}">صف تایید انبار</a>
         </div>
     </div>
@@ -1094,12 +1103,13 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     </div>
     @endif
 
-    <form action="{{ route('preinvoice.draft.save') }}" method="POST" id="orderForm" autocomplete="off">
+    <form action="{{ $isEdit ? route('preinvoice.draft.update', $order->uuid) : route('preinvoice.draft.save') }}" method="POST" id="orderForm" autocomplete="off">
         @csrf
+        @if($isEdit) @method('PUT') @endif
 
-        <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', '') }}">
-        <input type="hidden" name="customer_name" id="customer_name" value="{{ old('customer_name') }}">
-        <input type="hidden" name="customer_mobile" id="customer_mobile" value="{{ old('customer_mobile') }}">
+        <input type="hidden" name="customer_id" id="customer_id" value="{{ old('customer_id', $order->customer_id ?? '') }}">
+        <input type="hidden" name="customer_name" id="customer_name" value="{{ old('customer_name', $order->customer_name ?? '') }}">
+        <input type="hidden" name="customer_mobile" id="customer_mobile" value="{{ old('customer_mobile', $order->customer_mobile ?? '') }}">
         <input type="hidden" name="payment_status" value="pending">
         <input type="hidden" name="reservation_token" id="reservation_token" value="{{ old('reservation_token') }}">
         <input type="hidden" name="discount_breakdown" id="discount_breakdown" value="">
@@ -1142,7 +1152,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     <select id="shipping_id" name="shipping_id" class="form-select form-select-sm" required>
                         <option value="">انتخاب روش ارسال...</option>
                     </select>
-                    <input type="hidden" id="shipping_price" name="shipping_price" value="{{ old('shipping_price', 0) }}">
+                    <input type="hidden" id="shipping_price" name="shipping_price" value="{{ old('shipping_price', $order->shipping_price ?? 0) }}">
                 </div>
                 <div class="col-lg-4" id="provinceBox">
                     <label class="label-sm">استان</label>
@@ -1161,8 +1171,8 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                 <div class="hint" id="shipping_mode_hint">روش ارسال را انتخاب کنید.</div>
                 <button class="btn btn-sm btn-light border rounded-3" type="button" data-bs-toggle="collapse" data-bs-target="#addressCollapse">آدرس ارسال</button>
             </div>
-            <div id="addressCollapse" class="collapse mt-2 {{ old('customer_address') ? 'show' : '' }}">
-                <textarea id="customer_address" name="customer_address" class="form-control form-control-sm" rows="2" placeholder="آدرس ارسال...">{{ old('customer_address') }}</textarea>
+            <div id="addressCollapse" class="collapse mt-2 {{ old('customer_address', $order->customer_address ?? '') ? 'show' : '' }}">
+                <textarea id="customer_address" name="customer_address" class="form-control form-control-sm" rows="2" placeholder="آدرس ارسال...">{{ old('customer_address', $order->customer_address ?? '') }}</textarea>
             </div>
             <div class="preinvoice-note-box mt-2">
                 <label class="label-sm">توضیحات پیش‌فاکتور</label>
@@ -1218,7 +1228,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         </div>
 
         <div class="soft-card final-card">
-            <input type="hidden" name="discount_amount" id="discount" value="{{ \App\Support\Currency::toRial(old('discount_amount', 0)) }}">
+            <input type="hidden" name="discount_amount" id="discount" value="{{ \App\Support\Currency::toRial(old('discount_amount', $order->discount_amount ?? 0)) }}">
             <div class="final-grid">
                 <div>
                     <label class="label-sm">تخفیف کلی</label>
@@ -1227,7 +1237,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                             <option value="amount">ریال</option>
                             <option value="percent">درصد</option>
                         </select>
-                        <input type="number" id="orderDiscountValue" class="form-control form-control-sm" min="0" step="0.01" inputmode="decimal" value="{{ \App\Support\Currency::toRial(old('discount_amount', 0)) }}" placeholder="مقدار">
+                        <input type="number" id="orderDiscountValue" class="form-control form-control-sm" min="0" step="0.01" inputmode="decimal" value="{{ \App\Support\Currency::toRial(old('discount_amount', $order->discount_amount ?? 0)) }}" placeholder="مقدار">
                     </div>
                     <div class="discount-line" id="orderDiscountPreview">تخفیف کلی: 0 ریال</div>
                 </div>
@@ -1244,7 +1254,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     <input type="text" name="total_price" id="total_price" class="form-control form-control-sm total-view" readonly value="0">
                 </div>
                 <div>
-                    <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold" id="submitOrderBtn" disabled>ثبت پیش‌فاکتور</button>
+                    <button class="btn btn-primary px-4 py-2 rounded-3 fw-bold" id="submitOrderBtn" disabled>{{ $isEdit ? 'ذخیره و ارسال مجدد برای تایید' : 'ثبت پیش‌فاکتور' }}</button>
                     <div class="submit-disabled-hint" id="submitHint">برای ثبت، مشتری و حداقل یک کالا لازم است.</div>
                 </div>
             </div>
@@ -1328,15 +1338,16 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         },
         initRows: @json($initRows),
         shippings: @json($shippingMethods ?? []),
-        oldCustomerId: @json(old('customer_id', '')),
-        oldCustomerName: @json(old('customer_name', '')),
-        oldCustomerMobile: @json(old('customer_mobile', '')),
-        oldCustomerAddress: @json(old('customer_address', '')),
+        oldCustomerId: @json(old('customer_id', $order->customer_id ?? '')),
+        oldCustomerName: @json(old('customer_name', $order->customer_name ?? '')),
+        oldCustomerMobile: @json(old('customer_mobile', $order->customer_mobile ?? '')),
+        oldCustomerAddress: @json(old('customer_address', $order->customer_address ?? '')),
         oldDescription: @json($oldPreinvoiceDescription),
-        oldProvinceId: @json(old('province_id', '')),
-        oldCityId: @json(old('city_id', '')),
-        oldShippingId: @json(old('shipping_id', '')),
-        oldDiscountAmount: @json(old('discount_amount', 0))
+        oldProvinceId: @json(old('province_id', $order->province_id ?? '')),
+        oldCityId: @json(old('city_id', $order->city_id ?? '')),
+        oldShippingId: @json(old('shipping_id', $order->shipping_id ?? '')),
+        oldDiscountAmount: @json(old('discount_amount', $order->discount_amount ?? 0)),
+        isEdit: @json($isEdit)
     };
 
     const API = window.PREINVOICE_BOOT.api;
@@ -1350,6 +1361,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     const OLD_CITY_ID = window.PREINVOICE_BOOT.oldCityId;
     const OLD_SHIPPING_ID = window.PREINVOICE_BOOT.oldShippingId;
     const OLD_DISCOUNT_AMOUNT = window.PREINVOICE_BOOT.oldDiscountAmount;
+    const IS_EDIT = !!window.PREINVOICE_BOOT.isEdit;
 
     let shippings = INITIAL_SHIPPINGS || [];
     let areaProvinces = [];
@@ -1387,6 +1399,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     }
 
     function ensureReservationToken() {
+        if (IS_EDIT) return '';
         let token = normalize(document.getElementById('reservation_token')?.value);
         if (!token) token = normalize(localStorage.getItem(RESERVATION_TOKEN_KEY));
         if (!token) token = window.crypto?.randomUUID ? window.crypto.randomUUID() : cryptoRandomUuidFallback();
@@ -1431,6 +1444,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     }
 
     async function syncDraftReservation(sourceGroups = groupedSelections) {
+        if (IS_EDIT) return { ok: true };
         const token = ensureReservationToken();
         isSyncingReservation = true;
         try {
@@ -1710,6 +1724,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     }
 
     function scheduleLocalDraftSave() {
+        if (IS_EDIT) return;
         if (isBootingPage || isHydratingLocalDraft || isSubmittingProgrammatically) return;
         clearTimeout(localDraftSaveTimer);
         localDraftSaveTimer = setTimeout(saveLocalDraftNow, 350);
@@ -2534,6 +2549,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         </div>`);
             group.items.forEach(item => {
                 inputWrap.insertAdjacentHTML('beforeend', `
+                <input type="hidden" name="products[${idx}][item_id]" value="${Number(item.item_id || 0)}">
                 <input type="hidden" name="products[${idx}][id]" value="${productId}">
                 <input type="hidden" name="products[${idx}][variety_id]" value="${Number(item.variant_id)}">
                 <input type="hidden" name="products[${idx}][quantity]" value="${Number(item.quantity)}">
@@ -2621,6 +2637,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     const v = varieties.find(item => variantId(item) === vid);
                     return {
                         variant_id: vid,
+                        item_id: Number(row.item_id || row.id || 0),
                         quantity: Number(row.quantity || 0),
                         price: Number(row.price || (v ? variantPrice(v, product) : 0)),
                         model: v ? variantModel(v) : '—',
@@ -2654,6 +2671,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     }
 
     async function validateSelectedStockBeforeSubmit() {
+        if (IS_EDIT) return true;
         const errors = [];
         for (const group of Object.values(groupedSelections)) {
             const product = await getProductDetails(group.product.id, true);
@@ -2728,16 +2746,20 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         normalizeBeforeSubmit();
         btn.textContent = 'در حال ثبت...';
         isSubmittingProgrammatically = true;
-        localStorage.removeItem(LOCAL_DRAFT_KEY);
-        localStorage.removeItem(RESERVATION_TOKEN_KEY);
+        if (!IS_EDIT) {
+            localStorage.removeItem(LOCAL_DRAFT_KEY);
+            localStorage.removeItem(RESERVATION_TOKEN_KEY);
+        }
         hideLocalDraftBanner();
         document.getElementById('orderForm').submit();
         return true;
     }
 
     document.addEventListener('DOMContentLoaded', async function() {
-        ensureReservationToken();
-        bindLocalDraftEvents();
+        if (!IS_EDIT) {
+            ensureReservationToken();
+            bindLocalDraftEvents();
+        }
 
         initSelect2Basic(document.getElementById('province_id'), 'انتخاب استان...');
         initSelect2Basic(document.getElementById('city_id'), 'انتخاب شهر...');
@@ -2838,7 +2860,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
 
         isBootingPage = false;
 
-        if (!OLD_CUSTOMER_ID && !INIT_ROWS.length && localDraftExists()) {
+        if (!IS_EDIT && !OLD_CUSTOMER_ID && !INIT_ROWS.length && localDraftExists()) {
             showLocalDraftBanner();
         } else {
             scheduleLocalDraftSave();
