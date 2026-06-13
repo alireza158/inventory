@@ -1,22 +1,24 @@
 @extends('layouts.app')
 
 @php
-  $formatWarehouseLocation = function ($product): string {
-      if (! $product) {
+  $formatWarehouseLocation = function ($item): string {
+      $variant = $item->variant;
+      if (! $variant) {
           return '—';
       }
 
-      $zone = $product->warehouse_zone ? 'Z' . (int) $product->warehouse_zone : null;
-      $rows = collect((array) ($product->warehouse_rows ?? []))
-          ->filter(fn ($row) => $row !== null && $row !== '')
-          ->map(fn ($row) => 'R' . (int) $row)
-          ->implode(' / ');
-      $bins = collect((array) ($product->warehouse_bins ?? []))
-          ->filter(fn ($bin) => $bin !== null && $bin !== '')
-          ->map(fn ($bin) => 'B' . (int) $bin)
-          ->implode(' / ');
+      $warehouseId = (int) ($item->transfer?->from_warehouse_id ?? 0);
+      $stocks = $variant->locationStocks()
+          ->with('location')
+          ->when($warehouseId > 0, fn ($q) => $q->where('warehouse_id', $warehouseId))
+          ->where('quantity', '>', 0)
+          ->get();
 
-      return collect([$zone, $rows ?: null, $bins ?: null])->filter()->implode(' | ') ?: '—';
+      if ($stocks->isEmpty()) {
+          return 'بدون نقشه';
+      }
+
+      return $stocks->map(fn ($stock) => ($stock->location?->code ?? '—') . ' (' . number_format((int) $stock->quantity) . ')')->implode(' / ');
   };
 @endphp
 
@@ -68,7 +70,7 @@
                   ?: ($item->variant_code
                       ?: ($item->variant?->variant_code
                           ?: ($item->product?->sku ?: '—')));
-              $warehouseLocation = $formatWarehouseLocation($item->product);
+              $warehouseLocation = $formatWarehouseLocation($item);
             @endphp
             <tr>
               <td>{{ $loop->iteration }}</td>
