@@ -352,11 +352,6 @@ class ProductController extends Controller
             'variants.*.variety_id' => ['nullable', 'integer', 'min:1'],
             'variant_site_ids' => ['nullable', 'array'],
             'variant_site_ids.*' => ['nullable', 'integer', 'min:1'],
-            'warehouse_zone' => ['nullable', 'integer', 'min:1', 'max:7'],
-            'warehouse_rows' => ['nullable', 'array'],
-            'warehouse_rows.*' => ['integer', 'distinct', 'min:1', 'max:40'],
-            'warehouse_bins' => ['nullable', 'array'],
-            'warehouse_bins.*' => ['integer', 'distinct', 'min:1', 'max:10'],
         ]);
 
         $newImagePath = $this->storeProductImage($request);
@@ -370,9 +365,6 @@ class ProductController extends Controller
                 'category_id' => (int) $data['category_id'],
                 'name' => $data['name'],
                 'is_sellable' => (bool) ($data['is_sellable'] ?? false),
-                'warehouse_zone' => isset($data['warehouse_zone']) ? (int) $data['warehouse_zone'] : null,
-                'warehouse_rows' => array_values(array_map('intval', $data['warehouse_rows'] ?? [])),
-                'warehouse_bins' => array_values(array_map('intval', $data['warehouse_bins'] ?? [])),
             ];
 
             if ($newImagePath || $removeImage) {
