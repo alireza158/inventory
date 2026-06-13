@@ -166,6 +166,77 @@ class ProductExportService
         return 'data:image/png;base64,' . 'iVBORw0KGgoAAAANSUhEUgAAAFQAAABUCAYAAAAcaxDBAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAxUlEQVR4nO3QQQ3AIADAQMAJ/5yuwgOi8wKSpd1Z7z0AAAAAAAAAAAAAAAAAAAAAAAB8Z54H4GbEUYijEEchjkIchTgKcRTiKMTRiKMQRyGOQhyFOApxFOIoxNGIoxBHIY5CHIWE8c5zAF8rjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAK8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAG8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAP8WAAAAAAAAAAAAAAAAAAAAAAAArB2lJwKTe+Ve3wAAAABJRU5ErkJggg==';
     }
 
+
+    public static function pdfText(?string $text): string
+    {
+        $text = (string) $text;
+
+        if ($text === '') {
+            return '';
+        }
+
+        return preg_replace_callback('/[اآأإبپتثجچحخدذرزژسشصضطظعغفقکكگلمنوؤهةیيئء]+/u', function (array $matches): string {
+            return self::shapeArabicRun($matches[0]);
+        }, $text) ?? $text;
+    }
+
+    private static function shapeArabicRun(string $text): string
+    {
+        $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $shaped = [];
+        $count = count($chars);
+
+        for ($i = 0; $i < $count; $i++) {
+            $char = $chars[$i];
+            $forms = self::arabicForms()[$char] ?? null;
+
+            if (! $forms) {
+                $shaped[] = $char;
+                continue;
+            }
+
+            $previous = $chars[$i - 1] ?? null;
+            $next = $chars[$i + 1] ?? null;
+            $connectPrevious = $previous !== null && self::canConnectToPrevious($char) && self::canConnectToNext($previous);
+            $connectNext = $next !== null && self::canConnectToNext($char) && self::canConnectToPrevious($next);
+
+            $shaped[] = match (true) {
+                $connectPrevious && $connectNext => $forms[3] ?? $forms[0],
+                $connectPrevious => $forms[1] ?? $forms[0],
+                $connectNext => $forms[2] ?? $forms[0],
+                default => $forms[0],
+            };
+        }
+
+        return implode('', array_reverse($shaped));
+    }
+
+    private static function canConnectToPrevious(string $char): bool
+    {
+        return isset(self::arabicForms()[$char]) && ! in_array($char, ['ا', 'آ', 'أ', 'إ', 'د', 'ذ', 'ر', 'ز', 'ژ', 'و', 'ؤ'], true);
+    }
+
+    private static function canConnectToNext(string $char): bool
+    {
+        return isset(self::arabicForms()[$char]);
+    }
+
+    private static function arabicForms(): array
+    {
+        return [
+            'ا' => ['ﺍ', 'ﺎ', 'ﺍ', 'ﺎ'], 'آ' => ['ﺁ', 'ﺂ', 'ﺁ', 'ﺂ'], 'أ' => ['ﺃ', 'ﺄ', 'ﺃ', 'ﺄ'], 'إ' => ['ﺇ', 'ﺈ', 'ﺇ', 'ﺈ'],
+            'ب' => ['ﺏ', 'ﺐ', 'ﺑ', 'ﺒ'], 'پ' => ['ﭖ', 'ﭗ', 'ﭘ', 'ﭙ'], 'ت' => ['ﺕ', 'ﺖ', 'ﺗ', 'ﺘ'], 'ث' => ['ﺙ', 'ﺚ', 'ﺛ', 'ﺜ'],
+            'ج' => ['ﺝ', 'ﺞ', 'ﺟ', 'ﺠ'], 'چ' => ['ﭺ', 'ﭻ', 'ﭼ', 'ﭽ'], 'ح' => ['ﺡ', 'ﺢ', 'ﺣ', 'ﺤ'], 'خ' => ['ﺥ', 'ﺦ', 'ﺧ', 'ﺨ'],
+            'د' => ['ﺩ', 'ﺪ', 'ﺩ', 'ﺪ'], 'ذ' => ['ﺫ', 'ﺬ', 'ﺫ', 'ﺬ'], 'ر' => ['ﺭ', 'ﺮ', 'ﺭ', 'ﺮ'], 'ز' => ['ﺯ', 'ﺰ', 'ﺯ', 'ﺰ'], 'ژ' => ['ﮊ', 'ﮋ', 'ﮊ', 'ﮋ'],
+            'س' => ['ﺱ', 'ﺲ', 'ﺳ', 'ﺴ'], 'ش' => ['ﺵ', 'ﺶ', 'ﺷ', 'ﺸ'], 'ص' => ['ﺹ', 'ﺺ', 'ﺻ', 'ﺼ'], 'ض' => ['ﺽ', 'ﺾ', 'ﺿ', 'ﻀ'],
+            'ط' => ['ﻁ', 'ﻂ', 'ﻃ', 'ﻄ'], 'ظ' => ['ﻅ', 'ﻆ', 'ﻇ', 'ﻈ'], 'ع' => ['ﻉ', 'ﻊ', 'ﻋ', 'ﻌ'], 'غ' => ['ﻍ', 'ﻎ', 'ﻏ', 'ﻐ'],
+            'ف' => ['ﻑ', 'ﻒ', 'ﻓ', 'ﻔ'], 'ق' => ['ﻕ', 'ﻖ', 'ﻗ', 'ﻘ'], 'ک' => ['ﮎ', 'ﮏ', 'ﮐ', 'ﮑ'], 'ك' => ['ﻙ', 'ﻚ', 'ﻛ', 'ﻜ'],
+            'گ' => ['ﮒ', 'ﮓ', 'ﮔ', 'ﮕ'], 'ل' => ['ﻝ', 'ﻞ', 'ﻟ', 'ﻠ'], 'م' => ['ﻡ', 'ﻢ', 'ﻣ', 'ﻤ'], 'ن' => ['ﻥ', 'ﻦ', 'ﻧ', 'ﻨ'],
+            'و' => ['ﻭ', 'ﻮ', 'ﻭ', 'ﻮ'], 'ؤ' => ['ﺅ', 'ﺆ', 'ﺅ', 'ﺆ'], 'ه' => ['ﻩ', 'ﻪ', 'ﻫ', 'ﻬ'], 'ة' => ['ﺓ', 'ﺔ', 'ﺓ', 'ﺔ'],
+            'ی' => ['ﯼ', 'ﯽ', 'ﯾ', 'ﯿ'], 'ي' => ['ﻱ', 'ﻲ', 'ﻳ', 'ﻴ'], 'ئ' => ['ﺉ', 'ﺊ', 'ﺋ', 'ﺌ'], 'ء' => ['ﺀ', 'ﺀ', 'ﺀ', 'ﺀ'],
+        ];
+    }
+
     public function stock(Product $product): int
     {
         return max(0, (int) ($product->export_stock ?? $product->stock ?? 0));
