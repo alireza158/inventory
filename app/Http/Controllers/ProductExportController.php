@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\ProductRowsExport;
 use App\Models\Category;
 use App\Models\Warehouse;
 use App\Services\ProductExportService;
 use Illuminate\Http\Request;
-use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ProductExportController extends Controller
 {
@@ -43,14 +43,9 @@ class ProductExportController extends Controller
             return back()->with('error', 'محصولی برای این دسته‌بندی یافت نشد.');
         }
 
-        $format = $filters['format'];
         $filename = 'product-report-' . now()->format('Ymd-His');
 
-        return match ($format) {
-            'xlsx' => Excel::download(new ProductRowsExport($rows), $filename . '.xlsx'),
-            'csv' => Excel::download(new ProductRowsExport($rows), $filename . '.csv', \Maatwebsite\Excel\Excel::CSV),
-            'pdf' => $this->pdfResponse($rows, $filters, $filename),
-        };
+        return $this->pdfResponse($rows, $filters, $filename);
     }
 
     private function validatedFilters(Request $request, bool $requireFormat): array
@@ -60,35 +55,56 @@ class ProductExportController extends Controller
             'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'stock_status' => ['nullable', 'in:all,in_stock,out_of_stock,low_stock'],
             'search' => ['nullable', 'string', 'max:255'],
-            'format' => [$requireFormat ? 'required' : 'nullable', 'in:xlsx,excel,pdf,csv'],
-        ]) + ['stock_status' => 'all'];
+            'format' => [$requireFormat ? 'required' : 'nullable', 'in:pdf'],
+        ]) + ['stock_status' => 'all', 'format' => 'pdf'];
 
-        if (($filters['format'] ?? null) === 'excel') {
-            $filters['format'] = 'xlsx';
-        }
+        $filters['format'] = 'pdf';
 
         return $filters;
     }
 
     private function pdfResponse(array $rows, array $filters, string $filename)
     {
-        $html = view('product-exports.pdf', [
-            'rows' => $rows,
-            'meta' => $this->service->meta($filters),
-        ])->render();
-
         if (! class_exists(\Dompdf\Dompdf::class)) {
-            abort(500, 'کتابخانه تولید PDF نصب نیست. لطفاً وابستگی dompdf/dompdf را نصب کنید.');
+            return back()->with('error', 'امکان ساخت PDF فعال نیست؛ لطفاً بعد از دریافت آخرین تغییرات، دستور composer install یا composer update dompdf/dompdf را روی سرور اجرا کنید.');
         }
 
-        $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true, 'defaultFont' => 'DejaVu Sans']);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'landscape');
-        $dompdf->render();
+        try {
+            $html = view('product-exports.pdf', [
+                'rows' => $rows,
+                'meta' => $this->service->meta($filters),
+            ])->render();
 
-        return response($dompdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => "attachment; filename=\"{$filename}.pdf\"",
-        ]);
+            $options = new \Dompdf\Options();
+            $options->set('defaultFont', 'DejaVu Sans');
+            $options->set('isRemoteEnabled', true);
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('tempDir', storage_path('app/dompdf-temp'));
+            $options->set('fontCache', storage_path('app/dompdf-font-cache'));
+            $options->set('chroot', [public_path(), storage_path('app/public')]);
+
+            foreach (['app/dompdf-temp', 'app/dompdf-font-cache'] as $directory) {
+                if (! is_dir(storage_path($directory))) {
+                    mkdir(storage_path($directory), 0775, true);
+                }
+            }
+
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->render();
+
+            return response($dompdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "attachment; filename=\"{$filename}.pdf\"",
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('Product PDF export failed', [
+                'message' => $exception->getMessage(),
+                'filters' => $filters,
+            ]);
+
+            return back()->with('error', 'ساخت فایل PDF با خطا روبه‌رو شد. لطفاً دوباره تلاش کنید یا لاگ سرور را بررسی کنید.');
+        }
     }
 }

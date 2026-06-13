@@ -15,7 +15,7 @@
     <div class="export-hero mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div>
             <h1 class="h3 fw-black mb-2">خروجی محصولات</h1>
-            <div class="opacity-75">فیلتر محصولات بر اساس دسته‌بندی، انبار و وضعیت موجودی و دریافت خروجی Excel، PDF یا CSV.</div>
+            <div class="opacity-75">فیلتر محصولات بر اساس دسته‌بندی، انبار و وضعیت موجودی و دریافت خروجی PDF.</div>
         </div>
         <div class="badge bg-white text-dark p-3 rounded-pill">آستانه کم‌موجودی: {{ \App\Services\ProductExportService::LOW_STOCK_THRESHOLD }} عدد</div>
     </div>
@@ -60,9 +60,7 @@
             <div class="col-12 d-flex flex-wrap gap-2 justify-content-between align-items-center">
                 <button type="submit" class="btn btn-primary btn-export px-4">نمایش محصولات</button>
                 <div class="d-flex flex-wrap gap-2">
-                    <button type="button" data-format="xlsx" class="btn btn-success btn-export">دریافت خروجی Excel</button>
                     <button type="button" data-format="pdf" class="btn btn-danger btn-export">دریافت خروجی PDF</button>
-                    <button type="button" data-format="csv" class="btn btn-secondary btn-export">دریافت خروجی CSV</button>
                 </div>
             </div>
         </form>
