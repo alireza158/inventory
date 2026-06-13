@@ -18,6 +18,7 @@ use App\Support\ActivityLogger;
 use App\Services\WarehouseStockService;
 use App\Services\CentralInventoryService;
 use App\Services\SalesDocumentAccessService;
+use App\Services\SalesPrintDocumentService;
 use App\Services\PaymentRegistrationService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -289,14 +290,15 @@ class PreinvoiceController extends Controller
         return view('preinvoice.my-index', compact('orders', 'status', 'statusLabels'));
     }
 
-    public function myShow(string $uuid)
+    public function myShow(string $uuid, Request $request, SalesPrintDocumentService $printService)
     {
         abort_unless(auth()->check(), 403);
 
         $order = PreinvoiceOrder::query()
             ->with([
-                'items.product:id,name',
-                'items.variant:id,variant_name',
+                'items.product',
+                'items.variant.modelList',
+                'items.variant.color',
                 'creator:id,name',
                 'warehouseReviewer:id,name',
                 'reviews.user:id,name',
@@ -305,6 +307,12 @@ class PreinvoiceController extends Controller
             ->where('uuid', $uuid)
             ->where('created_by', auth()->id())
             ->firstOrFail();
+
+        if ($request->has('print') || $request->has('mode')) {
+            $printData = $printService->preinvoiceData($order, (string) $request->query('mode', $request->query('print', 'warehouse')));
+
+            return view('prints.invoice', compact('printData'));
+        }
 
         return view('archive.preinvoice-show', compact('order'));
     }
