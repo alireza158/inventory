@@ -57,4 +57,19 @@ class Warehouse extends Model
     {
         return $this->type === 'personnel' && !is_null($this->parent_id);
     }
+
+    public function locations()
+    {
+        return $this->hasMany(WarehouseLocation::class);
+    }
+
+    public function locationStocks()
+    {
+        return $this->hasMany(WarehouseLocationStock::class);
+    }
+
+    public function locationMovements()
+    {
+        return $this->hasMany(WarehouseLocationMovement::class);
+    }
 }

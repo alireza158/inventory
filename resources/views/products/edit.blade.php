@@ -49,9 +49,6 @@ if ($oldDesignNotes === null) {
 } else {
     $oldDesignNotes = array_values($oldDesignNotes);
 }
-    $oldWarehouseZone = old('warehouse_zone', $product->warehouse_zone);
-    $oldWarehouseRows = array_map('intval', (array) old('warehouse_rows', $product->warehouse_rows ?? []));
-    $oldWarehouseBins = array_map('intval', (array) old('warehouse_bins', $product->warehouse_bins ?? []));
 
     $hasModels = count($oldModelIds) > 0;
     $hasDesigns = count($oldDesignNotes) > 0;
@@ -556,53 +553,6 @@ if ($oldDesignNotes === null) {
                                     <div class="muted mb-1">دسته‌بندی انتخاب‌شده</div>
                                     <div class="fw-bold" id="categorySelectedTitle">هنوز انتخاب نشده</div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- نقشه انبار --}}
-            <div class="col-12">
-                <div class="card-soft">
-                    <div class="section-head">
-                        <div>
-                            <div class="section-title">نقشه انبار کالا</div>
-                            <div class="muted">موقعیت کالا را با Z، R و B مشخص کنید؛ R و B می‌توانند چند انتخاب داشته باشند.</div>
-                        </div>
-                    </div>
-
-                    <div class="p-3">
-                        <div class="row g-3">
-                            <div class="col-lg-4">
-                                <label class="form-label">Z (زون)</label>
-                                <select name="warehouse_zone" class="form-select">
-                                    <option value="">انتخاب نشده</option>
-                                    @for($z = 1; $z <= 7; $z++)
-                                        <option value="{{ $z }}" @selected((string) $oldWarehouseZone === (string) $z)>Z{{ $z }}</option>
-                                    @endfor
-                                </select>
-                                <div class="form-text">عدد Z باید بین ۱ تا ۷ باشد.</div>
-                            </div>
-
-                            <div class="col-lg-4">
-                                <label class="form-label">R (ردیف‌ها)</label>
-                                <select name="warehouse_rows[]" class="form-select" multiple size="8">
-                                    @for($r = 1; $r <= 40; $r++)
-                                        <option value="{{ $r }}" @selected(in_array($r, $oldWarehouseRows, true))>R{{ $r }}</option>
-                                    @endfor
-                                </select>
-                                <div class="form-text">برای انتخاب چند ردیف، Ctrl/Cmd را نگه دارید.</div>
-                            </div>
-
-                            <div class="col-lg-4">
-                                <label class="form-label">B (باکس‌ها)</label>
-                                <select name="warehouse_bins[]" class="form-select" multiple size="8">
-                                    @for($b = 1; $b <= 10; $b++)
-                                        <option value="{{ $b }}" @selected(in_array($b, $oldWarehouseBins, true))>B{{ $b }}</option>
-                                    @endfor
-                                </select>
-                                <div class="form-text">برای کالاهایی که چند باکس دارند، چند B را انتخاب کنید.</div>
                             </div>
                         </div>
                     </div>
