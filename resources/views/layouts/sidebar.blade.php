@@ -4,7 +4,7 @@
     $isRoute = static fn(string ...$patterns): bool => Str::is($patterns, $currentRouteName);
     $is = static fn(string ...$patterns): string => $isRoute(...$patterns) ? 'active' : '';
 
-    $productsActive = $isRoute('products.*', 'product-deactivation-documents.*', 'categories.*', 'model-lists.*')
+    $productsActive = $isRoute('products.*', 'admin.product-exports.*', 'product-deactivation-documents.*', 'categories.*', 'model-lists.*')
         && !$isRoute('products.create');
 
     $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*', 'preinvoice.warehouse.*', 'products.create', 'warehouse-map.*');
@@ -216,6 +216,7 @@
                     <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
                 
                     <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
+                    <a class="sidebar-sublink {{ $is('admin.product-exports.*') }}" href="{{ route('admin.product-exports.index') }}">خروجی محصولات</a>
                         @if($hasRole(['admin', 'Admin', 'Manager', 'manager', 'warehouse', 'StorageUser', 'StorageManager']))
                     <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست</a>
                     <a class="sidebar-sublink {{ $is('product-deactivation-documents.*') }}" href="{{ route('product-deactivation-documents.index') }}">غیرفعال‌سازی کالا</a>

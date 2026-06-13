@@ -42,12 +42,10 @@
                 لیست قیمت
             </a>
 
-            @can('export_products')
-                <a class="list-group-item list-group-item-action"
-                   href="{{ route('admin.product-exports.index') }}">
-                    خروجی محصولات
-                </a>
-            @endcan
+            <a class="list-group-item list-group-item-action"
+               href="{{ route('admin.product-exports.index') }}">
+                خروجی محصولات
+            </a>
         </div>
     </div>
 </div>
