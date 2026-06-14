@@ -729,7 +729,7 @@
 
 @push('scripts')
 <script>
-const AREA_API = "{{ url('/preinvoice/api/area') }}";
+const PROVINCES_API = "{{ route('locations.provinces.index') }}";
 let provinces = [];
 
 function initSelect2(selectEl, placeholder) {
@@ -772,12 +772,24 @@ function setProvinceOptions(selectEl) {
 
   selectEl.innerHTML = '<option value=""></option>';
 
+  if (!provinces.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'استانی ثبت نشده است؛ seeder استان و شهر را اجرا کنید.';
+    opt.disabled = true;
+    selectEl.appendChild(opt);
+    setSelectDisabled(selectEl, true);
+    return;
+  }
+
   provinces.forEach((p) => {
     const opt = document.createElement('option');
     opt.value = p.id;
     opt.textContent = p.name;
     selectEl.appendChild(opt);
   });
+
+  setSelectDisabled(selectEl, false);
 }
 
 function setCityOptions(selectEl, provinceId, selectedCityId = null) {
@@ -787,6 +799,27 @@ function setCityOptions(selectEl, provinceId, selectedCityId = null) {
   const cities = province?.cities ?? province?.city ?? [];
 
   selectEl.innerHTML = '<option value=""></option>';
+
+  if (!provinceId) {
+    setSelectDisabled(selectEl, true);
+    if (window.jQuery) {
+      $(selectEl).trigger('change.select2');
+    }
+    return;
+  }
+
+  if (!cities.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'شهری برای این استان ثبت نشده است.';
+    opt.disabled = true;
+    selectEl.appendChild(opt);
+    setSelectDisabled(selectEl, true);
+    if (window.jQuery) {
+      $(selectEl).trigger('change.select2');
+    }
+    return;
+  }
 
   cities.forEach((c) => {
     const opt = document.createElement('option');
@@ -825,14 +858,19 @@ document.addEventListener('DOMContentLoaded', async function () {
   const editCity = document.getElementById('edit_city_id');
 
   try {
-    const res = await fetch(AREA_API, {
+    const res = await fetch(PROVINCES_API, {
       headers: {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
       }
     });
 
+    if (!res.ok) {
+      throw new Error('Failed to load provinces');
+    }
+
     const json = await res.json();
-    provinces = json?.data?.provinces ?? [];
+    provinces = Array.isArray(json) ? json : (json?.data?.provinces ?? []);
   } catch (e) {
     provinces = [];
   }

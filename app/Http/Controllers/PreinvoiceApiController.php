@@ -419,6 +419,11 @@ class PreinvoiceApiController extends Controller
         ]);
     }
 
+    public function provinces()
+    {
+        return response()->json(IranLocations::provinces());
+    }
+
     public function cities(int $province)
     {
         abort_unless(IranLocations::provinceExists($province), 404);
