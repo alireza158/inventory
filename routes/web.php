@@ -56,6 +56,7 @@ Route::middleware('auth')->group(function () {
 
     // Products + categories
     Route::resource('products', ProductController::class)->except(['show', 'destroy']);
+    Route::get('/products/{product}/warehouse-stock', [ProductController::class, 'warehouseStock'])->name('products.warehouse-stock');
     Route::get('/products/{product}/image', [ProductController::class, 'image'])->name('products.image');
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('role:admin|Admin')->name('products.destroy');
     Route::get('/products/{product}/sales-ledger', [ProductSalesLedgerController::class, 'index'])->name('products.sales-ledger');
@@ -217,6 +218,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');
     Route::get('/purchases/export', [PurchaseController::class, 'exportExcel'])->name('purchases.export');
     Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
+    Route::get('/purchases/products/{product}/variants', [PurchaseController::class, 'productVariants'])->name('purchases.products.variants');
     Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
     Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show');
     Route::get('/purchases/{purchase}/edit', [PurchaseController::class, 'edit'])->name('purchases.edit');
