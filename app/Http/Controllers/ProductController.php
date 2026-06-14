@@ -527,6 +527,11 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        $request->merge([
+            'category_id' => $request->has('category_id') ? $request->input('category_id') : $product->category_id,
+            'name' => $request->has('name') ? $request->input('name') : $product->name,
+        ]);
+
         $data = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'name' => ['required', 'string', 'max:255'],
@@ -539,9 +544,9 @@ class ProductController extends Controller
             'variants.*.model_list_id' => ['nullable', 'integer', 'exists:model_lists,id'],
             'variants.*.variety_name' => ['required', 'string', 'max:255'],
             'variants.*.variety_code' => ['required', 'digits:4'],
-            'variants.*.sell_price' => ['required', 'integer', 'min:0'],
+            'variants.*.sell_price' => ['nullable', 'integer', 'min:0'],
             'variants.*.buy_price' => ['nullable', 'integer', 'min:0'],
-            'variants.*.stock' => ['required', 'integer', 'min:0'],
+            'variants.*.stock' => ['nullable', 'integer', 'min:0'],
             'variants.*.is_active' => ['nullable', 'boolean'],
             'variants.*.variety_id' => ['nullable', 'integer', 'min:1'],
             'variant_site_ids' => ['nullable', 'array'],
@@ -589,29 +594,37 @@ class ProductController extends Controller
 
                 $variantCode = $this->buildVariantCode11((string) $product->code, $modelCode3, $design2, $ignoreId);
 
-                $payload = [
-                    'variant_name' => $v['variant_name'],
-                    'model_list_id' => $modelListId,
-                    'variety_name' => $v['variety_name'],
-                    'variety_code' => $v['variety_code'],
-                    'variant_code' => $variantCode,
-                    'sell_price' => (int) $v['sell_price'],
-                    'buy_price' => isset($v['buy_price']) ? (int) $v['buy_price'] : null,
-                    'is_active' => (bool) ($v['is_active'] ?? true),
-                    'variety_id' => isset($v['variety_id']) && $v['variety_id'] !== '' ? (int) $v['variety_id'] : null,
-                ];
-
                 $variant = null;
 
                 if (!empty($v['id'])) {
                     $variant = ProductVariant::where('product_id', $product->id)
                         ->where('id', $v['id'])
                         ->first();
+                }
 
-                    if ($variant) {
-                        $variant->update($payload);
-                        $keepIds[] = $variant->id;
-                    }
+                $sellPrice = array_key_exists('sell_price', $v) && $v['sell_price'] !== ''
+                    ? (int) $v['sell_price']
+                    : (int) ($variant?->sell_price ?? 0);
+
+                $buyPrice = array_key_exists('buy_price', $v) && $v['buy_price'] !== ''
+                    ? (int) $v['buy_price']
+                    : $variant?->buy_price;
+
+                $payload = [
+                    'variant_name' => $v['variant_name'],
+                    'model_list_id' => $modelListId,
+                    'variety_name' => $v['variety_name'],
+                    'variety_code' => $v['variety_code'],
+                    'variant_code' => $variantCode,
+                    'sell_price' => $sellPrice,
+                    'buy_price' => $buyPrice,
+                    'is_active' => (bool) ($v['is_active'] ?? true),
+                    'variety_id' => isset($v['variety_id']) && $v['variety_id'] !== '' ? (int) $v['variety_id'] : null,
+                ];
+
+                if ($variant) {
+                    $variant->update($payload);
+                    $keepIds[] = $variant->id;
                 } else {
                     $variant = ProductVariant::create(array_merge($payload, [
                         'product_id' => $product->id,
@@ -622,7 +635,7 @@ class ProductController extends Controller
                     $keepIds[] = $variant->id;
                 }
 
-                if ($variant) {
+                if ($variant && array_key_exists('stock', $v) && $v['stock'] !== '') {
                     WarehouseStockService::set(
                         $centralWarehouseId,
                         (int) $product->id,

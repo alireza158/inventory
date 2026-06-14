@@ -252,6 +252,10 @@ class PurchaseController extends Controller
 
     public function update(Request $request, Purchase $purchase)
     {
+        if (! $request->filled('supplier_id')) {
+            $request->merge(['supplier_id' => $purchase->supplier_id]);
+        }
+
         $data = $this->validatePayload($request);
 
         DB::transaction(function () use ($purchase, $data) {
