@@ -16,6 +16,20 @@ return new class extends Migration
                 $table->boolean('is_active')->default(true);
                 $table->timestamps();
             });
+        } else {
+            Schema::table('provinces', function (Blueprint $table) {
+                if (!Schema::hasColumn('provinces', 'slug')) {
+                    $table->string('slug')->nullable()->after('name');
+                }
+
+                if (!Schema::hasColumn('provinces', 'is_active')) {
+                    $table->boolean('is_active')->default(true)->after('slug');
+                }
+
+                if (!Schema::hasColumn('provinces', 'created_at')) {
+                    $table->timestamps();
+                }
+            });
         }
 
         if (!Schema::hasTable('cities')) {
@@ -27,6 +41,20 @@ return new class extends Migration
                 $table->boolean('is_active')->default(true);
                 $table->timestamps();
                 $table->unique(['province_id', 'name'], 'city_prov_name_uq');
+            });
+        } else {
+            Schema::table('cities', function (Blueprint $table) {
+                if (!Schema::hasColumn('cities', 'slug')) {
+                    $table->string('slug')->nullable()->after('name');
+                }
+
+                if (!Schema::hasColumn('cities', 'is_active')) {
+                    $table->boolean('is_active')->default(true)->after('slug');
+                }
+
+                if (!Schema::hasColumn('cities', 'created_at')) {
+                    $table->timestamps();
+                }
             });
         }
     }
