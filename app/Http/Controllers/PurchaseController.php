@@ -126,6 +126,36 @@ class PurchaseController extends Controller
         ]);
     }
 
+    public function productVariants(Product $product)
+    {
+        $variants = $product->variants()
+            ->with(['modelList:id,model_name,code'])
+            ->select([
+                'id',
+                'product_id',
+                'model_list_id',
+                'variant_name',
+                'variant_code',
+                'variety_name',
+                'variety_code',
+                'sell_price',
+                'buy_price',
+                'stock',
+                'reserved',
+            ])
+            ->orderBy('variant_code')
+            ->orderBy('id')
+            ->get()
+            ->unique('id')
+            ->values()
+            ->map(fn (ProductVariant $variant) => $this->variantPayload($variant));
+
+        return response()->json([
+            'product_id' => (int) $product->id,
+            'variants' => $variants,
+        ]);
+    }
+
     public function edit(Purchase $purchase)
     {
         $purchase->load(['items', 'items.product', 'items.variant']);
@@ -220,6 +250,10 @@ class PurchaseController extends Controller
 
     public function update(Request $request, Purchase $purchase)
     {
+        if (! $request->filled('supplier_id')) {
+            $request->merge(['supplier_id' => $purchase->supplier_id]);
+        }
+
         $data = $this->validatePayload($request);
 
         DB::transaction(function () use ($purchase, $data) {
@@ -254,6 +288,30 @@ class PurchaseController extends Controller
         return redirect()->route('purchases.index')->with('success', 'سند خرید با موفقیت حذف شد.');
     }
 
+
+    private function variantPayload(ProductVariant $variant): array
+    {
+        return [
+            'id' => (int) $variant->id,
+            'product_id' => (int) $variant->product_id,
+            'model_list_id' => $variant->model_list_id ? (int) $variant->model_list_id : 0,
+            'name' => (string) ($variant->variant_name ?? ''),
+            'title' => (string) ($variant->variant_name ?: ($variant->variety_name ?: 'تنوع اصلی')),
+            'model_name' => (string) ($variant->modelList?->model_name ?? ''),
+            'model_code' => (string) ($variant->modelList?->code ?? ''),
+            'variety_name' => (string) ($variant->variety_name ?? ''),
+            'variety_code' => (string) ($variant->variety_code ?? ''),
+            'code' => (string) ($variant->variant_code ?? ''),
+            'variant_code' => (string) ($variant->variant_code ?? ''),
+            'sku' => (string) ($variant->variant_code ?? ''),
+            'barcode' => null,
+            'central_stock' => (int) ($variant->stock ?? 0),
+            'stock' => (int) ($variant->stock ?? 0),
+            'reserved' => (int) ($variant->reserved ?? 0),
+            'buy_price' => \App\Support\Currency::toRial($variant->buy_price ?? 0),
+            'sell_price' => \App\Support\Currency::toRial($variant->sell_price ?? 0),
+        ];
+    }
 
     private function discountTypeLabel(?string $type): string
     {
@@ -368,7 +426,9 @@ class PurchaseController extends Controller
                 ->exists();
 
             if (!$isValidVariant) {
-                abort(422, 'مدل انتخاب‌شده برای ردیف ' . ($index + 1) . ' متعلق به کالای انتخابی نیست.');
+                throw ValidationException::withMessages([
+                    "items.{$index}.variant_id" => 'تنوع انتخاب‌شده متعلق به این کالا نیست.',
+                ]);
             }
         }
 

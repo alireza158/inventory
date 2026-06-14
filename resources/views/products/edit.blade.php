@@ -1579,9 +1579,6 @@ function syncHiddenVariantInputs() {
             appendVariantHidden(rowIndex, 'variety_name', design.variety_name);
             appendVariantHidden(rowIndex, 'variety_code', design.variety_code);
 
-            appendVariantHidden(rowIndex, 'sell_price', existing ? existing.sell_price : 0);
-            appendVariantHidden(rowIndex, 'buy_price', existing && existing.buy_price !== null ? existing.buy_price : '');
-            appendVariantHidden(rowIndex, 'stock', existing ? existing.stock : 0);
             appendVariantHidden(rowIndex, 'is_active', existing ? (existing.is_active ? 1 : 0) : 1);
 
             rowIndex++;
