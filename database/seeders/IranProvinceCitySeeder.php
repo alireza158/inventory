@@ -12,17 +12,45 @@ class IranProvinceCitySeeder extends Seeder
     public function run(): void
     {
         foreach (config('iran.provinces', []) as $provinceData) {
+            $provinceName = trim((string) $provinceData['name']);
+
+            if ($provinceName === '') {
+                continue;
+            }
+
             $province = Province::updateOrCreate(
-                ['id' => (int) $provinceData['id']],
-                ['name' => $provinceData['name'], 'slug' => Str::slug($provinceData['name']), 'is_active' => true]
+                ['name' => $provinceName],
+                [
+                    'slug' => $this->slug($provinceName),
+                    'is_active' => true,
+                ]
             );
 
             foreach ($provinceData['cities'] ?? [] as $cityData) {
+                $cityName = trim((string) $cityData['name']);
+
+                if ($cityName === '') {
+                    continue;
+                }
+
                 City::updateOrCreate(
-                    ['id' => (int) $cityData['id']],
-                    ['province_id' => $province->id, 'name' => $cityData['name'], 'slug' => Str::slug($cityData['name']), 'is_active' => true]
+                    [
+                        'province_id' => $province->id,
+                        'name' => $cityName,
+                    ],
+                    [
+                        'slug' => $this->slug($cityName),
+                        'is_active' => true,
+                    ]
                 );
             }
         }
+    }
+
+    private function slug(string $name): ?string
+    {
+        $slug = Str::slug($name);
+
+        return $slug !== '' ? $slug : null;
     }
 }
