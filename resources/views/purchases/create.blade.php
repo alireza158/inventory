@@ -271,6 +271,7 @@
     const products = @json($productsPayload);
     const categories = @json($categoriesPayload);
     const initialItems = @json($initialItems);
+    const variantsUrlTemplate = @json(route('purchases.products.variants', ['product' => '__PRODUCT__']));
 
     const purchaseForm = document.getElementById('purchaseForm');
     const productCardsEl = document.getElementById('purchaseProducts');
@@ -335,7 +336,46 @@
         const parts = [];
         if (variant.model_name) parts.push(variant.model_name);
         if (variant.variety_name && variant.variety_name !== '—') parts.push(variant.variety_name);
-        return parts.join(' / ') || variant.name || 'تنوع عمومی';
+        return parts.join(' / ') || variant.title || variant.name || 'تنوع عمومی';
+    }
+
+    function normalizeVariant(variant, productId) {
+        return {
+            ...variant,
+            id: Number(variant.id || 0),
+            product_id: Number(variant.product_id || productId || 0),
+            name: variant.name || variant.variant_name || variant.title || '',
+            code: variant.code || variant.variant_code || variant.sku || variant.barcode || '',
+            stock: Number(variant.central_stock ?? variant.stock ?? 0),
+            reserved: Number(variant.reserved || 0),
+        };
+    }
+
+    function realVariantsForProduct(product, incomingVariants = null) {
+        const rows = Array.isArray(incomingVariants) ? incomingVariants : (product.variants || []);
+        const seen = new Set();
+
+        return rows
+            .map((variant) => normalizeVariant(variant, product.id))
+            .filter((variant) => String(variant.product_id) === String(product.id) && variant.id > 0)
+            .filter((variant) => {
+                if (seen.has(variant.id)) return false;
+                seen.add(variant.id);
+                return true;
+            });
+    }
+
+    async function fetchRealProductVariants(product) {
+        const url = variantsUrlTemplate.replace('__PRODUCT__', encodeURIComponent(product.id));
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+
+        if (!response.ok) {
+            throw new Error('خطا در دریافت تنوع‌های واقعی محصول.');
+        }
+
+        const payload = await response.json();
+        product.variants = realVariantsForProduct(product, payload.variants || []);
+        return product.variants;
     }
 
     function filteredProducts() {
@@ -408,7 +448,7 @@
     }
 
     function productCardTemplate(product) {
-        const variants = product.variants || [];
+        const variants = realVariantsForProduct(product);
         const variantsRows = variants.length ? variants.map((variant) => `
             <tr data-variant-row data-variant-id="${variant.id}" data-buy-overridden="0" data-sell-overridden="0">
                 <td>
@@ -488,7 +528,7 @@
         `;
     }
 
-    function addProductCard(productId, initialRows = []) {
+    async function addProductCard(productId, initialRows = []) {
         const product = productById(productId);
         if (!product) return null;
 
@@ -499,6 +539,17 @@
             setTimeout(() => existing.classList.remove('border-primary'), 1200);
             alert('این محصول قبلاً به لیست خرید اضافه شده است.');
             return existing;
+        }
+
+        if (!initialRows.length) {
+            try {
+                await fetchRealProductVariants(product);
+            } catch (error) {
+                alert(error.message || 'خطا در دریافت تنوع‌های محصول.');
+                return null;
+            }
+        } else {
+            product.variants = realVariantsForProduct(product);
         }
 
         productCardsEl.insertAdjacentHTML('beforeend', productCardTemplate(product));
@@ -688,7 +739,7 @@
         }
     });
 
-    function hydrateInitialItems() {
+    async function hydrateInitialItems() {
         if (!Array.isArray(initialItems) || !initialItems.length) return;
 
         const groups = new Map();
@@ -697,7 +748,9 @@
             groups.get(String(item.product_id)).push(item);
         });
 
-        groups.forEach((items, productId) => addProductCard(productId, items));
+        for (const [productId, items] of groups.entries()) {
+            await addProductCard(productId, items);
+        }
     }
 
     renderProductOptions();
