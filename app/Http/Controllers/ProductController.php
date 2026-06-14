@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\ModelList;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Warehouse;
 use App\Services\CrmProductSyncService;
 use App\Services\DefaultProductDesignService;
 use App\Services\WarehouseStockService;
@@ -24,8 +25,7 @@ class ProductController extends Controller
                 'category',
                 'variants.warehouseStocks.warehouse',
                 'warehouseStocks.warehouse',
-            ])
-            ->withMin('variants', 'buy_price');
+            ]);
 
         if ($request->filled('q')) {
             $q = trim((string) $request->q);
@@ -68,7 +68,6 @@ class ProductController extends Controller
             'barcode' => 'barcode',
             'name' => 'name',
             'stock' => 'stock',
-            'variants_buy_price_min' => 'variants_min_buy_price',
             'price' => 'price',
             'id' => 'id',
         ];
@@ -87,7 +86,11 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('products.index', compact('products', 'categoryTree', 'sort', 'dir'));
+        $centralWarehouseId = (int) (Warehouse::query()->where('type', 'central')->value('id')
+            ?: Warehouse::query()->where('name', 'انبار مرکزی')->value('id')
+            ?: (Warehouse::query()->count() === 1 ? Warehouse::query()->value('id') : 0));
+
+        return view('products.index', compact('products', 'categoryTree', 'sort', 'dir', 'centralWarehouseId'));
     }
 
     public function create()
