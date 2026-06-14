@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Supplier;
+use App\Support\IranLocations;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PersonController extends Controller
 {
@@ -73,6 +75,16 @@ class PersonController extends Controller
         ]);
 
         $types = collect($data['types'])->unique()->values();
+        $provinceId = !empty($data['province_id']) ? (int) $data['province_id'] : null;
+        $cityId = !empty($data['city_id']) ? (int) $data['city_id'] : null;
+
+        if ($provinceId && !IranLocations::provinceExists($provinceId)) {
+            throw ValidationException::withMessages(['province_id' => 'استان انتخاب‌شده معتبر نیست.']);
+        }
+
+        if (!IranLocations::cityBelongsToProvince($provinceId, $cityId)) {
+            throw ValidationException::withMessages(['city_id' => 'شهر انتخاب‌شده با استان انتخاب‌شده همخوانی ندارد.']);
+        }
 
         if ($types->contains('customer')) {
             $duplicateCustomer = Customer::query()->where('mobile', $data['mobile'])->exists();
@@ -83,7 +95,7 @@ class PersonController extends Controller
             }
         }
 
-        DB::transaction(function () use ($data, $types) {
+        DB::transaction(function () use ($data, $types, $provinceId, $cityId) {
             if ($types->contains('customer')) {
                 Customer::create([
                     'first_name' => $data['name'],
@@ -92,15 +104,14 @@ class PersonController extends Controller
                     'address' => $data['address'] ?? null,
                     'postal_code' => $data['postal_code'] ?? null,
                     'extra_description' => $data['description'] ?? null,
-                    'province_id' => $data['province_id'] ?? null,
-                    'city_id' => $data['city_id'] ?? null,
+                    'province_id' => $provinceId,
+                    'city_id' => $cityId,
                 ]);
             }
 
             if ($types->contains('supplier')) {
-                $provinces = config('iran.provinces', []);
-                $province = collect($provinces)->firstWhere('id', (int) ($data['province_id'] ?? 0));
-                $city = collect($province['cities'] ?? [])->firstWhere('id', (int) ($data['city_id'] ?? 0));
+                $province = IranLocations::province($provinceId);
+                $city = collect(IranLocations::cities($provinceId))->firstWhere('id', $cityId);
 
                 Supplier::create([
                     'name' => $data['name'],

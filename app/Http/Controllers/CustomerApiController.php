@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Support\IranLocations;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class CustomerApiController extends Controller
 {
@@ -84,6 +86,17 @@ class CustomerApiController extends Controller
             'city_id'    => 'nullable|integer',
         ]);
 
+        $provinceId = !empty($data['province_id']) ? (int) $data['province_id'] : null;
+        $cityId = !empty($data['city_id']) ? (int) $data['city_id'] : null;
+
+        if ($provinceId && !IranLocations::provinceExists($provinceId)) {
+            throw ValidationException::withMessages(['province_id' => 'استان انتخاب‌شده معتبر نیست.']);
+        }
+
+        if (!IranLocations::cityBelongsToProvince($provinceId, $cityId)) {
+            throw ValidationException::withMessages(['city_id' => 'شهر انتخاب‌شده با استان انتخاب‌شده همخوانی ندارد.']);
+        }
+
         $customer = Customer::create([
             'first_name' => $data['customer_name'] ?? $data['first_name'] ?? '',
             'last_name' => $data['last_name'] ?? null,
@@ -91,8 +104,8 @@ class CustomerApiController extends Controller
             'address' => $data['address'] ?? null,
             'postal_code' => $data['postal_code'] ?? null,
             'extra_description' => $data['extra_description'] ?? null,
-            'province_id' => $data['province_id'] ?? null,
-            'city_id' => $data['city_id'] ?? null,
+            'province_id' => $provinceId,
+            'city_id' => $cityId,
         ]);
 
         return response()->json([

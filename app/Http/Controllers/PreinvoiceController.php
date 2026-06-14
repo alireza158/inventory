@@ -13,6 +13,7 @@ use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
 use App\Models\StockMovement;
 use App\Support\Currency;
+use App\Support\IranLocations;
 use App\Support\DocumentCodeGenerator;
 use App\Support\ActivityLogger;
 use App\Services\WarehouseStockService;
@@ -524,6 +525,17 @@ class PreinvoiceController extends Controller
             'products.required' => 'حداقل یک محصول باید ثبت شود.',
             'products.min' => 'حداقل یک محصول باید ثبت شود.',
         ]);
+
+        $provinceId = !empty($validated['province_id']) ? (int) $validated['province_id'] : null;
+        $cityId = !empty($validated['city_id']) ? (int) $validated['city_id'] : null;
+
+        if ($provinceId && !IranLocations::provinceExists($provinceId)) {
+            throw ValidationException::withMessages(['province_id' => 'استان انتخاب‌شده معتبر نیست.']);
+        }
+
+        if (!IranLocations::cityBelongsToProvince($provinceId, $cityId)) {
+            throw ValidationException::withMessages(['city_id' => 'شهر انتخاب‌شده با استان انتخاب‌شده همخوانی ندارد.']);
+        }
 
         foreach (($validated['products'] ?? []) as $index => $productRow) {
             $isValidVariant = ProductVariant::query()
