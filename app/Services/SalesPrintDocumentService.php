@@ -26,7 +26,7 @@ class SalesPrintDocumentService
             'customerNumber' => $invoice->external_order_id ?: null,
             'registeredAt' => $invoice->preinvoiceOrder?->created_at ?? $invoice->created_at,
             'issuedAt' => $invoice->created_at,
-            'status' => $invoice->status,
+            'status' => $this->statusLabel($invoice->status),
             'customer' => [
                 'name' => $invoice->customer_name ?: $invoice->customer?->display_name,
                 'mobile' => $invoice->customer_mobile ?: $invoice->customer?->mobile,
@@ -67,7 +67,7 @@ class SalesPrintDocumentService
             'customerNumber' => $order->external_order_id ?: null,
             'registeredAt' => $order->created_at,
             'issuedAt' => null,
-            'status' => $order->status_label,
+            'status' => $this->statusLabel($order->status),
             'customer' => [
                 'name' => $order->customer_name,
                 'mobile' => $order->customer_mobile,
@@ -104,8 +104,8 @@ class SalesPrintDocumentService
             $product = $item->product;
 
             return [
-                'description' => $this->description($item),
-                'inventoryCode' => $variant?->barcode ?: $variant?->sku ?: $variant?->variant_code ?: $variant?->variety_code ?: $product?->barcode ?: $product?->sku ?: $product?->code ?: '—',
+                'description' => $this->formatInvoiceItemDescription($item),
+                'inventoryCode' => $this->inventoryCode($variant, $product),
                 'warehouseMap' => $variant ? $this->warehouseMap((int) $variant->id, $warehouseId) : 'بدون نقشه',
                 'quantity' => (int) $item->quantity,
                 'lineTotal' => (int) ($item->line_total ?? ((int) $item->quantity * (int) $item->price)),
@@ -113,18 +113,97 @@ class SalesPrintDocumentService
         });
     }
 
-    private function description($item): string
+    public function formatInvoiceItemDescription($item): string
     {
         $variant = $item->variant;
+        $product = $item->product;
+
         $parts = collect([
-            $item->product?->name,
+            $product?->name,
             $variant?->modelList?->model_name,
             $variant?->variant_name,
             $variant?->variety_name,
             $variant?->color?->name,
-        ])->filter(fn ($v) => filled($v))->unique()->values();
+        ])
+            ->map(fn ($value) => $this->cleanText($value))
+            ->filter()
+            ->reduce(function (Collection $carry, string $part) {
+                $normalizedPart = $this->normalizeText($part);
 
-        return $parts->isNotEmpty() ? $parts->implode(' - ') : ('#' . $item->product_id);
+                if ($carry->contains(fn (string $existing) => $this->normalizeText($existing) === $normalizedPart)) {
+                    return $carry;
+                }
+
+                if ($carry->contains(fn (string $existing) => str_contains($this->normalizeText($existing), $normalizedPart))) {
+                    return $carry;
+                }
+
+                return $carry->push($part);
+            }, collect());
+
+        return $parts->isNotEmpty() ? $parts->implode(' | ') : ('#' . $item->product_id);
+    }
+
+    private function inventoryCode($variant, $product): string
+    {
+        return collect([
+            $variant?->barcode,
+            $variant?->sku,
+            $variant?->variant_code,
+            $variant?->variety_code,
+            $variant?->unique_key,
+            $product?->barcode,
+            $product?->sku,
+            $product?->code,
+            $product?->short_barcode,
+        ])->first(fn ($value) => filled($value)) ?: '—';
+    }
+
+    private function statusLabel(?string $status): string
+    {
+        if (! filled($status)) {
+            return '—';
+        }
+
+        $labels = [
+            'pending_warehouse_approval' => 'در انتظار تایید انبار',
+            'warehouse_approved' => 'تایید شده توسط انبار',
+            'pending_finance_approval' => 'در انتظار تایید مالی',
+            'finance_approved' => 'تایید شده توسط مالی',
+            'sent' => 'ارسال شده',
+            'shipped' => 'ارسال شده',
+            'collecting' => 'در حال جمع‌آوری',
+            'draft' => 'پیش‌نویس',
+            'rejected' => 'رد شده',
+            'reserved_waiting_warehouse' => 'در انتظار تایید انبار',
+            'warehouse_reviewing' => 'در حال بررسی توسط انبار',
+            'warehouse_approved_waiting_finance' => 'تایید انبار و در انتظار مالی',
+            'finance_reviewing' => 'در حال بررسی توسط مالی',
+            'converted_to_invoice' => 'تبدیل‌شده به فاکتور',
+            'cancelled_by_warehouse' => 'لغوشده توسط انبار',
+            'cancelled_by_finance' => 'لغوشده توسط مالی',
+            'returned_to_warehouse' => 'برگشت‌خورده از مالی به انبار',
+            'checking_discrepancy' => 'در حال مغایرت و بررسی',
+            'final_check' => 'در حال چک نهایی',
+            'packing' => 'در حال بسته‌بندی',
+            'not_shipped' => 'کنسل شده',
+        ];
+
+        return $labels[$status] ?? str_replace('_', ' ', $status);
+    }
+
+    private function cleanText($value): ?string
+    {
+        if (! filled($value)) {
+            return null;
+        }
+
+        return trim(preg_replace('/\s+/u', ' ', (string) $value));
+    }
+
+    private function normalizeText(string $value): string
+    {
+        return mb_strtolower(preg_replace('/[\s\-_|()]+/u', '', $value));
     }
 
     private function warehouseMap(int $variantId, int $warehouseId): string
