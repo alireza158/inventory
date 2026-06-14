@@ -103,7 +103,7 @@ class ProductController extends Controller
         $variantId = $request->filled('variant_id') ? (int) $request->input('variant_id') : null;
 
         $variantsQuery = $product->variants()
-            ->select(['id', 'product_id', 'variant_name', 'variant_code', 'sku', 'barcode'])
+            ->select(['id', 'product_id', 'variant_name', 'variant_code'])
             ->orderBy('variant_code')
             ->orderBy('id');
 
@@ -167,6 +167,7 @@ class ProductController extends Controller
                     $rows->push([
                         'variant_id' => (int) $variant->id,
                         'variant_title' => $variantTitle,
+                        'display_code' => (string) ($variant->variant_code ?: '—'),
                         'warehouse_id' => (int) $warehouse->id,
                         'warehouse_name' => (string) $warehouse->name,
                         'total_quantity' => $physicalTotal,
@@ -266,7 +267,7 @@ class ProductController extends Controller
 
     private function variantDisplayTitle(ProductVariant $variant): string
     {
-        return (string) ($variant->variant_name ?: ($variant->variant_code ?: ($variant->sku ?: ($variant->barcode ?: 'تنوع اصلی'))));
+        return (string) ($variant->variant_name ?: ($variant->variant_code ?: 'تنوع اصلی'));
     }
 
     private function isCentralWarehouse(Warehouse $warehouse): bool
