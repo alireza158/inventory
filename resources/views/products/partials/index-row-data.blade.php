@@ -44,7 +44,11 @@
     $variantsPayload = $p->variants->sortBy('variant_code')->values()->map(fn ($v) => [
         'id' => (int) $v->id,
         'name' => $v->variant_name,
-        'stock' => $centralVariantQty($v),
+        'code' => $v->variant_code,
+        'sku' => $v->sku,
+        'barcode' => $v->barcode,
+        'central_stock' => $centralVariantQty($v),
+        'sale_price' => (int) ($v->sell_price ?? 0),
         'reserved' => max(0, (int) ($v->reserved ?? 0)),
         'is_active' => (bool) $v->is_active,
     ])->all();
@@ -58,14 +62,13 @@
         'data-is-sellable' => $isSellable ? '1' : '0',
         'data-product-name' => $p->name,
         'data-reserved-qty' => $reservedQty,
-        'data-variants' => json_encode($variantsPayload, JSON_UNESCAPED_UNICODE),
         'data-stock-rows' => json_encode($stockRowsPayload, JSON_UNESCAPED_UNICODE),
     ];
 @endphp
 
 @if(($mode ?? 'desktop') === 'desktop')
 <tr>
-    <td class="text-center"><input type="checkbox" class="form-check-input product-checkbox" value="{{ $p->id }}" data-product-id="{{ $p->id }}" @foreach($checkboxAttrs as $attr => $value) {{ $attr }}='{{ e($value) }}' @endforeach></td>
+    <td class="text-center"><input type="checkbox" class="form-check-input product-checkbox" value="{{ $p->id }}" data-product-id="{{ $p->id }}" @foreach($checkboxAttrs as $attr => $value) {{ $attr }}='{{ e($value) }}' @endforeach><script type="application/json" id="product-variants-{{ $p->id }}">{!! json_encode($variantsPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script></td>
     <td class="text-center">@if($hasVariants)<button class="btn btn-outline-primary btn-sm btn-mini variant-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $variantsId }}" aria-expanded="false" aria-controls="{{ $variantsId }}"><span class="variant-symbol">+</span></button>@else<span class="text-muted">—</span>@endif</td>
     <td>@if($p->image_path)<a href="{{ route('products.image', $p) }}" target="_blank" class="product-thumb" title="نمایش عکس کالا"><img src="{{ route('products.image', $p) }}" alt="عکس {{ $p->name }}"></a>@else<span class="product-thumb-placeholder" title="بدون عکس">📷</span>@endif</td>
     <td><span class="truncate fw-bold" title="{{ $p->name }}">{{ $p->name }}</span><div class="small text-muted truncate" title="{{ $p->category?->name ?? 'بدون دسته‌بندی' }}">{{ $p->category?->name ?? 'بدون دسته‌بندی' }}</div></td>
