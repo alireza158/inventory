@@ -24,8 +24,7 @@ class ProductController extends Controller
                 'category',
                 'variants.warehouseStocks.warehouse',
                 'warehouseStocks.warehouse',
-            ])
-            ->withMin('variants', 'buy_price');
+            ]);
 
         if ($request->filled('q')) {
             $q = trim((string) $request->q);
@@ -68,7 +67,6 @@ class ProductController extends Controller
             'barcode' => 'barcode',
             'name' => 'name',
             'stock' => 'stock',
-            'variants_buy_price_min' => 'variants_min_buy_price',
             'price' => 'price',
             'id' => 'id',
         ];
