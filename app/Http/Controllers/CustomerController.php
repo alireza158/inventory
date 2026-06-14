@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Support\IranLocations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -263,6 +264,21 @@ private function parseAmount($value): ?int
             ]);
         }
 
+        $provinceId = !empty($data['province_id']) ? (int) $data['province_id'] : null;
+        $cityId = !empty($data['city_id']) ? (int) $data['city_id'] : null;
+
+        if ($provinceId && !IranLocations::provinceExists($provinceId)) {
+            throw ValidationException::withMessages([
+                'province_id' => 'استان انتخاب‌شده معتبر نیست.',
+            ]);
+        }
+
+        if (!IranLocations::cityBelongsToProvince($provinceId, $cityId)) {
+            throw ValidationException::withMessages([
+                'city_id' => 'شهر انتخاب‌شده با استان انتخاب‌شده همخوانی ندارد.',
+            ]);
+        }
+
         $duplicateQuery = Customer::query()->where('mobile', $mobile);
 
         if ($customer) {
@@ -282,8 +298,8 @@ private function parseAmount($value): ?int
             'address' => $this->cleanCell($data['address'] ?? null),
             'postal_code' => $this->cleanCell($data['postal_code'] ?? null),
             'extra_description' => $this->cleanCell($data['extra_description'] ?? null),
-            'province_id' => !empty($data['province_id']) ? (int)$data['province_id'] : null,
-            'city_id' => !empty($data['city_id']) ? (int)$data['city_id'] : null,
+            'province_id' => $provinceId,
+            'city_id' => $cityId,
             'opening_balance' => (int) ($data['opening_balance'] ?? 0),
         ];
     }

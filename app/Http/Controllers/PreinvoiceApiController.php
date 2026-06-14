@@ -8,6 +8,7 @@ use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
 use App\Models\WarehouseStock;
 use App\Services\WarehouseStockService;
+use App\Support\IranLocations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -413,9 +414,16 @@ class PreinvoiceApiController extends Controller
     {
         return response()->json([
             'data' => [
-                'provinces' => config('iran.provinces', []),
+                'provinces' => IranLocations::provinces(),
             ],
         ]);
+    }
+
+    public function cities(int $province)
+    {
+        abort_unless(IranLocations::provinceExists($province), 404);
+
+        return response()->json(IranLocations::cities($province));
     }
 
     public function shippings()
