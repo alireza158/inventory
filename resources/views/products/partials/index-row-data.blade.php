@@ -59,6 +59,7 @@
         'data-purchase-ledger-url' => route('products.purchase-ledger', $p),
         'data-deactivate-url' => route('product-deactivation-documents.create', ['product_id' => $p->id]),
         'data-deactivation-history-url' => route('product-deactivation-documents.index', ['product_name' => $p->name]),
+        'data-warehouse-stock-url' => route('products.warehouse-stock', $p),
         'data-is-sellable' => $isSellable ? '1' : '0',
         'data-product-name' => $p->name,
         'data-reserved-qty' => $reservedQty,

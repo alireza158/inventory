@@ -6,7 +6,11 @@ use App\Models\Category;
 use App\Models\ModelList;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\PreinvoiceDraftReservation;
+use App\Models\PreinvoiceOrder;
+use App\Models\PreinvoiceOrderItem;
 use App\Models\Warehouse;
+use App\Models\WarehouseStock;
 use App\Services\CrmProductSyncService;
 use App\Services\DefaultProductDesignService;
 use App\Services\WarehouseStockService;
@@ -93,6 +97,119 @@ class ProductController extends Controller
         return view('products.index', compact('products', 'categoryTree', 'sort', 'dir', 'centralWarehouseId'));
     }
 
+
+    public function warehouseStock(Product $product, Request $request)
+    {
+        $variantId = $request->filled('variant_id') ? (int) $request->input('variant_id') : null;
+
+        $variantsQuery = $product->variants()
+            ->select(['id', 'product_id', 'variant_name', 'variant_code', 'sku', 'barcode'])
+            ->orderBy('variant_code')
+            ->orderBy('id');
+
+        if ($variantId) {
+            $variantsQuery->whereKey($variantId);
+        }
+
+        $variants = $variantsQuery->get();
+
+        if ($variantId && $variants->isEmpty()) {
+            throw ValidationException::withMessages([
+                'variant_id' => 'تنوع انتخاب‌شده متعلق به این کالا نیست.',
+            ]);
+        }
+
+        $variantIds = $variants->pluck('id')->map(fn ($id) => (int) $id)->values();
+        $hasVariants = $variantIds->isNotEmpty();
+
+        $warehouses = Warehouse::query()
+            ->orderByDesc('type')
+            ->orderBy('name')
+            ->get(['id', 'name', 'type']);
+
+        $stockRows = WarehouseStock::query()
+            ->with('warehouse:id,name')
+            ->where('product_id', $product->id)
+            ->when($hasVariants, fn ($query) => $query->whereIn('product_variant_id', $variantIds))
+            ->when(! $hasVariants, fn ($query) => $query->whereNull('product_variant_id'))
+            ->get();
+
+        $reservedByVariant = $hasVariants
+            ? $this->reservedPreinvoiceQuantities($product, $variantIds->all())
+            : collect();
+
+        $draftReservedByVariant = $hasVariants
+            ? $this->draftReservationQuantities($product, $variantIds->all())
+            : collect();
+
+        $rows = collect();
+
+        if ($hasVariants) {
+            $stocksByVariantWarehouse = $stockRows
+                ->groupBy(fn (WarehouseStock $stock) => ((int) $stock->product_variant_id) . ':' . ((int) $stock->warehouse_id));
+
+            foreach ($variants as $variant) {
+                $variantReserved = (int) ($reservedByVariant[(int) $variant->id] ?? 0);
+                $variantDraftReserved = (int) ($draftReservedByVariant[(int) $variant->id] ?? 0);
+                $variantTitle = $this->variantDisplayTitle($variant);
+
+                foreach ($warehouses as $warehouse) {
+                    $key = ((int) $variant->id) . ':' . ((int) $warehouse->id);
+                    $totalInWarehouse = (int) ($stocksByVariantWarehouse->get($key, collect())->sum('quantity'));
+                    $reservedInWarehouse = $this->isCentralWarehouse($warehouse) ? $variantReserved + $variantDraftReserved : 0;
+
+                    if ($totalInWarehouse === 0 && $reservedInWarehouse === 0) {
+                        continue;
+                    }
+
+                    $physicalTotal = $totalInWarehouse + $reservedInWarehouse;
+
+                    $rows->push([
+                        'variant_id' => (int) $variant->id,
+                        'variant_title' => $variantTitle,
+                        'warehouse_id' => (int) $warehouse->id,
+                        'warehouse_name' => (string) $warehouse->name,
+                        'total_quantity' => $physicalTotal,
+                        'reserved_quantity' => $reservedInWarehouse,
+                        'available_quantity' => $physicalTotal - $reservedInWarehouse,
+                        'has_over_reserved_warning' => $reservedInWarehouse > $physicalTotal,
+                    ]);
+                }
+            }
+        } else {
+            foreach ($stockRows->groupBy('warehouse_id') as $warehouseId => $warehouseRows) {
+                $warehouse = $warehouseRows->first()?->warehouse;
+                $total = (int) $warehouseRows->sum('quantity');
+                if ($total === 0) {
+                    continue;
+                }
+
+                $rows->push([
+                    'variant_id' => null,
+                    'variant_title' => 'کل کالا',
+                    'warehouse_id' => (int) $warehouseId,
+                    'warehouse_name' => (string) ($warehouse?->name ?: '—'),
+                    'total_quantity' => $total,
+                    'reserved_quantity' => 0,
+                    'available_quantity' => $total,
+                    'has_over_reserved_warning' => false,
+                ]);
+            }
+        }
+
+        $selectedVariant = $variantId ? $variants->first() : null;
+
+        return response()->json([
+            'product_id' => (int) $product->id,
+            'variant_id' => $variantId,
+            'title' => $selectedVariant
+                ? $product->name . ' / ' . $this->variantDisplayTitle($selectedVariant)
+                : $product->name,
+            'is_variant_mode' => (bool) $selectedVariant,
+            'rows' => $rows->values(),
+        ]);
+    }
+
     public function create()
     {
         $categories = Category::query()->orderBy('name')->get();
@@ -107,6 +224,54 @@ class ProductController extends Controller
         $previewSeq4 = $this->peekNextProductSeq4();
 
         return view('products.create', compact('categories', 'modelLists', 'previewSeq4'));
+    }
+
+
+    private function reservedPreinvoiceQuantities(Product $product, array $variantIds)
+    {
+        $activeStatuses = [
+            PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+            PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING,
+            PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+            PreinvoiceOrder::STATUS_FINANCE_REVIEWING,
+            PreinvoiceOrder::STATUS_RETURNED_TO_WAREHOUSE,
+        ];
+
+        return PreinvoiceOrderItem::query()
+            ->join('preinvoice_orders', 'preinvoice_orders.id', '=', 'preinvoice_order_items.preinvoice_order_id')
+            ->where('preinvoice_order_items.product_id', $product->id)
+            ->whereIn('preinvoice_order_items.variant_id', $variantIds)
+            ->whereIn('preinvoice_orders.status', $activeStatuses)
+            ->whereNull('preinvoice_orders.stock_released_at')
+            ->select('preinvoice_order_items.variant_id', DB::raw('SUM(preinvoice_order_items.quantity) as reserved_quantity'))
+            ->groupBy('preinvoice_order_items.variant_id')
+            ->pluck('reserved_quantity', 'variant_id')
+            ->map(fn ($quantity) => (int) $quantity);
+    }
+
+    private function draftReservationQuantities(Product $product, array $variantIds)
+    {
+        return PreinvoiceDraftReservation::query()
+            ->where('product_id', $product->id)
+            ->whereIn('variant_id', $variantIds)
+            ->whereNull('converted_at')
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->select('variant_id', DB::raw('SUM(quantity) as reserved_quantity'))
+            ->groupBy('variant_id')
+            ->pluck('reserved_quantity', 'variant_id')
+            ->map(fn ($quantity) => (int) $quantity);
+    }
+
+    private function variantDisplayTitle(ProductVariant $variant): string
+    {
+        return (string) ($variant->variant_name ?: ($variant->variant_code ?: ($variant->sku ?: ($variant->barcode ?: 'تنوع اصلی'))));
+    }
+
+    private function isCentralWarehouse(Warehouse $warehouse): bool
+    {
+        return $warehouse->type === 'central' || $warehouse->name === 'انبار مرکزی';
     }
 
     private function peekNextProductSeq4(): string
