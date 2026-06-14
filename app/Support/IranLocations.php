@@ -12,7 +12,7 @@ class IranLocations
     public static function provinces(): array
     {
         if (self::hasLocationTables()) {
-            return Province::query()
+            $provinces = Province::query()
                 ->where('is_active', true)
                 ->with(['cities' => fn ($q) => $q->where('is_active', true)->orderBy('name')->select(['id', 'province_id', 'name'])])
                 ->orderBy('name')
@@ -27,6 +27,10 @@ class IranLocations
                 ])
                 ->values()
                 ->all();
+
+            if ($provinces !== []) {
+                return $provinces;
+            }
         }
 
         return config('iran.provinces', []);
@@ -41,7 +45,13 @@ class IranLocations
         if (self::hasLocationTables()) {
             $province = Province::query()->where('is_active', true)->find($provinceId, ['id', 'name']);
 
-            return $province ? ['id' => (int) $province->id, 'name' => $province->name] : null;
+            if ($province) {
+                return ['id' => (int) $province->id, 'name' => $province->name];
+            }
+
+            if (Province::query()->where('is_active', true)->exists()) {
+                return null;
+            }
         }
 
         return collect(config('iran.provinces', []))->firstWhere('id', $provinceId);
@@ -53,7 +63,7 @@ class IranLocations
             return [];
         }
 
-        if (self::hasLocationTables()) {
+        if (self::hasLocationTables() && Province::query()->where('is_active', true)->exists()) {
             return City::query()
                 ->where('province_id', $provinceId)
                 ->where('is_active', true)
@@ -87,7 +97,7 @@ class IranLocations
             return false;
         }
 
-        if (self::hasLocationTables()) {
+        if (self::hasLocationTables() && Province::query()->where('is_active', true)->exists()) {
             return City::query()
                 ->whereKey($cityId)
                 ->where('province_id', $provinceId)
