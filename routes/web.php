@@ -44,6 +44,7 @@ Route::get('/', fn () => redirect()->route('dashboard'));
 
 Route::middleware('auth')->group(function () {
 
+    Route::get('/locations/provinces', [PreinvoiceApiController::class, 'provinces'])->name('locations.provinces.index');
     Route::get('/locations/provinces/{province}/cities', [PreinvoiceApiController::class, 'cities'])->name('locations.provinces.cities');
 
     // Dashboard + profile
