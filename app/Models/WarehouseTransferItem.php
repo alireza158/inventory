@@ -9,6 +9,7 @@ class WarehouseTransferItem extends Model
 {
     protected $fillable = [
         'warehouse_transfer_id',
+        'invoice_item_id',
         'product_id',
         'product_variant_id',
         'variant_name',
@@ -22,6 +23,11 @@ class WarehouseTransferItem extends Model
     public function transfer()
     {
         return $this->belongsTo(WarehouseTransfer::class, 'warehouse_transfer_id');
+    }
+
+    public function invoiceItem()
+    {
+        return $this->belongsTo(InvoiceItem::class);
     }
 
     public function product()

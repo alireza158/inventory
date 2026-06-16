@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
@@ -360,6 +361,7 @@ class VoucherController extends Controller
         } else {
             $rules['related_invoice_uuid'] = ['required', 'exists:invoices,uuid'];
             $rules['external_invoice_number'] = ['nullable', 'string', 'max:100'];
+            $rules['items.*.invoice_item_id'] = ['required', 'integer', 'exists:invoice_items,id'];
         }
 
         $data = $request->validate($rules);
@@ -407,6 +409,7 @@ class VoucherController extends Controller
                 'note' => $data['note'] ?? null,
                 'items' => array_map(fn ($it) => [
                     'category_id' => (int) Product::query()->whereKey((int) $it['product_id'])->value('category_id'),
+                    'invoice_item_id' => (int) $it['invoice_item_id'],
                     'product_id' => (int) $it['product_id'],
                     'variant_id' => (int) $it['variant_id'],
                     'quantity' => (int) $it['quantity'],
@@ -479,52 +482,66 @@ class VoucherController extends Controller
 
     private function validateInternalReturnItems(Invoice $invoice, array $items): void
     {
+        $invoiceItemsById = $invoice->items->keyBy('id');
+        $requestedByInvoiceItem = [];
+        $seenInvoiceItemRows = [];
+
         foreach ($items as $index => $row) {
+            $rowNo = $index + 1;
+            $invoiceItemId = (int) ($row['invoice_item_id'] ?? 0);
+            $invoiceItem = $invoiceItemsById->get($invoiceItemId);
+
+            if (!$invoiceItem) {
+                abort(422, 'ردیف ' . $rowNo . ': آیتم انتخابی متعلق به این فاکتور نیست.');
+            }
+
+            if ((int) $invoiceItem->product_id !== (int) $row['product_id'] || (int) $invoiceItem->variant_id !== (int) $row['variant_id']) {
+                abort(422, 'ردیف ' . $rowNo . ': کالا یا تنوع با آیتم فاکتور مطابقت ندارد.');
+            }
+
             $validVariant = ProductVariant::query()
                 ->whereKey((int) $row['variant_id'])
                 ->where('product_id', (int) $row['product_id'])
                 ->exists();
 
             if (!$validVariant) {
-                abort(422, 'ردیف ' . ($index + 1) . ': تنوع انتخابی برای محصول معتبر نیست.');
-            }
-        }
-
-        $requestedByVariant = [];
-        $seenVariantRows = [];
-
-        foreach ($items as $index => $row) {
-            $variantId = (int) $row['variant_id'];
-            $key = ((int) $row['product_id']) . ':' . $variantId;
-
-            if (isset($seenVariantRows[$key])) {
-                abort(422, 'ردیف ' . ($index + 1) . ': این محصول/تنوع تکراری است و فقط یک‌بار می‌تواند ثبت شود.');
+                abort(422, 'ردیف ' . $rowNo . ': تنوع انتخاب‌شده متعلق به این کالا نیست.');
             }
 
-            $seenVariantRows[$key] = true;
-            $requestedByVariant[$variantId] = ($requestedByVariant[$variantId] ?? 0) + (int) $row['quantity'];
+            if (isset($seenInvoiceItemRows[$invoiceItemId])) {
+                abort(422, 'ردیف ' . $rowNo . ': این آیتم فاکتور تکراری است و فقط یک‌بار می‌تواند ثبت شود.');
+            }
+
+            $seenInvoiceItemRows[$invoiceItemId] = true;
+            $requestedByInvoiceItem[$invoiceItemId] = ($requestedByInvoiceItem[$invoiceItemId] ?? 0) + (int) $row['quantity'];
         }
 
-        $alreadyReturnedByVariant = WarehouseTransfer::query()
+        $returnTransfers = WarehouseTransfer::query()
             ->where('voucher_type', WarehouseTransfer::TYPE_CUSTOMER_RETURN)
             ->where('related_invoice_id', $invoice->id)
             ->with('items')
-            ->get()
+            ->get();
+
+        $alreadyReturnedByInvoiceItem = $returnTransfers
             ->flatMap->items
+            ->filter(fn ($item) => !is_null($item->invoice_item_id))
+            ->groupBy('invoice_item_id')
+            ->map(fn ($items) => (int) $items->sum('quantity'));
+
+        $legacyReturnedByVariant = $returnTransfers
+            ->flatMap->items
+            ->filter(fn ($item) => is_null($item->invoice_item_id))
             ->groupBy('product_variant_id')
             ->map(fn ($items) => (int) $items->sum('quantity'));
 
-        $invoiceQtyByVariant = $invoice->items
-            ->groupBy('variant_id')
-            ->map(fn ($items) => (int) $items->sum('quantity'));
-
-        foreach ($requestedByVariant as $variantId => $requestedQty) {
-            $invoiced = (int) ($invoiceQtyByVariant[$variantId] ?? 0);
-            $alreadyReturned = (int) ($alreadyReturnedByVariant[$variantId] ?? 0);
-            $remaining = max($invoiced - $alreadyReturned, 0);
+        foreach ($requestedByInvoiceItem as $invoiceItemId => $requestedQty) {
+            $invoiceItem = $invoiceItemsById->get((int) $invoiceItemId);
+            $alreadyReturned = (int) ($alreadyReturnedByInvoiceItem[$invoiceItemId] ?? 0)
+                + (int) ($legacyReturnedByVariant[(int) $invoiceItem->variant_id] ?? 0);
+            $remaining = max((int) $invoiceItem->quantity - $alreadyReturned, 0);
 
             if ($requestedQty > $remaining) {
-                abort(422, "مقدار برگشتی برای این تنوع بیشتر از تعداد مجاز است. باقی‌مانده مجاز: {$remaining}");
+                abort(422, 'تعداد برگشتی از تعداد قابل برگشت این آیتم بیشتر است.');
             }
         }
     }
@@ -932,40 +949,49 @@ class VoucherController extends Controller
             ->where('uuid', $uuid)
             ->firstOrFail();
 
-        $returnedQtyByVariant = WarehouseTransfer::query()
+        $returnTransfers = WarehouseTransfer::query()
             ->where('voucher_type', WarehouseTransfer::TYPE_CUSTOMER_RETURN)
             ->where('related_invoice_id', $invoice->id)
             ->with('items')
-            ->get()
+            ->get();
+
+        $returnedQtyByInvoiceItem = $returnTransfers
             ->flatMap->items
+            ->filter(fn ($item) => !is_null($item->invoice_item_id))
+            ->groupBy('invoice_item_id')
+            ->map(fn ($items) => (int) $items->sum('quantity'));
+
+        $legacyReturnedQtyByVariant = $returnTransfers
+            ->flatMap->items
+            ->filter(fn ($item) => is_null($item->invoice_item_id))
             ->groupBy('product_variant_id')
             ->map(fn ($items) => (int) $items->sum('quantity'));
 
         $products = $invoice->items
             ->filter(fn ($item) => (int) ($item->variant_id ?? 0) > 0)
-            ->groupBy(function ($item) {
-                return ((int) $item->product_id) . ':' . ((int) $item->variant_id);
-            })
-            ->map(function ($items) use ($returnedQtyByVariant) {
-                $first = $items->first();
-                $variantId = (int) ($first->variant_id ?? 0);
-                $invoicedQty = (int) $items->sum('quantity');
-                $returnedQty = (int) ($returnedQtyByVariant[$variantId] ?? 0);
+            ->map(function (InvoiceItem $item) use ($returnedQtyByInvoiceItem, $legacyReturnedQtyByVariant) {
+                $variantId = (int) ($item->variant_id ?? 0);
+                $invoicedQty = (int) $item->quantity;
+                $returnedQty = (int) ($returnedQtyByInvoiceItem[(int) $item->id] ?? 0)
+                    + (int) ($legacyReturnedQtyByVariant[$variantId] ?? 0);
                 $remainingQty = max($invoicedQty - $returnedQty, 0);
+                $unitPrice = (int) ($item->price ?? 0);
 
                 return [
-                    'product_id' => (int) $first->product_id,
+                    'invoice_item_id' => (int) $item->id,
+                    'product_id' => (int) $item->product_id,
                     'variant_id' => $variantId,
-                    'category_id' => (int) ($first->product?->category_id ?? 0),
-                    'name' => (string) ($first->product?->name ?? ('#' . (int) $first->product_id)),
-                    'product_code' => (string) ($first->product?->code ?? ''),
-                    'variant_name' => (string) ($first->variant?->variant_name ?? ''),
-                    'variant_code' => (string) ($first->variant?->variant_code ?? ''),
-                    'variant_stock' => (int) ($first->variant?->stock ?? 0),
+                    'category_id' => (int) ($item->product?->category_id ?? 0),
+                    'name' => (string) ($item->product?->name ?? ('#' . (int) $item->product_id)),
+                    'product_code' => (string) ($item->product?->code ?? ''),
+                    'variant_name' => (string) ($item->variant?->variant_name ?? ''),
+                    'variant_code' => (string) ($item->variant?->variant_code ?? ''),
+                    'variant_stock' => (int) ($item->variant?->stock ?? 0),
                     'qty' => $invoicedQty,
                     'already_returned_qty' => $returnedQty,
                     'remaining_qty' => $remainingQty,
-                    'unit_price' => (int) ($first->price ?? 0),
+                    'unit_price' => $unitPrice,
+                    'line_total' => $remainingQty * $unitPrice,
                 ];
             })
             ->values();
@@ -1213,16 +1239,25 @@ class VoucherController extends Controller
 
             $invoiceItemPrice = null;
             if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $relatedInvoice) {
-                $invoiceItemPrice = (int) ($relatedInvoice->items()
-                    ->where('product_id', $product->id)
-                    ->where('variant_id', $variant->id)
-                    ->value('price') ?? 0);
+                if (!empty($item['invoice_item_id'])) {
+                    $invoiceItemPrice = (int) (InvoiceItem::query()
+                        ->whereKey((int) $item['invoice_item_id'])
+                        ->where('invoice_id', $relatedInvoice->id)
+                        ->where('product_id', $product->id)
+                        ->where('variant_id', $variant->id)
+                        ->value('price') ?? 0);
+                } else {
+                    $invoiceItemPrice = (int) ($relatedInvoice->items()
+                        ->where('product_id', $product->id)
+                        ->where('variant_id', $variant->id)
+                        ->value('price') ?? 0);
+                }
             }
 
             $unitPrice = in_array($voucherType, [WarehouseTransfer::TYPE_SCRAP, WarehouseTransfer::TYPE_SHOWROOM], true)
                 ? 0
                 : ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN
-                    ? (isset($item['unit_price']) ? (int) $item['unit_price'] : (int) $invoiceItemPrice)
+                    ? (array_key_exists('unit_price', $item) ? (int) $item['unit_price'] : (int) $invoiceItemPrice)
                     : (int) ($product->price ?? 0));
 
             $lineTotal = $qty * $unitPrice;
@@ -1308,6 +1343,7 @@ class VoucherController extends Controller
             $stockAfter = (int) $product->stock;
 
             $transfer->items()->create([
+                'invoice_item_id' => $item['invoice_item_id'] ?? null,
                 'product_id' => $item['product_id'],
                 'product_variant_id' => $variant->id,
                 'variant_name' => $variant->variant_name,
@@ -1335,7 +1371,7 @@ class VoucherController extends Controller
 
         if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $transfer->customer_id) {
             $ledgerNote = $relatedInvoice
-                ? ('مرجوعی کالا از فاکتور ' . $relatedInvoice->uuid)
+                ? ('بستانکاری بابت برگشت از فروش فاکتور شماره ' . $relatedInvoice->uuid)
                 : ('بستانکاری بابت برگشت از فروش دستی - بابت برگشت از فروش فاکتور سازه‌حساب شماره ' . ($data['external_invoice_number'] ?? '—'));
 
             if (!$relatedInvoice && !empty($data['note'])) {

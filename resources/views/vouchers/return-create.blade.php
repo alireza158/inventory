@@ -339,8 +339,9 @@
                                                 <th>تعداد فاکتور</th>
                                                 <th>قبلاً برگشتی</th>
                                                 <th>قابل برگشت</th>
-                                                <th>موجودی تنوع</th>
+                                                <th>قیمت واحد طبق فاکتور</th>
                                                 <th style="width:150px;">تعداد برگشتی</th>
+                                                <th>مبلغ برگشتی</th>
                                                 <th style="width:80px;"></th>
                                             </tr>
                                         </thead>
@@ -351,6 +352,39 @@
                                 <div class="empty-state d-none" id="itemsEmptyState">
                                     برای این فاکتور کالایی با مقدار قابل برگشت پیدا نشد.
                                 </div>
+
+                                <div class="alert alert-info mt-3 mb-0 d-none" id="internalReturnSummary">
+                                    <div>جمع تعداد برگشتی: <strong id="internalReturnQtyTotal">۰</strong></div>
+                                    <div>جمع برگشت از فروش: <strong id="internalReturnAmountTotal">۰</strong> ریال</div>
+                                    <div class="small mt-1">این مبلغ در گردش حساب مشتری به عنوان بستانکاری ثبت می‌شود.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="col-12 d-none" id="manualItemsSection">
+                        <div class="card-soft">
+                            <div class="section-head">
+                                <div>
+                                    <div class="section-title">کالاهای مرجوعی دستی / سازه‌حساب</div>
+                                    <div class="muted">کالا و تنوع را از محصولات تعریف‌شده انتخاب کن؛ مبلغ هر ردیف از عدد واردشده محاسبه می‌شود.</div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addManualItemBtn">افزودن کالا</button>
+                            </div>
+                            <div class="p-3">
+                                <div class="table-responsive">
+                                    <table class="table table-striped line-table" id="manualItemsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>کالا</th><th>تنوع</th><th>کد / بارکد</th><th>تعداد</th><th>مبلغ واحد</th><th>مبلغ کل</th><th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                                <div class="empty-state d-none" id="manualItemsEmptyState">حداقل یک کالای مرجوعی دستی باید اضافه شود.</div>
+                                <div class="text-start fw-bold mt-2">جمع کل مرجوعی: <span id="manualGrandTotal">۰</span> ریال</div>
                             </div>
                         </div>
                     </div>
@@ -504,6 +538,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const reloadItemsBtn = document.getElementById('reloadItemsBtn');
     const itemsEmptyState = document.getElementById('itemsEmptyState');
     const itemsWarningBox = document.getElementById('itemsWarningBox');
+    const internalReturnSummary = document.getElementById('internalReturnSummary');
+    const internalReturnQtyTotal = document.getElementById('internalReturnQtyTotal');
+    const internalReturnAmountTotal = document.getElementById('internalReturnAmountTotal');
     const tbody = document.querySelector('#itemsTable tbody');
     const returnForm = document.getElementById('returnForm');
     const submitBtn = document.getElementById('submitBtn');
@@ -618,6 +655,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         itemsSection.classList.add('d-none');
         tbody.innerHTML = '';
+        recalcInternalReturnSummary();
         itemsEmptyState.classList.add('d-none');
         showItemsWarning('');
         confirmInvoiceBtn.disabled = true;
@@ -735,6 +773,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const remaining = Number(item.remaining_qty !== undefined ? item.remaining_qty : Math.max(qty - returned, 0));
 
             return {
+                invoice_item_id: Number(item.invoice_item_id || 0),
                 product_id: Number(item.product_id || 0),
                 variant_id: Number(item.variant_id || item.product_variant_id || 0),
                 name: String(item.name || item.product_name || 'بدون نام'),
@@ -748,14 +787,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 unit_price: Number(item.unit_price || item.price || 0),
             };
         }).filter(function (item) {
-            return item.product_id > 0 && item.variant_id > 0;
+            return item.invoice_item_id > 0 && item.product_id > 0 && item.variant_id > 0;
         });
     }
 
-    function oldQuantityFor(productId, variantId) {
+    function oldQuantityFor(invoiceItemId, productId, variantId) {
         if (!Array.isArray(oldItems)) return null;
 
         const found = oldItems.find(function (row) {
+            if (row.invoice_item_id && String(row.invoice_item_id) === String(invoiceItemId)) return true;
+
             return String(row.product_id || '') === String(productId) &&
                    String(row.variant_id || '') === String(variantId);
         });
@@ -767,12 +808,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function itemRowTemplate(item, index, useOldQuantity) {
         const remaining = Number(item.remaining_qty || 0);
-        const defaultQtyFromOld = useOldQuantity ? oldQuantityFor(item.product_id, item.variant_id) : null;
+        const defaultQtyFromOld = useOldQuantity ? oldQuantityFor(item.invoice_item_id, item.product_id, item.variant_id) : null;
         const defaultQty = defaultQtyFromOld !== null ? Math.min(defaultQtyFromOld, remaining) : remaining;
 
         return `
-            <tr data-product-id="${escapeHtml(item.product_id)}" data-variant-id="${escapeHtml(item.variant_id)}">
+            <tr data-product-id="${escapeHtml(item.product_id)}" data-variant-id="${escapeHtml(item.variant_id)}" data-unit-price="${escapeHtml(item.unit_price || 0)}">
                 <td>
+                    <input type="hidden" name="items[${index}][invoice_item_id]" value="${escapeHtml(item.invoice_item_id)}">
                     <input type="hidden" name="items[${index}][product_id]" value="${escapeHtml(item.product_id)}">
                     <div class="fw-bold">${escapeHtml(item.name)}</div>
                 </td>
@@ -785,7 +827,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <td><span class="badge text-bg-light">${toMoney(item.qty || 0)}</span></td>
                 <td><span class="badge text-bg-light">${toMoney(item.already_returned_qty || 0)}</span></td>
                 <td><span class="badge text-bg-primary">${toMoney(remaining)}</span></td>
-                <td><span class="badge text-bg-light">${toMoney(item.variant_stock || 0)}</span></td>
+                <td><span class="badge text-bg-light">${toMoney(item.unit_price || 0)} ریال</span></td>
                 <td>
                     <input
                         type="number"
@@ -797,11 +839,35 @@ document.addEventListener('DOMContentLoaded', function () {
                         required
                     >
                 </td>
+                <td><span class="internal-line-total">۰ ریال</span></td>
                 <td>
                     <button type="button" class="btn btn-sm btn-outline-danger remove-row-btn">حذف</button>
                 </td>
             </tr>
         `;
+    }
+
+    function recalcInternalReturnSummary() {
+        let qtyTotal = 0;
+        let amountTotal = 0;
+
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            const qty = Number(tr.querySelector('.qty-input')?.value || 0);
+            const unitPrice = Number(tr.dataset.unitPrice || 0);
+            const lineTotal = Math.max(qty, 0) * Math.max(unitPrice, 0);
+            const lineTotalEl = tr.querySelector('.internal-line-total');
+
+            if (lineTotalEl) {
+                lineTotalEl.textContent = toMoney(lineTotal) + ' ریال';
+            }
+
+            qtyTotal += Math.max(qty, 0);
+            amountTotal += lineTotal;
+        });
+
+        internalReturnQtyTotal.textContent = toMoney(qtyTotal);
+        internalReturnAmountTotal.textContent = toMoney(amountTotal);
+        internalReturnSummary.classList.toggle('d-none', tbody.querySelectorAll('tr').length === 0);
     }
 
     function bindItemRows() {
@@ -812,6 +878,7 @@ document.addEventListener('DOMContentLoaded', function () {
             removeBtn.addEventListener('click', function () {
                 tr.remove();
                 refreshItemsStateAfterDelete();
+                recalcInternalReturnSummary();
             });
 
             qtyInput.addEventListener('input', function () {
@@ -821,6 +888,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (max > 0 && value > max) {
                     qtyInput.value = String(max);
                 }
+
+                recalcInternalReturnSummary();
             });
         });
     }
@@ -836,6 +905,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderInvoiceItems(useOldQuantity = false) {
         tbody.innerHTML = '';
+        recalcInternalReturnSummary();
         showItemsWarning('');
 
         const returnableItems = invoiceItems.filter(function (item) {
@@ -863,11 +933,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         bindItemRows();
+        recalcInternalReturnSummary();
     }
 
     async function loadInvoiceProducts(uuid, useOldQuantity = false) {
         itemsSection.classList.remove('d-none');
         tbody.innerHTML = '';
+        recalcInternalReturnSummary();
         itemsEmptyState.classList.add('d-none');
         showItemsWarning('در حال بارگذاری کالاهای خریداری‌شده فاکتور...');
 
