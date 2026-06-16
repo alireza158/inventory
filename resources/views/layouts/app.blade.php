@@ -216,7 +216,7 @@
                 </div>
             @endif
 
-            @if($errors->any())
+            @if(isset($errors) && is_object($errors) && method_exists($errors, 'any') && $errors->any())
                 <div class="alert alert-danger">
                     <div class="fw-bold mb-2">خطاها:</div>
                     <ul class="mb-0">
