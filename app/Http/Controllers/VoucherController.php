@@ -327,6 +327,20 @@ class VoucherController extends Controller
     {
         $returnType = $request->input('return_type', WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE);
 
+        if ($returnType === WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL) {
+            $items = collect($request->input('items', []))
+                ->map(function ($item) {
+                    if (array_key_exists('unit_price', $item)) {
+                        $item['unit_price'] = $this->normalizeMoney($item['unit_price']);
+                    }
+
+                    return $item;
+                })
+                ->all();
+
+            $request->merge(['items' => $items]);
+        }
+
         $rules = [
             'return_type' => ['required', 'in:' . implode(',', [WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE, WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL])],
             'customer_id' => ['required', 'exists:customers,id'],
@@ -427,6 +441,40 @@ class VoucherController extends Controller
             }
             $seenVariantRows[$key] = true;
         }
+    }
+
+    private function normalizeMoney(mixed $value): int
+    {
+        $normalized = strtr((string) $value, [
+            '۰' => '0',
+            '۱' => '1',
+            '۲' => '2',
+            '۳' => '3',
+            '۴' => '4',
+            '۵' => '5',
+            '۶' => '6',
+            '۷' => '7',
+            '۸' => '8',
+            '۹' => '9',
+            '٠' => '0',
+            '١' => '1',
+            '٢' => '2',
+            '٣' => '3',
+            '٤' => '4',
+            '٥' => '5',
+            '٦' => '6',
+            '٧' => '7',
+            '٨' => '8',
+            '٩' => '9',
+        ]);
+
+        $normalized = preg_replace('/[,\x{066C}\x{060C}\s]+/u', '', $normalized) ?? '';
+
+        if ($normalized === '' || !ctype_digit($normalized)) {
+            abort(422, 'مبلغ واحد مرجوعی باید عددی و بدون مقدار منفی باشد.');
+        }
+
+        return (int) $normalized;
     }
 
     private function validateInternalReturnItems(Invoice $invoice, array $items): void

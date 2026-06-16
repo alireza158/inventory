@@ -376,6 +376,7 @@
                                         <tbody></tbody>
                                     </table>
                                 </div>
+                                <div class="empty-state d-none" id="manualItemsEmptyState">حداقل یک کالای مرجوعی دستی باید اضافه شود.</div>
                                 <div class="text-start fw-bold mt-2">جمع کل مرجوعی: <span id="manualGrandTotal">۰</span> ریال</div>
                             </div>
                         </div>
@@ -474,6 +475,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const manualTbody = document.querySelector('#manualItemsTable tbody');
     const addManualItemBtn = document.getElementById('addManualItemBtn');
     const manualGrandTotal = document.getElementById('manualGrandTotal');
+    const manualItemsEmptyState = document.getElementById('manualItemsEmptyState');
     const customerSelect = document.getElementById('customerSelect');
     const warehouseSelect = document.getElementById('warehouseSelect');
     const returnReasonSelect = document.getElementById('returnReasonSelect');
@@ -942,67 +944,153 @@ document.addEventListener('DOMContentLoaded', function () {
         return returnTypeSelect.value === 'external_manual';
     }
 
+    function selectSearchText(option, fallbackText) {
+        return normalizeDigits(((option && option.getAttribute('data-search')) || '') + ' ' + (fallbackText || '')).toLowerCase();
+    }
+
+    function manualSelectMatcher(params, data) {
+        const term = normalizeDigits(jQuery.trim(params.term || '')).toLowerCase();
+        if (!term) return data;
+        if (!data.element) return null;
+
+        return selectSearchText(data.element, data.text).includes(term) ? data : null;
+    }
+
     function productOptions(selected) {
         return '<option value="">انتخاب کالا...</option>' + products.map(function (p) {
-            return `<option value="${escapeHtml(p.id)}" ${String(selected || '') === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}${p.code ? ' (' + escapeHtml(p.code) + ')' : ''}</option>`;
+            const variantsSearch = (p.variants || []).map(function (v) {
+                return [v.name || '', v.code || '', v.barcode || ''].join(' ');
+            }).join(' ');
+            const search = [p.name || '', p.code || '', p.barcode || '', variantsSearch].join(' ');
+            return `<option value="${escapeHtml(p.id)}" data-search="${escapeHtml(search)}" ${String(selected || '') === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}${p.code ? ' (' + escapeHtml(p.code) + ')' : ''}</option>`;
         }).join('');
     }
 
     function variantOptions(productId, selected) {
         const product = products.find(function (p) { return String(p.id) === String(productId); });
         if (!product) return '<option value="">ابتدا کالا...</option>';
-        return '<option value="">انتخاب تنوع...</option>' + product.variants.map(function (v) {
-            return `<option value="${escapeHtml(v.id)}" data-code="${escapeHtml(v.code || product.code || '')}" data-price="${escapeHtml(v.price || product.price || 0)}" ${String(selected || '') === String(v.id) ? 'selected' : ''}>${escapeHtml(v.name)}${v.code ? ' [' + escapeHtml(v.code) + ']' : ''}</option>`;
+        return '<option value="">انتخاب تنوع...</option>' + (product.variants || []).map(function (v) {
+            const search = [v.name || '', v.code || '', v.barcode || '', product.name || '', product.code || ''].join(' ');
+            return `<option value="${escapeHtml(v.id)}" data-search="${escapeHtml(search)}" data-code="${escapeHtml(v.code || v.barcode || product.code || product.barcode || '')}" data-price="${escapeHtml(v.price || product.price || 0)}" ${String(selected || '') === String(v.id) ? 'selected' : ''}>${escapeHtml(v.name)}${v.code ? ' [' + escapeHtml(v.code) + ']' : ''}</option>`;
         }).join('');
+    }
+
+    function parseMoney(value) {
+        return Number(normalizeDigits(value)
+            .replace(/[٬,،\s]/g, '')
+            .replace(/[^0-9]/g, '') || 0);
+    }
+
+    function syncMoneyRaw(row) {
+        const displayInput = row.querySelector('.manual-price-display');
+        const rawInput = row.querySelector('.manual-price');
+        const raw = parseMoney(displayInput?.value || '');
+        if (rawInput) rawInput.value = String(raw);
+        return raw;
+    }
+
+    function initManualSelects(tr) {
+        if (!window.jQuery || !jQuery.fn || !jQuery.fn.select2) {
+            return;
+        }
+
+        jQuery(tr).find('.manual-product,.manual-variant').each(function () {
+            const $select = jQuery(this);
+            if ($select.data('select2')) {
+                $select.select2('destroy');
+            }
+
+            $select.select2({
+                dir: 'rtl',
+                width: '100%',
+                matcher: manualSelectMatcher,
+                placeholder: $select.hasClass('manual-product') ? 'جستجوی کالا...' : 'جستجوی تنوع...',
+                language: {
+                    noResults: function () { return 'موردی پیدا نشد'; },
+                    searching: function () { return 'در حال جستجو...'; }
+                }
+            });
+        });
     }
 
     function recalcManualTotals() {
         let total = 0;
         manualTbody.querySelectorAll('tr').forEach(function (tr) {
             const qty = Number(tr.querySelector('.manual-qty')?.value || 0);
-            const price = Number(tr.querySelector('.manual-price')?.value || 0);
+            const price = syncMoneyRaw(tr);
             const line = Math.max(qty, 0) * Math.max(price, 0);
-            tr.querySelector('.manual-line-total').textContent = toMoney(line);
+            tr.querySelector('.manual-line-total').textContent = toMoney(line) + ' ریال';
             total += line;
         });
         manualGrandTotal.textContent = toMoney(total);
+        manualItemsEmptyState.classList.toggle('d-none', manualTbody.querySelectorAll('tr').length > 0);
     }
 
     function addManualRow(rowData = {}) {
         const index = Date.now() + manualTbody.children.length;
+        const unitPrice = Number(rowData.unit_price || 0);
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><select name="items[${index}][product_id]" class="form-select manual-product" required>${productOptions(rowData.product_id)}</select></td>
             <td><select name="items[${index}][variant_id]" class="form-select manual-variant" required>${variantOptions(rowData.product_id, rowData.variant_id)}</select></td>
             <td><span class="mono manual-code">—</span></td>
             <td><input name="items[${index}][quantity]" type="number" min="1" class="form-control manual-qty" value="${escapeHtml(rowData.quantity || 1)}" required></td>
-            <td><input name="items[${index}][unit_price]" type="number" min="0" class="form-control manual-price" value="${escapeHtml(rowData.unit_price || 0)}" required></td>
-            <td><span class="manual-line-total">۰</span> ریال</td>
+            <td>
+                <input type="text" inputmode="numeric" autocomplete="off" class="form-control manual-price-display" value="${escapeHtml(unitPrice.toLocaleString('en-US'))}">
+                <input type="hidden" name="items[${index}][unit_price]" class="manual-price" value="${escapeHtml(unitPrice)}">
+            </td>
+            <td><span class="manual-line-total">۰ ریال</span></td>
             <td><button type="button" class="btn btn-sm btn-outline-danger manual-remove">حذف</button></td>
         `;
         manualTbody.appendChild(tr);
 
         const productSelect = tr.querySelector('.manual-product');
         const variantSelect = tr.querySelector('.manual-variant');
-        const priceInput = tr.querySelector('.manual-price');
+        const priceDisplayInput = tr.querySelector('.manual-price-display');
         const codeEl = tr.querySelector('.manual-code');
 
         function refreshVariantMeta(applySuggestedPrice) {
+            const product = products.find(function (p) { return String(p.id) === String(productSelect.value); });
             const option = variantSelect.selectedOptions[0];
-            codeEl.textContent = option?.dataset?.code || '—';
+            codeEl.textContent = option?.dataset?.code || product?.code || product?.barcode || '—';
             if (applySuggestedPrice && option?.dataset?.price !== undefined) {
-                priceInput.value = option.dataset.price || '0';
+                const suggested = Number(option.dataset.price || product?.price || 0);
+                priceDisplayInput.value = suggested.toLocaleString('en-US');
             }
             recalcManualTotals();
         }
 
         productSelect.addEventListener('change', function () {
+            if (window.jQuery && jQuery.fn && jQuery(variantSelect).data('select2')) {
+                jQuery(variantSelect).select2('destroy');
+            }
             variantSelect.innerHTML = variantOptions(productSelect.value, '');
+            if (variantSelect.options.length === 2) {
+                variantSelect.selectedIndex = 1;
+            }
+            initManualSelects(tr);
             refreshVariantMeta(true);
         });
         variantSelect.addEventListener('change', function () { refreshVariantMeta(true); });
-        tr.querySelectorAll('.manual-qty,.manual-price').forEach(function (input) { input.addEventListener('input', recalcManualTotals); });
-        tr.querySelector('.manual-remove').addEventListener('click', function () { tr.remove(); recalcManualTotals(); });
+        tr.querySelector('.manual-qty').addEventListener('input', recalcManualTotals);
+        priceDisplayInput.addEventListener('input', function () {
+            const raw = parseMoney(priceDisplayInput.value);
+            priceDisplayInput.value = priceDisplayInput.value.trim() === '' ? '' : raw.toLocaleString('en-US');
+            recalcManualTotals();
+        });
+        tr.querySelector('.manual-remove').addEventListener('click', function () {
+            if (window.jQuery && jQuery.fn) {
+                jQuery(tr).find('.manual-product,.manual-variant').each(function () {
+                    if (jQuery(this).data('select2')) jQuery(this).select2('destroy');
+                });
+            }
+            tr.remove();
+            recalcManualTotals();
+        });
+        if (variantSelect.options.length === 2 && !rowData.variant_id) {
+            variantSelect.selectedIndex = 1;
+        }
+        initManualSelects(tr);
         refreshVariantMeta(false);
     }
 
@@ -1109,6 +1197,10 @@ document.addEventListener('DOMContentLoaded', function () {
             event.preventDefault();
             alert('لطفاً علت برگشت از فروش را انتخاب کنید.');
             return;
+        }
+
+        if (isManualReturn()) {
+            recalcManualTotals();
         }
 
         const rows = Array.from((isManualReturn() ? manualTbody : tbody).querySelectorAll('tr'));
