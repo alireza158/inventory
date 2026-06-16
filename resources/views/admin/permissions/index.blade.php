@@ -50,8 +50,14 @@
         <div class="row g-3">
             @foreach($permissions as $group => $groupPermissions)
                 <div class="col-lg-6 col-xl-4">
-                    <div class="card h-100 border-0 shadow-sm">
-                        <div class="card-header bg-white fw-bold">{{ $group ?: 'سایر' }}</div>
+                    <div class="card h-100 border-0 shadow-sm permission-group-card">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span class="fw-bold">{{ $group ?: 'سایر' }}</span>
+                            <span class="d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-success js-select-group">انتخاب همه</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-clear-group">حذف همه</button>
+                            </span>
+                        </div>
                         <div class="card-body">
                             <div class="row g-2">
                                 @foreach($groupPermissions as $permission)
@@ -79,4 +85,22 @@
 @else
     <div class="alert alert-warning">هیچ کاربری برای مدیریت دسترسی‌ها یافت نشد.</div>
 @endif
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.permission-group-card').forEach(function (card) {
+        card.querySelector('.js-select-group')?.addEventListener('click', function () {
+            card.querySelectorAll('input[type="checkbox"]').forEach(function (checkbox) {
+                checkbox.checked = true;
+            });
+        });
+
+        card.querySelector('.js-clear-group')?.addEventListener('click', function () {
+            card.querySelectorAll('input[type="checkbox"]').forEach(function (checkbox) {
+                checkbox.checked = false;
+            });
+        });
+    });
+});
+</script>
 @endsection

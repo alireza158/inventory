@@ -214,7 +214,7 @@
     <div class="purchase-topbar d-flex justify-content-between align-items-center">
         <h4 class="page-title mb-0">مشاهده سند خرید #{{ $purchase->id }}</h4>
         <div class="d-flex gap-2">
-            <a class="btn btn-light" href="{{ route('purchases.edit', $purchase) }}">ویرایش سند</a>
+            @canPermission('stock_in.edit')<a class="btn btn-light" href="{{ route('purchases.edit', $purchase) }}">ویرایش سند</a>@endcanPermission
             <a class="btn btn-outline-light" href="{{ route('purchases.index') }}">بازگشت</a>
         </div>
     </div>

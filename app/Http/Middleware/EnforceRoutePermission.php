@@ -2,14 +2,22 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\PermissionCatalog;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class CheckPermission
+class EnforceRoutePermission
 {
-    public function handle(Request $request, Closure $next, string $permission): Response
+    public function handle(Request $request, Closure $next): Response
     {
+        $routeName = $request->route()?->getName();
+        $permission = $routeName ? (PermissionCatalog::routePermissions()[$routeName] ?? null) : null;
+
+        if ($permission === null) {
+            return $next($request);
+        }
+
         $user = $request->user();
 
         if ($user && $user->hasPermission($permission)) {

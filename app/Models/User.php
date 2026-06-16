@@ -85,7 +85,7 @@ class User extends Authenticatable
 
     public function hasPermission(string $key): bool
     {
-        if ($this->hasAnyRole(['admin', 'Admin', 'ادمین'])) {
+        if ($this->hasAnyRole(['admin', 'Admin', 'ادمین', 'super_admin', 'Super Admin', 'super-admin'])) {
             return true;
         }
 

@@ -43,7 +43,7 @@ use App\Http\Controllers\Admin\UserPermissionController;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'route.permission'])->group(function () {
 
     Route::get('/locations/provinces', [PreinvoiceApiController::class, 'provinces'])->name('locations.provinces.index');
     Route::get('/locations/provinces/{province}/cities', [PreinvoiceApiController::class, 'cities'])->name('locations.provinces.cities');
@@ -69,9 +69,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('permission:products.delete')->name('products.destroy');
     Route::get('/products/{product}/sales-ledger', [ProductSalesLedgerController::class, 'index'])->name('products.sales-ledger');
     Route::get('/products/{product}/purchase-ledger', [ProductPurchaseLedgerController::class, 'purchaseLedger'])->name('products.purchase-ledger');
-    Route::resource('categories', CategoryController::class)->except(['show', 'destroy'])->middleware('permission:categories.manage');
-    Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('permission:categories.manage')->name('categories.destroy');
-    Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->middleware('permission:categories.manage')->name('categories.fixCodes');
+    Route::resource('categories', CategoryController::class)->except(['show', 'destroy']);
+    Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+    Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
 
     Route::get('/products/pricelist', [ProductController::class, 'priceList'])->middleware('permission:products.view')->name('products.pricelist');
 
@@ -321,13 +321,14 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
 
     // Users (External CRM)
-    Route::get('/users', [UserController::class, 'index'])->middleware('permission:users.manage')->name('users.index');
-    Route::post('/users/sync', [UserController::class, 'sync'])->middleware('permission:users.manage')->name('users.sync');
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
 
-    Route::get('/admin/permissions', [UserPermissionController::class, 'index'])->middleware('permission:permissions.manage')->name('admin.permissions.index');
-    Route::put('/admin/permissions/{user}', [UserPermissionController::class, 'update'])->middleware('permission:permissions.manage')->name('admin.permissions.update');
+    Route::get('/admin/permissions', [UserPermissionController::class, 'index'])->name('admin.permissions.index');
+    Route::put('/admin/permissions/{user}', [UserPermissionController::class, 'update'])->name('admin.permissions.update');
 });
 Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])
+    ->middleware(['auth', 'route.permission'])
     ->name('model-lists.import-phone-catalog');
 
 
@@ -336,9 +337,11 @@ Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'im
 // اگر route مشابه داری، فقط مطمئن شو URL ها با همین دو آدرس یکی باشند.
 
 Route::get('/vouchers/return/customers/{customer}/invoices', [VoucherController::class, 'customerInvoices'])
+    ->middleware(['auth', 'route.permission'])
     ->name('vouchers.return.customer-invoices');
 
 Route::get('/vouchers/invoice/{uuid}/products', [VoucherController::class, 'invoiceProducts'])
+    ->middleware(['auth', 'route.permission'])
     ->name('vouchers.invoice.products');
 
 use Illuminate\Support\Facades\Auth;
@@ -379,5 +382,6 @@ Route::get('/auto-login', function (Request $request) {
 
 
 Route::get('/finance/cheques', [ChequeController::class, 'index'])
+    ->middleware(['auth', 'route.permission'])
     ->name('finance.cheques.index');
 require __DIR__ . '/auth.php';

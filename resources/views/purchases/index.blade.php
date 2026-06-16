@@ -13,8 +13,8 @@
     <div class="purchase-topbar d-flex justify-content-between align-items-center">
         <h4 class="page-title mb-0">خرید کالا</h4>
         <div class="d-flex gap-2 flex-wrap justify-content-end">
-            <a class="btn btn-outline-light" href="{{ route('purchases.export') }}">خروجی اکسل همه خریدها</a>
-            <a class="btn btn-light" href="{{ route('purchases.create') }}">+ ثبت خرید جدید</a>
+            @canPermission('stock_in.export')<a class="btn btn-outline-light" href="{{ route('purchases.export') }}">خروجی اکسل همه خریدها</a>@endcanPermission
+            @canPermission('stock_in.create')<a class="btn btn-light" href="{{ route('purchases.create') }}">+ ثبت خرید جدید</a>@endcanPermission
         </div>
     </div>
 
@@ -96,13 +96,13 @@
                             <td><span class="badge-items">{{ $purchase->items_count }}</span></td>
                             <td class="text-end action-btns">
                                 <a href="{{ route('purchases.show', $purchase) }}" class="btn btn-sm btn-outline-secondary">مشاهده</a>
-                                <a href="{{ route('purchases.edit', $purchase) }}" class="btn btn-sm btn-outline-primary">ویرایش</a>
-                                <form method="POST" action="{{ route('purchases.destroy', $purchase) }}" class="d-inline"
+                                @canPermission('stock_in.edit')<a href="{{ route('purchases.edit', $purchase) }}" class="btn btn-sm btn-outline-primary">ویرایش</a>@endcanPermission
+                                @canPermission('stock_in.delete')<form method="POST" action="{{ route('purchases.destroy', $purchase) }}" class="d-inline"
                                       onsubmit="return confirm('از حذف این سند خرید مطمئن هستید؟')">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-sm btn-outline-danger">حذف</button>
-                                </form>
+                                </form>@endcanPermission
                             </td>
                         </tr>
                     @empty

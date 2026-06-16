@@ -37,8 +37,8 @@
             </div>
             <div class="header-actions">
                 <button class="btn-soft" type="button" data-bs-toggle="offcanvas" data-bs-target="#catOffcanvas">دسته‌بندی‌ها</button>
-                <a class="btn-soft" href="{{ route('purchases.create') }}">خرید کالا</a>
-                <a class="btn-main" href="{{ route('products.create') }}">افزودن کالا</a>
+                @canPermission('stock_in.create')<a class="btn-soft" href="{{ route('purchases.create') }}">خرید کالا</a>@endcanPermission
+                @canPermission('products.create')<a class="btn-main" href="{{ route('products.create') }}">افزودن کالا</a>@endcanPermission
             </div>
         </div>
     </div>
@@ -77,8 +77,8 @@
                 <div class="selected-info"><div class="selected-dot" id="selectedCountBadge">۰</div><div class="min-w-0"><div class="selected-title" id="selectedProductTitle">هیچ کالایی انتخاب نشده است</div><div class="selected-hint" id="variantHelpText">برای عملیات گروهی، ابتدا کالا را انتخاب کنید.</div></div></div>
                 <div class="bulk-empty-message">برای عملیات گروهی، ابتدا کالا را انتخاب کنید.</div>
                 <div class="operation-actions">
-                    <button class="btn btn-primary btn-mini" type="button" id="bulkEditBtn">ویرایش</button>
-                    @if($canDeleteProducts)<button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeleteBtn">حذف</button>@endif
+                    @canPermission('products.edit')<button class="btn btn-primary btn-mini" type="button" id="bulkEditBtn">ویرایش</button>@endcanPermission
+                    @canPermission('products.delete')<button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeleteBtn">حذف</button>@endcanPermission
                     <button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeactivateBtn">غیرفعال‌سازی</button>
                     <select id="bulkVariantSelect" class="form-select form-select-sm variant-operation-select" disabled><option value="">تنوع محصول...</option></select>
                     <button class="btn btn-outline-primary btn-mini" type="button" id="bulkStockBtn">موجودی انبار</button>
