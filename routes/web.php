@@ -39,34 +39,41 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WarehouseMapController;
+use App\Http\Controllers\Admin\UserPermissionController;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'route.permission'])->group(function () {
 
     Route::get('/locations/provinces', [PreinvoiceApiController::class, 'provinces'])->name('locations.provinces.index');
     Route::get('/locations/provinces/{province}/cities', [PreinvoiceApiController::class, 'cities'])->name('locations.provinces.cities');
 
     // Dashboard + profile
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dashboard/monthly-report', [DashboardController::class, 'monthlyReport'])->name('dashboard.monthly-report');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard.view')->name('dashboard');
+    Route::get('/dashboard/monthly-report', [DashboardController::class, 'monthlyReport'])->middleware('permission:dashboard.view')->name('dashboard.monthly-report');
     Route::get('/global-search', [DashboardController::class, 'globalSearch'])->name('global-search');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Products + categories
-    Route::resource('products', ProductController::class)->except(['show', 'destroy']);
+    Route::resource('products', ProductController::class)->except(['show', 'destroy'])->middleware([
+        'index' => 'permission:products.view',
+        'create' => 'permission:products.create',
+        'store' => 'permission:products.create',
+        'edit' => 'permission:products.edit',
+        'update' => 'permission:products.edit',
+    ]);
     Route::get('/products/{product}/warehouse-stock', [ProductController::class, 'warehouseStock'])->name('products.warehouse-stock');
     Route::get('/products/{product}/image', [ProductController::class, 'image'])->name('products.image');
-    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('role:admin|Admin')->name('products.destroy');
+    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('permission:products.delete')->name('products.destroy');
     Route::get('/products/{product}/sales-ledger', [ProductSalesLedgerController::class, 'index'])->name('products.sales-ledger');
     Route::get('/products/{product}/purchase-ledger', [ProductPurchaseLedgerController::class, 'purchaseLedger'])->name('products.purchase-ledger');
     Route::resource('categories', CategoryController::class)->except(['show', 'destroy']);
-    Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('role:admin|Admin')->name('categories.destroy');
+    Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
     Route::post('/categories/fix-codes', [CategoryController::class, 'fixCodes'])->name('categories.fixCodes');
 
-    Route::get('/products/pricelist', [ProductController::class, 'priceList'])->name('products.pricelist');
+    Route::get('/products/pricelist', [ProductController::class, 'priceList'])->middleware('permission:products.view')->name('products.pricelist');
 
     Route::prefix('admin/product-exports')->name('admin.product-exports.')->group(function () {
         Route::get('/', [ProductExportController::class, 'index'])->name('index');
@@ -107,7 +114,7 @@ Route::middleware('auth')->group(function () {
     // Stock movements
     Route::get('/products/{product}/movements/create', [StockMovementController::class, 'create'])->name('movements.create');
     Route::post('/products/{product}/movements', [StockMovementController::class, 'store'])->name('movements.store');
-    Route::get('/movements', [StockMovementReportController::class, 'index'])->name('movements.index');
+    Route::get('/movements', [StockMovementReportController::class, 'index'])->middleware('permission:reports.stock_movement')->name('movements.index');
 
     // Vouchers
 Route::get('/vouchers', [VoucherController::class, 'hub'])->name('vouchers.index');
@@ -147,7 +154,7 @@ Route::get('/vouchers/{voucher}', [VoucherController::class, 'show'])->name('vou
 Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
 Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
 Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
-    Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->name('warehouse.outputs');
+    Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->middleware('permission:stock.out')->name('warehouse.outputs');
 
     // Asset trustee module (امین اموال)
     Route::prefix('warehouse/asset-trustee')->name('asset.')->group(function () {
@@ -206,7 +213,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     });
 
     // Warehouses
-    Route::get('/warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
+    Route::get('/warehouses', [WarehouseController::class, 'index'])->middleware('permission:inventory.view')->name('warehouses.index');
     Route::get('/warehouses/{warehouse}/edit', [WarehouseController::class, 'edit'])->name('warehouses.edit');
     Route::put('/warehouses/{warehouse}', [WarehouseController::class, 'update'])->name('warehouses.update');
     Route::delete('/warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->name('warehouses.destroy');
@@ -216,11 +223,11 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/warehouses/{warehouse}/personnel/{personnel}', [WarehouseController::class, 'personnelShow'])->name('warehouses.personnel.show');
 
     // Purchases
-    Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');
+    Route::get('/purchases', [PurchaseController::class, 'index'])->middleware('permission:stock.in')->name('purchases.index');
     Route::get('/purchases/export', [PurchaseController::class, 'exportExcel'])->name('purchases.export');
-    Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
+    Route::get('/purchases/create', [PurchaseController::class, 'create'])->middleware('permission:stock.in')->name('purchases.create');
     Route::get('/purchases/products/{product}/variants', [PurchaseController::class, 'productVariants'])->name('purchases.products.variants');
-    Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
+    Route::post('/purchases', [PurchaseController::class, 'store'])->middleware('permission:stock.in')->name('purchases.store');
     Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show');
     Route::get('/purchases/{purchase}/edit', [PurchaseController::class, 'edit'])->name('purchases.edit');
     Route::put('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
@@ -231,12 +238,12 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::post('/persons', [PersonController::class, 'store'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.store');
 
     // Suppliers
-    Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
-    Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+    Route::get('/suppliers', [SupplierController::class, 'index'])->middleware('permission:suppliers.manage')->name('suppliers.index');
+    Route::post('/suppliers', [SupplierController::class, 'store'])->middleware('permission:suppliers.manage')->name('suppliers.store');
 
     // Stocktake / Stock Count Documents
-    Route::get('/stocktake', [StocktakeController::class, 'index'])->name('stocktake.index');
-    Route::get('/stock-count-documents', [StocktakeController::class, 'index'])->name('stock-count-documents.index');
+    Route::get('/stocktake', [StocktakeController::class, 'index'])->middleware('permission:inventory.view')->name('stocktake.index');
+    Route::get('/stock-count-documents', [StocktakeController::class, 'index'])->middleware('permission:inventory.view')->name('stock-count-documents.index');
     Route::get('/stock-count-documents/create', [StocktakeController::class, 'create'])->name('stock-count-documents.create');
     Route::post('/stock-count-documents', [StocktakeController::class, 'store'])->name('stock-count-documents.store');
     Route::get('/stock-count-documents/{stockCountDocument}', [StocktakeController::class, 'show'])->name('stock-count-documents.show');
@@ -279,8 +286,8 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     });
 
     // Customers
-    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
-    Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+    Route::get('/customers', [CustomerController::class, 'index'])->middleware('permission:customers.manage')->name('customers.index');
+    Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage')->name('customers.store');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
 
@@ -316,8 +323,12 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     // Users (External CRM)
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
+
+    Route::get('/admin/permissions', [UserPermissionController::class, 'index'])->name('admin.permissions.index');
+    Route::put('/admin/permissions/{user}', [UserPermissionController::class, 'update'])->name('admin.permissions.update');
 });
 Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])
+    ->middleware(['auth', 'route.permission'])
     ->name('model-lists.import-phone-catalog');
 
 
@@ -326,9 +337,11 @@ Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'im
 // اگر route مشابه داری، فقط مطمئن شو URL ها با همین دو آدرس یکی باشند.
 
 Route::get('/vouchers/return/customers/{customer}/invoices', [VoucherController::class, 'customerInvoices'])
+    ->middleware(['auth', 'route.permission'])
     ->name('vouchers.return.customer-invoices');
 
 Route::get('/vouchers/invoice/{uuid}/products', [VoucherController::class, 'invoiceProducts'])
+    ->middleware(['auth', 'route.permission'])
     ->name('vouchers.invoice.products');
 
 use Illuminate\Support\Facades\Auth;
@@ -369,5 +382,6 @@ Route::get('/auto-login', function (Request $request) {
 
 
 Route::get('/finance/cheques', [ChequeController::class, 'index'])
+    ->middleware(['auth', 'route.permission'])
     ->name('finance.cheques.index');
 require __DIR__ . '/auth.php';
