@@ -389,6 +389,33 @@
                         </div>
                     </div>
 
+
+                    <div class="col-12 d-none" id="manualItemsSection">
+                        <div class="card-soft">
+                            <div class="section-head">
+                                <div>
+                                    <div class="section-title">کالاهای مرجوعی دستی / سازه‌حساب</div>
+                                    <div class="muted">کالا و تنوع را از محصولات تعریف‌شده انتخاب کن؛ مبلغ هر ردیف از عدد واردشده محاسبه می‌شود.</div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addManualItemBtn">افزودن کالا</button>
+                            </div>
+                            <div class="p-3">
+                                <div class="table-responsive">
+                                    <table class="table table-striped line-table" id="manualItemsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>کالا</th><th>تنوع</th><th>کد / بارکد</th><th>تعداد</th><th>مبلغ واحد</th><th>مبلغ کل</th><th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                                <div class="empty-state d-none" id="manualItemsEmptyState">حداقل یک کالای مرجوعی دستی باید اضافه شود.</div>
+                                <div class="text-start fw-bold mt-2">جمع کل مرجوعی: <span id="manualGrandTotal">۰</span> ریال</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="col-md-6">
                         <label class="form-label">شماره حواله / ارجاع اختیاری</label>
                         <input name="reference" class="form-control" value="{{ old('reference') }}" maxlength="100">
