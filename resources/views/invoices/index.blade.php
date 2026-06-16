@@ -118,7 +118,26 @@
               <td><span class="customer-cell" title="{{ $customerName }}">{{ $customerName }}</span></td><td>{{ $customerCode ?: '—' }}</td><td>{{ $inv->customer_mobile ?: $inv->customer?->mobile ?: '—' }}</td>
               <td class="money-cell">{{ $rial($inv->total) }}</td><td class="money-cell text-success">{{ $rial($paid) }}</td><td class="money-cell fw-bold {{ $remaining>0?'text-danger':'text-success' }}">{{ $rial($remaining) }}</td>
               <td><span class="badge {{ $payClass($paid,$inv->total) }}">{{ $payLabel($paid,$inv->total) }}</span></td><td><span class="badge {{ $statusBadge($inv->status) }}">{{ $statusFa($inv->status) }}</span></td><td><span class="customer-cell">{{ $inv->preinvoiceOrder?->creator?->name ?? '—' }}</span></td>
-              <td><div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">عملیات</button><ul class="dropdown-menu"><li><a class="dropdown-item" href="{{ route('invoices.show',$inv->uuid) }}">مشاهده جزئیات</a></li>@if(($canRegisterPayments ?? false)&&$remaining>0)<li><button type="button" class="dropdown-item js-open-payment" data-action="{{ route('invoices.payments.store',$inv->uuid) }}" data-invoice="{{ $inv->uuid }}" data-customer="{{ $customerName }}" data-remaining="{{ $remaining }}" data-remaining-label="{{ $rial($remaining) }}">ثبت پرداخت</button></li>@endif<li><a class="dropdown-item" href="{{ route('invoices.print',$inv->uuid) }}" target="_blank">چاپ فاکتور</a></li>@if($inv->customer_id)<li><a class="dropdown-item" href="{{ route('account-statements.show',$inv->customer_id) }}">گردش حساب مشتری</a></li>@endif@if($inv->preinvoiceOrder)<li><a class="dropdown-item" href="{{ route('archive.preinvoices.show',$inv->preinvoiceOrder->uuid) }}">پیش‌فاکتور مرتبط</a></li>@endif</ul></div></td>
+              <td>
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">عملیات</button>
+                  <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ route('invoices.show',$inv->uuid) }}">مشاهده جزئیات</a></li>
+                    @if(($canRegisterPayments ?? false)&&$remaining>0)
+                      <li>
+                        <button type="button" class="dropdown-item js-open-payment" data-action="{{ route('invoices.payments.store',$inv->uuid) }}" data-invoice="{{ $inv->uuid }}" data-customer="{{ $customerName }}" data-remaining="{{ $remaining }}" data-remaining-label="{{ $rial($remaining) }}">ثبت پرداخت</button>
+                      </li>
+                    @endif
+                    <li><a class="dropdown-item" href="{{ route('invoices.print',$inv->uuid) }}" target="_blank">چاپ فاکتور</a></li>
+                    @if($inv->customer_id)
+                      <li><a class="dropdown-item" href="{{ route('account-statements.show',$inv->customer_id) }}">گردش حساب مشتری</a></li>
+                    @endif
+                    @if($inv->preinvoiceOrder)
+                      <li><a class="dropdown-item" href="{{ route('archive.preinvoices.show',$inv->preinvoiceOrder->uuid) }}">پیش‌فاکتور مرتبط</a></li>
+                    @endif
+                  </ul>
+                </div>
+              </td>
             </tr>
           @empty <tr><td colspan="12" class="text-center text-muted py-4">هیچ فاکتوری با فیلترهای انتخاب‌شده یافت نشد.</td></tr>@endforelse
         </tbody>
@@ -130,7 +149,25 @@
   <div class="d-lg-none vstack gap-2">
     @forelse($invoices as $inv)
       @php $paid=(int)($inv->paid_total??0); $remaining=max((int)$inv->total-$paid,0); $customerName=$inv->customer_name ?: $inv->customer?->display_name ?: '—'; @endphp
-      <div class="invoice-mobile-card"><div class="d-flex justify-content-between gap-2 mb-2"><div class="fw-bold">{{ $customerName }}</div><span class="code-cell">{{ Str::limit($inv->uuid,12,'…') }}</span></div><div class="d-flex flex-wrap gap-2 mb-2"><span class="badge {{ $statusBadge($inv->status) }}">{{ $statusFa($inv->status) }}</span><span class="badge {{ $payClass($paid,$inv->total) }}">{{ $payLabel($paid,$inv->total) }}</span></div><div class="small text-muted d-flex justify-content-between"><span>مبلغ</span><strong>{{ $rial($inv->total) }}</strong></div><div class="small text-muted d-flex justify-content-between"><span>پرداخت‌شده</span><strong>{{ $rial($paid) }}</strong></div><div class="small text-muted d-flex justify-content-between"><span>مانده</span><strong class="{{ $remaining>0?'text-danger':'text-success' }}">{{ $rial($remaining) }}</strong></div><div class="dropdown mt-3"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">عملیات</button><ul class="dropdown-menu"><li><a class="dropdown-item" href="{{ route('invoices.show',$inv->uuid) }}">مشاهده جزئیات</a></li>@if(($canRegisterPayments ?? false)&&$remaining>0)<li><button type="button" class="dropdown-item js-open-payment" data-action="{{ route('invoices.payments.store',$inv->uuid) }}" data-invoice="{{ $inv->uuid }}" data-customer="{{ $customerName }}" data-remaining="{{ $remaining }}" data-remaining-label="{{ $rial($remaining) }}">ثبت پرداخت</button></li>@endif<li><a class="dropdown-item" href="{{ route('invoices.print',$inv->uuid) }}" target="_blank">چاپ فاکتور</a></li></ul></div></div>
+      <div class="invoice-mobile-card">
+        <div class="d-flex justify-content-between gap-2 mb-2"><div class="fw-bold">{{ $customerName }}</div><span class="code-cell">{{ Str::limit($inv->uuid,12,'…') }}</span></div>
+        <div class="d-flex flex-wrap gap-2 mb-2"><span class="badge {{ $statusBadge($inv->status) }}">{{ $statusFa($inv->status) }}</span><span class="badge {{ $payClass($paid,$inv->total) }}">{{ $payLabel($paid,$inv->total) }}</span></div>
+        <div class="small text-muted d-flex justify-content-between"><span>مبلغ</span><strong>{{ $rial($inv->total) }}</strong></div>
+        <div class="small text-muted d-flex justify-content-between"><span>پرداخت‌شده</span><strong>{{ $rial($paid) }}</strong></div>
+        <div class="small text-muted d-flex justify-content-between"><span>مانده</span><strong class="{{ $remaining>0?'text-danger':'text-success' }}">{{ $rial($remaining) }}</strong></div>
+        <div class="dropdown mt-3">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">عملیات</button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ route('invoices.show',$inv->uuid) }}">مشاهده جزئیات</a></li>
+            @if(($canRegisterPayments ?? false)&&$remaining>0)
+              <li>
+                <button type="button" class="dropdown-item js-open-payment" data-action="{{ route('invoices.payments.store',$inv->uuid) }}" data-invoice="{{ $inv->uuid }}" data-customer="{{ $customerName }}" data-remaining="{{ $remaining }}" data-remaining-label="{{ $rial($remaining) }}">ثبت پرداخت</button>
+              </li>
+            @endif
+            <li><a class="dropdown-item" href="{{ route('invoices.print',$inv->uuid) }}" target="_blank">چاپ فاکتور</a></li>
+          </ul>
+        </div>
+      </div>
     @empty <div class="invoice-mobile-card text-center text-muted">هیچ فاکتوری با فیلترهای انتخاب‌شده یافت نشد.</div>@endforelse
   </div>
 
@@ -206,7 +243,6 @@
     </div>
   </div>
 </div>
-@endif
 
 <script>
 (function(){
