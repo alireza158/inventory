@@ -27,11 +27,15 @@
   </div>
 
   <div class="d-flex gap-2 flex-wrap">
+    @canPermission('categories.create')
     <a class="btn btn-primary" href="{{ route('categories.create') }}">+ افزودن دسته‌بندی</a>
+    @endcanPermission
 
     <form method="POST" action="{{ route('categories.fixCodes') }}" onsubmit="return confirm('کد همه دسته‌ها ۲ رقمی یونیک شود؟');">
       @csrf
+      @canPermission('categories.edit')
       <button class="btn btn-outline-secondary">اصلاح کدها (۲ رقمی)</button>
+      @endcanPermission
     </form>
   </div>
 </div>

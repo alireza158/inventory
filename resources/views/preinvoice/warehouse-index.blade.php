@@ -45,6 +45,7 @@
               <td class="text-end">
                 <div class="d-flex gap-1 justify-content-end">
                   <a href="{{ route('preinvoice.warehouse.review', $order->uuid) }}" class="btn btn-sm btn-outline-primary">بررسی و تایید</a>
+                  <a href="{{ route('warehouse.reviews.show', $order->uuid) }}" class="btn btn-sm btn-outline-info">پرونده انبار</a>
                   <a href="{{ route('archive.preinvoices.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
                 </div>
               </td>

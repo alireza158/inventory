@@ -7,10 +7,12 @@
         <div class="text-muted small">لیست کاربران سینک‌شده از CRM و کاربران داخلی</div>
     </div>
 
+    @canPermission('users.sync')
     <form method="POST" action="{{ route('users.sync') }}">
         @csrf
         <button type="submit" class="btn btn-primary">🔄 همگام‌سازی با CRM</button>
     </form>
+    @endcanPermission
 </div>
 
 @if(session('sync_success'))

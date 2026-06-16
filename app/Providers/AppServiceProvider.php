@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use App\Models\Category;
 use App\Models\Cheque;
 use App\Models\Customer;
@@ -31,6 +33,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // موقتاً همه Gate/@can دسترسی‌ها آزاد هستند تا پس از تکمیل رول‌بندی حذف شود.
+        Gate::before(function ($user, $ability) {
+            return true;
+        });
+
         Product::observe(ActivityObserver::class);
         ProductVariant::observe(ActivityObserver::class);
         Category::observe(ActivityObserver::class);
@@ -49,5 +56,23 @@ class AppServiceProvider extends ServiceProvider
         WarehouseStock::observe(WarehouseStockObserver::class);
         StockMovement::observe(StockMovementObserver::class);
         Paginator::useBootstrapFive(); // یا useBootstrapFour()
+
+        Blade::if('canPermission', function (string $permission): bool {
+            return auth()->check() && auth()->user()->hasPermission($permission);
+        });
+
+        Blade::if('canAnyPermission', function (array|string $permissions): bool {
+            if (! auth()->check()) {
+                return false;
+            }
+
+            foreach ((array) $permissions as $permission) {
+                if (auth()->user()->hasPermission($permission)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
     }
 }

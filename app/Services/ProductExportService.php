@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -19,6 +20,19 @@ class ProductExportService
 
         return Product::query()
             ->with('category')
+            ->with(['variants' => function ($query) use ($warehouseId) {
+                $query->with(['modelList', 'color'])
+                    ->with(['warehouseStocks' => function ($stockQuery) use ($warehouseId) {
+                        $stockQuery->with('warehouse');
+
+                        if ($warehouseId) {
+                            $stockQuery->where('warehouse_id', (int) $warehouseId);
+                        }
+                    }])
+                    ->orderBy('variant_name')
+                    ->orderBy('variety_name')
+                    ->orderBy('id');
+            }])
             ->withSum(['warehouseStocks as export_stock' => function ($query) use ($warehouseId) {
                 if ($warehouseId) {
                     $query->where('warehouse_id', (int) $warehouseId);
@@ -32,7 +46,15 @@ class ProductExportService
                         ->orWhere('sku', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%")
                         ->orWhere('barcode', 'like', "%{$search}%")
-                        ->orWhere('short_barcode', 'like', "%{$search}%");
+                        ->orWhere('short_barcode', 'like', "%{$search}%")
+                        ->orWhereHas('variants', function (Builder $variantQuery) use ($search) {
+                            $variantQuery->where('variant_name', 'like', "%{$search}%")
+                                ->orWhere('variety_name', 'like', "%{$search}%")
+                                ->orWhere('sku', 'like', "%{$search}%")
+                                ->orWhere('barcode', 'like', "%{$search}%")
+                                ->orWhere('variant_code', 'like', "%{$search}%")
+                                ->orWhere('variety_code', 'like', "%{$search}%");
+                        });
                 });
             })
             ->orderBy('name');
@@ -68,6 +90,7 @@ class ProductExportService
             'id' => $product->id,
             'image_url' => $this->imageUrl($product),
             'pdf_image_src' => $this->pdfImageSrc($product),
+            'has_image' => $this->hasPdfImage($product),
             'name' => $product->name,
             'sku' => $product->sku ?: ($product->code ?: '—'),
             'category' => $product->category?->name ?: 'بدون دسته‌بندی',
@@ -78,6 +101,8 @@ class ProductExportService
             'updated_at' => optional($product->updated_at)->format('Y/m/d H:i'),
             'unit' => $product->unit ?: 'عدد',
             'barcode' => $product->barcode ?: ($product->short_barcode ?: ''),
+            'is_sellable' => (bool) ($product->is_sellable ?? true),
+            'variants' => $product->variants->map(fn (ProductVariant $variant) => $this->variantRow($variant, $product))->values()->all(),
         ];
     }
 
@@ -93,6 +118,7 @@ class ProductExportService
             'search' => $filters['search'] ?? '',
             'exported_at' => now()->format('Y/m/d H:i'),
             'store_name' => config('app.name', 'سامانه انبارداری'),
+            'low_stock_threshold' => self::LOW_STOCK_THRESHOLD,
         ];
     }
 
@@ -109,6 +135,11 @@ class ProductExportService
         }
 
         return $this->placeholderImage();
+    }
+
+    public function hasPdfImage(Product $product): bool
+    {
+        return (bool) $this->localImagePath($product) || $this->isRemoteImage($product->image_path);
     }
 
     public function pdfImageSrc(Product $product): string
@@ -164,6 +195,47 @@ class ProductExportService
     private function placeholderImage(): string
     {
         return 'data:image/png;base64,' . 'iVBORw0KGgoAAAANSUhEUgAAAFQAAABUCAYAAAAcaxDBAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAxUlEQVR4nO3QQQ3AIADAQMAJ/5yuwgOi8wKSpd1Z7z0AAAAAAAAAAAAAAAAAAAAAAAB8Z54H4GbEUYijEEchjkIchTgKcRTiKMTRiKMQRyGOQhyFOApxFOIoxNGIoxBHIY5CHIWE8c5zAF8rjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAK8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAG8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAP8WAAAAAAAAAAAAAAAAAAAAAAAArB2lJwKTe+Ve3wAAAABJRU5ErkJggg==';
+    }
+
+    public function variantRow(ProductVariant $variant, Product $product): array
+    {
+        $stock = $this->variantStock($variant);
+        $warehouseStocks = $variant->warehouseStocks->filter(fn ($stockRow) => (int) ($stockRow->quantity ?? 0) !== 0);
+
+        return [
+            'id' => $variant->id,
+            'name' => $this->variantName($variant),
+            'code' => $variant->sku ?: ($variant->variant_code ?: ($variant->variety_code ?: ($variant->barcode ?: '—'))),
+            'barcode' => $variant->barcode ?: '',
+            'stock' => $stock,
+            'unit' => $product->unit ?: 'عدد',
+            'price' => (int) ($variant->sell_price ?? $product->price ?? $product->sale_retail ?? 0),
+            'status' => $variant->is_active ? 'فعال' : 'غیرفعال',
+            'stock_status' => $this->stockStatus($stock),
+            'stock_status_class' => $this->stockStatusClass($stock),
+            'warehouse_stocks' => $warehouseStocks->map(fn ($stockRow) => [
+                'warehouse' => $stockRow->warehouse?->name ?: 'بدون انبار',
+                'quantity' => max(0, (int) ($stockRow->quantity ?? 0)),
+            ])->values()->all(),
+        ];
+    }
+
+    private function variantName(ProductVariant $variant): string
+    {
+        return $variant->variant_name
+            ?: $variant->variety_name
+            ?: $variant->color?->name
+            ?: $variant->modelList?->name
+            ?: 'تنوع بدون نام';
+    }
+
+    private function variantStock(ProductVariant $variant): int
+    {
+        if ($variant->relationLoaded('warehouseStocks') && $variant->warehouseStocks->isNotEmpty()) {
+            return max(0, (int) $variant->warehouseStocks->sum('quantity'));
+        }
+
+        return max(0, (int) ($variant->stock ?? 0));
     }
 
 
@@ -239,6 +311,10 @@ class ProductExportService
 
     public function stock(Product $product): int
     {
+        if ($product->relationLoaded('variants') && $product->variants->isNotEmpty()) {
+            return max(0, (int) $product->variants->sum(fn (ProductVariant $variant) => $this->variantStock($variant)));
+        }
+
         return max(0, (int) ($product->export_stock ?? $product->stock ?? 0));
     }
 
