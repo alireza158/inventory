@@ -97,6 +97,21 @@ class PreinvoiceOrder extends Model
         return $this->hasOne(Invoice::class, 'preinvoice_order_id');
     }
 
+    public function warehouseReviewSnapshots()
+    {
+        return $this->hasMany(WarehouseReviewSnapshot::class);
+    }
+
+    public function warehouseReviewLogs()
+    {
+        return $this->hasMany(WarehouseReviewLog::class);
+    }
+
+    public function warehouseReviewItemLogs()
+    {
+        return $this->hasMany(WarehouseReviewItemLog::class);
+    }
+
     public function activityLogs()
     {
         return $this->morphMany(ActivityLog::class, 'subject')->latest('occurred_at');
