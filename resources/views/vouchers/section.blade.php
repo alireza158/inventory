@@ -332,7 +332,9 @@
                         <th>مبدا</th>
                         <th>مقصد</th>
                         <th>کاربر</th>
+                        <th>نوع برگشت</th>
                         <th>فاکتور مرجع</th>
+                        <th>شماره سازه‌حساب</th>
                         <th>علت برگشت</th>
                         <th></th>
                     </tr>
@@ -346,7 +348,9 @@
                             <td>{{ $voucher->fromWarehouse?->name ?: '—' }}</td>
                             <td>{{ $voucher->toWarehouse?->name ?: '—' }}</td>
                             <td>{{ $voucher->user?->name ?: '—' }}</td>
+                            <td>{{ \App\Models\WarehouseTransfer::returnSourceLabel($voucher->return_type ?? null) }}</td>
                             <td>{{ $voucher->relatedInvoice?->uuid ?: '—' }}</td>
+                            <td>{{ $voucher->external_invoice_number ?: '—' }}</td>
                             <td>{{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}</td>
                             <td>
                                 <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.edit', $voucher) }}">ویرایش</a>
@@ -359,7 +363,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-4 text-muted">موردی ثبت نشده است.</td>
+                            <td colspan="11" class="text-center py-4 text-muted">موردی ثبت نشده است.</td>
                         </tr>
                     @endforelse
                     </tbody>
