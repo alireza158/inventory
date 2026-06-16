@@ -13,7 +13,7 @@
 
     $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'finance.cheques.*');
 
-    $configActive = $isRoute('shipping-methods.*', 'users.*', 'activity-logs.*', 'inventory-webhooks.*');
+    $configActive = $isRoute('shipping-methods.*', 'users.*', 'admin.permissions.*', 'activity-logs.*', 'inventory-webhooks.*');
 
     $initialOpenSection = match (true) {
         $productsActive => 'products',
@@ -194,10 +194,12 @@
         </div>
 
         {{-- Dashboard (no submenu) --}}
+        @canPermission('dashboard.view')
         <a class="sidebar-section-title sidebar-section-link {{ $isRoute('dashboard') ? 'is-active' : '' }}"
            href="{{ route('dashboard') }}">
             <span>داشبورد</span>
         </a>
+        @endcanPermission
 
 
         {{-- Products --}}
@@ -213,10 +215,16 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
+                    @canPermission('products.view')
                     <a class="sidebar-sublink {{ $is('products.index') }}" href="{{ route('products.index') }}">نمایش کالاها</a>
+                    @endcanPermission
                 
+                    @canPermission('categories.view')
                     <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
+                    @endcanPermission
+                    @canPermission('products.view')
                     <a class="sidebar-sublink {{ $is('admin.product-exports.*') }}" href="{{ route('admin.product-exports.index') }}">خروجی محصولات</a>
+                    @endcanPermission
                         @if($hasRole(['admin', 'Admin', 'Manager', 'manager', 'warehouse', 'StorageUser', 'StorageManager']))
                     <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست</a>
                     <a class="sidebar-sublink {{ $is('product-deactivation-documents.*') }}" href="{{ route('product-deactivation-documents.index') }}">غیرفعال‌سازی کالا</a>
@@ -239,14 +247,26 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
+                    @canPermission('products.create')
                     <a class="sidebar-sublink {{ $is('products.create') }}" href="{{ route('products.create') }}">افزودن کالا</a>
+                    @endcanPermission
+                    @canPermission('stock_in.view')
                     <a class="sidebar-sublink {{ $is('purchases.index', 'purchases.show', 'purchases.edit') }}" href="{{ route('purchases.index') }}">لیست خرید کالاها</a>
+                    @endcanPermission
+                    @canPermission('stock_in.view')
                     <a class="sidebar-sublink {{ $is('purchases.create') }}" href="{{ route('purchases.create') }}">ثبت خرید کالا</a>
+                    @endcanPermission
                     <a class="sidebar-sublink {{ $is('preinvoice.warehouse.*') }}" href="{{ route('preinvoice.warehouse.index') }}">در انتظار تایید انبار</a>
+                    @canPermission('issues.view')
                     <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
+                    @endcanPermission
+                    @canPermission('inventory.view')
                     <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
+                    @endcanPermission
                     <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
+                    @canPermission('inventory.view')
                     <a class="sidebar-sublink {{ $is('warehouse-map.*') }}" href="{{ route('warehouse-map.index') }}">نقشه انبار</a>
+                    @endcanPermission
                 </div>
             </div>
         </div>
@@ -268,7 +288,9 @@
                     <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
                     <a class="sidebar-sublink {{ $is('preinvoice.my.*') }}" href="{{ route('preinvoice.my.index') }}">پیش‌فاکتورهای من</a>
                     @if($hasRole(['admin', 'Admin', 'finance', 'Accountant']))
+                        @canPermission('customers.view')
                         <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
+                        @endcanPermission
                     @endif
                 </div>
             </div>
@@ -312,7 +334,12 @@
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
                     <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
+                    @canPermission('users.view')
                     <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
+                    @endcanPermission
+                    @canPermission('permissions.view')
+                    <a class="sidebar-sublink {{ $is('admin.permissions.*') }}" href="{{ route('admin.permissions.index') }}">مدیریت دسترسی کاربران</a>
+                    @endcanPermission
                     <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
                     <a class="sidebar-sublink {{ $is('inventory-webhooks.*') }}" href="{{ route('inventory-webhooks.index') }}">مدیریت API موجودی/قیمت</a>
                 </div>
