@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -74,5 +75,24 @@ class User extends Authenticatable
     public function manager(): BelongsTo
     {
         return $this->belongsTo(self::class, 'manager_id');
+    }
+
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(AccessPermission::class, 'user_permissions', 'user_id', 'permission_id')
+            ->withTimestamps();
+    }
+
+    public function hasPermission(string $key): bool
+    {
+        if ($this->hasAnyRole(['admin', 'Admin', 'ادمین'])) {
+            return true;
+        }
+
+        if ($this->relationLoaded('permissions')) {
+            return $this->permissions->contains('key', $key);
+        }
+
+        return $this->permissions()->where('key', $key)->exists();
     }
 }

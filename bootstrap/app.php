@@ -4,7 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\ConvertRialCurrencyInputs;
-use Spatie\Permission\Middleware\PermissionMiddleware;
+use App\Http\Middleware\CheckPermission;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
@@ -19,7 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => RoleMiddleware::class,
-            'permission' => PermissionMiddleware::class,
+            'permission' => CheckPermission::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
     })

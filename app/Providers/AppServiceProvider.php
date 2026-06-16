@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Blade;
 use App\Models\Category;
 use App\Models\Cheque;
 use App\Models\Customer;
@@ -49,5 +50,9 @@ class AppServiceProvider extends ServiceProvider
         WarehouseStock::observe(WarehouseStockObserver::class);
         StockMovement::observe(StockMovementObserver::class);
         Paginator::useBootstrapFive(); // یا useBootstrapFour()
+
+        Blade::if('canPermission', function (string $permission): bool {
+            return auth()->check() && auth()->user()->hasPermission($permission);
+        });
     }
 }
