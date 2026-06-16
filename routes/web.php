@@ -154,7 +154,7 @@ Route::get('/vouchers/{voucher}', [VoucherController::class, 'show'])->name('vou
 Route::get('/vouchers/{voucher}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
 Route::put('/vouchers/{voucher}', [VoucherController::class, 'update'])->name('vouchers.update');
 Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
-    Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->name('warehouse.outputs');
+    Route::get('/warehouse-outputs', [VoucherController::class, 'outputs'])->middleware('permission:stock.out')->name('warehouse.outputs');
 
     // Asset trustee module (امین اموال)
     Route::prefix('warehouse/asset-trustee')->name('asset.')->group(function () {
@@ -223,11 +223,11 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/warehouses/{warehouse}/personnel/{personnel}', [WarehouseController::class, 'personnelShow'])->name('warehouses.personnel.show');
 
     // Purchases
-    Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');
+    Route::get('/purchases', [PurchaseController::class, 'index'])->middleware('permission:stock.in')->name('purchases.index');
     Route::get('/purchases/export', [PurchaseController::class, 'exportExcel'])->name('purchases.export');
-    Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
+    Route::get('/purchases/create', [PurchaseController::class, 'create'])->middleware('permission:stock.in')->name('purchases.create');
     Route::get('/purchases/products/{product}/variants', [PurchaseController::class, 'productVariants'])->name('purchases.products.variants');
-    Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
+    Route::post('/purchases', [PurchaseController::class, 'store'])->middleware('permission:stock.in')->name('purchases.store');
     Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show');
     Route::get('/purchases/{purchase}/edit', [PurchaseController::class, 'edit'])->name('purchases.edit');
     Route::put('/purchases/{purchase}', [PurchaseController::class, 'update'])->name('purchases.update');
@@ -238,8 +238,8 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::post('/persons', [PersonController::class, 'store'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.store');
 
     // Suppliers
-    Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
-    Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+    Route::get('/suppliers', [SupplierController::class, 'index'])->middleware('permission:suppliers.manage')->name('suppliers.index');
+    Route::post('/suppliers', [SupplierController::class, 'store'])->middleware('permission:suppliers.manage')->name('suppliers.store');
 
     // Stocktake / Stock Count Documents
     Route::get('/stocktake', [StocktakeController::class, 'index'])->middleware('permission:inventory.view')->name('stocktake.index');
@@ -286,8 +286,8 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     });
 
     // Customers
-    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
-    Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+    Route::get('/customers', [CustomerController::class, 'index'])->middleware('permission:customers.manage')->name('customers.index');
+    Route::post('/customers', [CustomerController::class, 'store'])->middleware('permission:customers.manage')->name('customers.store');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
 
