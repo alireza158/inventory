@@ -76,7 +76,7 @@ class ProductExportController extends Controller
             ])->render();
 
             $options = new \Dompdf\Options();
-            $options->set('defaultFont', 'DejaVu Sans');
+            $options->set('defaultFont', 'Vazirmatn');
             $options->set('isRemoteEnabled', true);
             $options->set('isHtml5ParserEnabled', true);
             $options->set('tempDir', storage_path('app/dompdf-temp'));
@@ -91,7 +91,7 @@ class ProductExportController extends Controller
 
             $dompdf = new \Dompdf\Dompdf($options);
             $dompdf->loadHtml($html, 'UTF-8');
-            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
 
             return response($dompdf->output(), 200, [
