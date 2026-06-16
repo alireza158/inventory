@@ -50,12 +50,16 @@
         </div>
 
         <div class="d-flex gap-1 cat-actions">
+          @canPermission('categories.edit')
           <a class="btn btn-sm btn-outline-secondary" href="{{ route('categories.edit', $cat) }}">ویرایش</a>
+          @endcanPermission
+          @canPermission('categories.delete')
           <form method="POST" action="{{ route('categories.destroy', $cat) }}" onsubmit="return confirm('حذف شود؟')">
             @csrf
             @method('DELETE')
             <button class="btn btn-sm btn-outline-danger">حذف</button>
           </form>
+          @endcanPermission
         </div>
       </div>
 
