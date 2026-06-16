@@ -437,25 +437,34 @@
 
 @php
     $manualReturnProducts = $products->map(function ($product) {
+        $variants = collect($product->variants ?? []);
+
         return [
             'id' => (int) $product->id,
             'name' => (string) ($product->name ?? ''),
             'code' => (string) ($product->code ?? $product->sku ?? $product->barcode ?? $product->short_barcode ?? ''),
             'barcode' => (string) ($product->barcode ?? $product->short_barcode ?? ''),
+            'sale_price' => (int) ($product->price ?? $product->sale_retail ?? $product->sale_wholesale ?? 0),
             'price' => (int) ($product->price ?? $product->sale_retail ?? $product->sale_wholesale ?? 0),
-            'variants' => $product->variants->map(function ($variant) {
+            'variants' => $variants->map(function ($variant) {
                 $variantName = $variant->variant_name
-                    ?? $variant->variety_name
-                    ?? $variant->name
-                    ?? 'تنوع عمومی';
+                    ?: ($variant->variety_name
+                    ?: ($variant->name
+                    ?: ($variant->title ?: 'تنوع عمومی')));
+                $variantCode = $variant->variant_code
+                    ?: ($variant->sku
+                    ?: ($variant->barcode
+                    ?: ($variant->variety_code ?: '')));
+                $salePrice = (int) ($variant->sell_price ?? $variant->price ?? 0);
 
                 return [
                     'id' => (int) $variant->id,
                     'product_id' => (int) $variant->product_id,
                     'name' => (string) $variantName,
-                    'code' => (string) ($variant->variant_code ?? $variant->sku ?? $variant->barcode ?? $variant->variety_code ?? ''),
+                    'code' => (string) $variantCode,
                     'barcode' => (string) ($variant->barcode ?? ''),
-                    'price' => (int) ($variant->sell_price ?? $variant->price ?? 0),
+                    'sale_price' => $salePrice,
+                    'price' => $salePrice,
                 ];
             })->values(),
         ];
@@ -975,6 +984,52 @@ document.addEventListener('DOMContentLoaded', function () {
         }).join('');
     }
 
+
+    function destroySelect2(select) {
+        if (window.jQuery && jQuery.fn && jQuery(select).data('select2')) {
+            jQuery(select).select2('destroy');
+        }
+    }
+
+    function selectedProduct(productId) {
+        return products.find(function (p) { return String(p.id) === String(productId); }) || null;
+    }
+
+    function fillVariantSelect(tr, productId, selectedVariantId = '') {
+        const variantSelect = tr.querySelector('.manual-variant');
+        const product = selectedProduct(productId);
+
+        destroySelect2(variantSelect);
+        variantSelect.innerHTML = '';
+        variantSelect.disabled = false;
+
+        if (!product) {
+            variantSelect.innerHTML = '<option value="">ابتدا کالا...</option>';
+            initManualSelect(variantSelect);
+            return;
+        }
+
+        const variants = Array.isArray(product.variants) ? product.variants : [];
+
+        if (!variants.length) {
+            variantSelect.disabled = true;
+            variantSelect.innerHTML = '<option value="">این کالا تنوعی ندارد</option>';
+            initManualSelect(variantSelect);
+            return;
+        }
+
+        variantSelect.innerHTML = variantOptions(product.id, selectedVariantId);
+
+        if (variants.length === 1 && !selectedVariantId) {
+            variantSelect.value = String(variants[0].id);
+        }
+
+        initManualSelect(variantSelect);
+        if (window.jQuery && jQuery.fn) {
+            jQuery(variantSelect).trigger('change.select2');
+        }
+    }
+
     function parseMoney(value) {
         return Number(normalizeDigits(value)
             .replace(/[٬,،\s]/g, '')
@@ -989,28 +1044,30 @@ document.addEventListener('DOMContentLoaded', function () {
         return raw;
     }
 
-    function initManualSelects(tr) {
+    function initManualSelect(select) {
         if (!window.jQuery || !jQuery.fn || !jQuery.fn.select2) {
             return;
         }
 
-        jQuery(tr).find('.manual-product,.manual-variant').each(function () {
-            const $select = jQuery(this);
-            if ($select.data('select2')) {
-                $select.select2('destroy');
-            }
+        const $select = jQuery(select);
+        if ($select.data('select2')) {
+            $select.select2('destroy');
+        }
 
-            $select.select2({
-                dir: 'rtl',
-                width: '100%',
-                matcher: manualSelectMatcher,
-                placeholder: $select.hasClass('manual-product') ? 'جستجوی کالا...' : 'جستجوی تنوع...',
-                language: {
-                    noResults: function () { return 'موردی پیدا نشد'; },
-                    searching: function () { return 'در حال جستجو...'; }
-                }
-            });
+        $select.select2({
+            dir: 'rtl',
+            width: '100%',
+            matcher: manualSelectMatcher,
+            placeholder: $select.hasClass('manual-product') ? 'جستجوی کالا...' : 'جستجوی تنوع...',
+            language: {
+                noResults: function () { return 'موردی پیدا نشد'; },
+                searching: function () { return 'در حال جستجو...'; }
+            }
         });
+    }
+
+    function initManualSelects(tr) {
+        tr.querySelectorAll('.manual-product,.manual-variant').forEach(initManualSelect);
     }
 
     function recalcManualTotals() {
@@ -1060,18 +1117,22 @@ document.addEventListener('DOMContentLoaded', function () {
             recalcManualTotals();
         }
 
-        productSelect.addEventListener('change', function () {
-            if (window.jQuery && jQuery.fn && jQuery(variantSelect).data('select2')) {
-                jQuery(variantSelect).select2('destroy');
-            }
-            variantSelect.innerHTML = variantOptions(productSelect.value, '');
-            if (variantSelect.options.length === 2) {
-                variantSelect.selectedIndex = 1;
-            }
-            initManualSelects(tr);
+        function onProductChanged() {
+            fillVariantSelect(tr, productSelect.value);
             refreshVariantMeta(true);
-        });
-        variantSelect.addEventListener('change', function () { refreshVariantMeta(true); });
+        }
+
+        function onVariantChanged() {
+            refreshVariantMeta(true);
+        }
+
+        if (window.jQuery && jQuery.fn) {
+            jQuery(productSelect).on('change', onProductChanged);
+            jQuery(variantSelect).on('change', onVariantChanged);
+        } else {
+            productSelect.addEventListener('change', onProductChanged);
+            variantSelect.addEventListener('change', onVariantChanged);
+        }
         tr.querySelector('.manual-qty').addEventListener('input', recalcManualTotals);
         priceDisplayInput.addEventListener('input', function () {
             const raw = parseMoney(priceDisplayInput.value);
@@ -1087,9 +1148,7 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.remove();
             recalcManualTotals();
         });
-        if (variantSelect.options.length === 2 && !rowData.variant_id) {
-            variantSelect.selectedIndex = 1;
-        }
+        fillVariantSelect(tr, productSelect.value, rowData.variant_id || '');
         initManualSelects(tr);
         refreshVariantMeta(false);
     }

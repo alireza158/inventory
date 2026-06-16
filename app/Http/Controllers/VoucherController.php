@@ -432,7 +432,7 @@ class VoucherController extends Controller
                 ->exists();
 
             if (!$validVariant) {
-                abort(422, 'ردیف ' . ($index + 1) . ': تنوع انتخابی برای محصول معتبر نیست.');
+                abort(422, 'ردیف ' . ($index + 1) . ': تنوع انتخاب‌شده متعلق به این کالا نیست.');
             }
 
             $key = ((int) $row['product_id']) . ':' . ((int) $row['variant_id']);
