@@ -208,6 +208,26 @@
 
                 <input type="hidden" name="related_invoice_uuid" id="relatedInvoiceUuid" value="{{ old('related_invoice_uuid') }}">
 
+                <div class="row g-3 mb-1">
+                    <div class="col-lg-4">
+                        <label class="form-label">نوع برگشت از فروش</label>
+                        <select name="return_type" id="returnTypeSelect" class="form-select" required>
+                            <option value="internal_invoice" @selected(old('return_type', 'internal_invoice') === 'internal_invoice')>بر اساس فاکتور داخلی</option>
+                            <option value="external_manual" @selected(old('return_type') === 'external_manual')>بدون فاکتور داخلی / فاکتور سازه‌حساب</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-4 d-none" id="externalInvoiceWrap">
+                        <label class="form-label">شماره فاکتور سازه‌حساب</label>
+                        <input name="external_invoice_number" id="externalInvoiceNumber" class="form-control" value="{{ old('external_invoice_number') }}" maxlength="100">
+                        <div class="form-text">برای مرجوعی‌هایی که فاکتورشان در نرم‌افزار قبلی ثبت شده است.</div>
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label">انبار مقصد خودکار</label>
+                        <input class="form-control" value="{{ $returnsWarehouse->name }}" readonly>
+                        <input type="hidden" name="to_warehouse_id" id="warehouseSelect" value="{{ $returnsWarehouse->id }}">
+                    </div>
+                </div>
+
                 <div class="row g-3">
                     <div class="col-lg-4">
                         <label class="form-label">مشتری</label>
@@ -240,24 +260,12 @@
                         <div class="form-text">Select2 فعال است؛ با اسم، فامیل، موبایل یا ID مشتری جستجو کن.</div>
                     </div>
 
-                    <div class="col-lg-4">
+                    <div class="col-lg-4" id="invoicePickerWrap">
                         <label class="form-label">فاکتور مشتری</label>
                         <button type="button" class="btn btn-outline-primary w-100" id="openInvoiceModalBtn" disabled>
                             انتخاب فاکتور
                         </button>
                         <div class="form-text">بعد از انتخاب مشتری، این دکمه فعال می‌شود.</div>
-                    </div>
-
-                    <div class="col-lg-4">
-                        <label class="form-label">انبار مقصد برگشت</label>
-                        <select name="to_warehouse_id" id="warehouseSelect" class="form-select" required>
-                            <option value="">انتخاب انبار...</option>
-                            @foreach($warehouses as $warehouse)
-                                <option value="{{ $warehouse->id }}" @selected(old('to_warehouse_id') == $warehouse->id)>
-                                    {{ $warehouse->name }}
-                                </option>
-                            @endforeach
-                        </select>
                     </div>
 
                     <div class="col-md-4">
@@ -347,6 +355,33 @@
                         </div>
                     </div>
 
+
+                    <div class="col-12 d-none" id="manualItemsSection">
+                        <div class="card-soft">
+                            <div class="section-head">
+                                <div>
+                                    <div class="section-title">کالاهای مرجوعی دستی / سازه‌حساب</div>
+                                    <div class="muted">کالا و تنوع را از محصولات تعریف‌شده انتخاب کن؛ مبلغ هر ردیف از عدد واردشده محاسبه می‌شود.</div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addManualItemBtn">افزودن کالا</button>
+                            </div>
+                            <div class="p-3">
+                                <div class="table-responsive">
+                                    <table class="table table-striped line-table" id="manualItemsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>کالا</th><th>تنوع</th><th>کد / بارکد</th><th>تعداد</th><th>مبلغ واحد</th><th>مبلغ کل</th><th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                                <div class="empty-state d-none" id="manualItemsEmptyState">حداقل یک کالای مرجوعی دستی باید اضافه شود.</div>
+                                <div class="text-start fw-bold mt-2">جمع کل مرجوعی: <span id="manualGrandTotal">۰</span> ریال</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="col-md-6">
                         <label class="form-label">شماره حواله / ارجاع اختیاری</label>
                         <input name="reference" class="form-control" value="{{ old('reference') }}" maxlength="100">
@@ -400,11 +435,56 @@
     </div>
 </div>
 
+@php
+    $manualReturnProducts = $products->map(function ($product) {
+        $variants = collect($product->variants ?? []);
+
+        return [
+            'id' => (int) $product->id,
+            'name' => (string) ($product->name ?? ''),
+            'code' => (string) ($product->code ?? $product->sku ?? $product->barcode ?? $product->short_barcode ?? ''),
+            'barcode' => (string) ($product->barcode ?? $product->short_barcode ?? ''),
+            'sale_price' => (int) ($product->price ?? $product->sale_retail ?? $product->sale_wholesale ?? 0),
+            'price' => (int) ($product->price ?? $product->sale_retail ?? $product->sale_wholesale ?? 0),
+            'variants' => $variants->map(function ($variant) {
+                $variantName = $variant->variant_name
+                    ?: ($variant->variety_name
+                    ?: ($variant->name
+                    ?: ($variant->title ?: 'تنوع عمومی')));
+                $variantCode = $variant->variant_code
+                    ?: ($variant->sku
+                    ?: ($variant->barcode
+                    ?: ($variant->variety_code ?: '')));
+                $salePrice = (int) ($variant->sell_price ?? $variant->price ?? 0);
+
+                return [
+                    'id' => (int) $variant->id,
+                    'product_id' => (int) $variant->product_id,
+                    'name' => (string) $variantName,
+                    'code' => (string) $variantCode,
+                    'barcode' => (string) ($variant->barcode ?? ''),
+                    'sale_price' => $salePrice,
+                    'price' => $salePrice,
+                ];
+            })->values(),
+        ];
+    })->values();
+@endphp
+
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const returnTypeSelect = document.getElementById('returnTypeSelect');
+    const externalInvoiceWrap = document.getElementById('externalInvoiceWrap');
+    const externalInvoiceNumber = document.getElementById('externalInvoiceNumber');
+    const invoicePickerWrap = document.getElementById('invoicePickerWrap');
+    const manualItemsSection = document.getElementById('manualItemsSection');
+    const manualTbody = document.querySelector('#manualItemsTable tbody');
+    const addManualItemBtn = document.getElementById('addManualItemBtn');
+    const manualGrandTotal = document.getElementById('manualGrandTotal');
+    const manualItemsEmptyState = document.getElementById('manualItemsEmptyState');
     const customerSelect = document.getElementById('customerSelect');
     const warehouseSelect = document.getElementById('warehouseSelect');
     const returnReasonSelect = document.getElementById('returnReasonSelect');
@@ -435,6 +515,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const oldRelatedInvoiceUuid = @json(old('related_invoice_uuid'));
     const oldItems = @json(old('items', []));
+    const products = @json($manualReturnProducts);
 
     let customerInvoices = [];
     let selectedInvoice = null;
@@ -867,10 +948,245 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+
+    function isManualReturn() {
+        return returnTypeSelect.value === 'external_manual';
+    }
+
+    function selectSearchText(option, fallbackText) {
+        return normalizeDigits(((option && option.getAttribute('data-search')) || '') + ' ' + (fallbackText || '')).toLowerCase();
+    }
+
+    function manualSelectMatcher(params, data) {
+        const term = normalizeDigits(jQuery.trim(params.term || '')).toLowerCase();
+        if (!term) return data;
+        if (!data.element) return null;
+
+        return selectSearchText(data.element, data.text).includes(term) ? data : null;
+    }
+
+    function productOptions(selected) {
+        return '<option value="">انتخاب کالا...</option>' + products.map(function (p) {
+            const variantsSearch = (p.variants || []).map(function (v) {
+                return [v.name || '', v.code || '', v.barcode || ''].join(' ');
+            }).join(' ');
+            const search = [p.name || '', p.code || '', p.barcode || '', variantsSearch].join(' ');
+            return `<option value="${escapeHtml(p.id)}" data-search="${escapeHtml(search)}" ${String(selected || '') === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}${p.code ? ' (' + escapeHtml(p.code) + ')' : ''}</option>`;
+        }).join('');
+    }
+
+    function variantOptions(productId, selected) {
+        const product = products.find(function (p) { return String(p.id) === String(productId); });
+        if (!product) return '<option value="">ابتدا کالا...</option>';
+        return '<option value="">انتخاب تنوع...</option>' + (product.variants || []).map(function (v) {
+            const search = [v.name || '', v.code || '', v.barcode || '', product.name || '', product.code || ''].join(' ');
+            return `<option value="${escapeHtml(v.id)}" data-search="${escapeHtml(search)}" data-code="${escapeHtml(v.code || v.barcode || product.code || product.barcode || '')}" data-price="${escapeHtml(v.price || product.price || 0)}" ${String(selected || '') === String(v.id) ? 'selected' : ''}>${escapeHtml(v.name)}${v.code ? ' [' + escapeHtml(v.code) + ']' : ''}</option>`;
+        }).join('');
+    }
+
+
+    function destroySelect2(select) {
+        if (window.jQuery && jQuery.fn && jQuery(select).data('select2')) {
+            jQuery(select).select2('destroy');
+        }
+    }
+
+    function selectedProduct(productId) {
+        return products.find(function (p) { return String(p.id) === String(productId); }) || null;
+    }
+
+    function fillVariantSelect(tr, productId, selectedVariantId = '') {
+        const variantSelect = tr.querySelector('.manual-variant');
+        const product = selectedProduct(productId);
+
+        destroySelect2(variantSelect);
+        variantSelect.innerHTML = '';
+        variantSelect.disabled = false;
+
+        if (!product) {
+            variantSelect.innerHTML = '<option value="">ابتدا کالا...</option>';
+            initManualSelect(variantSelect);
+            return;
+        }
+
+        const variants = Array.isArray(product.variants) ? product.variants : [];
+
+        if (!variants.length) {
+            variantSelect.disabled = true;
+            variantSelect.innerHTML = '<option value="">این کالا تنوعی ندارد</option>';
+            initManualSelect(variantSelect);
+            return;
+        }
+
+        variantSelect.innerHTML = variantOptions(product.id, selectedVariantId);
+
+        if (variants.length === 1 && !selectedVariantId) {
+            variantSelect.value = String(variants[0].id);
+        }
+
+        initManualSelect(variantSelect);
+        if (window.jQuery && jQuery.fn) {
+            jQuery(variantSelect).trigger('change.select2');
+        }
+    }
+
+    function parseMoney(value) {
+        return Number(normalizeDigits(value)
+            .replace(/[٬,،\s]/g, '')
+            .replace(/[^0-9]/g, '') || 0);
+    }
+
+    function syncMoneyRaw(row) {
+        const displayInput = row.querySelector('.manual-price-display');
+        const rawInput = row.querySelector('.manual-price');
+        const raw = parseMoney(displayInput?.value || '');
+        if (rawInput) rawInput.value = String(raw);
+        return raw;
+    }
+
+    function initManualSelect(select) {
+        if (!window.jQuery || !jQuery.fn || !jQuery.fn.select2) {
+            return;
+        }
+
+        const $select = jQuery(select);
+        if ($select.data('select2')) {
+            $select.select2('destroy');
+        }
+
+        $select.select2({
+            dir: 'rtl',
+            width: '100%',
+            matcher: manualSelectMatcher,
+            placeholder: $select.hasClass('manual-product') ? 'جستجوی کالا...' : 'جستجوی تنوع...',
+            language: {
+                noResults: function () { return 'موردی پیدا نشد'; },
+                searching: function () { return 'در حال جستجو...'; }
+            }
+        });
+    }
+
+    function initManualSelects(tr) {
+        tr.querySelectorAll('.manual-product,.manual-variant').forEach(initManualSelect);
+    }
+
+    function recalcManualTotals() {
+        let total = 0;
+        manualTbody.querySelectorAll('tr').forEach(function (tr) {
+            const qty = Number(tr.querySelector('.manual-qty')?.value || 0);
+            const price = syncMoneyRaw(tr);
+            const line = Math.max(qty, 0) * Math.max(price, 0);
+            tr.querySelector('.manual-line-total').textContent = toMoney(line) + ' ریال';
+            total += line;
+        });
+        manualGrandTotal.textContent = toMoney(total);
+        manualItemsEmptyState.classList.toggle('d-none', manualTbody.querySelectorAll('tr').length > 0);
+    }
+
+    function addManualRow(rowData = {}) {
+        const index = Date.now() + manualTbody.children.length;
+        const unitPrice = Number(rowData.unit_price || 0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><select name="items[${index}][product_id]" class="form-select manual-product" required>${productOptions(rowData.product_id)}</select></td>
+            <td><select name="items[${index}][variant_id]" class="form-select manual-variant" required>${variantOptions(rowData.product_id, rowData.variant_id)}</select></td>
+            <td><span class="mono manual-code">—</span></td>
+            <td><input name="items[${index}][quantity]" type="number" min="1" class="form-control manual-qty" value="${escapeHtml(rowData.quantity || 1)}" required></td>
+            <td>
+                <input type="text" inputmode="numeric" autocomplete="off" class="form-control manual-price-display" value="${escapeHtml(unitPrice.toLocaleString('en-US'))}">
+                <input type="hidden" name="items[${index}][unit_price]" class="manual-price" value="${escapeHtml(unitPrice)}">
+            </td>
+            <td><span class="manual-line-total">۰ ریال</span></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger manual-remove">حذف</button></td>
+        `;
+        manualTbody.appendChild(tr);
+
+        const productSelect = tr.querySelector('.manual-product');
+        const variantSelect = tr.querySelector('.manual-variant');
+        const priceDisplayInput = tr.querySelector('.manual-price-display');
+        const codeEl = tr.querySelector('.manual-code');
+
+        function refreshVariantMeta(applySuggestedPrice) {
+            const product = products.find(function (p) { return String(p.id) === String(productSelect.value); });
+            const option = variantSelect.selectedOptions[0];
+            codeEl.textContent = option?.dataset?.code || product?.code || product?.barcode || '—';
+            if (applySuggestedPrice && option?.dataset?.price !== undefined) {
+                const suggested = Number(option.dataset.price || product?.price || 0);
+                priceDisplayInput.value = suggested.toLocaleString('en-US');
+            }
+            recalcManualTotals();
+        }
+
+        function onProductChanged() {
+            fillVariantSelect(tr, productSelect.value);
+            refreshVariantMeta(true);
+        }
+
+        function onVariantChanged() {
+            refreshVariantMeta(true);
+        }
+
+        if (window.jQuery && jQuery.fn) {
+            jQuery(productSelect).on('change', onProductChanged);
+            jQuery(variantSelect).on('change', onVariantChanged);
+        } else {
+            productSelect.addEventListener('change', onProductChanged);
+            variantSelect.addEventListener('change', onVariantChanged);
+        }
+        tr.querySelector('.manual-qty').addEventListener('input', recalcManualTotals);
+        priceDisplayInput.addEventListener('input', function () {
+            const raw = parseMoney(priceDisplayInput.value);
+            priceDisplayInput.value = priceDisplayInput.value.trim() === '' ? '' : raw.toLocaleString('en-US');
+            recalcManualTotals();
+        });
+        tr.querySelector('.manual-remove').addEventListener('click', function () {
+            if (window.jQuery && jQuery.fn) {
+                jQuery(tr).find('.manual-product,.manual-variant').each(function () {
+                    if (jQuery(this).data('select2')) jQuery(this).select2('destroy');
+                });
+            }
+            tr.remove();
+            recalcManualTotals();
+        });
+        fillVariantSelect(tr, productSelect.value, rowData.variant_id || '');
+        initManualSelects(tr);
+        refreshVariantMeta(false);
+    }
+
+    function toggleReturnMode() {
+        const manual = isManualReturn();
+        externalInvoiceWrap.classList.toggle('d-none', !manual);
+        externalInvoiceNumber.required = manual;
+        invoicePickerWrap.classList.toggle('d-none', manual);
+        selectedInvoiceBox.classList.toggle('d-none', manual || !relatedInvoiceUuid.value);
+        invoiceEmptyBox.classList.toggle('d-none', manual || !!relatedInvoiceUuid.value);
+        itemsSection.classList.toggle('d-none', manual || !relatedInvoiceUuid.value);
+        manualItemsSection.classList.toggle('d-none', !manual);
+        if (manual) {
+            relatedInvoiceUuid.value = '';
+            tbody.innerHTML = '';
+            openInvoiceModalBtn.disabled = true;
+            if (!manualTbody.children.length) addManualRow();
+        } else {
+            openInvoiceModalBtn.disabled = !customerSelect.value;
+            manualTbody.innerHTML = '';
+            recalcManualTotals();
+        }
+    }
+
     customerSelect.addEventListener('change', function () {
-        resetInvoiceSelection();
-        openInvoiceModalBtn.disabled = !customerSelect.value;
+        if (!isManualReturn()) {
+            resetInvoiceSelection();
+            openInvoiceModalBtn.disabled = !customerSelect.value;
+        }
     });
+
+    returnTypeSelect.addEventListener('change', function () {
+        resetInvoiceSelection();
+        toggleReturnMode();
+    });
+
+    addManualItemBtn.addEventListener('click', function () { addManualRow(); });
 
     openInvoiceModalBtn.addEventListener('click', function () {
         if (!customerSelect.value) {
@@ -918,9 +1234,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (!relatedInvoiceUuid.value) {
+        if (!isManualReturn() && !relatedInvoiceUuid.value) {
             event.preventDefault();
             alert('لطفاً فاکتور مشتری را انتخاب کنید.');
+            return;
+        }
+
+        if (isManualReturn() && !externalInvoiceNumber.value.trim()) {
+            event.preventDefault();
+            alert('لطفاً شماره فاکتور سازه‌حساب را وارد کنید.');
             return;
         }
 
@@ -936,7 +1258,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const rows = Array.from(tbody.querySelectorAll('tr'));
+        if (isManualReturn()) {
+            recalcManualTotals();
+        }
+
+        const rows = Array.from((isManualReturn() ? manualTbody : tbody).querySelectorAll('tr'));
 
         if (!rows.length) {
             event.preventDefault();
@@ -947,14 +1273,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const seenVariants = new Set();
 
         for (const row of rows) {
-            const productId = row.querySelector('input[name$="[product_id]"]')?.value || '';
-            const variantId = row.querySelector('input[name$="[variant_id]"]')?.value || '';
-            const qtyInput = row.querySelector('.qty-input');
+            const productId = row.querySelector('[name$="[product_id]"]')?.value || '';
+            const variantId = row.querySelector('[name$="[variant_id]"]')?.value || '';
+            const qtyInput = row.querySelector(isManualReturn() ? '.manual-qty' : '.qty-input');
             const qty = Number(qtyInput?.value || 0);
-            const maxQty = Number(qtyInput?.max || 0);
+            const maxQty = isManualReturn() ? 0 : Number(qtyInput?.max || 0);
+            const unitPrice = isManualReturn() ? Number(row.querySelector('.manual-price')?.value || -1) : 0;
             const dupKey = productId + ':' + variantId;
 
-            if (!productId || !variantId || qty <= 0) {
+            if (!productId || !variantId || qty <= 0 || (isManualReturn() && unitPrice < 0)) {
                 event.preventDefault();
                 alert('تعداد برگشتی همه ردیف‌ها باید حداقل ۱ باشد. اگر کالایی برگشت ندارد، ردیف آن را حذف کن.');
                 return;
@@ -979,13 +1306,19 @@ document.addEventListener('DOMContentLoaded', function () {
         submitBtn.textContent = 'در حال ثبت...';
     });
 
+    if (Array.isArray(oldItems) && oldItems.length && isManualReturn()) {
+        manualTbody.innerHTML = '';
+        oldItems.forEach(function (row) { addManualRow(row); });
+    }
+
+    toggleReturnMode();
     initCustomerSelect2();
 
-    if (customerSelect.value) {
+    if (customerSelect.value && !isManualReturn()) {
         openInvoiceModalBtn.disabled = false;
     }
 
-    if (oldRelatedInvoiceUuid) {
+    if (oldRelatedInvoiceUuid && !isManualReturn()) {
         applySelectedInvoice({
             uuid: oldRelatedInvoiceUuid,
             invoice_date: '—',
