@@ -239,7 +239,7 @@
 
 
         {{-- Warehouse --}}
-        @canAnyPermission(['stock_in.view','stock_in.create','stock_out.view','issues.view','inventory.count.view','assets.view','warehouse_map.view','preinvoices.warehouse.view'])
+        @canAnyPermission(['products.create','stock_in.view','stock_in.create','stock_out.view','issues.view','inventory.count.view','assets.view','warehouse_map.view','preinvoices.warehouse.view'])
         <div class="sidebar-accordion-item {{ $warehouseActive ? 'is-open' : '' }}" data-accordion-section="warehouse">
             <button type="button"
                     class="sidebar-section-title sidebar-accordion-trigger {{ $warehouseActive ? 'is-active' : '' }}"
