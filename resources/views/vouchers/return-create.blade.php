@@ -434,6 +434,33 @@
     </div>
 </div>
 
+@php
+    $manualReturnProducts = $products->map(function ($product) {
+        return [
+            'id' => (int) $product->id,
+            'name' => (string) ($product->name ?? ''),
+            'code' => (string) ($product->code ?? $product->sku ?? $product->barcode ?? $product->short_barcode ?? ''),
+            'barcode' => (string) ($product->barcode ?? $product->short_barcode ?? ''),
+            'price' => (int) ($product->price ?? $product->sale_retail ?? $product->sale_wholesale ?? 0),
+            'variants' => $product->variants->map(function ($variant) {
+                $variantName = $variant->variant_name
+                    ?? $variant->variety_name
+                    ?? $variant->name
+                    ?? 'تنوع عمومی';
+
+                return [
+                    'id' => (int) $variant->id,
+                    'product_id' => (int) $variant->product_id,
+                    'name' => (string) $variantName,
+                    'code' => (string) ($variant->variant_code ?? $variant->sku ?? $variant->barcode ?? $variant->variety_code ?? ''),
+                    'barcode' => (string) ($variant->barcode ?? ''),
+                    'price' => (int) ($variant->sell_price ?? $variant->price ?? 0),
+                ];
+            })->values(),
+        ];
+    })->values();
+@endphp
+
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
@@ -477,19 +504,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const oldRelatedInvoiceUuid = @json(old('related_invoice_uuid'));
     const oldItems = @json(old('items', []));
-    const products = @json($products->map(fn ($p) => [
-        'id' => (int) $p->id,
-        'name' => (string) $p->name,
-        'code' => (string) ($p->code ?: $p->sku ?: $p->barcode ?: ''),
-        'price' => (int) ($p->price ?? 0),
-        'variants' => $p->variants->map(fn ($v) => [
-            'id' => (int) $v->id,
-            'product_id' => (int) $v->product_id,
-            'name' => (string) ($v->variant_name ?: $v->variety_name ?: 'تنوع عمومی'),
-            'code' => (string) ($v->variant_code ?: $v->sku ?: $v->barcode ?: ''),
-            'sell_price' => (int) ($v->sell_price ?? 0),
-        ])->values(),
-    ])->values());
+    const products = @json($manualReturnProducts);
 
     let customerInvoices = [];
     let selectedInvoice = null;
@@ -937,7 +952,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const product = products.find(function (p) { return String(p.id) === String(productId); });
         if (!product) return '<option value="">ابتدا کالا...</option>';
         return '<option value="">انتخاب تنوع...</option>' + product.variants.map(function (v) {
-            return `<option value="${escapeHtml(v.id)}" data-code="${escapeHtml(v.code || product.code || '')}" data-price="${escapeHtml(v.sell_price || product.price || 0)}" ${String(selected || '') === String(v.id) ? 'selected' : ''}>${escapeHtml(v.name)}${v.code ? ' [' + escapeHtml(v.code) + ']' : ''}</option>`;
+            return `<option value="${escapeHtml(v.id)}" data-code="${escapeHtml(v.code || product.code || '')}" data-price="${escapeHtml(v.price || product.price || 0)}" ${String(selected || '') === String(v.id) ? 'selected' : ''}>${escapeHtml(v.name)}${v.code ? ' [' + escapeHtml(v.code) + ']' : ''}</option>`;
         }).join('');
     }
 
