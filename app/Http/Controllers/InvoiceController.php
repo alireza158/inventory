@@ -23,74 +23,92 @@ class InvoiceController extends Controller
 
     public function index(Request $request)
     {
+        $allowedPaymentStatuses = ['paid', 'partial', 'unpaid'];
+        $allowedStatuses = $this->statusService->all();
+
         $filters = [
-            'date' => trim((string) $request->query('date', '')),
+            'date_from' => trim((string) $request->query('date_from', $request->query('date', ''))),
+            'date_to' => trim((string) $request->query('date_to', '')),
+            'quick_range' => trim((string) $request->query('quick_range', '')),
             'invoice_number' => trim((string) $request->query('invoice_number', $request->query('q', ''))),
             'customer_code' => trim((string) $request->query('customer_code', '')),
             'customer_name' => trim((string) $request->query('customer_name', '')),
+            'customer_mobile' => trim((string) $request->query('customer_mobile', '')),
+            'payment_status' => trim((string) $request->query('payment_status', '')),
+            'status' => trim((string) $request->query('status', '')),
+            'seller' => trim((string) $request->query('seller', '')),
+            'only_remaining' => $request->boolean('only_remaining') ? '1' : '',
+            'only_paid' => $request->boolean('only_paid') ? '1' : '',
+            'has_cheque' => $request->boolean('has_cheque') ? '1' : '',
+            'min_amount' => $this->normalizeDigits(trim((string) $request->query('min_amount', ''))),
+            'max_amount' => $this->normalizeDigits(trim((string) $request->query('max_amount', ''))),
         ];
 
-        $reportDateInput = trim((string) $request->query('export_date', $filters['date']));
-        $reportDate = $this->parseInvoiceFilterDate($reportDateInput) ?? now()->startOfDay();
-        $filterDate = $this->parseInvoiceFilterDate($filters['date']);
-
-        $baseQuery = Invoice::query()
-            ->with(['payments.cheque', 'customer:id,crm_customer_id,first_name,last_name,mobile', 'preinvoiceOrder.creator:id,name'])
-            ->withSum('payments as paid_total', 'amount')
-            ->when($filters['invoice_number'] !== '', function ($query) use ($filters) {
-                $query->where('uuid', 'like', '%' . $filters['invoice_number'] . '%');
-            })
-            ->when($filters['customer_name'] !== '', function ($query) use ($filters) {
-                $name = $filters['customer_name'];
-                $query->where(function ($qq) use ($name) {
-                    $qq->where('customer_name', 'like', "%{$name}%")
-                        ->orWhereHas('customer', function ($customerQuery) use ($name) {
-                            $customerQuery->where('first_name', 'like', "%{$name}%")
-                                ->orWhere('last_name', 'like', "%{$name}%")
-                                ->orWhereRaw("CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) LIKE ?", ["%{$name}%"]);
-                        });
-                });
-            })
-            ->when($filters['customer_code'] !== '', function ($query) use ($filters) {
-                $code = $this->normalizeDigits($filters['customer_code']);
-                $query->where(function ($qq) use ($code) {
-                    if (ctype_digit($code)) {
-                        $qq->where('customer_id', (int) $code);
-                    }
-
-                    $qq->orWhereHas('customer', function ($customerQuery) use ($code) {
-                        $customerQuery->where('id', 'like', "%{$code}%")
-                            ->orWhere('crm_customer_id', 'like', "%{$code}%")
-                            ->orWhere('mobile', 'like', "%{$code}%");
-                    });
-                });
-            });
-
-        if ($filterDate) {
-            $baseQuery->whereDate('created_at', $filterDate->toDateString());
-        }
-
-        if ($request->input('export') === 'daily_csv') {
-            $exportQuery = clone $baseQuery;
-            if ($filters['date'] === '') {
-                $exportQuery->whereDate('created_at', $reportDate->toDateString());
+        if ($filters['quick_range'] !== '') {
+            [$quickFrom, $quickTo] = $this->quickJalaliRange($filters['quick_range']);
+            if ($quickFrom && $quickTo) {
+                $filters['date_from'] = Jalalian::fromCarbon($quickFrom)->format('Y/m/d');
+                $filters['date_to'] = Jalalian::fromCarbon($quickTo)->format('Y/m/d');
             }
-
-            return $this->exportDailyCustomerFinanceCsv($exportQuery->orderBy('id')->get(), $reportDate);
         }
 
-        $invoices = $baseQuery
+        $errors = [];
+        $dateFrom = $this->parseInvoiceFilterDate($filters['date_from']);
+        $dateTo = $this->parseInvoiceFilterDate($filters['date_to']);
+        if ($filters['date_from'] !== '' && !$dateFrom) {
+            $errors[] = 'تاریخ شروع معتبر نیست.';
+        }
+        if ($filters['date_to'] !== '' && !$dateTo) {
+            $errors[] = 'تاریخ پایان معتبر نیست.';
+        }
+        if ($dateFrom && $dateTo && $dateFrom->gt($dateTo)) {
+            $errors[] = 'تاریخ شروع نباید بعد از تاریخ پایان باشد.';
+        }
+        if ($filters['payment_status'] !== '' && !in_array($filters['payment_status'], $allowedPaymentStatuses, true)) {
+            $errors[] = 'وضعیت پرداخت انتخاب‌شده معتبر نیست.';
+            $filters['payment_status'] = '';
+        }
+        if ($filters['status'] !== '' && !in_array($filters['status'], $allowedStatuses, true)) {
+            $errors[] = 'وضعیت عملیاتی انتخاب‌شده معتبر نیست.';
+            $filters['status'] = '';
+        }
+        foreach (['min_amount' => 'حداقل مبلغ', 'max_amount' => 'حداکثر مبلغ'] as $key => $label) {
+            if ($filters[$key] !== '' && !ctype_digit($filters[$key])) {
+                $errors[] = $label . ' باید عددی باشد.';
+                $filters[$key] = '';
+            }
+        }
+
+        $baseQuery = $this->invoiceReportQuery($filters, $dateFrom, $dateTo);
+
+        if ($request->input('export') === 'csv' || $request->input('export') === 'excel' || $request->input('export') === 'daily_csv') {
+            abort_unless($this->canHandleFinanceActions(), 403);
+            return $this->exportInvoiceAccountingCsv((clone $baseQuery)->with(['customer:id,crm_customer_id,first_name,last_name,mobile', 'preinvoiceOrder.creator:id,name'])->orderByDesc('id')->get(), $filters, $request->input('export') === 'excel');
+        }
+
+        $summary = $this->invoiceReportSummary(clone $baseQuery);
+
+        $invoices = (clone $baseQuery)
+            ->with(['payments.cheque', 'customer:id,crm_customer_id,first_name,last_name,mobile', 'preinvoiceOrder.creator:id,name'])
             ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();
 
+        $pageRows = $invoices->getCollection();
+        $pageTotals = [
+            'count' => $pageRows->count(),
+            'total' => (int) $pageRows->sum('total'),
+            'paid' => (int) $pageRows->sum(fn ($invoice) => (int) ($invoice->paid_total ?? 0)),
+            'remaining' => (int) $pageRows->sum(fn ($invoice) => max((int) $invoice->total - (int) ($invoice->paid_total ?? 0), 0)),
+        ];
+
         $statusLabels = $this->statusService->labels();
         $q = $filters['invoice_number'];
-        $dateInput = $filters['date'];
-
+        $dateInput = $filters['date_from'];
+        $reportDateInput = $filters['date_from'];
         $canRegisterPayments = $this->canHandleFinanceActions();
 
-        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput', 'filters', 'reportDateInput', 'canRegisterPayments'));
+        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput', 'filters', 'reportDateInput', 'canRegisterPayments', 'summary', 'pageTotals', 'errors', 'allowedStatuses'));
     }
 
     public function salesVouchers(Request $request)
@@ -294,6 +312,120 @@ class InvoiceController extends Controller
         return back()->with('success', '✅ فاکتور کنسل شد و موجودی به انبار برگشت.');
     }
 
+    private function invoiceReportQuery(array $filters, ?Carbon $dateFrom, ?Carbon $dateTo)
+    {
+        $query = Invoice::query()
+            ->select('invoices.*')
+            ->selectSub('select coalesce(sum(amount), 0) from invoice_payments where invoice_payments.invoice_id = invoices.id', 'paid_total')
+            ->when($filters['invoice_number'] !== '', fn ($q) => $q->where('uuid', 'like', '%' . $filters['invoice_number'] . '%'))
+            ->when($filters['customer_name'] !== '', function ($query) use ($filters) {
+                $name = $filters['customer_name'];
+                $query->where(function ($qq) use ($name) {
+                    $qq->where('customer_name', 'like', "%{$name}%")
+                        ->orWhereHas('customer', function ($customerQuery) use ($name) {
+                            $customerQuery->where('first_name', 'like', "%{$name}%")
+                                ->orWhere('last_name', 'like', "%{$name}%")
+                                ->orWhereRaw("CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) LIKE ?", ["%{$name}%"]);
+                        });
+                });
+            })
+            ->when($filters['customer_code'] !== '', function ($query) use ($filters) {
+                $code = $this->normalizeDigits($filters['customer_code']);
+                $query->where(function ($qq) use ($code) {
+                    if (ctype_digit($code)) {
+                        $qq->where('customer_id', (int) $code);
+                    }
+                    $qq->orWhereHas('customer', fn ($customerQuery) => $customerQuery
+                        ->where('id', 'like', "%{$code}%")
+                        ->orWhere('crm_customer_id', 'like', "%{$code}%"));
+                });
+            })
+            ->when($filters['customer_mobile'] !== '', function ($query) use ($filters) {
+                $mobile = $this->normalizeDigits($filters['customer_mobile']);
+                $query->where(function ($qq) use ($mobile) {
+                    $qq->where('customer_mobile', 'like', "%{$mobile}%")
+                        ->orWhereHas('customer', fn ($customerQuery) => $customerQuery->where('mobile', 'like', "%{$mobile}%"));
+                });
+            })
+            ->when($filters['status'] !== '', fn ($q) => $q->where('status', $filters['status']))
+            ->when($filters['seller'] !== '', fn ($q) => $q->whereHas('preinvoiceOrder.creator', fn ($userQ) => $userQ->where('name', 'like', '%' . $filters['seller'] . '%')))
+            ->when($filters['has_cheque'] === '1', fn ($q) => $q->whereHas('payments.cheque'))
+            ->when($filters['min_amount'] !== '', fn ($q) => $q->where('total', '>=', (int) $filters['min_amount']))
+            ->when($filters['max_amount'] !== '', fn ($q) => $q->where('total', '<=', (int) $filters['max_amount']));
+
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom->copy()->startOfDay());
+        }
+        if ($dateTo) {
+            $query->where('created_at', '<=', $dateTo->copy()->endOfDay());
+        }
+
+        $paidExpr = '(select coalesce(sum(amount), 0) from invoice_payments where invoice_payments.invoice_id = invoices.id)';
+        if ($filters['only_remaining'] === '1') {
+            $query->whereRaw("(invoices.total - {$paidExpr}) > 0");
+        }
+        if ($filters['only_paid'] === '1') {
+            $query->whereRaw("(invoices.total - {$paidExpr}) <= 0");
+        }
+        match ($filters['payment_status']) {
+            'paid' => $query->whereRaw("(invoices.total - {$paidExpr}) <= 0"),
+            'partial' => $query->whereRaw("{$paidExpr} > 0 and (invoices.total - {$paidExpr}) > 0"),
+            'unpaid' => $query->whereRaw("{$paidExpr} = 0 and invoices.total > 0"),
+            default => null,
+        };
+
+        return $query;
+    }
+
+    private function invoiceReportSummary($query): array
+    {
+        $rows = DB::query()->fromSub($query->toBase(), 'invoice_report')->selectRaw('
+            count(*) as invoice_count,
+            coalesce(sum(total), 0) as total_sales,
+            coalesce(sum(paid_total), 0) as paid_amount,
+            coalesce(sum(greatest(total - paid_total, 0)), 0) as remaining_amount,
+            coalesce(sum(case when (total - paid_total) <= 0 then 1 else 0 end), 0) as paid_count,
+            coalesce(sum(case when paid_total > 0 and (total - paid_total) > 0 then 1 else 0 end), 0) as partial_count,
+            coalesce(sum(case when paid_total = 0 and total > 0 then 1 else 0 end), 0) as unpaid_count
+        ')->first();
+
+        return [
+            'invoice_count' => (int) ($rows->invoice_count ?? 0),
+            'total_sales' => (int) ($rows->total_sales ?? 0),
+            'paid_amount' => (int) ($rows->paid_amount ?? 0),
+            'remaining_amount' => (int) ($rows->remaining_amount ?? 0),
+            'paid_count' => (int) ($rows->paid_count ?? 0),
+            'partial_count' => (int) ($rows->partial_count ?? 0),
+            'unpaid_count' => (int) ($rows->unpaid_count ?? 0),
+        ];
+    }
+
+    private function quickJalaliRange(string $range): array
+    {
+        $today = Jalalian::now();
+        $currentYear = $today->getYear();
+        $currentMonth = $today->getMonth();
+        $lastMonthYear = $currentMonth === 1 ? $currentYear - 1 : $currentYear;
+        $lastMonth = $currentMonth === 1 ? 12 : $currentMonth - 1;
+        $nextMonthYear = $currentMonth === 12 ? $currentYear + 1 : $currentYear;
+        $nextMonth = $currentMonth === 12 ? 1 : $currentMonth + 1;
+
+        return match ($range) {
+            'today' => [now()->startOfDay(), now()->endOfDay()],
+            'yesterday' => [now()->subDay()->startOfDay(), now()->subDay()->endOfDay()],
+            'this_week' => [now()->startOfWeek(Carbon::SATURDAY)->startOfDay(), now()->endOfDay()],
+            'this_month' => [
+                (new Jalalian($currentYear, $currentMonth, 1))->toCarbon()->startOfDay(),
+                (new Jalalian($nextMonthYear, $nextMonth, 1))->toCarbon()->subSecond(),
+            ],
+            'last_month' => [
+                (new Jalalian($lastMonthYear, $lastMonth, 1))->toCarbon()->startOfDay(),
+                (new Jalalian($currentYear, $currentMonth, 1))->toCarbon()->subSecond(),
+            ],
+            default => [null, null],
+        };
+    }
+
     private function parseInvoiceFilterDate(string $dateInput): ?Carbon
     {
         $dateInput = $this->normalizeDigits($dateInput);
@@ -329,6 +461,51 @@ class InvoiceController extends Controller
             '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
             '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
         ]));
+    }
+
+    private function exportInvoiceAccountingCsv($invoices, array $filters, bool $excelAlias = false): StreamedResponse
+    {
+        $filename = 'invoice-accounting-report-' . now()->format('Ymd-His') . ($excelAlias ? '.xls' : '.csv');
+
+        return response()->streamDownload(function () use ($invoices) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'invoice_number', 'invoice_date', 'customer_name', 'customer_code', 'customer_mobile',
+                'invoice_total', 'paid_amount', 'remaining_amount', 'payment_status', 'invoice_status', 'seller',
+            ]);
+
+            foreach ($invoices as $invoice) {
+                $paid = (int) ($invoice->paid_total ?? 0);
+                $remaining = max((int) $invoice->total - $paid, 0);
+                fputcsv($handle, [
+                    $invoice->uuid,
+                    optional($invoice->created_at)->format('Y-m-d'),
+                    $invoice->customer_name ?: $invoice->customer?->display_name,
+                    $invoice->customer?->crm_customer_id ?: $invoice->customer_id,
+                    $invoice->customer_mobile ?: $invoice->customer?->mobile,
+                    (int) $invoice->total,
+                    $paid,
+                    $remaining,
+                    $this->paymentStatusLabel($paid, (int) $invoice->total),
+                    $this->statusService->labels()[$invoice->status] ?? ($invoice->status ?: ''),
+                    $invoice->preinvoiceOrder?->creator?->name ?? '',
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    private function paymentStatusLabel(int $paid, int $total): string
+    {
+        $remaining = max($total - $paid, 0);
+        if ($remaining <= 0) {
+            return 'تسویه‌شده';
+        }
+
+        return $paid > 0 ? 'پرداخت ناقص' : 'پرداخت‌نشده';
     }
 
     private function exportDailyCustomerFinanceCsv($invoices, Carbon $reportDate): StreamedResponse
