@@ -231,6 +231,51 @@ class PermissionCatalog
         ];
     }
 
+
+    public static function sidebarPages(): array
+    {
+        return [
+            'داشبورد' => [
+                ['permission' => 'dashboard.view', 'label' => 'داشبورد'],
+            ],
+            'کالاها' => [
+                ['permission' => 'products.view', 'label' => 'نمایش کالاها'],
+                ['permission' => 'categories.view', 'label' => 'دسته‌بندی محصولات'],
+                ['permission' => 'products.export', 'label' => 'خروجی محصولات'],
+                ['permission' => 'model_lists.view', 'label' => 'مدل لیست'],
+                ['permission' => 'products.change_status', 'label' => 'غیرفعال‌سازی کالا'],
+            ],
+            'انبارداری' => [
+                ['permission' => 'products.create', 'label' => 'افزودن کالا'],
+                ['permission' => 'stock_in.view', 'label' => 'لیست خرید کالاها'],
+                ['permission' => 'stock_in.create', 'label' => 'ثبت خرید کالا'],
+                ['permission' => 'preinvoices.warehouse.view', 'label' => 'در انتظار تایید انبار'],
+                ['permission' => 'issues.view', 'label' => 'حواله‌های انبار'],
+                ['permission' => 'inventory.count.view', 'label' => 'انبارگردانی'],
+                ['permission' => 'assets.view', 'label' => 'امین اموال'],
+                ['permission' => 'warehouse_map.view', 'label' => 'نقشه انبار'],
+            ],
+            'بازرگانی و فروش' => [
+                ['permission' => 'preinvoices.create', 'label' => 'ثبت پیش‌فاکتور'],
+                ['permission' => 'preinvoices.own.view', 'label' => 'پیش‌فاکتورهای من'],
+                ['permission' => 'customers.view', 'label' => 'اشخاص و طرف‌حساب‌ها'],
+            ],
+            'مالی' => [
+                ['permission' => 'preinvoices.finance.view', 'label' => 'در انتظار تایید مالی'],
+                ['permission' => 'account_statements.view', 'label' => 'گردش حساب اشخاص'],
+                ['permission' => 'invoices.view', 'label' => 'فاکتورها'],
+                ['permission' => 'cheques.view', 'label' => 'چک‌های ثبت‌شده'],
+            ],
+            'پیکربندی' => [
+                ['permission' => 'shipping_methods.view', 'label' => 'روش‌های ارسال بار'],
+                ['permission' => 'users.view', 'label' => 'کاربران و پرسنل'],
+                ['permission' => 'permissions.view', 'label' => 'مدیریت دسترسی کاربران'],
+                ['permission' => 'logs.view', 'label' => 'لاگ فعالیت کاربران'],
+                ['permission' => 'inventory_webhooks.view', 'label' => 'مدیریت API موجودی/قیمت'],
+            ],
+        ];
+    }
+
     public static function all(): array
     {
         $permissions = [];
