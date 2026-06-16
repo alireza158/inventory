@@ -12,6 +12,8 @@ class WarehouseTransfer extends Model
     public const TYPE_CUSTOMER_RETURN = 'customer_return';
     public const TYPE_SHOWROOM = 'showroom';
     public const TYPE_PERSONNEL_ASSET = 'personnel_asset';
+    public const RETURN_SOURCE_INTERNAL_INVOICE = 'internal_invoice';
+    public const RETURN_SOURCE_EXTERNAL_MANUAL = 'external_manual';
     public const RETURN_REASON_WRONG_PICKING = 'wrong_picking';
     public const RETURN_REASON_WARRANTY = 'warranty';
     public const RETURN_REASON_PACKAGING_DAMAGE = 'packaging_damage';
@@ -26,6 +28,19 @@ class WarehouseTransfer extends Model
             self::TYPE_SHOWROOM => 'حواله شوروم سالن',
             self::TYPE_PERSONNEL_ASSET => 'حواله اموال پرسنل',
         ];
+    }
+
+    public static function returnSourceOptions(): array
+    {
+        return [
+            self::RETURN_SOURCE_INTERNAL_INVOICE => 'فاکتور داخلی',
+            self::RETURN_SOURCE_EXTERNAL_MANUAL => 'فاکتور سازه‌حساب / دستی',
+        ];
+    }
+
+    public static function returnSourceLabel(?string $source): string
+    {
+        return self::returnSourceOptions()[$source ?: self::RETURN_SOURCE_INTERNAL_INVOICE] ?? 'فاکتور داخلی';
     }
 
     public static function returnReasonOptions(): array
@@ -44,6 +59,8 @@ class WarehouseTransfer extends Model
         'from_warehouse_id',
         'to_warehouse_id',
         'related_invoice_id',
+        'return_type',
+        'external_invoice_number',
         'customer_id',
         'beneficiary_name',
         'return_reason',
