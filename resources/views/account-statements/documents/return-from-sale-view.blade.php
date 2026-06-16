@@ -20,7 +20,9 @@
             <div class="col-md-4"><strong>تاریخ:</strong> {{ $voucher->transferred_at ? Jalalian::fromDateTime($voucher->transferred_at)->format('Y/m/d H:i') : '—' }}</div>
             <div class="col-md-4"><strong>مبلغ کل:</strong> {{ \App\Support\Currency::formatRial($voucher->total_amount) }}</div>
             <div class="col-md-4"><strong>مشتری:</strong> {{ $voucher->customer?->display_name ?: ($voucher->beneficiary_name ?: '—') }}</div>
+            <div class="col-md-4"><strong>نوع برگشت:</strong> {{ \App\Models\WarehouseTransfer::returnSourceLabel($voucher->return_type ?? null) }}</div>
             <div class="col-md-4"><strong>فاکتور مرجع:</strong> {{ $voucher->relatedInvoice?->uuid ?: '—' }}</div>
+            <div class="col-md-4"><strong>شماره فاکتور سازه‌حساب:</strong> {{ $voucher->external_invoice_number ?: '—' }}</div>
             <div class="col-md-4"><strong>علت برگشت:</strong> {{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}</div>
             <div class="col-md-6"><strong>انبار مبدا:</strong> {{ $voucher->fromWarehouse?->name ?: '—' }}</div>
             <div class="col-md-6"><strong>انبار مقصد:</strong> {{ $voucher->toWarehouse?->name ?: '—' }}</div>

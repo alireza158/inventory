@@ -36,6 +36,19 @@ class VoucherController extends Controller
         return $map[$type];
     }
 
+    private function returnsWarehouse(): Warehouse
+    {
+        return Warehouse::firstOrCreate(
+            [
+                'type' => 'return',
+                'name' => 'انبار مرجوعی',
+            ],
+            [
+                'is_active' => true,
+            ]
+        );
+    }
+
     private function scrapWarehouse(): Warehouse
     {
         $warehouse = Warehouse::query()
@@ -291,25 +304,32 @@ class VoucherController extends Controller
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'mobile']);
 
-        $warehouses = $this->selectableWarehouses()
-            ->where('type', '!=', 'personnel')
-            ->values();
+        $returnsWarehouse = $this->returnsWarehouse();
+        $warehouses = collect([$returnsWarehouse]);
+
+        $products = Product::query()
+            ->with(['variants' => fn ($q) => $q->orderBy('variant_name')])
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'sku', 'barcode', 'category_id', 'price']);
 
         $returnReasons = WarehouseTransfer::returnReasonOptions();
 
         return view('vouchers.return-create', compact(
             'customers',
             'warehouses',
+            'returnsWarehouse',
+            'products',
             'returnReasons'
         ));
     }
 
     public function returnStore(Request $request)
     {
-        $data = $request->validate([
+        $returnType = $request->input('return_type', WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE);
+
+        $rules = [
+            'return_type' => ['required', 'in:' . implode(',', [WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE, WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL])],
             'customer_id' => ['required', 'exists:customers,id'],
-            'related_invoice_uuid' => ['required', 'exists:invoices,uuid'],
-            'to_warehouse_id' => ['required', 'exists:warehouses,id'],
             'return_reason' => ['required', 'in:' . implode(',', array_keys(WarehouseTransfer::returnReasonOptions()))],
             'reference' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
@@ -317,15 +337,101 @@ class VoucherController extends Controller
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-        ]);
+        ];
 
-        $invoice = Invoice::query()->with('items')->where('uuid', $data['related_invoice_uuid'])->firstOrFail();
-
-        if ((int) $invoice->customer_id !== (int) $data['customer_id']) {
-            abort(422, 'فاکتور انتخابی متعلق به مشتری انتخاب‌شده نیست.');
+        if ($returnType === WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL) {
+            $rules['related_invoice_uuid'] = ['nullable'];
+            $rules['external_invoice_number'] = ['required', 'string', 'max:100'];
+            $rules['items.*.unit_price'] = ['required', 'integer', 'min:0'];
+        } else {
+            $rules['related_invoice_uuid'] = ['required', 'exists:invoices,uuid'];
+            $rules['external_invoice_number'] = ['nullable', 'string', 'max:100'];
         }
 
-        foreach ($data['items'] as $index => $row) {
+        $data = $request->validate($rules);
+        $returnsWarehouse = $this->returnsWarehouse();
+        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
+
+        if ($data['return_type'] === WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL) {
+            $this->validateManualReturnItems($data['items']);
+
+            $payload = [
+                'voucher_type' => WarehouseTransfer::TYPE_CUSTOMER_RETURN,
+                'return_type' => WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL,
+                'from_warehouse_id' => $centralWarehouseId,
+                'to_warehouse_id' => (int) $returnsWarehouse->id,
+                'customer_id' => (int) $data['customer_id'],
+                'external_invoice_number' => $data['external_invoice_number'],
+                'return_reason' => $data['return_reason'],
+                'reference' => $data['reference'] ?? null,
+                'note' => $data['note'] ?? null,
+                'items' => array_map(fn ($it) => [
+                    'category_id' => (int) Product::query()->whereKey((int) $it['product_id'])->value('category_id'),
+                    'product_id' => (int) $it['product_id'],
+                    'variant_id' => (int) $it['variant_id'],
+                    'quantity' => (int) $it['quantity'],
+                    'unit_price' => (int) $it['unit_price'],
+                ], $data['items']),
+            ];
+        } else {
+            $invoice = Invoice::query()->with('items')->where('uuid', $data['related_invoice_uuid'])->firstOrFail();
+
+            if ((int) $invoice->customer_id !== (int) $data['customer_id']) {
+                abort(422, 'فاکتور انتخابی متعلق به مشتری انتخاب‌شده نیست.');
+            }
+
+            $this->validateInternalReturnItems($invoice, $data['items']);
+
+            $payload = [
+                'voucher_type' => WarehouseTransfer::TYPE_CUSTOMER_RETURN,
+                'return_type' => WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE,
+                'from_warehouse_id' => $centralWarehouseId,
+                'to_warehouse_id' => (int) $returnsWarehouse->id,
+                'related_invoice_uuid' => $data['related_invoice_uuid'],
+                'return_reason' => $data['return_reason'],
+                'reference' => $data['reference'] ?? null,
+                'note' => $data['note'] ?? null,
+                'items' => array_map(fn ($it) => [
+                    'category_id' => (int) Product::query()->whereKey((int) $it['product_id'])->value('category_id'),
+                    'product_id' => (int) $it['product_id'],
+                    'variant_id' => (int) $it['variant_id'],
+                    'quantity' => (int) $it['quantity'],
+                ], $data['items']),
+            ];
+        }
+
+        DB::transaction(function () use ($payload) {
+            $this->createTransfer($payload, now());
+        });
+
+        return redirect()->route('vouchers.section.index', 'return-from-sale')->with('success', 'برگشت از فروش ثبت شد.');
+    }
+
+    private function validateManualReturnItems(array $items): void
+    {
+        $seenVariantRows = [];
+
+        foreach ($items as $index => $row) {
+            $validVariant = ProductVariant::query()
+                ->whereKey((int) $row['variant_id'])
+                ->where('product_id', (int) $row['product_id'])
+                ->exists();
+
+            if (!$validVariant) {
+                abort(422, 'ردیف ' . ($index + 1) . ': تنوع انتخابی برای محصول معتبر نیست.');
+            }
+
+            $key = ((int) $row['product_id']) . ':' . ((int) $row['variant_id']);
+            if (isset($seenVariantRows[$key])) {
+                abort(422, 'ردیف ' . ($index + 1) . ': این محصول/تنوع تکراری است و فقط یک‌بار می‌تواند ثبت شود.');
+            }
+            $seenVariantRows[$key] = true;
+        }
+    }
+
+    private function validateInternalReturnItems(Invoice $invoice, array $items): void
+    {
+        foreach ($items as $index => $row) {
             $validVariant = ProductVariant::query()
                 ->whereKey((int) $row['variant_id'])
                 ->where('product_id', (int) $row['product_id'])
@@ -339,7 +445,7 @@ class VoucherController extends Controller
         $requestedByVariant = [];
         $seenVariantRows = [];
 
-        foreach ($data['items'] as $index => $row) {
+        foreach ($items as $index => $row) {
             $variantId = (int) $row['variant_id'];
             $key = ((int) $row['product_id']) . ':' . $variantId;
 
@@ -373,30 +479,6 @@ class VoucherController extends Controller
                 abort(422, "مقدار برگشتی برای این تنوع بیشتر از تعداد مجاز است. باقی‌مانده مجاز: {$remaining}");
             }
         }
-
-        $centralWarehouseId = WarehouseStockService::centralWarehouseId();
-
-        $payload = [
-            'voucher_type' => WarehouseTransfer::TYPE_CUSTOMER_RETURN,
-            'from_warehouse_id' => $centralWarehouseId,
-            'to_warehouse_id' => (int) $data['to_warehouse_id'],
-            'related_invoice_uuid' => $data['related_invoice_uuid'],
-            'return_reason' => $data['return_reason'],
-            'reference' => $data['reference'] ?? null,
-            'note' => $data['note'] ?? null,
-            'items' => array_map(fn ($it) => [
-                'category_id' => (int) Product::query()->whereKey((int) $it['product_id'])->value('category_id'),
-                'product_id' => (int) $it['product_id'],
-                'variant_id' => (int) $it['variant_id'],
-                'quantity' => (int) $it['quantity'],
-            ], $data['items']),
-        ];
-
-        DB::transaction(function () use ($payload) {
-            $this->createTransfer($payload, now());
-        });
-
-        return redirect()->route('vouchers.section.index', 'return-from-sale')->with('success', 'برگشت از فروش ثبت شد.');
     }
 
     public function saleDeliveryIndex(Request $request)
@@ -1046,7 +1128,9 @@ class VoucherController extends Controller
             'from_warehouse_id' => $data['from_warehouse_id'],
             'to_warehouse_id' => $data['to_warehouse_id'],
             'related_invoice_id' => $relatedInvoice?->id,
-            'customer_id' => $relatedInvoice?->customer_id,
+            'return_type' => $data['return_type'] ?? WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE,
+            'external_invoice_number' => $data['external_invoice_number'] ?? null,
+            'customer_id' => $relatedInvoice?->customer_id ?? ($data['customer_id'] ?? null),
             'beneficiary_name' => $data['beneficiary_name'] ?? null,
             'return_reason' => $data['return_reason'] ?? null,
             'user_id' => auth()->id(),
@@ -1089,7 +1173,9 @@ class VoucherController extends Controller
 
             $unitPrice = in_array($voucherType, [WarehouseTransfer::TYPE_SCRAP, WarehouseTransfer::TYPE_SHOWROOM], true)
                 ? 0
-                : ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN ? (int) $invoiceItemPrice : (int) ($product->price ?? 0));
+                : ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN
+                    ? (isset($item['unit_price']) ? (int) $item['unit_price'] : (int) $invoiceItemPrice)
+                    : (int) ($product->price ?? 0));
 
             $lineTotal = $qty * $unitPrice;
             $sum += $lineTotal;
@@ -1104,7 +1190,9 @@ class VoucherController extends Controller
 
                 $movementType = 'in';
                 $movementReason = 'return';
-                $movementNote = 'مرجوعی از مشتری - ' . ($variant->variant_name ?: 'تنوع');
+                $movementNote = 'ورود کالا به انبار مرجوعی بابت برگشت از فروش'
+                    . (!empty($data['external_invoice_number']) ? (' فاکتور سازه‌حساب شماره ' . $data['external_invoice_number']) : '')
+                    . ' - ' . ($variant->variant_name ?: 'تنوع');
             } elseif ($voucherType === WarehouseTransfer::TYPE_SCRAP) {
                 $available = WarehouseStockService::available(
                     (int) $data['from_warehouse_id'],
@@ -1197,14 +1285,22 @@ class VoucherController extends Controller
 
         $transfer->update(['total_amount' => $sum]);
 
-        if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $relatedInvoice && $relatedInvoice->customer_id) {
+        if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $transfer->customer_id) {
+            $ledgerNote = $relatedInvoice
+                ? ('مرجوعی کالا از فاکتور ' . $relatedInvoice->uuid)
+                : ('بستانکاری بابت برگشت از فروش دستی - بابت برگشت از فروش فاکتور سازه‌حساب شماره ' . ($data['external_invoice_number'] ?? '—'));
+
+            if (!$relatedInvoice && !empty($data['note'])) {
+                $ledgerNote .= ' - ' . $data['note'];
+            }
+
             CustomerLedger::create([
-                'customer_id' => $relatedInvoice->customer_id,
+                'customer_id' => $transfer->customer_id,
                 'type' => 'credit',
                 'amount' => max($sum, 0),
                 'reference_type' => WarehouseTransfer::class,
                 'reference_id' => $transfer->id,
-                'note' => 'مرجوعی کالا از فاکتور ' . $relatedInvoice->uuid,
+                'note' => $ledgerNote,
             ]);
         }
 
