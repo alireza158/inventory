@@ -36,15 +36,20 @@
     })->values()->toArray();
 
     $reviews = $order->reviews()->with('user:id,name')->latest()->get();
+
+    $changeReasons = \App\Services\WarehouseReviewAuditService::REASONS;
 @endphp
 
 @section('content')
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0">بررسی انبار پیش‌فاکتور</h4>
-        <a href="{{ route('preinvoice.warehouse.index') }}" class="btn btn-outline-secondary">
-            بازگشت به صف انبار
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{{ route('warehouse.reviews.show', $order->uuid) }}" class="btn btn-outline-info">مشاهده سوابق این پیش‌فاکتور</a>
+            <a href="{{ route('preinvoice.warehouse.index') }}" class="btn btn-outline-secondary">
+                بازگشت به صف انبار
+            </a>
+        </div>
     </div>
 
     @if(session('success'))
@@ -123,6 +128,8 @@
                             <th>موجودی کالای انبار مرکزی</th>
                             <th>تعداد</th>
                             <th>قیمت</th>
+                            <th>دلیل تغییر/حذف</th>
+                            <th>توضیح</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -196,8 +203,17 @@
 <script>
     const products = @json($productsData);
     const initialItems = @json($initialItems);
+    const changeReasons = @json($changeReasons);
+    const removedItems = [];
 
     const tbody = document.querySelector('#itemsTable tbody');
+
+    function reasonOptions(selectedValue = '') {
+        return '<option value="">انتخاب دلیل...</option>' + Object.entries(changeReasons).map(([value, label]) => {
+            const isSelected = String(selectedValue || '') === String(value) ? 'selected' : '';
+            return `<option value="${value}" ${isSelected}>${label}</option>`;
+        }).join('');
+    }
 
     function optionHtml(items, selectedValue = null) {
         return items.map(item => {
@@ -229,6 +245,12 @@
                 <input type="number" class="form-control price" min="0" value="${data.price || 0}" required readonly>
             </td>
             <td>
+                <select class="form-select change-reason">${reasonOptions(data.change_reason || '')}</select>
+            </td>
+            <td>
+                <input type="text" class="form-control change-note" maxlength="1000" value="${data.change_note || ''}" placeholder="اگر دلیل سایر است، توضیح الزامی است">
+            </td>
+            <td>
                 <button type="button" class="btn btn-sm btn-outline-danger remove">حذف</button>
             </td>
         `;
@@ -243,7 +265,30 @@
             fillVariants(tr);
         });
 
+        tr.dataset.originalQuantity = String(data.quantity || 1);
+        tr.dataset.productId = String(data.product_id || '');
+        tr.dataset.variantId = String(data.variant_id || '');
+
         removeBtn.addEventListener('click', function () {
+            const reason = tr.querySelector('.change-reason').value;
+            const note = tr.querySelector('.change-note').value;
+
+            if (!reason) {
+                alert('برای حذف کالا ابتدا دلیل حذف را انتخاب کنید.');
+                return;
+            }
+
+            if (reason === 'other' && !note.trim()) {
+                alert('برای دلیل «سایر»، توضیح متنی الزامی است.');
+                return;
+            }
+
+            removedItems.push({
+                product_id: tr.dataset.productId || tr.querySelector('.product').value,
+                variant_id: tr.dataset.variantId || tr.querySelector('.variant').value,
+                change_reason: reason,
+                change_note: note
+            });
             tr.remove();
         });
 
@@ -286,19 +331,23 @@
     }
 
     function attachHiddenInputs(form) {
-        form.querySelectorAll('input[name^="items["]').forEach(el => el.remove());
+        form.querySelectorAll('input[name^="items["], input[name^="removed_items["]').forEach(el => el.remove());
 
         [...tbody.querySelectorAll('tr')].forEach((tr, index) => {
             const productId = tr.querySelector('.product').value;
             const variantId = tr.querySelector('.variant').value;
             const quantity = tr.querySelector('.qty').value;
             const price = tr.querySelector('.price').value;
+            const reason = tr.querySelector('.change-reason').value;
+            const note = tr.querySelector('.change-note').value;
 
             const fields = {
                 product_id: productId,
                 variant_id: variantId,
                 quantity: quantity,
-                price: price
+                price: price,
+                change_reason: reason,
+                change_note: note
             };
 
             Object.entries(fields).forEach(([key, value]) => {
@@ -309,13 +358,23 @@
                 form.appendChild(input);
             });
         });
+
+        removedItems.forEach((row, index) => {
+            Object.entries(row).forEach(([key, value]) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = `removed_items[${index}][${key}]`;
+                input.value = value;
+                form.appendChild(input);
+            });
+        });
     }
 
     if (initialItems.length) {
         initialItems.forEach(item => addRow(item));
     }
 
-    document.getElementById('warehouseForm').addEventListener('submit', function () {
+    document.getElementById('warehouseForm').addEventListener('submit', function (event) {
         const methodInput = this.querySelector('input[name="_method"]');
         const modeInput = document.getElementById('warehouseFormMode');
 
@@ -324,11 +383,40 @@
             methodInput.disabled = false;
         }
 
+        if (!validateChangedRows()) {
+            event.preventDefault();
+            return;
+        }
+
         attachHiddenInputs(this);
     });
 
+    function validateChangedRows() {
+        for (const tr of [...tbody.querySelectorAll('tr')]) {
+            const oldQty = Number(tr.dataset.originalQuantity || 0);
+            const newQty = Number(tr.querySelector('.qty').value || 0);
+            const reason = tr.querySelector('.change-reason').value;
+            const note = tr.querySelector('.change-note').value;
+
+            if (newQty < oldQty && !reason) {
+                alert('برای کاهش تعداد کالا، انتخاب دلیل الزامی است.');
+                return false;
+            }
+
+            if (newQty < oldQty && reason === 'other' && !note.trim()) {
+                alert('برای دلیل «سایر»، توضیح متنی الزامی است.');
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     document.getElementById('approveBtn').addEventListener('click', function () {
         const form = document.getElementById('warehouseForm');
+        if (!validateChangedRows()) {
+            return;
+        }
         attachHiddenInputs(form);
 
         form.action = "{{ route('preinvoice.warehouse.approve', $order->uuid) }}";

@@ -39,6 +39,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WarehouseMapController;
+use App\Http\Controllers\WarehouseReviewController;
 use App\Http\Controllers\Admin\UserPermissionController;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
@@ -257,6 +258,13 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     // Preinvoice pages
     Route::get('/preinvoice/create', [PreinvoiceController::class, 'create'])->name('preinvoice.create');
     Route::post('/preinvoice/draft', [PreinvoiceController::class, 'saveDraft'])->name('preinvoice.draft.save');
+
+    Route::prefix('warehouse/reviews')->name('warehouse.reviews.')->middleware('permission:preinvoices.warehouse.reviews.view')->group(function () {
+        Route::get('/', [WarehouseReviewController::class, 'index'])->name('index');
+        Route::get('/{preinvoiceOrder:uuid}', [WarehouseReviewController::class, 'show'])->name('show');
+        Route::get('/{preinvoiceOrder:uuid}/print', [WarehouseReviewController::class, 'print'])->name('print');
+    });
+
     Route::get('/preinvoice/warehouse', [PreinvoiceController::class, 'warehouseQueue'])->name('preinvoice.warehouse.index');
     Route::get('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseReview'])->name('preinvoice.warehouse.review');
     Route::put('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseSave'])->name('preinvoice.warehouse.save');

@@ -16,6 +16,7 @@ use App\Support\Currency;
 use App\Support\IranLocations;
 use App\Support\DocumentCodeGenerator;
 use App\Support\ActivityLogger;
+use App\Services\WarehouseReviewAuditService;
 use App\Services\WarehouseStockService;
 use App\Services\CentralInventoryService;
 use App\Services\SalesDocumentAccessService;
@@ -34,6 +35,7 @@ class PreinvoiceController extends Controller
         private readonly NotificationService $notificationService,
         private readonly CentralInventoryService $centralInventoryService,
         private readonly SalesDocumentAccessService $accessService,
+        private readonly WarehouseReviewAuditService $warehouseReviewAuditService,
     ) {}
 
     public function create()
@@ -100,6 +102,8 @@ class PreinvoiceController extends Controller
             $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
             abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
             $this->assertWarehouseCanOnlyReduceOrDelete($order, $data['items']);
+            $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id());
+            $this->validateWarehouseChangeReasons($order, $data);
 
             $before = $this->snapshotItems($order);
             $stockLocked = $this->hasActiveFreeze($order);
@@ -118,13 +122,18 @@ class PreinvoiceController extends Controller
                 'total_price' => $this->calculateOrderTotal($order),
             ]);
 
+            $after = $this->snapshotItems($order->fresh('items.product', 'items.variant'));
             $order->reviews()->create([
                 'user_id' => auth()->id(),
                 'action' => 'warehouse_saved',
                 'reason' => $data['warehouse_review_note'] ?? null,
                 'before_items' => $before,
-                'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
+                'after_items' => $after,
             ]);
+            $this->warehouseReviewAuditService->recordItemChanges($order->fresh(), $before, $after, $this->warehouseChangeReasons($data), auth()->id());
+            if (!empty($data['warehouse_review_note'])) {
+                $this->warehouseReviewAuditService->log($order->fresh(), \App\Models\WarehouseReviewLog::ACTION_NOTE_ADDED, auth()->id(), $order->status, $order->status, $data['warehouse_review_note']);
+            }
             if (!empty($order->created_by)) {
                 $this->notificationService->notifyUser(
                     (int)$order->created_by,
@@ -153,6 +162,8 @@ class PreinvoiceController extends Controller
             $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
             abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
             $this->assertWarehouseCanOnlyReduceOrDelete($order, $data['items']);
+            $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id());
+            $this->validateWarehouseChangeReasons($order, $data);
 
             $before = $this->snapshotItems($order);
             $stockLocked = $this->hasActiveFreeze($order);
@@ -174,13 +185,17 @@ class PreinvoiceController extends Controller
                 'total_price' => $this->calculateOrderTotal($order),
             ]);
 
+            $after = $this->snapshotItems($order->fresh('items.product', 'items.variant'));
             $order->reviews()->create([
                 'user_id' => auth()->id(),
                 'action' => 'warehouse_approved',
                 'reason' => $data['warehouse_review_note'] ?? null,
                 'before_items' => $before,
-                'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
+                'after_items' => $after,
             ]);
+            $this->warehouseReviewAuditService->recordItemChanges($order->fresh(), $before, $after, $this->warehouseChangeReasons($data), auth()->id());
+            $this->warehouseReviewAuditService->createAfterSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), $data['warehouse_review_note'] ?? null);
+            $this->warehouseReviewAuditService->log($order->fresh(), \App\Models\WarehouseReviewLog::ACTION_APPROVED_TO_FINANCE, auth()->id(), PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, $data['warehouse_review_note'] ?? null);
             $this->notificationService->notifyRole(
                 'finance',
                 'preinvoice_submitted_to_finance',
@@ -218,6 +233,7 @@ class PreinvoiceController extends Controller
         DB::transaction(function () use ($order, $data) {
             $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
             abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
+            $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id());
 
             $order->update([
                 'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
@@ -236,6 +252,8 @@ class PreinvoiceController extends Controller
                 'before_items' => $this->snapshotItems($order),
                 'after_items' => $this->snapshotItems($order),
             ]);
+            $this->warehouseReviewAuditService->createAfterSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), $data['warehouse_reject_reason']);
+            $this->warehouseReviewAuditService->log($order->fresh(), \App\Models\WarehouseReviewLog::ACTION_REJECTED_TO_CREATOR, auth()->id(), PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE, $data['warehouse_reject_reason']);
             if (!empty($order->created_by)) {
                 $this->notificationService->notifyUser((int)$order->created_by, 'preinvoice_warehouse_rejected', 'پیش‌فاکتور شما توسط انبار برگشت خورد', 'علت: ' . $data['warehouse_reject_reason'], route('preinvoice.my.show', $order->uuid), ['level' => 'danger', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "operator_warehouse_rejected:{$order->id}:{$order->created_by}"]);
             }
@@ -354,6 +372,7 @@ class PreinvoiceController extends Controller
                 'stock_frozen_until' => now(),
                 'stock_released_at' => null,
             ]);
+            $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), null);
 
             $this->notificationService->notifyRole(
                 'warehouse',
@@ -454,6 +473,9 @@ class PreinvoiceController extends Controller
                 'items_updated_at' => now(),
                 'items_updated_by' => auth()->id(),
             ]);
+
+            $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), $oldStatus);
+            $this->warehouseReviewAuditService->log($order->fresh(), \App\Models\WarehouseReviewLog::ACTION_RESUBMITTED_TO_WAREHOUSE, auth()->id(), $oldStatus, PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 'پیش‌فاکتور بعد از اصلاح دوباره به صف انبار ارسال شد.');
 
             $this->syncExistingInvoiceFromOrderForReapproval($order->fresh(['items', 'invoice.items']));
 
@@ -617,6 +639,13 @@ class PreinvoiceController extends Controller
             'items.*.variant_id' => ['required', 'integer', Rule::exists('product_variants', 'id')->where(fn($q) => $q->where('is_active', true))],
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'nullable|integer|min:0',
+            'items.*.change_reason' => 'nullable|string|in:' . implode(',', array_keys(WarehouseReviewAuditService::REASONS)),
+            'items.*.change_note' => 'nullable|string|max:1000',
+            'removed_items' => 'nullable|array',
+            'removed_items.*.product_id' => 'required_with:removed_items|integer',
+            'removed_items.*.variant_id' => 'required_with:removed_items|integer',
+            'removed_items.*.change_reason' => 'required_with:removed_items|string|in:' . implode(',', array_keys(WarehouseReviewAuditService::REASONS)),
+            'removed_items.*.change_note' => 'nullable|string|max:1000',
         ], [
             'warehouse_review_note.required' => 'برای تایید و ارسال به مالی، دلیل/توضیح بازبینی انبار الزامی است.',
             'items.required' => 'حداقل یک آیتم در پیش‌فاکتور لازم است.',
@@ -640,6 +669,58 @@ class PreinvoiceController extends Controller
         return $validated;
     }
 
+    private function validateWarehouseChangeReasons(PreinvoiceOrder $order, array $data): void
+    {
+        $oldMap = $this->itemQuantityMap($order->items->map(fn($item) => [
+            'product_id' => (int) $item->product_id,
+            'variant_id' => (int) $item->variant_id,
+            'quantity' => (int) $item->quantity,
+        ])->all());
+        $newMap = $this->itemQuantityMap($data['items'] ?? []);
+        $reasons = $this->warehouseChangeReasons($data);
+
+        foreach ($oldMap as $key => $oldQty) {
+            $newQty = (int) ($newMap[$key] ?? 0);
+            if ($newQty >= (int) $oldQty) {
+                continue;
+            }
+
+            $reason = trim((string) ($reasons[$key]['reason'] ?? ''));
+            $note = trim((string) ($reasons[$key]['note'] ?? ''));
+
+            if ($reason === '') {
+                throw ValidationException::withMessages(['items' => 'برای کاهش تعداد یا حذف کالا، انتخاب دلیل الزامی است.']);
+            }
+
+            if ($reason === 'other' && $note === '') {
+                throw ValidationException::withMessages(['items' => 'وقتی دلیل «سایر» انتخاب می‌شود، توضیح متنی الزامی است.']);
+            }
+        }
+    }
+
+    private function warehouseChangeReasons(array $data): array
+    {
+        $reasons = [];
+
+        foreach (($data['items'] ?? []) as $row) {
+            $key = ((int) ($row['product_id'] ?? 0)) . ':' . ((int) ($row['variant_id'] ?? 0));
+            $reasons[$key] = [
+                'reason' => $row['change_reason'] ?? null,
+                'note' => $row['change_note'] ?? null,
+            ];
+        }
+
+        foreach (($data['removed_items'] ?? []) as $row) {
+            $key = ((int) ($row['product_id'] ?? 0)) . ':' . ((int) ($row['variant_id'] ?? 0));
+            $reasons[$key] = [
+                'reason' => $row['change_reason'] ?? null,
+                'note' => $row['change_note'] ?? null,
+            ];
+        }
+
+        return $reasons;
+    }
+
     private function replaceOrderItems(PreinvoiceOrder $order, array $items): void
     {
         $order->items()->delete();
@@ -660,15 +741,19 @@ class PreinvoiceController extends Controller
 
     private function snapshotItems(PreinvoiceOrder $order): array
     {
-        $order->loadMissing(['items.product:id,name', 'items.variant:id,variant_name']);
+        $order->loadMissing(['items.product:id,name,code,sku,barcode', 'items.variant:id,variant_name,variety_name,sku,barcode,variant_code,stock,reserved']);
 
         return $order->items->map(fn($item) => [
+            'item_id' => (int) $item->id,
             'product_id' => (int) $item->product_id,
             'product_name' => $item->product?->name,
             'variant_id' => (int) $item->variant_id,
-            'variant_name' => $item->variant?->variant_name,
+            'variant_name' => $item->variant?->variant_name ?: $item->variant?->variety_name,
+            'code' => $item->variant?->sku ?: ($item->variant?->variant_code ?: ($item->variant?->barcode ?: ($item->product?->sku ?: $item->product?->code))),
             'quantity' => (int) $item->quantity,
             'price' => (int) $item->price,
+            'stock_at_review' => $item->variant ? max(0, (int) $item->variant->stock) : null,
+            'available_stock_at_review' => $item->variant ? max(0, (int) $item->variant->stock - (int) $item->variant->reserved) : null,
         ])->values()->all();
     }
 
