@@ -79,7 +79,7 @@
                 <div class="operation-actions">
                     @canPermission('products.edit')<button class="btn btn-primary btn-mini" type="button" id="bulkEditBtn">ویرایش</button>@endcanPermission
                     @canPermission('products.delete')<button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeleteBtn">حذف</button>@endcanPermission
-                    <button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeactivateBtn">غیرفعال‌سازی</button>
+                    @canPermission('products.change_status')<button class="btn btn-outline-danger btn-mini" type="button" id="bulkDeactivateBtn">غیرفعال‌سازی</button>@endcanPermission
                     <select id="bulkVariantSelect" class="form-select form-select-sm variant-operation-select" disabled><option value="">تنوع محصول...</option></select>
                     <button class="btn btn-outline-primary btn-mini" type="button" id="bulkStockBtn">موجودی انبار</button>
                     <button class="btn btn-outline-secondary btn-mini" type="button" id="bulkSalesLedgerBtn">کارتکس فروش</button>

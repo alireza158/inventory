@@ -203,6 +203,7 @@
 
 
         {{-- Products --}}
+        @canAnyPermission(['products.view','products.create','products.export','products.change_status','categories.view','model_lists.view'])
         <div class="sidebar-accordion-item {{ $productsActive ? 'is-open' : '' }}" data-accordion-section="products">
             <button type="button"
                     class="sidebar-section-title sidebar-accordion-trigger {{ $productsActive ? 'is-active' : '' }}"
@@ -222,19 +223,23 @@
                     @canPermission('categories.view')
                     <a class="sidebar-sublink {{ $is('categories.*') }}" href="{{ route('categories.index') }}">دسته‌بندی محصولات</a>
                     @endcanPermission
-                    @canPermission('products.view')
+                    @canPermission('products.export')
                     <a class="sidebar-sublink {{ $is('admin.product-exports.*') }}" href="{{ route('admin.product-exports.index') }}">خروجی محصولات</a>
                     @endcanPermission
-                        @if($hasRole(['admin', 'Admin', 'Manager', 'manager', 'warehouse', 'StorageUser', 'StorageManager']))
+                    @canPermission('model_lists.view')
                     <a class="sidebar-sublink {{ $is('model-lists.*') }}" href="{{ route('model-lists.index') }}">مدل لیست</a>
+                    @endcanPermission
+                    @canPermission('products.change_status')
                     <a class="sidebar-sublink {{ $is('product-deactivation-documents.*') }}" href="{{ route('product-deactivation-documents.index') }}">غیرفعال‌سازی کالا</a>
-                    @endif
+                    @endcanPermission
                 </div>
             </div>
         </div>
+        @endcanAnyPermission
 
 
         {{-- Warehouse --}}
+        @canAnyPermission(['stock_in.view','stock_in.create','stock_out.view','issues.view','inventory.count.view','assets.view','warehouse_map.view','preinvoices.warehouse.view'])
         <div class="sidebar-accordion-item {{ $warehouseActive ? 'is-open' : '' }}" data-accordion-section="warehouse">
             <button type="button"
                     class="sidebar-section-title sidebar-accordion-trigger {{ $warehouseActive ? 'is-active' : '' }}"
@@ -253,26 +258,32 @@
                     @canPermission('stock_in.view')
                     <a class="sidebar-sublink {{ $is('purchases.index', 'purchases.show', 'purchases.edit') }}" href="{{ route('purchases.index') }}">لیست خرید کالاها</a>
                     @endcanPermission
-                    @canPermission('stock_in.view')
+                    @canPermission('stock_in.create')
                     <a class="sidebar-sublink {{ $is('purchases.create') }}" href="{{ route('purchases.create') }}">ثبت خرید کالا</a>
                     @endcanPermission
+                    @canPermission('preinvoices.warehouse.view')
                     <a class="sidebar-sublink {{ $is('preinvoice.warehouse.*') }}" href="{{ route('preinvoice.warehouse.index') }}">در انتظار تایید انبار</a>
+                    @endcanPermission
                     @canPermission('issues.view')
                     <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
                     @endcanPermission
-                    @canPermission('inventory.view')
+                    @canPermission('inventory.count.view')
                     <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>
                     @endcanPermission
+                    @canPermission('assets.view')
                     <a class="sidebar-sublink {{ $is('asset.*') }}" href="{{ route('asset.hub') }}">امین اموال</a>
-                    @canPermission('inventory.view')
+                    @endcanPermission
+                    @canPermission('warehouse_map.view')
                     <a class="sidebar-sublink {{ $is('warehouse-map.*') }}" href="{{ route('warehouse-map.index') }}">نقشه انبار</a>
                     @endcanPermission
                 </div>
             </div>
         </div>
+        @endcanAnyPermission
 
 
         {{-- Commerce & Sales --}}
+        @canAnyPermission(['preinvoices.create','preinvoices.own.view','customers.view'])
         <div class="sidebar-accordion-item {{ $salesActive ? 'is-open' : '' }}" data-accordion-section="sales">
             <button type="button"
                     class="sidebar-section-title sidebar-accordion-trigger {{ $salesActive ? 'is-active' : '' }}"
@@ -285,17 +296,20 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
+                    @canPermission('preinvoices.create')
                     <a class="sidebar-sublink {{ $is('preinvoice.create') }}" href="{{ route('preinvoice.create') }}">ثبت پیش‌فاکتور</a>
+                    @endcanPermission
+                    @canPermission('preinvoices.own.view')
                     <a class="sidebar-sublink {{ $is('preinvoice.my.*') }}" href="{{ route('preinvoice.my.index') }}">پیش‌فاکتورهای من</a>
-                    @if($hasRole(['admin', 'Admin', 'finance', 'Accountant']))
-                        @canPermission('customers.view')
-                        <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
-                        @endcanPermission
-                    @endif
+                    @endcanPermission
+                    @canPermission('customers.view')
+                    <a class="sidebar-sublink {{ $is('customers.*', 'persons.*') }}" href="{{ route('customers.index') }}">اشخاص و طرف‌حساب‌ها</a>
+                    @endcanPermission
                 </div>
             </div>
         </div>
-@if($hasRole(['Admin']) || $hasRole(['Accountant']) )
+        @endcanAnyPermission
+@canAnyPermission(['preinvoices.finance.view','account_statements.view','invoices.view','cheques.view'])
         {{-- Finance --}}
         <div class="sidebar-accordion-item {{ $financeActive ? 'is-open' : '' }}" data-accordion-section="finance">
             <button type="button"
@@ -309,16 +323,24 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
+                    @canPermission('preinvoices.finance.view')
                     <a class="sidebar-sublink {{ $is('preinvoice.draft.*') }}" href="{{ route('preinvoice.draft.index') }}">در انتظار تایید مالی</a>
+                    @endcanPermission
+                    @canPermission('account_statements.view')
                     <a class="sidebar-sublink {{ $is('account-statements.*') }}" href="{{ route('account-statements.index') }}">گردش حساب اشخاص</a>
+                    @endcanPermission
+                    @canPermission('invoices.view')
                     <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+                    @endcanPermission
+                    @canPermission('cheques.view')
                     <a class="sidebar-sublink {{ $is('finance.cheques.*') }}" href="{{ route('finance.cheques.registered') }}">چک‌های ثبت‌شده</a>
+                    @endcanPermission
                 </div>
             </div>
         </div>
-@endif
+@endcanAnyPermission
 
-@if($hasRole(['Admin'])  )
+@canAnyPermission(['shipping_methods.view','users.view','permissions.view','logs.view','inventory_webhooks.view'])
 
         {{-- Configuration --}}
         <div class="sidebar-accordion-item {{ $configActive ? 'is-open' : '' }}" data-accordion-section="config">
@@ -333,19 +355,25 @@
             </button>
             <div class="sidebar-accordion-panel" data-accordion-panel>
                 <div class="sidebar-submenu">
+                    @canPermission('shipping_methods.view')
                     <a class="sidebar-sublink {{ $is('shipping-methods.*') }}" href="{{ route('shipping-methods.index') }}">روش‌های ارسال بار</a>
+                    @endcanPermission
                     @canPermission('users.view')
                     <a class="sidebar-sublink {{ $is('users.*') }}" href="{{ route('users.index') }}">کاربران و پرسنل</a>
                     @endcanPermission
                     @canPermission('permissions.view')
                     <a class="sidebar-sublink {{ $is('admin.permissions.*') }}" href="{{ route('admin.permissions.index') }}">مدیریت دسترسی کاربران</a>
                     @endcanPermission
+                    @canPermission('logs.view')
                     <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
+                    @endcanPermission
+                    @canPermission('inventory_webhooks.view')
                     <a class="sidebar-sublink {{ $is('inventory-webhooks.*') }}" href="{{ route('inventory-webhooks.index') }}">مدیریت API موجودی/قیمت</a>
+                    @endcanPermission
                 </div>
             </div>
         </div>
-@endif
+@endcanAnyPermission
     </div>
 </div>
 

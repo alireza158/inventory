@@ -54,5 +54,19 @@ class AppServiceProvider extends ServiceProvider
         Blade::if('canPermission', function (string $permission): bool {
             return auth()->check() && auth()->user()->hasPermission($permission);
         });
+
+        Blade::if('canAnyPermission', function (array|string $permissions): bool {
+            if (! auth()->check()) {
+                return false;
+            }
+
+            foreach ((array) $permissions as $permission) {
+                if (auth()->user()->hasPermission($permission)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
     }
 }
