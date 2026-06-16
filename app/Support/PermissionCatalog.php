@@ -288,6 +288,19 @@ class PermissionCatalog
         return $permissions;
     }
 
+
+    public static function permissionAliases(): array
+    {
+        return [
+            'inventory.view' => ['warehouses.view', 'inventory.count.view'],
+            'stock.in' => ['stock_in.view', 'stock_in.create'],
+            'stock.out' => ['stock_out.view'],
+            'customers.manage' => ['customers.view', 'customers.create', 'customers.edit'],
+            'suppliers.manage' => ['suppliers.view', 'suppliers.create', 'suppliers.edit'],
+            'export_products' => ['products.export'],
+        ];
+    }
+
     public static function routePermissions(): array
     {
         return [

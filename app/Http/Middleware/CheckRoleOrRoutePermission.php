@@ -7,16 +7,32 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class CheckPermission
+class CheckRoleOrRoutePermission
 {
-    public function handle(Request $request, Closure $next, string $permission): Response
+    public function handle(Request $request, Closure $next, string $roles): Response
     {
         $user = $request->user();
 
-        if ($user && $this->userHasPermission($user, $permission)) {
+        if ($user === null) {
+            return $this->deny($request);
+        }
+
+        $routeName = $request->route()?->getName();
+        $routePermission = $routeName ? (PermissionCatalog::routePermissions()[$routeName] ?? null) : null;
+
+        if ($routePermission !== null && $user->hasPermission($routePermission)) {
             return $next($request);
         }
 
+        if ($user->hasAnyRole(explode('|', $roles))) {
+            return $next($request);
+        }
+
+        return $this->deny($request);
+    }
+
+    private function deny(Request $request): Response
+    {
         $message = 'شما دسترسی لازم برای انجام این عملیات را ندارید.';
 
         if ($request->expectsJson()) {
@@ -28,20 +44,5 @@ class CheckPermission
             : redirect()->route('dashboard');
 
         return $redirect->with('error', $message);
-    }
-
-    private function userHasPermission($user, string $permission): bool
-    {
-        if ($user->hasPermission($permission)) {
-            return true;
-        }
-
-        foreach (PermissionCatalog::permissionAliases()[$permission] ?? [] as $alias) {
-            if ($user->hasPermission($alias)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
