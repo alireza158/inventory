@@ -17,6 +17,10 @@ class CheckRoleOrRoutePermission
             return $this->deny($request);
         }
 
+        if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+            return $next($request);
+        }
+
         $routeName = $request->route()?->getName();
         $routePermission = $routeName ? (PermissionCatalog::routePermissions()[$routeName] ?? null) : null;
 
@@ -33,16 +37,10 @@ class CheckRoleOrRoutePermission
 
     private function deny(Request $request): Response
     {
-        $message = 'شما دسترسی لازم برای انجام این عملیات را ندارید.';
-
-        if ($request->expectsJson()) {
-            return response()->json(['message' => $message], 403);
+        if ($request->user() === null) {
+            return redirect()->guest(route('login'));
         }
 
-        $redirect = url()->previous() !== $request->fullUrl()
-            ? redirect()->back()
-            : redirect()->route('dashboard');
-
-        return $redirect->with('error', $message);
+        abort(403, 'شما دسترسی لازم برای مشاهده این بخش را ندارید.');
     }
 }

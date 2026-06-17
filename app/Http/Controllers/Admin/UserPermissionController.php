@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Spatie\Permission\Models\Role;
 
 class UserPermissionController extends Controller
 {
@@ -17,10 +18,10 @@ class UserPermissionController extends Controller
     {
         $this->syncCatalogPermissions();
 
-        $users = User::query()->orderBy('name')->get();
+        $users = User::query()->with('roles')->orderBy('name')->get();
         $selectedUser = $request->integer('user_id')
-            ? User::with('permissions')->find($request->integer('user_id'))
-            : $users->first()?->load('permissions');
+            ? User::with(['permissions', 'roles'])->find($request->integer('user_id'))
+            : $users->first()?->load(['permissions', 'roles']);
 
         $permissions = AccessPermission::query()
             ->whereNotNull('key')
@@ -33,9 +34,14 @@ class UserPermissionController extends Controller
             ? $selectedUser->permissions->pluck('id')->all()
             : [];
 
+        $roles = Role::query()->orderBy('name')->get();
+        $selectedRoleNames = $selectedUser
+            ? $selectedUser->roles->pluck('name')->all()
+            : [];
+
         $sidebarPages = $this->sidebarPagesWithModels();
 
-        return view('admin.permissions.index', compact('users', 'selectedUser', 'permissions', 'selectedPermissionIds', 'sidebarPages'));
+        return view('admin.permissions.index', compact('users', 'selectedUser', 'permissions', 'selectedPermissionIds', 'sidebarPages', 'roles', 'selectedRoleNames'));
     }
 
     public function update(Request $request, User $user): RedirectResponse
@@ -43,10 +49,24 @@ class UserPermissionController extends Controller
         $validated = $request->validate([
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', 'exists:roles,name'],
         ]);
 
         $permissionIds = $validated['permissions'] ?? [];
+        $roleNames = $validated['roles'] ?? [];
+
+        if ($user->is(auth()->user()) && $user->isSuperAdmin() && ! in_array('super_admin', $roleNames, true)) {
+            $superAdminCount = User::role('super_admin')->count();
+            if ($superAdminCount <= 1) {
+                return back()->with('error', 'برای جلوگیری از قفل شدن پنل، امکان حذف تنها نقش مدیرکل از حساب خودتان وجود ندارد.');
+            }
+        }
+
         $user->permissions()->sync($permissionIds);
+        if (auth()->user()?->can('permissions.assign_roles')) {
+            $user->syncRoles($roleNames);
+        }
 
         return redirect()
             ->route('admin.permissions.index', ['user_id' => $user->id])
