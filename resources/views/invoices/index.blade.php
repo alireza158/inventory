@@ -206,7 +206,6 @@
     </div>
   </div>
 </div>
-@endif
 
 <script>
 (function(){
