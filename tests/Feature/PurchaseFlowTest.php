@@ -18,7 +18,7 @@ class PurchaseFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_purchase_create_stores_purchase_note(): void
+    public function test_purchase_create_and_update_store_purchase_note(): void
     {
         foreach (PermissionCatalog::all() as $permission) {
             Permission::findOrCreate($permission['key'], 'web')->update([
@@ -28,7 +28,7 @@ class PurchaseFlowTest extends TestCase
         }
 
         $role = Role::findOrCreate('purchase-manager', 'web');
-        $role->givePermissionTo(Permission::where('key', 'stock_in.create')->first());
+        $role->givePermissionTo(Permission::whereIn('key', ['stock_in.create', 'stock_in.edit'])->get());
 
         $user = User::factory()->create();
         $user->assignRole($role);
@@ -73,6 +73,27 @@ class PurchaseFlowTest extends TestCase
         ]);
 
         $response->assertRedirect(route('purchases.index'));
-        $this->assertSame($note, Purchase::first()?->note);
+        $purchase = Purchase::first();
+        $this->assertSame($note, $purchase?->note);
+
+        $updatedNote = 'توضیحات ویرایش‌شده خرید باید در لیست نمایش داده شود';
+
+        $updateResponse = $this->actingAs($user)->put(route('purchases.update', $purchase), [
+            'supplier_id' => $supplier->id,
+            'note' => '',
+            'description' => $updatedNote,
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'variant_id' => $variant->id,
+                    'quantity' => 2,
+                    'buy_price' => 100000,
+                    'sell_price' => 150000,
+                ],
+            ],
+        ]);
+
+        $updateResponse->assertRedirect(route('purchases.index'));
+        $this->assertSame($updatedNote, $purchase->refresh()->note);
     }
 }

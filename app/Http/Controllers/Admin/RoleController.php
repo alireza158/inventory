@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Support\PermissionCatalog;
 use Illuminate\View\View;
 use App\Support\PermissionCatalog;
 use Spatie\Permission\Models\Role;
@@ -74,18 +75,7 @@ class RoleController extends Controller
 
     private function syncCatalogPermissions(): void
     {
-        foreach (PermissionCatalog::all() as $permission) {
-            DB::table('permissions')->updateOrInsert(
-                ['key' => $permission['key']],
-                [
-                    'name' => $permission['name'],
-                    'group' => $permission['group'],
-                    'guard_name' => 'web',
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
+        PermissionCatalog::syncToDatabase();
     }
 
     private function validated(Request $request, ?Role $role = null): array

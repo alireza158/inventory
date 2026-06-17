@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\DB;
+use Spatie\Permission\PermissionRegistrar;
+
 class PermissionCatalog
 {
     public static function superAdminRoles(): array
@@ -275,6 +278,9 @@ class PermissionCatalog
                 ['permission' => 'stock_in.create', 'label' => 'ثبت خرید کالا'],
                 ['permission' => 'stock_in.edit', 'label' => 'ویرایش خرید کالا'],
                 ['permission' => 'stock_in.delete', 'label' => 'حذف خرید کالا'],
+                ['permission' => 'stock_in.confirm', 'label' => 'تأیید خرید کالا'],
+                ['permission' => 'stock_in.cancel', 'label' => 'لغو خرید کالا'],
+                ['permission' => 'stock_in.print', 'label' => 'چاپ خرید کالا'],
                 ['permission' => 'stock_in.export', 'label' => 'خروجی خرید کالا'],
             ],
             'انبارداری' => [
@@ -320,6 +326,23 @@ class PermissionCatalog
         return $permissions;
     }
 
+    public static function syncToDatabase(): void
+    {
+        foreach (self::all() as $permission) {
+            DB::table('permissions')->updateOrInsert(
+                ['key' => $permission['key']],
+                [
+                    'name' => $permission['name'],
+                    'group' => $permission['group'],
+                    'guard_name' => 'web',
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
 
     public static function permissionAliases(): array
     {
