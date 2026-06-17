@@ -37,9 +37,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $router->aliasMiddleware('route.permission', RoutePermissionMiddleware::class);
 
-        // موقتاً همه Gate/@can دسترسی‌ها آزاد هستند تا پس از تکمیل رول‌بندی حذف شود.
         Gate::before(function ($user, $ability) {
-            return true;
+            return method_exists($user, 'hasPermission') && $user->hasPermission($ability) ? true : null;
         });
 
         Product::observe(ActivityObserver::class);
