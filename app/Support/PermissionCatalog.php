@@ -245,11 +245,11 @@ class PermissionCatalog
                 ['permission' => 'products.export', 'label' => 'خروجی محصولات'],
                 ['permission' => 'model_lists.view', 'label' => 'مدل لیست'],
                 ['permission' => 'products.change_status', 'label' => 'غیرفعال‌سازی کالا'],
+                ['permission' => 'stock_in.view', 'label' => 'خرید کالا'],
+                ['permission' => 'stock_in.create', 'label' => 'ثبت خرید کالا'],
             ],
             'انبارداری' => [
                 ['permission' => 'products.create', 'label' => 'افزودن کالا'],
-                ['permission' => 'stock_in.view', 'label' => 'لیست خرید کالاها'],
-                ['permission' => 'stock_in.create', 'label' => 'ثبت خرید کالا'],
                 ['permission' => 'preinvoices.warehouse.view', 'label' => 'در انتظار تایید انبار'],
                 ['permission' => 'preinvoices.warehouse.reviews.view', 'label' => 'سوابق تأیید انبار'],
                 ['permission' => 'issues.view', 'label' => 'حواله‌های انبار'],
@@ -301,6 +301,33 @@ class PermissionCatalog
             'suppliers.manage' => ['suppliers.view', 'suppliers.create', 'suppliers.edit'],
             'export_products' => ['products.export'],
         ];
+    }
+
+    public static function userHasPermission($user, string $permission): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        if (method_exists($user, 'hasPermission') && $user->hasPermission($permission)) {
+            return true;
+        }
+
+        foreach (self::permissionAliases()[$permission] ?? [] as $alias) {
+            if (method_exists($user, 'hasPermission') && $user->hasPermission($alias)) {
+                return true;
+            }
+        }
+
+        foreach (self::permissionAliases() as $aliasPermission => $aliases) {
+            if (in_array($permission, $aliases, true)
+                && method_exists($user, 'hasPermission')
+                && $user->hasPermission($aliasPermission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function routePermissions(): array

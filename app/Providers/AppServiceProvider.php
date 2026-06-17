@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
+use App\Support\PermissionCatalog;
 use Illuminate\Routing\Router;
 use App\Models\Category;
 use App\Models\Cheque;
@@ -37,9 +38,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $router->aliasMiddleware('route.permission', RoutePermissionMiddleware::class);
 
-        // موقتاً همه Gate/@can دسترسی‌ها آزاد هستند تا پس از تکمیل رول‌بندی حذف شود.
         Gate::before(function ($user, $ability) {
-            return true;
+            return PermissionCatalog::userHasPermission($user, $ability) ? true : null;
         });
 
         Product::observe(ActivityObserver::class);
@@ -62,7 +62,7 @@ class AppServiceProvider extends ServiceProvider
         Paginator::useBootstrapFive(); // یا useBootstrapFour()
 
         Blade::if('canPermission', function (string $permission): bool {
-            return auth()->check() && auth()->user()->hasPermission($permission);
+            return auth()->check() && PermissionCatalog::userHasPermission(auth()->user(), $permission);
         });
 
         Blade::if('canAnyPermission', function (array|string $permissions): bool {
@@ -71,7 +71,7 @@ class AppServiceProvider extends ServiceProvider
             }
 
             foreach ((array) $permissions as $permission) {
-                if (auth()->user()->hasPermission($permission)) {
+                if (PermissionCatalog::userHasPermission(auth()->user(), $permission)) {
                     return true;
                 }
             }

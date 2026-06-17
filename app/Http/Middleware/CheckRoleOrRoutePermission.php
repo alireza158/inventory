@@ -11,10 +11,6 @@ class CheckRoleOrRoutePermission
 {
     public function handle(Request $request, Closure $next, string $roles): Response
     {
-        // موقتاً همه کاربران عبور کنند تا نرم‌افزار بالا بیاید.
-        // بعداً پس از تکمیل رول‌بندی، منطق واقعی role/permission دوباره فعال و این bypass حذف می‌شود.
-        return $next($request);
-
         $user = $request->user();
 
         if ($user === null) {
@@ -24,7 +20,7 @@ class CheckRoleOrRoutePermission
         $routeName = $request->route()?->getName();
         $routePermission = $routeName ? (PermissionCatalog::routePermissions()[$routeName] ?? null) : null;
 
-        if ($routePermission !== null && $user->hasPermission($routePermission)) {
+        if ($routePermission !== null && PermissionCatalog::userHasPermission($user, $routePermission)) {
             return $next($request);
         }
 
