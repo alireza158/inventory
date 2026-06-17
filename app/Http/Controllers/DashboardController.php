@@ -285,14 +285,13 @@ class DashboardController extends Controller
 
             $results['variants'] = ProductVariant::query()
                 ->with('product:id,name')
-                ->where(fn ($query) => $query->where('sku', 'like', "%{$q}%")
-                    ->orWhere('barcode', 'like', "%{$q}%")
+                ->where(fn ($query) => $query->where('barcode', 'like', "%{$q}%")
                     ->orWhere('variant_code', 'like', "%{$q}%")
                     ->orWhere('variety_code', 'like', "%{$q}%")
                     ->orWhere('variant_name', 'like', "%{$q}%"))
                 ->latest('id')
                 ->limit(10)
-                ->get(['id', 'product_id', 'variant_name', 'sku', 'barcode', 'stock']);
+                ->get(['id', 'product_id', 'variant_name', 'variant_code', 'barcode', 'stock']);
 
             $results['invoices'] = Invoice::query()
                 ->where(fn ($query) => $query->where('uuid', 'like', "%{$q}%")

@@ -147,9 +147,8 @@ class SalesPrintDocumentService
     private function inventoryCode($variant, $product): string
     {
         return collect([
-            $variant?->barcode,
-            $variant?->sku,
             $variant?->variant_code,
+            $variant?->barcode,
             $variant?->variety_code,
             $variant?->unique_key,
             $product?->barcode,
