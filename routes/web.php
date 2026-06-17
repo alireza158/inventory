@@ -41,6 +41,7 @@ use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WarehouseMapController;
 use App\Http\Controllers\WarehouseReviewController;
 use App\Http\Controllers\Admin\UserPermissionController;
+use App\Http\Controllers\Admin\RoleController;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 
@@ -58,13 +59,12 @@ Route::middleware(['auth', 'route.permission'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Products + categories
-    Route::resource('products', ProductController::class)->except(['show', 'destroy'])->middleware([
-        'index' => 'permission:products.view',
-        'create' => 'permission:products.create',
-        'store' => 'permission:products.create',
-        'edit' => 'permission:products.edit',
-        'update' => 'permission:products.edit',
-    ]);
+    Route::get('/products', [ProductController::class, 'index'])->middleware('permission:products.view')->name('products.index');
+    Route::get('/products/create', [ProductController::class, 'create'])->middleware('permission:products.create')->name('products.create');
+    Route::post('/products', [ProductController::class, 'store'])->middleware('permission:products.create')->name('products.store');
+    Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->middleware('permission:products.edit')->name('products.edit');
+    Route::put('/products/{product}', [ProductController::class, 'update'])->middleware('permission:products.edit')->name('products.update');
+    Route::patch('/products/{product}', [ProductController::class, 'update'])->middleware('permission:products.edit')->name('products.update');
     Route::get('/products/{product}/warehouse-stock', [ProductController::class, 'warehouseStock'])->name('products.warehouse-stock');
     Route::get('/products/{product}/image', [ProductController::class, 'image'])->name('products.image');
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('permission:products.delete')->name('products.destroy');
@@ -334,6 +334,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
 
     Route::get('/admin/permissions', [UserPermissionController::class, 'index'])->name('admin.permissions.index');
     Route::put('/admin/permissions/{user}', [UserPermissionController::class, 'update'])->name('admin.permissions.update');
+    Route::resource('/admin/roles', RoleController::class)->except(['show'])->names('admin.roles');
 });
 Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])
     ->middleware(['auth', 'route.permission'])

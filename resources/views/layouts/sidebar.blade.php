@@ -13,7 +13,7 @@
 
     $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'finance.cheques.*');
 
-    $configActive = $isRoute('shipping-methods.*', 'users.*', 'admin.permissions.*', 'activity-logs.*', 'inventory-webhooks.*');
+    $configActive = $isRoute('shipping-methods.*', 'users.*', 'admin.permissions.*', 'admin.roles.*', 'activity-logs.*', 'inventory-webhooks.*');
 
     $initialOpenSection = match (true) {
         $productsActive => 'products',
@@ -343,7 +343,7 @@
         </div>
 @endcanAnyPermission
 
-@canAnyPermission(['shipping_methods.view','users.view','permissions.view','logs.view','inventory_webhooks.view'])
+@canAnyPermission(['shipping_methods.view','users.view','permissions.view','roles.view','logs.view','inventory_webhooks.view'])
 
         {{-- Configuration --}}
         <div class="sidebar-accordion-item {{ $configActive ? 'is-open' : '' }}" data-accordion-section="config">
@@ -366,6 +366,9 @@
                     @endcanPermission
                     @canPermission('permissions.view')
                     <a class="sidebar-sublink {{ $is('admin.permissions.*') }}" href="{{ route('admin.permissions.index') }}">مدیریت دسترسی کاربران</a>
+                    @endcanPermission
+                    @canPermission('roles.view')
+                    <a class="sidebar-sublink {{ $is('admin.roles.*') }}" href="{{ route('admin.roles.index') }}">مدیریت نقش‌ها</a>
                     @endcanPermission
                     @canPermission('logs.view')
                     <a class="sidebar-sublink {{ $is('activity-logs.*') }}" href="{{ route('activity-logs.index') }}">لاگ فعالیت کاربران</a>
