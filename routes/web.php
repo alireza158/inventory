@@ -41,6 +41,7 @@ use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WarehouseMapController;
 use App\Http\Controllers\WarehouseReviewController;
 use App\Http\Controllers\Admin\UserPermissionController;
+use App\Http\Controllers\Admin\RoleController;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 
@@ -334,6 +335,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
 
     Route::get('/admin/permissions', [UserPermissionController::class, 'index'])->name('admin.permissions.index');
     Route::put('/admin/permissions/{user}', [UserPermissionController::class, 'update'])->name('admin.permissions.update');
+    Route::resource('/admin/roles', RoleController::class)->except(['show'])->names('admin.roles');
 });
 Route::post('model-lists/import-phone-catalog', [ModelListController::class, 'importPhoneCatalog'])
     ->middleware(['auth', 'route.permission'])

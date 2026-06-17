@@ -47,6 +47,28 @@
             @endif
         </div>
 
+
+        @canPermission('permissions.assign_roles')
+        <div class="card shadow-sm border-success mb-4">
+            <div class="card-header bg-success text-white">
+                <div class="fw-bold">نقش‌های کاربر</div>
+                <div class="small opacity-75">برای جلوگیری از قفل شدن پنل، تنها مدیرکل نمی‌تواند نقش super_admin خودش را حذف کند.</div>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    @foreach($roles as $role)
+                        <div class="col-md-4 col-xl-3">
+                            <label class="form-check d-flex align-items-center gap-2 m-0 p-2 rounded border bg-light">
+                                <input class="form-check-input" type="checkbox" name="roles[]" value="{{ $role->name }}" @checked(in_array($role->name, $selectedRoleNames, true))>
+                                <code dir="ltr">{{ $role->name }}</code>
+                            </label>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        @endcanPermission
+
         <div class="card shadow-sm border-primary mb-4">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div>

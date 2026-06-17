@@ -4,6 +4,16 @@ namespace App\Support;
 
 class PermissionCatalog
 {
+    public static function superAdminRoles(): array
+    {
+        return ['super_admin', 'super-admin', 'Super Admin', 'مدیرکل'];
+    }
+
+    public static function administratorRoles(): array
+    {
+        return array_merge(self::superAdminRoles(), ['admin', 'Admin', 'ادمین']);
+    }
+
     public static function groups(): array
     {
         return [
@@ -199,6 +209,20 @@ class PermissionCatalog
                 'permissions.view' => 'مشاهده دسترسی‌ها',
                 'permissions.edit' => 'ویرایش دسترسی‌های کاربر',
                 'permissions.sync' => 'ذخیره/همگام‌سازی دسترسی‌ها',
+                'permissions.assign_roles' => 'اختصاص نقش به کاربر',
+            ],
+            'محتوا و تیکت‌ها' => [
+                'posts.view' => 'مشاهده مطالب',
+                'posts.create' => 'ایجاد مطلب',
+                'posts.edit' => 'ویرایش مطلب',
+                'posts.delete' => 'حذف مطلب',
+                'unions.view' => 'مشاهده اتحادیه‌ها',
+                'unions.create' => 'ایجاد اتحادیه',
+                'unions.edit' => 'ویرایش اتحادیه',
+                'unions.delete' => 'حذف اتحادیه',
+                'tickets.view' => 'مشاهده تیکت‌ها',
+                'tickets.reply' => 'پاسخ به تیکت',
+                'tickets.close' => 'بستن تیکت',
             ],
             'گزارشات' => [
                 'reports.inventory' => 'گزارش موجودی',
@@ -272,6 +296,7 @@ class PermissionCatalog
                 ['permission' => 'shipping_methods.view', 'label' => 'روش‌های ارسال بار'],
                 ['permission' => 'users.view', 'label' => 'کاربران و پرسنل'],
                 ['permission' => 'permissions.view', 'label' => 'مدیریت دسترسی کاربران'],
+                ['permission' => 'roles.view', 'label' => 'مدیریت نقش‌ها'],
                 ['permission' => 'logs.view', 'label' => 'لاگ فعالیت کاربران'],
                 ['permission' => 'inventory_webhooks.view', 'label' => 'مدیریت API موجودی/قیمت'],
             ],
@@ -307,6 +332,14 @@ class PermissionCatalog
     {
         if ($user === null) {
             return false;
+        }
+
+        if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(self::superAdminRoles())) {
+            return true;
+        }
+
+        if ($permission === '*') {
+            return method_exists($user, 'hasAnyRole') && $user->hasAnyRole(self::administratorRoles());
         }
 
         if (method_exists($user, 'hasPermission') && $user->hasPermission($permission)) {
@@ -362,6 +395,7 @@ class PermissionCatalog
             'activity-logs.index' => 'logs.view',
             'users.index' => 'users.view', 'users.sync' => 'users.sync',
             'admin.permissions.index' => 'permissions.view', 'admin.permissions.update' => 'permissions.sync',
+            'admin.roles.index' => 'roles.view', 'admin.roles.create' => 'roles.create', 'admin.roles.store' => 'roles.create', 'admin.roles.edit' => 'roles.edit', 'admin.roles.update' => 'roles.edit', 'admin.roles.destroy' => 'roles.delete',
         ];
     }
 }
