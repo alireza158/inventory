@@ -279,7 +279,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::get('/preinvoice/all', [PreinvoiceController::class, 'allIndex'])->middleware('role:admin|Admin|warehouse|finance|Accountant|Manager')->name('preinvoice.all.index');
     Route::get('/preinvoice/my', [PreinvoiceController::class, 'myIndex'])->name('preinvoice.my.index');
     Route::get('/preinvoice/my/{uuid}', [PreinvoiceController::class, 'myShow'])->name('preinvoice.my.show');
-    Route::get('/preinvoice/{uuid}/print', [ArchiveController::class, 'showPreinvoice'])->middleware('role:admin|Admin|finance|Accountant|Manager|warehouse')->name('preinvoice.print');
+    Route::get('/preinvoice/{uuid}/print', [ArchiveController::class, 'showPreinvoice'])->name('preinvoice.print');
 
     // Preinvoice APIs
     Route::prefix('preinvoice/api')->group(function () {
@@ -301,8 +301,8 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
 
     Route::post('/customers/import', [CustomerController::class, 'import'])->name('customers.import');
     Route::redirect('/archive', '/invoices')->name('archive.index');
-    Route::get('/archive/preinvoices/{uuid}', [ArchiveController::class, 'showPreinvoice'])->middleware('role:admin|Admin|finance|Accountant|Manager|warehouse')->name('archive.preinvoices.show');
-    Route::get('/archive/invoices/{uuid}', [ArchiveController::class, 'showInvoice'])->middleware('role:admin|Admin|finance|Accountant|Manager|warehouse')->name('archive.invoices.show');
+    Route::get('/archive/preinvoices/{uuid}', [ArchiveController::class, 'showPreinvoice'])->name('archive.preinvoices.show');
+    Route::get('/archive/invoices/{uuid}', [ArchiveController::class, 'showInvoice'])->name('archive.invoices.show');
     // Invoices
     Route::prefix('invoices')->group(function () {
         Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');
