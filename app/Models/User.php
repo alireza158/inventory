@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Support\PermissionCatalog;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
@@ -85,7 +86,7 @@ class User extends Authenticatable
 
     public function hasPermission(string $key): bool
     {
-        if ($this->hasAnyRole(['admin', 'Admin', 'ادمین', 'super_admin', 'Super Admin', 'super-admin'])) {
+        if ($this->hasAnyRole(PermissionCatalog::administratorRoles())) {
             return true;
         }
 
@@ -93,6 +94,25 @@ class User extends Authenticatable
             return $this->permissions->contains('key', $key);
         }
 
-        return $this->permissions()->where('key', $key)->exists();
+        if ($this->permissions()->where('key', $key)->exists()) {
+            return true;
+        }
+
+        if (method_exists($this, 'hasPermissionTo')) {
+            try {
+                return $this->hasPermissionTo($key, 'web')
+                    || $this->hasPermissionTo('*', 'web')
+                    || $this->getAllPermissions()->contains('key', $key);
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasAnyRole(PermissionCatalog::superAdminRoles());
     }
 }
