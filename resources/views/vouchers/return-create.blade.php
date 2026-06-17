@@ -486,9 +486,8 @@
                     ?: ($variant->name
                     ?: ($variant->title ?: 'تنوع عمومی')));
                 $variantCode = $variant->variant_code
-                    ?: ($variant->sku
                     ?: ($variant->barcode
-                    ?: ($variant->variety_code ?: '')));
+                    ?: ($variant->variety_code ?: ''));
                 $salePrice = (int) ($variant->sell_price ?? $variant->price ?? 0);
 
                 return [

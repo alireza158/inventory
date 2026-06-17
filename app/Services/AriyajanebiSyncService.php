@@ -178,7 +178,7 @@ class AriyajanebiSyncService
                 'variant_code' => $variant->variant_code,
                 'variety_name' => $variant->variety_name,
                 'variety_code' => $variant->variety_code,
-                'variant_sku' => $variant->sku,
+                'variant_sku' => $variant->variant_code ?: ($variant->barcode ?: null),
             ];
         }
         return $rows;
