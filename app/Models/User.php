@@ -90,21 +90,27 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($this->relationLoaded('permissions')) {
-            return $this->permissions->contains('key', $key);
+        if ($this->relationLoaded('permissions') && $this->permissions->contains('key', $key)) {
+            return true;
         }
 
-        if ($this->permissions()->where('key', $key)->exists()) {
+        if (! $this->relationLoaded('permissions') && $this->permissions()->where('key', $key)->exists()) {
+            return true;
+        }
+
+        if (method_exists($this, 'getAllPermissions') && $this->getAllPermissions()->contains('key', $key)) {
             return true;
         }
 
         if (method_exists($this, 'hasPermissionTo')) {
-            try {
-                return $this->hasPermissionTo($key, 'web')
-                    || $this->hasPermissionTo('*', 'web')
-                    || $this->getAllPermissions()->contains('key', $key);
-            } catch (\Throwable) {
-                return false;
+            foreach ([$key, '*'] as $permissionName) {
+                try {
+                    if ($this->hasPermissionTo($permissionName, 'web')) {
+                        return true;
+                    }
+                } catch (\Throwable) {
+                    continue;
+                }
             }
         }
 
