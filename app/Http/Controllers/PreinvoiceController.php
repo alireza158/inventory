@@ -741,7 +741,7 @@ class PreinvoiceController extends Controller
 
     private function snapshotItems(PreinvoiceOrder $order): array
     {
-        $order->loadMissing(['items.product:id,name,code,sku,barcode', 'items.variant:id,variant_name,variety_name,sku,barcode,variant_code,stock,reserved']);
+        $order->loadMissing(['items.product:id,name,code,sku,barcode', 'items.variant:id,variant_name,variety_name,barcode,variant_code,stock,reserved']);
 
         return $order->items->map(fn($item) => [
             'item_id' => (int) $item->id,
@@ -749,7 +749,7 @@ class PreinvoiceController extends Controller
             'product_name' => $item->product?->name,
             'variant_id' => (int) $item->variant_id,
             'variant_name' => $item->variant?->variant_name ?: $item->variant?->variety_name,
-            'code' => $item->variant?->sku ?: ($item->variant?->variant_code ?: ($item->variant?->barcode ?: ($item->product?->sku ?: $item->product?->code))),
+            'code' => $item->variant?->variant_code ?: ($item->variant?->barcode ?: ($item->product?->sku ?: $item->product?->code)),
             'quantity' => (int) $item->quantity,
             'price' => (int) $item->price,
             'stock_at_review' => $item->variant ? max(0, (int) $item->variant->stock) : null,

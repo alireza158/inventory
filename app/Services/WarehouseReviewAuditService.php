@@ -242,7 +242,7 @@ class WarehouseReviewAuditService
             'variant_id' => (int) $item->variant_id,
             'product_name' => $item->product?->name,
             'variant_name' => $variant?->variant_name ?: $variant?->variety_name,
-            'code' => $variant?->sku ?: ($variant?->variant_code ?: ($variant?->barcode ?: ($item->product?->sku ?: $item->product?->code))),
+            'code' => $variant?->variant_code ?: ($variant?->barcode ?: ($item->product?->sku ?: $item->product?->code)),
             'barcode' => $variant?->barcode ?: $item->product?->barcode,
             'quantity' => (int) $item->quantity,
             'price' => (int) $item->price,
