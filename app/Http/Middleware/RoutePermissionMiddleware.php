@@ -24,7 +24,7 @@ class RoutePermissionMiddleware
 
         $user = $request->user();
 
-        if ($user && $this->userHasPermission($user, $permission)) {
+        if ($user && PermissionCatalog::userHasPermission($user, $permission)) {
             return $next($request);
         }
 
@@ -41,18 +41,4 @@ class RoutePermissionMiddleware
         return $redirect->with('error', $message);
     }
 
-    private function userHasPermission($user, string $permission): bool
-    {
-        if ($user->hasPermission($permission)) {
-            return true;
-        }
-
-        foreach (PermissionCatalog::permissionAliases()[$permission] ?? [] as $alias) {
-            if ($user->hasPermission($alias)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

@@ -303,6 +303,33 @@ class PermissionCatalog
         ];
     }
 
+    public static function userHasPermission($user, string $permission): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        if (method_exists($user, 'hasPermission') && $user->hasPermission($permission)) {
+            return true;
+        }
+
+        foreach (self::permissionAliases()[$permission] ?? [] as $alias) {
+            if (method_exists($user, 'hasPermission') && $user->hasPermission($alias)) {
+                return true;
+            }
+        }
+
+        foreach (self::permissionAliases() as $aliasPermission => $aliases) {
+            if (in_array($permission, $aliases, true)
+                && method_exists($user, 'hasPermission')
+                && $user->hasPermission($aliasPermission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function routePermissions(): array
     {
         return [
