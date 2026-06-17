@@ -111,14 +111,14 @@ class WarehouseMapController extends Controller
                 $total = $service->totalQuantity((int) $variant->id, $warehouseId);
                 $mapped = $service->mappedQuantity((int) $variant->id, $warehouseId);
                 $unmapped = $total - $mapped;
-                $code = $variant->variant_code ?: ($variant->barcode ?: ($variant->variety_code ?: ''));
+                $code = $variant->variant_code ?: ($variant->sku ?: ($variant->barcode ?: ($variant->variety_code ?: '')));
                 $parts = collect([$variant->variant_name, $variant->modelList?->name, $variant->color?->name, $variant->variety_name])->filter()->unique()->values();
 
                 return [
                     'id' => $variant->id,
                     'title' => $parts->implode(' / ') ?: 'تنوع اصلی',
                     'code' => $code,
-                    'sku' => $variant->variant_code ?: ($variant->barcode ?: null),
+                    'sku' => $variant->sku,
                     'barcode' => $variant->barcode,
                     'total_stock' => $total,
                     'mapped_quantity' => $mapped,
@@ -229,6 +229,7 @@ class WarehouseMapController extends Controller
                 $q->where(function ($qq) use ($term) {
                     $qq->where('variant_name', 'like', "%{$term}%")
                         ->orWhere('variant_code', 'like', "%{$term}%")
+                        ->orWhere('sku', 'like', "%{$term}%")
                         ->orWhere('barcode', 'like', "%{$term}%")
                         ->orWhereHas('product', fn ($p) => $p->where('name', 'like', "%{$term}%")->orWhere('code', 'like', "%{$term}%")->orWhere('sku', 'like', "%{$term}%")->orWhere('barcode', 'like', "%{$term}%"));
                 });

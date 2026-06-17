@@ -5,7 +5,7 @@
   $tab = $activeTab ?? 'locations';
   $fmt = fn($n) => number_format((int) $n);
   $variantLabel = fn($v) => trim(($v?->product?->name ?? '—') . ' / ' . ($v?->variant_name ?: $v?->variety_name ?: 'تنوع اصلی'));
-  $variantCode = fn($v) => $v?->variant_code ?: ($v?->barcode ?: ($v?->product?->code ?? '—'));
+  $variantCode = fn($v) => $v?->variant_code ?: ($v?->sku ?: ($v?->barcode ?: ($v?->product?->code ?? '—')));
 @endphp
 <style>
   .warehouse-map-page{max-width:100%;overflow-x:hidden}.wm-hero{background:linear-gradient(135deg,#0f766e,#0ea5e9);border-radius:22px;color:#fff;padding:24px;box-shadow:0 18px 45px rgba(14,116,144,.18)}
