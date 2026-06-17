@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Routing\Router;
 use App\Models\Category;
 use App\Models\Cheque;
 use App\Models\Customer;
@@ -21,6 +22,7 @@ use App\Observers\ProductInventoryObserver;
 use App\Observers\StockMovementObserver;
 use App\Observers\WarehouseStockObserver;
 use App\Observers\ProductVariantSyncObserver;
+use App\Http\Middleware\RoutePermissionMiddleware;
 use App\Models\WarehouseStock;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
@@ -31,8 +33,10 @@ class AppServiceProvider extends ServiceProvider
         //
     }
 
-    public function boot(): void
+    public function boot(Router $router): void
     {
+        $router->aliasMiddleware('route.permission', RoutePermissionMiddleware::class);
+
         // موقتاً همه Gate/@can دسترسی‌ها آزاد هستند تا پس از تکمیل رول‌بندی حذف شود.
         Gate::before(function ($user, $ability) {
             return true;
