@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Support\PermissionCatalog;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -24,6 +25,8 @@ class RoleController extends Controller
 
     public function create(): View
     {
+        $this->syncCatalogPermissions();
+
         return view('admin.roles.form', ['role' => new Role(), 'permissions' => $this->permissions(), 'selectedPermissionIds' => []]);
     }
 
@@ -37,6 +40,8 @@ class RoleController extends Controller
 
     public function edit(Role $role): View
     {
+        $this->syncCatalogPermissions();
+
         return view('admin.roles.form', [
             'role' => $role,
             'permissions' => $this->permissions(),
@@ -65,6 +70,22 @@ class RoleController extends Controller
     private function permissions()
     {
         return AccessPermission::query()->whereNotNull('key')->orderBy('group')->orderBy('name')->get()->groupBy('group');
+    }
+
+    private function syncCatalogPermissions(): void
+    {
+        foreach (PermissionCatalog::all() as $permission) {
+            DB::table('permissions')->updateOrInsert(
+                ['key' => $permission['key']],
+                [
+                    'name' => $permission['name'],
+                    'group' => $permission['group'],
+                    'guard_name' => 'web',
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
     }
 
     private function validated(Request $request, ?Role $role = null): array
