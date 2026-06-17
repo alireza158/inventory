@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\DB;
+use Spatie\Permission\PermissionRegistrar;
+
 class PermissionCatalog
 {
     public static function superAdminRoles(): array
@@ -78,15 +81,15 @@ class PermissionCatalog
                 'inventory.count.confirm' => 'نهایی‌سازی انبارگردانی',
                 'inventory.count.cancel' => 'لغو انبارگردانی',
             ],
-            'ورود کالا' => [
-                'stock_in.view' => 'مشاهده ورود کالا',
-                'stock_in.create' => 'ثبت ورود کالا',
-                'stock_in.edit' => 'ویرایش ورود کالا',
-                'stock_in.delete' => 'حذف ورود کالا',
-                'stock_in.confirm' => 'تأیید ورود کالا',
-                'stock_in.cancel' => 'لغو ورود کالا',
-                'stock_in.print' => 'چاپ ورود کالا',
-                'stock_in.export' => 'خروجی ورود کالا',
+            'خرید کالا' => [
+                'stock_in.view' => 'مشاهده خرید کالا',
+                'stock_in.create' => 'ثبت خرید کالا',
+                'stock_in.edit' => 'ویرایش خرید کالا',
+                'stock_in.delete' => 'حذف خرید کالا',
+                'stock_in.confirm' => 'تأیید خرید کالا',
+                'stock_in.cancel' => 'لغو خرید کالا',
+                'stock_in.print' => 'چاپ خرید کالا',
+                'stock_in.export' => 'خروجی خرید کالا',
             ],
             'خروج کالا و حواله انبار' => [
                 'stock_out.view' => 'مشاهده خروج کالا',
@@ -269,8 +272,16 @@ class PermissionCatalog
                 ['permission' => 'products.export', 'label' => 'خروجی محصولات'],
                 ['permission' => 'model_lists.view', 'label' => 'مدل لیست'],
                 ['permission' => 'products.change_status', 'label' => 'غیرفعال‌سازی کالا'],
-                ['permission' => 'stock_in.view', 'label' => 'خرید کالا'],
+            ],
+            'خرید کالا' => [
+                ['permission' => 'stock_in.view', 'label' => 'لیست خرید کالاها'],
                 ['permission' => 'stock_in.create', 'label' => 'ثبت خرید کالا'],
+                ['permission' => 'stock_in.edit', 'label' => 'ویرایش خرید کالا'],
+                ['permission' => 'stock_in.delete', 'label' => 'حذف خرید کالا'],
+                ['permission' => 'stock_in.confirm', 'label' => 'تأیید خرید کالا'],
+                ['permission' => 'stock_in.cancel', 'label' => 'لغو خرید کالا'],
+                ['permission' => 'stock_in.print', 'label' => 'چاپ خرید کالا'],
+                ['permission' => 'stock_in.export', 'label' => 'خروجی خرید کالا'],
             ],
             'انبارداری' => [
                 ['permission' => 'products.create', 'label' => 'افزودن کالا'],
@@ -315,6 +326,23 @@ class PermissionCatalog
         return $permissions;
     }
 
+    public static function syncToDatabase(): void
+    {
+        foreach (self::all() as $permission) {
+            DB::table('permissions')->updateOrInsert(
+                ['key' => $permission['key']],
+                [
+                    'name' => $permission['name'],
+                    'group' => $permission['group'],
+                    'guard_name' => 'web',
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
 
     public static function permissionAliases(): array
     {

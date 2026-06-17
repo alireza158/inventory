@@ -322,12 +322,31 @@ class PurchaseController extends Controller
         };
     }
 
+    private function resolveNote(Request $request): ?string
+    {
+        $candidateKeys = ['note', 'notes', 'description'];
+
+        foreach ($candidateKeys as $key) {
+            if ($request->has($key) && trim((string) $request->input($key)) !== '') {
+                return trim((string) $request->input($key));
+            }
+        }
+
+        foreach ($candidateKeys as $key) {
+            if ($request->has($key)) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
     private function validatePayload(Request $request): array
     {
         $invoiceDiscountType = $request->input('invoice_discount_type', $request->input('discount_type'));
         $invoiceDiscountRaw = $request->input('invoice_discount_value', $request->input('discount_value'));
         $invoiceDiscountValue = $this->filledNumber($invoiceDiscountRaw) ? $this->normalizeNumber($invoiceDiscountRaw) : null;
-        $note = $request->input('note', $request->input('notes'));
+        $note = $this->resolveNote($request);
 
         $items = collect((array) $request->input('items', []))
             ->map(function ($item) {

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AccessPermission;
 use App\Models\User;
 use App\Support\PermissionCatalog;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -76,18 +75,7 @@ class UserPermissionController extends Controller
 
     private function syncCatalogPermissions(): void
     {
-        foreach (PermissionCatalog::all() as $permission) {
-            DB::table('permissions')->updateOrInsert(
-                ['key' => $permission['key']],
-                [
-                    'name' => $permission['name'],
-                    'group' => $permission['group'],
-                    'guard_name' => 'web',
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
+        PermissionCatalog::syncToDatabase();
     }
 
     private function sidebarPagesWithModels(): array
