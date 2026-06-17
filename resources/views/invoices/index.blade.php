@@ -57,8 +57,8 @@
     </div>
   </div>
 
-  @if(!empty($errors))
-    <div class="alert alert-danger no-report-print">@foreach($errors as $error)<div>{{ $error }}</div>@endforeach</div>
+  @if(!empty($filterErrors))
+    <div class="alert alert-danger no-report-print">@foreach($filterErrors as $error)<div>{{ $error }}</div>@endforeach</div>
   @endif
 
   <div class="card sales-card sales-filter-card mb-3 no-report-print">

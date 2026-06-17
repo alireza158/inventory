@@ -52,29 +52,29 @@ class InvoiceController extends Controller
             }
         }
 
-        $errors = [];
+        $filterErrors = [];
         $dateFrom = $this->parseInvoiceFilterDate($filters['date_from']);
         $dateTo = $this->parseInvoiceFilterDate($filters['date_to']);
         if ($filters['date_from'] !== '' && !$dateFrom) {
-            $errors[] = 'تاریخ شروع معتبر نیست.';
+            $filterErrors[] = 'تاریخ شروع معتبر نیست.';
         }
         if ($filters['date_to'] !== '' && !$dateTo) {
-            $errors[] = 'تاریخ پایان معتبر نیست.';
+            $filterErrors[] = 'تاریخ پایان معتبر نیست.';
         }
         if ($dateFrom && $dateTo && $dateFrom->gt($dateTo)) {
-            $errors[] = 'تاریخ شروع نباید بعد از تاریخ پایان باشد.';
+            $filterErrors[] = 'تاریخ شروع نباید بعد از تاریخ پایان باشد.';
         }
         if ($filters['payment_status'] !== '' && !in_array($filters['payment_status'], $allowedPaymentStatuses, true)) {
-            $errors[] = 'وضعیت پرداخت انتخاب‌شده معتبر نیست.';
+            $filterErrors[] = 'وضعیت پرداخت انتخاب‌شده معتبر نیست.';
             $filters['payment_status'] = '';
         }
         if ($filters['status'] !== '' && !in_array($filters['status'], $allowedStatuses, true)) {
-            $errors[] = 'وضعیت عملیاتی انتخاب‌شده معتبر نیست.';
+            $filterErrors[] = 'وضعیت عملیاتی انتخاب‌شده معتبر نیست.';
             $filters['status'] = '';
         }
         foreach (['min_amount' => 'حداقل مبلغ', 'max_amount' => 'حداکثر مبلغ'] as $key => $label) {
             if ($filters[$key] !== '' && !ctype_digit($filters[$key])) {
-                $errors[] = $label . ' باید عددی باشد.';
+                $filterErrors[] = $label . ' باید عددی باشد.';
                 $filters[$key] = '';
             }
         }
@@ -108,7 +108,7 @@ class InvoiceController extends Controller
         $reportDateInput = $filters['date_from'];
         $canRegisterPayments = $this->canHandleFinanceActions();
 
-        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput', 'filters', 'reportDateInput', 'canRegisterPayments', 'summary', 'pageTotals', 'errors', 'allowedStatuses'));
+        return view('invoices.index', compact('invoices', 'q', 'statusLabels', 'dateInput', 'filters', 'reportDateInput', 'canRegisterPayments', 'summary', 'pageTotals', 'filterErrors', 'allowedStatuses'));
     }
 
     public function salesVouchers(Request $request)
