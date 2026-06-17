@@ -50,6 +50,7 @@ class ProductExportService
                         ->orWhereHas('variants', function (Builder $variantQuery) use ($search) {
                             $variantQuery->where('variant_name', 'like', "%{$search}%")
                                 ->orWhere('variety_name', 'like', "%{$search}%")
+                                ->orWhere('sku', 'like', "%{$search}%")
                                 ->orWhere('barcode', 'like', "%{$search}%")
                                 ->orWhere('variant_code', 'like', "%{$search}%")
                                 ->orWhere('variety_code', 'like', "%{$search}%");
@@ -204,7 +205,7 @@ class ProductExportService
         return [
             'id' => $variant->id,
             'name' => $this->variantName($variant),
-            'code' => $variant->variant_code ?: ($variant->barcode ?: ($variant->variety_code ?: '—')),
+            'code' => $variant->sku ?: ($variant->variant_code ?: ($variant->variety_code ?: ($variant->barcode ?: '—'))),
             'barcode' => $variant->barcode ?: '',
             'stock' => $stock,
             'unit' => $product->unit ?: 'عدد',

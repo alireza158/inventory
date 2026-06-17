@@ -17,6 +17,7 @@ class ProductVariant extends Model
         'variant_code',
         'variety_id',
         'unique_key',
+        'sku',
         'barcode',
 
         'buy_price',

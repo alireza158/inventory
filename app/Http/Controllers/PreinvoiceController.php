@@ -741,33 +741,20 @@ class PreinvoiceController extends Controller
 
     private function snapshotItems(PreinvoiceOrder $order): array
     {
-        $order->loadMissing(['items.product:id,name,code,sku,barcode', 'items.variant:id,variant_name,variety_name,barcode,variant_code,stock,reserved']);
+        $order->loadMissing(['items.product:id,name,code,sku,barcode', 'items.variant:id,variant_name,variety_name,sku,barcode,variant_code,stock,reserved']);
 
-        return $order->items->map(function ($item) {
-            $variantName = $item->variant?->variant_name ?: $item->variant?->variety_name;
-            $displayCode = $item->variant?->variant_code ?: ($item->variant?->barcode ?: ($item->product?->sku ?: $item->product?->code));
-
-            return [
-                'item_id' => (int) $item->id,
-                'product_id' => (int) $item->product_id,
-                'product_variant_id' => $item->variant_id ? (int) $item->variant_id : null,
-                'product_name' => $item->product?->name,
-                'product_name_snapshot' => $item->product?->name,
-                'variant_id' => $item->variant_id ? (int) $item->variant_id : null,
-                'variant_name' => $variantName,
-                'variant_name_snapshot' => $variantName,
-                'variant_code_snapshot' => $item->variant?->variant_code,
-                'barcode_snapshot' => $item->variant?->barcode,
-                'code' => $displayCode,
-                'display_code' => $displayCode,
-                'quantity' => (int) $item->quantity,
-                'price' => (int) $item->price,
-                'unit_price' => (int) $item->price,
-                'line_total' => (int) $item->quantity * (int) $item->price,
-                'stock_at_review' => $item->variant ? max(0, (int) $item->variant->stock) : null,
-                'available_stock_at_review' => $item->variant ? max(0, (int) $item->variant->stock - (int) $item->variant->reserved) : null,
-            ];
-        })->values()->all();
+        return $order->items->map(fn($item) => [
+            'item_id' => (int) $item->id,
+            'product_id' => (int) $item->product_id,
+            'product_name' => $item->product?->name,
+            'variant_id' => (int) $item->variant_id,
+            'variant_name' => $item->variant?->variant_name ?: $item->variant?->variety_name,
+            'code' => $item->variant?->sku ?: ($item->variant?->variant_code ?: ($item->variant?->barcode ?: ($item->product?->sku ?: $item->product?->code))),
+            'quantity' => (int) $item->quantity,
+            'price' => (int) $item->price,
+            'stock_at_review' => $item->variant ? max(0, (int) $item->variant->stock) : null,
+            'available_stock_at_review' => $item->variant ? max(0, (int) $item->variant->stock - (int) $item->variant->reserved) : null,
+        ])->values()->all();
     }
 
     private function calculateOrderTotal(PreinvoiceOrder $order): int

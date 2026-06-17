@@ -235,26 +235,17 @@ class WarehouseReviewAuditService
     {
         $variant = $item->variant;
         $stock = $variant ? max(0, (int) $variant->stock) : null;
-        $variantName = $variant?->variant_name ?: $variant?->variety_name;
-        $displayCode = $variant?->variant_code ?: ($variant?->barcode ?: ($item->product?->sku ?: $item->product?->code));
 
         return [
             'item_id' => (int) $item->id,
             'product_id' => (int) $item->product_id,
-            'product_variant_id' => $item->variant_id ? (int) $item->variant_id : null,
             'variant_id' => (int) $item->variant_id,
             'product_name' => $item->product?->name,
-            'product_name_snapshot' => $item->product?->name,
-            'variant_name' => $variantName,
-            'variant_name_snapshot' => $variantName,
-            'variant_code_snapshot' => $variant?->variant_code,
-            'barcode_snapshot' => $variant?->barcode,
-            'code' => $displayCode,
-            'display_code' => $displayCode,
+            'variant_name' => $variant?->variant_name ?: $variant?->variety_name,
+            'code' => $variant?->sku ?: ($variant?->variant_code ?: ($variant?->barcode ?: ($item->product?->sku ?: $item->product?->code))),
             'barcode' => $variant?->barcode ?: $item->product?->barcode,
             'quantity' => (int) $item->quantity,
             'price' => (int) $item->price,
-            'unit_price' => (int) $item->price,
             'line_total' => (int) $item->quantity * (int) $item->price,
             'stock_at_review' => $stock,
             'available_stock_at_review' => $stock !== null ? max(0, $stock - (int) ($variant?->reserved ?? 0)) : null,
