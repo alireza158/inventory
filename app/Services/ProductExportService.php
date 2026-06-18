@@ -9,177 +9,414 @@ use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class ProductExportService
 {
     public const LOW_STOCK_THRESHOLD = 5;
 
+    /**
+     * کوئری محصولات مطابق فیلترها
+     */
     public function query(array $filters): Builder
     {
-        $warehouseId = $filters['warehouse_id'] ?? null;
+        $warehouseId = ! empty($filters['warehouse_id'])
+            ? (int) $filters['warehouse_id']
+            : null;
 
         return Product::query()
             ->with('category')
-            ->with(['variants' => function ($query) use ($warehouseId) {
-                $query->with(['modelList', 'color'])
-                    ->with(['warehouseStocks' => function ($stockQuery) use ($warehouseId) {
-                        $stockQuery->with('warehouse');
+            ->with([
+                'variants' => function ($query) use ($warehouseId) {
+                    $query
+                        ->with(['modelList', 'color'])
+                        ->with([
+                            'warehouseStocks' => function ($stockQuery) use ($warehouseId) {
+                                $stockQuery->with('warehouse');
 
-                        if ($warehouseId) {
-                            $stockQuery->where('warehouse_id', (int) $warehouseId);
-                        }
-                    }])
-                    ->orderBy('variant_name')
-                    ->orderBy('variety_name')
-                    ->orderBy('id');
-            }])
-            ->withSum(['warehouseStocks as export_stock' => function ($query) use ($warehouseId) {
-                if ($warehouseId) {
-                    $query->where('warehouse_id', (int) $warehouseId);
-                }
-            }], 'quantity')
-            ->when(!empty($filters['category_id']), fn (Builder $query) => $query->where('category_id', (int) $filters['category_id']))
-            ->when(!empty($filters['search']), function (Builder $query) use ($filters) {
-                $search = trim((string) $filters['search']);
-                $query->where(function (Builder $q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%")
-                        ->orWhere('barcode', 'like', "%{$search}%")
-                        ->orWhere('short_barcode', 'like', "%{$search}%")
-                        ->orWhereHas('variants', function (Builder $variantQuery) use ($search) {
-                            $variantQuery->where('variant_name', 'like', "%{$search}%")
-                                ->orWhere('variety_name', 'like', "%{$search}%")
-                                ->orWhere('sku', 'like', "%{$search}%")
-                                ->orWhere('barcode', 'like', "%{$search}%")
-                                ->orWhere('variant_code', 'like', "%{$search}%")
-                                ->orWhere('variety_code', 'like', "%{$search}%");
-                        });
-                });
-            })
+                                if ($warehouseId !== null) {
+                                    $stockQuery->where('warehouse_id', $warehouseId);
+                                }
+                            },
+                        ])
+                        ->orderBy('variant_name')
+                        ->orderBy('variety_name')
+                        ->orderBy('id');
+                },
+            ])
+            ->withSum([
+                'warehouseStocks as export_stock' => function ($query) use ($warehouseId) {
+                    if ($warehouseId !== null) {
+                        $query->where('warehouse_id', $warehouseId);
+                    }
+                },
+            ], 'quantity')
+            ->when(
+                ! empty($filters['category_id']),
+                fn (Builder $query) => $query->where(
+                    'category_id',
+                    (int) $filters['category_id']
+                )
+            )
+            ->when(
+                filled($filters['search'] ?? null),
+                fn (Builder $query) => $this->applySearch(
+                    $query,
+                    trim((string) $filters['search'])
+                )
+            )
             ->orderBy('name');
     }
 
+    /**
+     * اعمال جستجو روی محصول و تنوع‌ها
+     */
+    private function applySearch(Builder $query, string $search): void
+    {
+        $query->where(function (Builder $productQuery) use ($search) {
+            $productQuery
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('sku', 'like', "%{$search}%")
+                ->orWhere('code', 'like', "%{$search}%")
+                ->orWhere('barcode', 'like', "%{$search}%")
+                ->orWhere('short_barcode', 'like', "%{$search}%")
+                ->orWhereHas('variants', function (Builder $variantQuery) use ($search) {
+                    $variantQuery
+                        ->where('variant_name', 'like', "%{$search}%")
+                        ->orWhere('variety_name', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%")
+                        ->orWhere('barcode', 'like', "%{$search}%")
+                        ->orWhere('variant_code', 'like', "%{$search}%")
+                        ->orWhere('variety_code', 'like', "%{$search}%");
+                });
+        });
+    }
+
+    /**
+     * دریافت محصولات و اعمال فیلتر وضعیت موجودی
+     */
     public function filteredProducts(array $filters): Collection
     {
-        $products = $this->query($filters)->get();
-        $status = $filters['stock_status'] ?? 'all';
+        $warehouseFilterActive = ! empty($filters['warehouse_id']);
+        $stockStatus = $filters['stock_status'] ?? 'all';
 
-        return $products->filter(function (Product $product) use ($status) {
-            $stock = $this->stock($product);
+        return $this->query($filters)
+            ->get()
+            ->filter(function (Product $product) use (
+                $stockStatus,
+                $warehouseFilterActive
+            ) {
+                $stock = $this->stock(
+                    $product,
+                    $warehouseFilterActive
+                );
 
-            return match ($status) {
-                'in_stock' => $stock > 0,
-                'out_of_stock' => $stock <= 0,
-                'low_stock' => $stock > 0 && $stock <= self::LOW_STOCK_THRESHOLD,
-                default => true,
-            };
-        })->values();
+                return match ($stockStatus) {
+                    'in_stock' => $stock > 0,
+
+                    'out_of_stock' => $stock <= 0,
+
+                    'low_stock' => $stock > 0
+                        && $stock <= self::LOW_STOCK_THRESHOLD,
+
+                    default => true,
+                };
+            })
+            ->values();
     }
 
+    /**
+     * ساخت ردیف‌های خروجی
+     */
     public function rows(array $filters): array
     {
-        return $this->filteredProducts($filters)->map(fn (Product $product) => $this->row($product, $filters))->all();
+        return $this->filteredProducts($filters)
+            ->map(
+                fn (Product $product) => $this->row(
+                    $product,
+                    $filters
+                )
+            )
+            ->all();
     }
 
+    /**
+     * ساخت اطلاعات خروجی هر محصول
+     */
     public function row(Product $product, array $filters = []): array
     {
         $warehouseFilterActive = ! empty($filters['warehouse_id']);
-        $stock = $this->stock($product, $warehouseFilterActive);
+
+        $stock = $this->stock(
+            $product,
+            $warehouseFilterActive
+        );
 
         return [
             'id' => $product->id,
+
             'image_url' => $this->imageUrl($product),
+
             'pdf_image_src' => $this->pdfImageSrc($product),
+
             'has_image' => $this->hasPdfImage($product),
-            'name' => $product->name,
-            'display_code' => $product->sku ?: ($product->code ?: ($product->barcode ?: '—')),
-            'sku' => $product->sku ?: ($product->code ?: ($product->barcode ?: '—')),
-            'category' => $product->category?->name ?: 'بدون دسته‌بندی',
+
+            'name' => $this->cleanText(
+                $product->name,
+                'محصول بدون نام'
+            ),
+
+            'display_code' => $this->productCode($product),
+
+            'sku' => $this->productCode($product),
+
+            'category' => $this->cleanText(
+                $product->category?->name,
+                'بدون دسته‌بندی'
+            ),
+
             'stock' => $stock,
+
             'price' => $this->productSalePrice($product),
+
             'price_label' => $this->productPriceLabel($product),
+
             'stock_status' => $this->stockStatus($stock),
+
             'stock_status_class' => $this->stockStatusClass($stock),
-            'updated_at' => optional($product->updated_at)->format('Y/m/d H:i'),
-            'unit' => $product->unit ?: 'عدد',
-            'barcode' => $product->barcode ?: ($product->short_barcode ?: ''),
+
+            'updated_at' => optional($product->updated_at)
+                ->format('Y/m/d H:i'),
+
+            'unit' => $this->cleanText(
+                $product->unit,
+                'عدد'
+            ),
+
+            'barcode' => trim(
+                (string) (
+                    $product->barcode
+                    ?: $product->short_barcode
+                    ?: ''
+                )
+            ),
+
             'is_sellable' => (bool) ($product->is_sellable ?? true),
-            'variants' => $product->variants->map(fn (ProductVariant $variant) => $this->variantRow($variant, $product, $warehouseFilterActive))->values()->all(),
+
+            'variants' => $product->variants
+                ->map(
+                    fn (ProductVariant $variant) => $this->variantRow(
+                        $variant,
+                        $product,
+                        $warehouseFilterActive
+                    )
+                )
+                ->values()
+                ->all(),
         ];
     }
 
+    /**
+     * کد اصلی محصول
+     */
+    private function productCode(Product $product): string
+    {
+        return trim(
+            (string) (
+                $product->sku
+                ?: $product->code
+                ?: $product->barcode
+                ?: $product->short_barcode
+                ?: '—'
+            )
+        );
+    }
+
+    /**
+     * اطلاعات بالای گزارش
+     */
     public function meta(array $filters): array
     {
-        $category = !empty($filters['category_id']) ? Category::find($filters['category_id']) : null;
-        $warehouse = !empty($filters['warehouse_id']) ? Warehouse::find($filters['warehouse_id']) : null;
+        $category = ! empty($filters['category_id'])
+            ? Category::query()->find((int) $filters['category_id'])
+            : null;
+
+        $warehouse = ! empty($filters['warehouse_id'])
+            ? Warehouse::query()->find((int) $filters['warehouse_id'])
+            : null;
 
         return [
-            'category' => $category?->name ?? 'همه دسته‌بندی‌ها',
-            'warehouse' => $warehouse?->name ?? 'همه انبارها',
-            'stock_status' => $this->stockStatusFilterLabel($filters['stock_status'] ?? 'all'),
-            'search' => $filters['search'] ?? '',
+            'category' => $this->cleanText(
+                $category?->name,
+                'همه دسته‌بندی‌ها'
+            ),
+
+            'warehouse' => $this->cleanText(
+                $warehouse?->name,
+                'همه انبارها'
+            ),
+
+            'stock_status' => $this->stockStatusFilterLabel(
+                $filters['stock_status'] ?? 'all'
+            ),
+
+            'search' => trim(
+                (string) ($filters['search'] ?? '')
+            ),
+
             'exported_at' => now()->format('Y/m/d H:i'),
-            'store_name' => config('app.name', 'سامانه انبارداری'),
+
+            'store_name' => $this->cleanText(
+                config('app.name'),
+                'سامانه انبارداری'
+            ),
+
             'low_stock_threshold' => self::LOW_STOCK_THRESHOLD,
         ];
     }
 
+    /**
+     * آدرس تصویر برای نمایش داخل سایت
+     */
     public function imageUrl(Product $product): string
     {
-        $path = $this->localImagePath($product);
+        $localPath = $this->localImagePath($product);
 
-        if ($path) {
+        if ($localPath !== null) {
             return route('products.image', $product);
         }
 
         if ($this->isRemoteImage($product->image_path)) {
-            return $product->image_path;
+            return trim((string) $product->image_path);
         }
 
         return $this->placeholderImage();
     }
 
-    public function hasPdfImage(Product $product): bool
-    {
-        return (bool) $this->localImagePath($product) || $this->isRemoteImage($product->image_path);
+    /**
+     * بررسی وجود تصویر واقعی برای PDF
+     */
+public function hasPdfImage(Product $product): bool
+{
+    return $this->pdfImageSrc($product) !== '';
+}
+
+    /**
+     * آماده‌سازی تصویر برای PDF
+     *
+     * تصاویر محلی به Base64 تبدیل می‌شوند تا mPDF
+     * بدون مشکل دسترسی، آن‌ها را نمایش دهد.
+     */
+   public function pdfImageSrc(Product $product): string
+{
+    $path = $this->localImagePath($product);
+
+    if ($path) {
+        $absolutePath = Storage::disk('public')->path($path);
+
+        if (is_file($absolutePath) && is_readable($absolutePath)) {
+            /*
+             * تبدیل بک‌اسلش ویندوز برای سازگاری با mPDF
+             */
+            return str_replace('\\', '/', $absolutePath);
+        }
     }
 
-    public function pdfImageSrc(Product $product): string
+    if ($this->isRemoteImage($product->image_path)) {
+        return trim((string) $product->image_path);
+    }
+
+    return '';
+}
+
+    /**
+     * تبدیل تصویر محلی به Base64
+     */
+    private function localImageAsBase64(string $path): ?string
     {
-        $path = $this->localImagePath($product);
+        try {
+            $disk = Storage::disk('public');
 
-        if ($path) {
-            $absolutePath = Storage::disk('public')->path($path);
-            $mime = @mime_content_type($absolutePath) ?: 'image/jpeg';
-            $content = @file_get_contents($absolutePath);
-
-            if ($content !== false) {
-                return 'data:' . $mime . ';base64,' . base64_encode($content);
+            if (! $disk->exists($path)) {
+                return null;
             }
-        }
 
-        if ($this->isRemoteImage($product->image_path)) {
-            return $product->image_path;
-        }
+            $absolutePath = $disk->path($path);
 
-        return $this->placeholderImage();
+            if (! is_file($absolutePath) || ! is_readable($absolutePath)) {
+                return null;
+            }
+
+            $content = file_get_contents($absolutePath);
+
+            if ($content === false || $content === '') {
+                return null;
+            }
+
+            $mimeType = mime_content_type($absolutePath);
+
+            if (! is_string($mimeType) || ! str_starts_with($mimeType, 'image/')) {
+                $mimeType = 'image/jpeg';
+            }
+
+            return sprintf(
+                'data:%s;base64,%s',
+                $mimeType,
+                base64_encode($content)
+            );
+        } catch (Throwable) {
+            return null;
+        }
     }
 
+    /**
+     * پیدا کردن مسیر واقعی تصویر در public disk
+     */
     private function localImagePath(Product $product): ?string
     {
-        $imagePath = trim((string) ($product->image_path ?? ''));
+        $imagePath = trim(
+            (string) ($product->image_path ?? '')
+        );
 
-        if ($imagePath === '' || $this->isRemoteImage($imagePath)) {
+        if (
+            $imagePath === ''
+            || $this->isRemoteImage($imagePath)
+        ) {
             return null;
         }
 
-        $candidates = array_values(array_unique(array_filter([
-            ltrim($imagePath, '/'),
-            preg_replace('#^/?storage/#', '', $imagePath),
-            preg_replace('#^/?public/#', '', $imagePath),
-            basename($imagePath) ? 'products/' . basename($imagePath) : null,
-        ])));
+        $normalizedPath = str_replace('\\', '/', $imagePath);
+
+        $candidates = [
+            ltrim($normalizedPath, '/'),
+
+            preg_replace(
+                '#^/?storage/#i',
+                '',
+                $normalizedPath
+            ),
+
+            preg_replace(
+                '#^/?public/#i',
+                '',
+                $normalizedPath
+            ),
+        ];
+
+        $fileName = basename($normalizedPath);
+
+        if ($fileName !== '') {
+            $candidates[] = 'products/' . $fileName;
+        }
+
+        $candidates = array_values(
+            array_unique(
+                array_filter(
+                    $candidates,
+                    fn ($path) => is_string($path) && $path !== ''
+                )
+            )
+        );
 
         foreach ($candidates as $candidate) {
             if (Storage::disk('public')->exists($candidate)) {
@@ -190,200 +427,344 @@ class ProductExportService
         return null;
     }
 
+    /**
+     * تشخیص تصویر اینترنتی
+     */
     private function isRemoteImage(?string $path): bool
     {
-        return is_string($path) && (str_starts_with($path, 'http://') || str_starts_with($path, 'https://'));
+        if (! is_string($path)) {
+            return false;
+        }
+
+        $path = trim($path);
+
+        return filter_var($path, FILTER_VALIDATE_URL) !== false
+            && in_array(
+                strtolower((string) parse_url($path, PHP_URL_SCHEME)),
+                ['http', 'https'],
+                true
+            );
     }
 
+    /**
+     * تصویر جایگزین
+     */
     private function placeholderImage(): string
     {
-        return 'data:image/png;base64,' . 'iVBORw0KGgoAAAANSUhEUgAAAFQAAABUCAYAAAAcaxDBAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAxUlEQVR4nO3QQQ3AIADAQMAJ/5yuwgOi8wKSpd1Z7z0AAAAAAAAAAAAAAAAAAAAAAAB8Z54H4GbEUYijEEchjkIchTgKcRTiKMTRiKMQRyGOQhyFOApxFOIoxNGIoxBHIY5CHIWE8c5zAF8rjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAK8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAG8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAP8WAAAAAAAAAAAAAAAAAAAAAAAArB2lJwKTe+Ve3wAAAABJRU5ErkJggg==';
+        return 'data:image/png;base64,'
+            . 'iVBORw0KGgoAAAANSUhEUgAAAFQAAABUCAYAAAAcaxDBAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAxUlEQVR4nO3QQQ3AIADAQMAJ/5yuwgOi8wKSpd1Z7z0AAAAAAAAAAAAAAAAAAAAAAAB8Z54H4GbEUYijEEchjkIchTgKcRTiKMTRiKMQRyGOQhyFOApxFOIoxNGIoxBHIY5CHIWE8c5zAF8rjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAK8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAG8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAP8WAAAAAAAAAAAAAAAAAAAAAAAArB2lJwKTe+Ve3wAAAABJRU5ErkJggg==';
     }
 
-    public function variantRow(ProductVariant $variant, Product $product, bool $warehouseFilterActive = false): array
-    {
-        $stock = $this->variantStock($variant, $warehouseFilterActive);
-        $warehouseStocks = $variant->warehouseStocks->filter(fn ($stockRow) => (int) ($stockRow->quantity ?? 0) !== 0);
+    /**
+     * ساخت اطلاعات هر تنوع
+     */
+    public function variantRow(
+        ProductVariant $variant,
+        Product $product,
+        bool $warehouseFilterActive = false
+    ): array {
+        $stock = $this->variantStock(
+            $variant,
+            $warehouseFilterActive
+        );
+
+        $warehouseStocks = $variant->relationLoaded('warehouseStocks')
+            ? $variant->warehouseStocks
+                ->filter(
+                    fn ($stockRow) => (int) ($stockRow->quantity ?? 0) !== 0
+                )
+            : collect();
 
         return [
             'id' => $variant->id,
+
             'name' => $this->variantName($variant),
-            'code' => $variant->variant_code ?: ($variant->barcode ?: ($variant->variety_code ?: ($variant->sku ?: '—'))),
-            'barcode' => $variant->barcode ?: '',
+
+            'code' => $this->variantCode($variant),
+
+            'barcode' => trim(
+                (string) ($variant->barcode ?? '')
+            ),
+
             'stock' => $stock,
-            'unit' => $product->unit ?: 'عدد',
-            'price' => (int) ($variant->sell_price ?? $product->price ?? $product->sale_retail ?? 0),
-            'status' => $variant->is_active ? 'فعال' : 'غیرفعال',
+
+            'unit' => $this->cleanText(
+                $product->unit,
+                'عدد'
+            ),
+
+            'price' => $this->variantSalePrice(
+                $variant,
+                $product
+            ),
+
+            'status' => (bool) $variant->is_active
+                ? 'فعال'
+                : 'غیرفعال',
+
             'stock_status' => $this->stockStatus($stock),
+
             'stock_status_class' => $this->stockStatusClass($stock),
-            'warehouse_stocks' => $warehouseStocks->map(fn ($stockRow) => [
-                'warehouse' => $stockRow->warehouse?->name ?: 'بدون انبار',
-                'quantity' => max(0, (int) ($stockRow->quantity ?? 0)),
-            ])->values()->all(),
+
+            'warehouse_stocks' => $warehouseStocks
+                ->map(fn ($stockRow) => [
+                    'warehouse' => $this->cleanText(
+                        $stockRow->warehouse?->name,
+                        'بدون انبار'
+                    ),
+
+                    'quantity' => max(
+                        0,
+                        (int) ($stockRow->quantity ?? 0)
+                    ),
+                ])
+                ->values()
+                ->all(),
         ];
     }
 
+    /**
+     * نام تنوع
+     */
     private function variantName(ProductVariant $variant): string
     {
-        return $variant->variant_name
-            ?: $variant->variety_name
-            ?: $variant->color?->name
-            ?: $variant->modelList?->name
-            ?: 'تنوع بدون نام';
+        return $this->cleanText(
+            $variant->variant_name
+                ?: $variant->variety_name
+                ?: $variant->color?->name
+                ?: $variant->modelList?->name,
+            'تنوع بدون نام'
+        );
     }
 
-    private function variantStock(ProductVariant $variant, bool $warehouseFilterActive = false): int
+    /**
+     * کد تنوع
+     */
+    private function variantCode(ProductVariant $variant): string
     {
+        return trim(
+            (string) (
+                $variant->variant_code
+                ?: $variant->barcode
+                ?: $variant->variety_code
+                ?: $variant->sku
+                ?: '—'
+            )
+        );
+    }
+
+    /**
+     * موجودی تنوع
+     */
+    private function variantStock(
+        ProductVariant $variant,
+        bool $warehouseFilterActive = false
+    ): int {
         if ($variant->relationLoaded('warehouseStocks')) {
+            /*
+             * وقتی فیلتر انبار فعال است، رابطه فقط موجودی همان
+             * انبار را دریافت کرده است؛ پس جمع خالی برابر صفر است.
+             */
             if ($warehouseFilterActive) {
-                return max(0, (int) $variant->warehouseStocks->sum('quantity'));
+                return max(
+                    0,
+                    (int) $variant->warehouseStocks->sum('quantity')
+                );
             }
 
             if ($variant->warehouseStocks->isNotEmpty()) {
-                return max(0, (int) $variant->warehouseStocks->sum('quantity'));
+                return max(
+                    0,
+                    (int) $variant->warehouseStocks->sum('quantity')
+                );
             }
         }
 
-        return max(0, (int) ($variant->stock ?? 0));
+        return max(
+            0,
+            (int) ($variant->stock ?? 0)
+        );
     }
 
+    /**
+     * قیمت فروش تنوع
+     */
+    private function variantSalePrice(
+        ProductVariant $variant,
+        Product $product
+    ): int {
+        return max(
+            0,
+            (int) (
+                $variant->sell_price
+                ?? $product->price
+                ?? $product->sale_retail
+                ?? 0
+            )
+        );
+    }
+
+    /**
+     * قیمت فروش محصول
+     */
     private function productSalePrice(Product $product): int
     {
-        $variantPrices = $product->relationLoaded('variants')
-            ? $product->variants->pluck('sell_price')->filter(fn ($price) => (int) $price > 0)
-            : collect();
+        if ($product->relationLoaded('variants')) {
+            $variantPrices = $product->variants
+                ->pluck('sell_price')
+                ->filter(
+                    fn ($price) => is_numeric($price)
+                        && (int) $price > 0
+                );
 
-        if ($variantPrices->isNotEmpty()) {
-            return (int) $variantPrices->min();
+            if ($variantPrices->isNotEmpty()) {
+                return (int) $variantPrices->min();
+            }
         }
 
-        return (int) ($product->price ?? $product->sale_retail ?? 0);
+        return max(
+            0,
+            (int) (
+                $product->price
+                ?? $product->sale_retail
+                ?? 0
+            )
+        );
     }
 
+    /**
+     * عنوان قیمت محصول
+     */
     private function productPriceLabel(Product $product): string
     {
         if (! $product->relationLoaded('variants')) {
             return 'قیمت فروش';
         }
 
-        $variantPrices = $product->variants->pluck('sell_price')->filter(fn ($price) => (int) $price > 0)->unique();
+        $variantPrices = $product->variants
+            ->pluck('sell_price')
+            ->filter(
+                fn ($price) => is_numeric($price)
+                    && (int) $price > 0
+            )
+            ->map(fn ($price) => (int) $price)
+            ->unique()
+            ->values();
 
-        return $variantPrices->count() > 1 ? 'قیمت فروش از' : 'قیمت فروش';
+        return $variantPrices->count() > 1
+            ? 'قیمت فروش از'
+            : 'قیمت فروش';
     }
 
-
-    public static function pdfText(?string $text): string
-    {
-        $text = (string) $text;
-
-        if ($text === '') {
-            return '';
+    /**
+     * موجودی کل محصول
+     */
+    public function stock(
+        Product $product,
+        bool $warehouseFilterActive = false
+    ): int {
+        if (
+            $product->relationLoaded('variants')
+            && $product->variants->isNotEmpty()
+        ) {
+            return max(
+                0,
+                (int) $product->variants->sum(
+                    fn (ProductVariant $variant) => $this->variantStock(
+                        $variant,
+                        $warehouseFilterActive
+                    )
+                )
+            );
         }
 
-        return preg_replace_callback('/[اآأإبپتثجچحخدذرزژسشصضطظعغفقکكگلمنوؤهةیيئء]+/u', function (array $matches): string {
-            return self::shapeArabicRun($matches[0]);
-        }, $text) ?? $text;
-    }
-
-    private static function shapeArabicRun(string $text): string
-    {
-        $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $shaped = [];
-        $count = count($chars);
-
-        for ($i = 0; $i < $count; $i++) {
-            $char = $chars[$i];
-            $forms = self::arabicForms()[$char] ?? null;
-
-            if (! $forms) {
-                $shaped[] = $char;
-                continue;
-            }
-
-            $previous = $chars[$i - 1] ?? null;
-            $next = $chars[$i + 1] ?? null;
-            $connectPrevious = $previous !== null && self::canConnectToPrevious($char) && self::canConnectToNext($previous);
-            $connectNext = $next !== null && self::canConnectToNext($char) && self::canConnectToPrevious($next);
-
-            $shaped[] = match (true) {
-                $connectPrevious && $connectNext => $forms[3] ?? $forms[0],
-                $connectPrevious => $forms[1] ?? $forms[0],
-                $connectNext => $forms[2] ?? $forms[0],
-                default => $forms[0],
-            };
+        /*
+         * وقتی انبار انتخاب شده، export_stock فقط موجودی همان
+         * انبار است و حتی اگر null باشد باید صفر در نظر گرفته شود.
+         */
+        if ($warehouseFilterActive) {
+            return max(
+                0,
+                (int) ($product->export_stock ?? 0)
+            );
         }
 
-        return implode('', array_reverse($shaped));
+        return max(
+            0,
+            (int) (
+                $product->export_stock
+                ?? $product->stock
+                ?? 0
+            )
+        );
     }
 
-    private static function canConnectToPrevious(string $char): bool
-    {
-        return isset(self::arabicForms()[$char]) && ! in_array($char, ['ا', 'آ', 'أ', 'إ', 'د', 'ذ', 'ر', 'ز', 'ژ', 'و', 'ؤ'], true);
-    }
-
-    private static function canConnectToNext(string $char): bool
-    {
-        return isset(self::arabicForms()[$char]);
-    }
-
-    private static function arabicForms(): array
-    {
-        return [
-            'ا' => ['ﺍ', 'ﺎ', 'ﺍ', 'ﺎ'], 'آ' => ['ﺁ', 'ﺂ', 'ﺁ', 'ﺂ'], 'أ' => ['ﺃ', 'ﺄ', 'ﺃ', 'ﺄ'], 'إ' => ['ﺇ', 'ﺈ', 'ﺇ', 'ﺈ'],
-            'ب' => ['ﺏ', 'ﺐ', 'ﺑ', 'ﺒ'], 'پ' => ['ﭖ', 'ﭗ', 'ﭘ', 'ﭙ'], 'ت' => ['ﺕ', 'ﺖ', 'ﺗ', 'ﺘ'], 'ث' => ['ﺙ', 'ﺚ', 'ﺛ', 'ﺜ'],
-            'ج' => ['ﺝ', 'ﺞ', 'ﺟ', 'ﺠ'], 'چ' => ['ﭺ', 'ﭻ', 'ﭼ', 'ﭽ'], 'ح' => ['ﺡ', 'ﺢ', 'ﺣ', 'ﺤ'], 'خ' => ['ﺥ', 'ﺦ', 'ﺧ', 'ﺨ'],
-            'د' => ['ﺩ', 'ﺪ', 'ﺩ', 'ﺪ'], 'ذ' => ['ﺫ', 'ﺬ', 'ﺫ', 'ﺬ'], 'ر' => ['ﺭ', 'ﺮ', 'ﺭ', 'ﺮ'], 'ز' => ['ﺯ', 'ﺰ', 'ﺯ', 'ﺰ'], 'ژ' => ['ﮊ', 'ﮋ', 'ﮊ', 'ﮋ'],
-            'س' => ['ﺱ', 'ﺲ', 'ﺳ', 'ﺴ'], 'ش' => ['ﺵ', 'ﺶ', 'ﺷ', 'ﺸ'], 'ص' => ['ﺹ', 'ﺺ', 'ﺻ', 'ﺼ'], 'ض' => ['ﺽ', 'ﺾ', 'ﺿ', 'ﻀ'],
-            'ط' => ['ﻁ', 'ﻂ', 'ﻃ', 'ﻄ'], 'ظ' => ['ﻅ', 'ﻆ', 'ﻇ', 'ﻈ'], 'ع' => ['ﻉ', 'ﻊ', 'ﻋ', 'ﻌ'], 'غ' => ['ﻍ', 'ﻎ', 'ﻏ', 'ﻐ'],
-            'ف' => ['ﻑ', 'ﻒ', 'ﻓ', 'ﻔ'], 'ق' => ['ﻕ', 'ﻖ', 'ﻗ', 'ﻘ'], 'ک' => ['ﮎ', 'ﮏ', 'ﮐ', 'ﮑ'], 'ك' => ['ﻙ', 'ﻚ', 'ﻛ', 'ﻜ'],
-            'گ' => ['ﮒ', 'ﮓ', 'ﮔ', 'ﮕ'], 'ل' => ['ﻝ', 'ﻞ', 'ﻟ', 'ﻠ'], 'م' => ['ﻡ', 'ﻢ', 'ﻣ', 'ﻤ'], 'ن' => ['ﻥ', 'ﻦ', 'ﻧ', 'ﻨ'],
-            'و' => ['ﻭ', 'ﻮ', 'ﻭ', 'ﻮ'], 'ؤ' => ['ﺅ', 'ﺆ', 'ﺅ', 'ﺆ'], 'ه' => ['ﻩ', 'ﻪ', 'ﻫ', 'ﻬ'], 'ة' => ['ﺓ', 'ﺔ', 'ﺓ', 'ﺔ'],
-            'ی' => ['ﯼ', 'ﯽ', 'ﯾ', 'ﯿ'], 'ي' => ['ﻱ', 'ﻲ', 'ﻳ', 'ﻴ'], 'ئ' => ['ﺉ', 'ﺊ', 'ﺋ', 'ﺌ'], 'ء' => ['ﺀ', 'ﺀ', 'ﺀ', 'ﺀ'],
-        ];
-    }
-
-    public function stock(Product $product, bool $warehouseFilterActive = false): int
-    {
-        if ($product->relationLoaded('variants') && $product->variants->isNotEmpty()) {
-            return max(0, (int) $product->variants->sum(fn (ProductVariant $variant) => $this->variantStock($variant, $warehouseFilterActive)));
-        }
-
-        return max(0, (int) ($product->export_stock ?? $product->stock ?? 0));
-    }
-
+    /**
+     * عنوان وضعیت موجودی
+     */
     public function stockStatus(int $stock): string
     {
-        if ($stock <= 0) {
-            return 'ناموجود';
-        }
+        return match (true) {
+            $stock <= 0 => 'ناموجود',
 
-        if ($stock <= self::LOW_STOCK_THRESHOLD) {
-            return 'کم‌موجودی';
-        }
+            $stock <= self::LOW_STOCK_THRESHOLD => 'کم‌موجودی',
 
-        return 'موجود';
+            default => 'موجود',
+        };
     }
 
+    /**
+     * کلاس نمایشی وضعیت موجودی
+     */
     public function stockStatusClass(int $stock): string
     {
-        if ($stock <= 0) {
-            return 'danger';
-        }
+        return match (true) {
+            $stock <= 0 => 'danger',
 
-        if ($stock <= self::LOW_STOCK_THRESHOLD) {
-            return 'warning';
-        }
+            $stock <= self::LOW_STOCK_THRESHOLD => 'warning',
 
-        return 'success';
+            default => 'success',
+        };
     }
 
+    /**
+     * عنوان فیلتر وضعیت موجودی
+     */
     private function stockStatusFilterLabel(string $status): string
     {
         return match ($status) {
             'in_stock' => 'فقط کالاهای موجود',
+
             'out_of_stock' => 'فقط کالاهای ناموجود',
+
             'low_stock' => 'کالاهای کم‌موجودی',
+
             default => 'همه محصولات',
         };
+    }
+
+    /**
+     * پاک‌سازی متن بدون دست‌کاری شکل حروف فارسی
+     */
+    private function cleanText(
+        mixed $value,
+        string $fallback = ''
+    ): string {
+        $text = trim(
+            strip_tags((string) $value)
+        );
+
+        if ($text === '') {
+            return $fallback;
+        }
+
+        /*
+         * یکسان‌سازی حروف عربی با حروف فارسی
+         */
+        return str_replace(
+            ['ي', 'ك', "\u{200F}", "\u{200E}"],
+            ['ی', 'ک', '', ''],
+            $text
+        );
     }
 }
