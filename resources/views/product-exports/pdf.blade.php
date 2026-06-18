@@ -3,6 +3,15 @@
     $exportedAt = $meta['exported_at'] ?? now()->format('Y/m/d H:i');
 @endphp
 
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        {!! $styles !!}
+    </style>
+</head>
+<body>
 <table class="report-header">
     <tr>
         <td>
@@ -117,3 +126,5 @@
         @endforeach
     </tbody>
 </table>
+</body>
+</html>

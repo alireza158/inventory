@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Mpdf\Config\ConfigVariables;
 use Mpdf\Config\FontVariables;
-use Mpdf\HTMLParserMode;
 use Mpdf\Mpdf;
 use Mpdf\Output\Destination;
 use RuntimeException;
@@ -73,11 +72,6 @@ class ProductExportController extends Controller
 
             $meta = $this->service->meta($filters);
 
-            $mpdf->WriteHTML(
-                $this->pdfStyles(),
-                HTMLParserMode::HEADER_CSS
-            );
-
             $mpdf->SetHTMLFooter(
                 $this->pdfFooter($meta)
             );
@@ -85,12 +79,10 @@ class ProductExportController extends Controller
             $html = view('product-exports.pdf', [
                 'rows' => $rows,
                 'meta' => $meta,
+                'styles' => $this->pdfStyles(),
             ])->render();
 
-            $mpdf->WriteHTML(
-                $html,
-                HTMLParserMode::HTML_BODY
-            );
+            $mpdf->WriteHTML($html);
 
             $filename = 'product-report-'
                 . now()->format('Ymd-His')
@@ -101,9 +93,12 @@ class ProductExportController extends Controller
                 Destination::STRING_RETURN
             );
 
-            if ($pdfContent === '') {
+            if (
+                $pdfContent === ''
+                || ! str_starts_with($pdfContent, '%PDF-')
+            ) {
                 throw new RuntimeException(
-                    'محتوای PDF تولید نشد.'
+                    'فایل PDF معتبر تولید نشد.'
                 );
             }
 
@@ -264,11 +259,6 @@ class ProductExportController extends Controller
     private function pdfStyles(): string
     {
         return <<<'CSS'
-        @page {
-            size: A4 landscape;
-            margin: 10mm 8mm 14mm;
-        }
-
         * {
             box-sizing: border-box;
         }
