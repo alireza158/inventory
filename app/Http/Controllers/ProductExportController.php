@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Mpdf\Config\ConfigVariables;
 use Mpdf\Config\FontVariables;
-use Mpdf\HTMLParserMode;
 use Mpdf\Mpdf;
 use Mpdf\Output\Destination;
 use RuntimeException;
@@ -73,15 +72,6 @@ class ProductExportController extends Controller
 
             $meta = $this->service->meta($filters);
 
-            /*
-             * CSS و HTML جداگانه ارسال می‌شوند تا از خروجی سفید
-             * در HTMLهای حجیم جلوگیری شود.
-             */
-            $mpdf->WriteHTML(
-                $this->pdfStyles(),
-                HTMLParserMode::HEADER_CSS
-            );
-
             $mpdf->SetHTMLFooter(
                 $this->pdfFooter($meta)
             );
@@ -89,12 +79,10 @@ class ProductExportController extends Controller
             $html = view('product-exports.pdf', [
                 'rows' => $rows,
                 'meta' => $meta,
+                'styles' => $this->pdfStyles(),
             ])->render();
 
-            $mpdf->WriteHTML(
-                $html,
-                HTMLParserMode::HTML_BODY
-            );
+            $mpdf->WriteHTML($html);
 
             $filename = 'product-report-'
                 . now()->format('Ymd-His')
@@ -105,9 +93,12 @@ class ProductExportController extends Controller
                 Destination::STRING_RETURN
             );
 
-            if ($pdfContent === '') {
+            if (
+                $pdfContent === ''
+                || ! str_starts_with($pdfContent, '%PDF-')
+            ) {
                 throw new RuntimeException(
-                    'محتوای PDF تولید نشد.'
+                    'فایل PDF معتبر تولید نشد.'
                 );
             }
 
@@ -144,9 +135,6 @@ class ProductExportController extends Controller
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
 
-            /*
-             * افقی انتخاب شده تا جدول فشرده یا خراب نشود.
-             */
             'format' => 'A4-L',
 
             'margin_left' => 8,
@@ -179,10 +167,6 @@ class ProductExportController extends Controller
             'autoLangToFont' => true,
             'useSubstitutions' => true,
 
-            /*
-             * از simpleTables، autosize و تنظیمات مشکل‌دار
-             * استفاده نمی‌کنیم.
-             */
             'use_kwt' => false,
         ]);
 
@@ -191,11 +175,8 @@ class ProductExportController extends Controller
         $mpdf->SetAuthor(config('app.name', 'سامانه انبارداری'));
         $mpdf->SetCreator(config('app.name', 'سامانه انبارداری'));
 
-        /*
-         * موقتاً برای پیدا کردن خطاهای مخفی فعال باشد.
-         */
-        $mpdf->debug = true;
-        $mpdf->showImageErrors = true;
+        $mpdf->debug = false;
+        $mpdf->showImageErrors = false;
 
         return $mpdf;
     }
@@ -278,144 +259,217 @@ class ProductExportController extends Controller
     private function pdfStyles(): string
     {
         return <<<'CSS'
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
         body {
+            margin: 0;
+            padding: 0;
             direction: rtl;
             text-align: right;
-            font-family: vazirmatn;
+            font-family: vazirmatn, sans-serif;
             font-size: 9pt;
             color: #172033;
             line-height: 1.6;
         }
 
-        table {
-            font-family: vazirmatn;
+        table,
+        tr,
+        th,
+        td,
+        div,
+        span {
+            font-family: vazirmatn, sans-serif;
         }
 
-        .header {
+        .report-header {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             background-color: #1e293b;
         }
 
-        .header td {
+        .report-header td {
             padding: 12px;
             border: 0;
             color: #ffffff;
+            vertical-align: middle;
         }
 
-        .title {
+        .report-title {
             font-size: 17pt;
             font-weight: bold;
             color: #ffffff;
         }
 
-        .subtitle {
+        .report-subtitle {
             margin-top: 3px;
             color: #cbd5e1;
             font-size: 8pt;
         }
 
-        .date {
+        .report-date {
             width: 28%;
             text-align: left;
+            color: #ffffff;
         }
 
         .meta-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
 
         .meta-table td {
-            padding: 6px;
+            width: 25%;
+            padding: 7px;
             border: 1px solid #dbe3ec;
             background-color: #f8fafc;
+            vertical-align: middle;
         }
 
         .meta-label {
             color: #64748b;
-            font-size: 7pt;
+            font-size: 7.5pt;
         }
 
         .meta-value {
+            margin-top: 2px;
             color: #1e293b;
             font-weight: bold;
         }
 
         .summary {
-            padding: 6px 8px;
-            margin-bottom: 8px;
+            padding: 7px 10px;
+            margin-bottom: 10px;
             background-color: #eff6ff;
-            border-right: 3px solid #2563eb;
+            border-right: 4px solid #2563eb;
             color: #1e40af;
         }
 
-        .products {
+        .products-table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
+            page-break-inside: auto;
         }
 
-        .products th {
-            padding: 6px 3px;
+        .products-table thead {
+            display: table-header-group;
+        }
+
+        .products-table tr {
+            page-break-inside: avoid;
+        }
+
+        .products-table th {
+            padding: 7px 4px;
             border: 1px solid #334155;
             background-color: #334155;
             color: #ffffff;
             text-align: center;
-            font-size: 7.5pt;
+            vertical-align: middle;
+            font-size: 8pt;
         }
 
-        .products td {
-            padding: 5px 3px;
+        .products-table td {
+            padding: 6px 4px;
             border: 1px solid #dbe3ec;
             text-align: center;
             vertical-align: middle;
+            background-color: #ffffff;
+        }
+
+        .products-table tbody tr:nth-child(even) td {
+            background-color: #f8fafc;
         }
 
         .product-name {
             text-align: right;
             font-weight: bold;
+            color: #0f172a;
         }
 
-        .small {
+        .product-unit,
+        .muted {
             color: #64748b;
             font-size: 7pt;
         }
 
-        .ltr {
+        .product-unit {
+            margin-top: 2px;
+            text-align: right;
+        }
+
+        .number,
+        .code {
             direction: ltr;
+            unicode-bidi: embed;
             text-align: center;
+            white-space: nowrap;
         }
 
-        .image {
-            width: 36px;
-            height: 36px;
+        .product-image {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #dbe3ec;
+            padding: 2px;
         }
 
-        .status {
+        .price {
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .price-label {
+            display: block;
+            color: #64748b;
+            font-size: 7pt;
+        }
+
+        .badge {
+            display: inline-block;
             font-size: 7pt;
             font-weight: bold;
             padding: 2px 5px;
+            white-space: nowrap;
         }
 
-        .success {
+        .badge-success {
             color: #067647;
             background-color: #dcfae6;
         }
 
-        .warning {
+        .badge-warning {
             color: #9a6700;
             background-color: #fef0c7;
         }
 
-        .danger {
+        .badge-danger {
             color: #b42318;
             background-color: #fee4e2;
         }
 
-        .variant td {
+        .badge-secondary {
+            color: #475569;
+            background-color: #e2e8f0;
+        }
+
+        .variant-row td {
             background-color: #f1f5f9;
             font-size: 7.5pt;
+        }
+
+        .variant-name {
+            text-align: right;
+            padding-right: 10px;
+        }
+
+        .variant-label {
+            color: #2563eb;
+            font-weight: bold;
         }
         CSS;
     }
