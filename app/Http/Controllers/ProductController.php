@@ -528,6 +528,8 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        $this->sanitizeUpdateVariants($request, $product);
+
         $request->merge([
             'category_id' => $request->has('category_id') ? $request->input('category_id') : $product->category_id,
             'name' => $request->has('name') ? $request->input('name') : $product->name,
@@ -539,8 +541,8 @@ class ProductController extends Controller
             'remove_image' => ['nullable', 'boolean'],
             'is_sellable' => ['nullable', 'boolean'],
 
-            'variants' => ['required', 'array', 'min:1'],
-            'variants.*.id' => ['nullable', 'integer', 'exists:product_variants,id'],
+            'variants' => ['nullable', 'array'],
+            'variants.*.id' => ['nullable', 'integer'],
             'variants.*.variant_name' => ['required', 'string', 'max:255'],
             'variants.*.model_list_id' => ['nullable', 'integer', 'exists:model_lists,id'],
             'variants.*.variety_name' => ['required', 'string', 'max:255'],
@@ -552,6 +554,12 @@ class ProductController extends Controller
             'variants.*.variety_id' => ['nullable', 'integer', 'min:1'],
             'variant_site_ids' => ['nullable', 'array'],
             'variant_site_ids.*' => ['nullable', 'integer', 'min:1'],
+        ], [
+            'variants.*.variant_name.required' => 'اطلاعات یکی از تنوع‌های کالا ناقص است. نام تنوع برای ردیف‌های فعال الزامی است.',
+            'variants.*.variety_name.required' => 'اطلاعات یکی از تنوع‌های کالا ناقص است. مدل/عنوان طرح برای ردیف‌های فعال الزامی است.',
+            'variants.*.variety_code.required' => 'اطلاعات یکی از تنوع‌های کالا ناقص است. کد تنوع برای ردیف‌های فعال الزامی است.',
+            'variants.*.variety_code.digits' => 'کد تنوع ردیف‌های فعال باید دقیقاً ۴ رقم باشد.',
+            'variants.*.model_list_id.exists' => 'مدل انتخاب‌شده برای یکی از تنوع‌های کالا معتبر نیست.',
         ]);
 
         $newImagePath = $this->storeProductImage($request);
@@ -577,7 +585,7 @@ class ProductController extends Controller
             $keepIds = [];
             $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
-            foreach ($data['variants'] as $v) {
+            foreach (($data['variants'] ?? []) as $v) {
                 $ignoreId = !empty($v['id']) ? (int) $v['id'] : null;
 
                 $modelCode3 = '000';
@@ -652,9 +660,11 @@ class ProductController extends Controller
                 $defaultDesignService->electricDefaultColorVariantIds($product)
             )));
 
-            ProductVariant::where('product_id', $product->id)
-                ->when(count($keepIds) > 0, fn ($q) => $q->whereNotIn('id', $keepIds))
-                ->delete();
+            if (array_key_exists('variants', $data) && count($data['variants']) > 0) {
+                ProductVariant::where('product_id', $product->id)
+                    ->when(count($keepIds) > 0, fn ($q) => $q->whereNotIn('id', $keepIds))
+                    ->delete();
+            }
 
             foreach (($data['variant_site_ids'] ?? []) as $variantId => $siteVariantId) {
                 if ($siteVariantId === null || $siteVariantId === '') {
@@ -676,6 +686,41 @@ class ProductController extends Controller
         }
 
         return redirect()->to($this->safeProductsReturnUrl($request->input('return_to')))->with('success', 'کالا بروزرسانی شد.');
+    }
+
+    private function sanitizeUpdateVariants(Request $request, Product $product): void
+    {
+        if (!$request->has('variants')) {
+            return;
+        }
+
+        $productVariantIds = $product->variants()->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $cleanVariants = collect($request->input('variants', []))
+            ->filter(function ($variant) use ($productVariantIds) {
+                if (!is_array($variant)) {
+                    return false;
+                }
+
+                $variantId = $variant['id'] ?? null;
+
+                if (filled($variantId) && !in_array((int) $variantId, $productVariantIds, true)) {
+                    return false;
+                }
+
+                return filled($variantId)
+                    || filled($variant['variant_name'] ?? null)
+                    || filled($variant['variety_name'] ?? null)
+                    || filled($variant['variety_code'] ?? null)
+                    || filled($variant['variant_code'] ?? null)
+                    || filled($variant['barcode'] ?? null);
+            })
+            ->values()
+            ->all();
+
+        $request->merge([
+            'variants' => $cleanVariants,
+        ]);
     }
 
     private function safeProductsReturnUrl(?string $returnTo): string
