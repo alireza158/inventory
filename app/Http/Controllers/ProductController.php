@@ -542,6 +542,15 @@ class ProductController extends Controller
             'remove_image' => ['nullable', 'boolean'],
             'is_sellable' => ['nullable', 'boolean'],
             'generate_new_variants' => ['nullable', 'boolean'],
+            'use_models' => ['nullable'],
+            'use_designs' => ['nullable'],
+            'model_list_ids' => ['nullable', 'array'],
+            'model_list_ids.*' => ['integer', 'exists:model_lists,id'],
+            'design_count' => ['nullable', 'integer', 'min:1', 'max:99'],
+            'design_notes' => ['nullable', 'array'],
+            'design_notes.*' => ['nullable', 'string', 'max:120'],
+            'buy_price' => ['nullable', 'integer', 'min:0'],
+            'sell_price' => ['nullable', 'integer', 'min:0'],
 
             'variants' => ['nullable', 'array'],
             'variants.*.id' => ['nullable', 'integer', Rule::exists('product_variants', 'id')->where('product_id', $product->id)],
@@ -569,7 +578,7 @@ class ProductController extends Controller
         $removeImage = $request->boolean('remove_image');
         $oldImagePath = null;
 
-        DB::transaction(function () use ($data, $product, $newImagePath, $removeImage, &$oldImagePath) {
+        DB::transaction(function () use ($data, $request, $product, $newImagePath, $removeImage, &$oldImagePath) {
             $product = Product::query()->lockForUpdate()->findOrFail($product->id);
 
             $productUpdate = [
@@ -663,11 +672,9 @@ class ProductController extends Controller
                 $defaultDesignService->electricDefaultColorVariantIds($product)
             )));
 
-            if (array_key_exists('variants', $data) && count($data['variants']) > 0) {
-                ProductVariant::where('product_id', $product->id)
-                    ->when(count($keepIds) > 0, fn ($q) => $q->whereNotIn('id', $keepIds))
-                    ->delete();
-            }
+            // ویرایش ساختار کالا نباید هیچ تنوع واقعی را صرفاً به‌خاطر نبودن در request حذف کند.
+            // حذف/غیرفعال‌سازی واقعی باید بعداً از مسیر صریح و کنترل‌شده انجام شود.
+            $this->syncExpectedVariantsFromStructure($product, $request, $data);
 
             foreach (($data['variant_site_ids'] ?? []) as $variantId => $siteVariantId) {
                 if ($siteVariantId === null || $siteVariantId === '') {
@@ -689,6 +696,103 @@ class ProductController extends Controller
         }
 
         return redirect()->to($this->safeProductsReturnUrl($request->input('return_to')))->with('success', 'کالا بروزرسانی شد.');
+    }
+
+
+    private function syncExpectedVariantsFromStructure(Product $product, Request $request, array $data): void
+    {
+        $useModels = $request->boolean('use_models');
+        $useDesigns = $request->boolean('use_designs');
+
+        $modelIds = $useModels
+            ? collect($data['model_list_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values()
+            : collect([null]);
+
+        if ($useModels && $modelIds->isEmpty()) {
+            return;
+        }
+
+        $modelsById = $useModels
+            ? ModelList::query()->whereIn('id', $modelIds->all())->get(['id', 'model_name', 'code'])->keyBy('id')
+            : collect();
+
+        $designCount = $useDesigns ? max(1, min(99, (int) ($data['design_count'] ?? 1))) : 0;
+        $designNotes = collect($data['design_notes'] ?? [])->map(fn ($note) => trim((string) $note))->values();
+        $designIndexes = $useDesigns ? range(1, $designCount) : [0];
+
+        $defaultSellPrice = array_key_exists('sell_price', $data) && $data['sell_price'] !== null
+            ? (int) $data['sell_price']
+            : 0;
+        $defaultBuyPrice = array_key_exists('buy_price', $data) && $data['buy_price'] !== null
+            ? (int) $data['buy_price']
+            : null;
+
+        foreach ($modelIds as $modelId) {
+            $model = $modelId ? $modelsById->get($modelId) : null;
+            if ($useModels && !$model) {
+                continue;
+            }
+
+            $modelCode3 = $model ? $this->normalizeModel3($model->code) : '000';
+
+            foreach ($designIndexes as $designIndex) {
+                $design2 = $designIndex > 0 ? str_pad((string) $designIndex, 2, '0', STR_PAD_LEFT) : '00';
+                $varietyCode = $designIndex > 0 ? str_pad((string) $designIndex, 4, '0', STR_PAD_LEFT) : '0000';
+                $designTitle = $designIndex > 0 ? $this->designTitle($designIndex, (string) ($designNotes->get($designIndex - 1) ?? '')) : '—';
+
+                $existingQuery = ProductVariant::query()
+                    ->where('product_id', $product->id)
+                    ->whereRaw('RIGHT(variety_code, 2) = ?', [$design2]);
+
+                if ($model) {
+                    $existingQuery->where('model_list_id', $model->id);
+                } else {
+                    $existingQuery->whereNull('model_list_id');
+                }
+
+                $variant = $existingQuery->first();
+                $variantCode = $this->buildVariantCode11((string) $product->code, $modelCode3, $design2, $variant?->id);
+
+                $variantName = trim(collect([
+                    $product->name,
+                    $model?->model_name,
+                    $designIndex > 0 ? $designTitle : null,
+                ])->filter(fn ($part) => trim((string) $part) !== '' && $part !== '—')->implode(' '));
+
+                $payload = [
+                    'variant_name' => $variantName !== '' ? $variantName : $product->name,
+                    'model_list_id' => $model?->id,
+                    'variety_name' => $designTitle,
+                    'variety_code' => $varietyCode,
+                    'variant_code' => $variantCode,
+                ];
+
+                if ($variant) {
+                    $variant->update($payload);
+                    continue;
+                }
+
+                ProductVariant::create(array_merge($payload, [
+                    'product_id' => $product->id,
+                    'is_active' => true,
+                    'sell_price' => $defaultSellPrice,
+                    'buy_price' => $defaultBuyPrice,
+                    'stock' => 0,
+                    'reserved' => 0,
+                ]));
+            }
+        }
+    }
+
+    private function designTitle(int $index, string $note): string
+    {
+        $note = trim($note);
+
+        if (in_array($note, ['مشکی', 'سفید'], true)) {
+            return $note;
+        }
+
+        return $note !== '' ? ('طرح ' . $index . ' (' . $note . ')') : ('طرح ' . $index);
     }
 
     private function sanitizeUpdateVariants(Request $request, Product $product): void
