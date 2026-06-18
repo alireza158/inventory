@@ -25,33 +25,57 @@
     $oldCategoryId   = old('category_id', $product->category_id);
     $oldModelIds     = array_map('intval', old('model_list_ids', $product->variants->pluck('model_list_id')->filter()->unique()->values()->all()));
     $oldDesignNotes = old('design_notes');
+    $designIndexes = [];
 
-if ($oldDesignNotes === null) {
-    $oldDesignNotes = $product->variants
-        ->pluck('variety_name')
-        ->filter(fn ($name) => $name && $name !== '—')
-        ->unique()
-        ->values()
-        ->map(function ($name) {
-            $name = (string) $name;
+    if ($oldDesignNotes === null) {
+        $designNotesByIndex = [];
 
-            if (preg_match('/^طرح\s+\d+\s*\((.*)\)$/u', $name, $m)) {
-                return $m[1];
+        foreach ($product->variants as $variant) {
+            $varietyCode = (string) ($variant->variety_code ?? '');
+            $design2 = substr(str_pad(preg_replace('/\D+/', '', $varietyCode), 2, '0', STR_PAD_LEFT), -2);
+            $designIndex = (int) $design2;
+
+            if ($designIndex <= 0) {
+                continue;
             }
 
-            if (preg_match('/^طرح\s+\d+$/u', $name)) {
-                return '';
+            $designIndexes[$designIndex] = $designIndex;
+
+            if (array_key_exists($designIndex, $designNotesByIndex)) {
+                continue;
             }
 
-            return $name;
-        })
-        ->all();
-} else {
-    $oldDesignNotes = array_values($oldDesignNotes);
-}
+            $name = trim((string) ($variant->variety_name ?? ''));
+            if ($name === '' || $name === '—') {
+                $designNotesByIndex[$designIndex] = '';
+                continue;
+            }
+
+            if (preg_match('/^طرح\s+' . $designIndex . '\s*\((.*)\)$/u', $name, $m)) {
+                $designNotesByIndex[$designIndex] = trim((string) $m[1]);
+                continue;
+            }
+
+            if (preg_match('/^طرح\s+' . $designIndex . '$/u', $name)) {
+                $designNotesByIndex[$designIndex] = '';
+                continue;
+            }
+
+            $designNotesByIndex[$designIndex] = $name;
+        }
+
+        ksort($designIndexes);
+        $oldDesignNotes = collect(array_keys($designIndexes))
+            ->map(fn ($index) => $designNotesByIndex[$index] ?? '')
+            ->values()
+            ->all();
+    } else {
+        $oldDesignNotes = array_values($oldDesignNotes);
+        $designIndexes = count($oldDesignNotes) > 0 ? array_fill_keys(range(1, count($oldDesignNotes)), true) : [];
+    }
 
     $hasModels = count($oldModelIds) > 0;
-    $hasDesigns = count($oldDesignNotes) > 0;
+    $hasDesigns = count($designIndexes) > 0;
     $defaultBrandGroup = old('model_brand_group');
     if (!$defaultBrandGroup && $hasModels) {
         $defaultBrandGroup = optional($modelLists->firstWhere('id', $oldModelIds[0] ?? null))->brand;
