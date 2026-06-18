@@ -541,6 +541,7 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'remove_image' => ['nullable', 'boolean'],
             'is_sellable' => ['nullable', 'boolean'],
+            'generate_new_variants' => ['nullable', 'boolean'],
 
             'variants' => ['nullable', 'array'],
             'variants.*.id' => ['nullable', 'integer', Rule::exists('product_variants', 'id')->where('product_id', $product->id)],
@@ -697,9 +698,10 @@ class ProductController extends Controller
         }
 
         $productVariantIds = $product->variants()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $allowNewVariants = $request->boolean('generate_new_variants');
 
         $cleanVariants = collect($request->input('variants', []))
-            ->filter(function ($variant) use ($productVariantIds) {
+            ->filter(function ($variant) use ($productVariantIds, $allowNewVariants) {
                 if (!is_array($variant)) {
                     return false;
                 }
@@ -730,11 +732,15 @@ class ProductController extends Controller
                 $hasActiveFlag = array_key_exists('is_active', $variant) || array_key_exists('enabled', $variant);
                 $isActive = filter_var($variant['is_active'] ?? $variant['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
+                if (!$hasRealId && !$allowNewVariants) {
+                    return false;
+                }
+
                 if (!$hasRealId && $hasActiveFlag && !$isActive) {
                     return false;
                 }
 
-                return $hasRealId || $hasAnyValue || $isActive;
+                return $hasRealId || ($allowNewVariants && ($hasAnyValue || $isActive));
             })
             ->map(function ($variant) {
                 unset($variant['_delete'], $variant['deleted'], $variant['_template'], $variant['is_template'], $variant['_disabled'], $variant['disabled'], $variant['enabled']);

@@ -421,6 +421,7 @@ if ($oldDesignNotes === null) {
 
             {{-- hidden inputs برای model_list_ids - اینجا توسط JS مدیریت می‌شن --}}
             <input type="hidden" name="return_to" value="{{ $returnTo }}">
+            <input type="hidden" name="generate_new_variants" id="generateNewVariants" value="0">
             <div id="modelHiddenInputsContainer"></div>
             <div id="variantsHiddenInputsContainer"></div>
 
@@ -684,8 +685,15 @@ if ($oldDesignNotes === null) {
                                 </div>
 
                                 <div class="col-md-9">
-                                    <div class="muted mb-2">نمونه کد تنوع‌های قابل ساخت</div>
+                                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+                                        <div>
+                                            <div class="muted">نمونه کد تنوع‌های قابل ساخت</div>
+                                            <div class="muted">مدل‌ها/طرح‌های تازه فقط پیشنهاد هستند و تا زدن دکمه زیر به عنوان تنوع فعال ارسال نمی‌شوند.</div>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-success" id="enableNewVariantsGeneration">تولید تنوع‌های جدید از انتخاب‌ها</button>
+                                    </div>
                                     <div class="examples-grid" id="variantExamples"></div>
+                                    <div class="muted mt-2" id="newVariantsGenerationStatus">تنوع‌های جدید پیشنهادی در ذخیره عادی ارسال نمی‌شوند.</div>
                                 </div>
                             </div>
                         </div>
@@ -800,7 +808,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var modelHiddenInputsContainer = document.getElementById('modelHiddenInputsContainer');
     var variantsHiddenInputsContainer = document.getElementById('variantsHiddenInputsContainer');
+    var generateNewVariantsEl = document.getElementById('generateNewVariants');
+    var enableNewVariantsGenerationEl = document.getElementById('enableNewVariantsGeneration');
+    var newVariantsGenerationStatusEl = document.getElementById('newVariantsGenerationStatus');
     var existingVariants = @json($existingVariants);
+    var includeNewVariantsOnSubmit = false;
 
     // مجموعه آیدی‌های انتخاب‌شده - منبع اصلی داده
     var selectedModelIds = new Set(oldModelIds.map(function (x) { return parseInt(x, 10); }));
@@ -1560,6 +1572,10 @@ function syncHiddenVariantInputs() {
             var modelListId = model ? parseInt(model.id, 10) : null;
             var existing = findExistingVariant(modelListId, design.variety_code);
 
+            if (!existing && !includeNewVariantsOnSubmit) {
+                return;
+            }
+
             var variantName = productName;
 
             if (model && designsOn) {
@@ -1581,6 +1597,10 @@ function syncHiddenVariantInputs() {
 
             appendVariantHidden(rowIndex, 'is_active', existing ? (existing.is_active ? 1 : 0) : 1);
 
+            if (!existing) {
+                appendVariantHidden(rowIndex, '_new', 1);
+            }
+
             rowIndex++;
         });
     });
@@ -1599,6 +1619,10 @@ document.getElementById('productEditForm').addEventListener('submit', function (
         e.preventDefault();
         alert('برای مدل‌لیست، حداقل یک مدل انتخاب کنید.');
         return;
+    }
+
+    if (generateNewVariantsEl) {
+        generateNewVariantsEl.value = includeNewVariantsOnSubmit ? '1' : '0';
     }
 
     var ok = syncHiddenVariantInputs();
@@ -1660,6 +1684,20 @@ document.getElementById('productEditForm').addEventListener('submit', function (
             quickAddCategory();
         }
     });
+
+    if (enableNewVariantsGenerationEl) {
+        enableNewVariantsGenerationEl.addEventListener('click', function () {
+            includeNewVariantsOnSubmit = true;
+            if (generateNewVariantsEl) {
+                generateNewVariantsEl.value = '1';
+            }
+            if (newVariantsGenerationStatusEl) {
+                newVariantsGenerationStatusEl.textContent = 'در ثبت بعدی، ترکیب‌های جدید انتخاب‌شده هم به عنوان تنوع واقعی تولید می‌شوند.';
+            }
+            enableNewVariantsGenerationEl.classList.remove('btn-outline-success');
+            enableNewVariantsGenerationEl.classList.add('btn-success');
+        });
+    }
 
     useModelsEl.addEventListener('change', syncSections);
     useDesignsEl.addEventListener('change', syncSections);
