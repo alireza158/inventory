@@ -17,6 +17,7 @@ use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -542,7 +543,7 @@ class ProductController extends Controller
             'is_sellable' => ['nullable', 'boolean'],
 
             'variants' => ['nullable', 'array'],
-            'variants.*.id' => ['nullable', 'integer'],
+            'variants.*.id' => ['nullable', 'integer', Rule::exists('product_variants', 'id')->where('product_id', $product->id)],
             'variants.*.variant_name' => ['required', 'string', 'max:255'],
             'variants.*.model_list_id' => ['nullable', 'integer', 'exists:model_lists,id'],
             'variants.*.variety_name' => ['required', 'string', 'max:255'],
@@ -555,9 +556,10 @@ class ProductController extends Controller
             'variant_site_ids' => ['nullable', 'array'],
             'variant_site_ids.*' => ['nullable', 'integer', 'min:1'],
         ], [
-            'variants.*.variant_name.required' => 'اطلاعات یکی از تنوع‌های کالا ناقص است. نام تنوع برای ردیف‌های فعال الزامی است.',
-            'variants.*.variety_name.required' => 'اطلاعات یکی از تنوع‌های کالا ناقص است. مدل/عنوان طرح برای ردیف‌های فعال الزامی است.',
-            'variants.*.variety_code.required' => 'اطلاعات یکی از تنوع‌های کالا ناقص است. کد تنوع برای ردیف‌های فعال الزامی است.',
+            'variants.*.id.exists' => 'تنوع انتخاب‌شده متعلق به این کالا نیست.',
+            'variants.*.variant_name.required' => 'اطلاعات یکی از ردیف‌های فعال تنوع ناقص است. لطفاً نام تنوع، عنوان طرح و کد تنوع را کامل کنید.',
+            'variants.*.variety_name.required' => 'اطلاعات یکی از ردیف‌های فعال تنوع ناقص است. لطفاً نام تنوع، عنوان طرح و کد تنوع را کامل کنید.',
+            'variants.*.variety_code.required' => 'اطلاعات یکی از ردیف‌های فعال تنوع ناقص است. لطفاً نام تنوع، عنوان طرح و کد تنوع را کامل کنید.',
             'variants.*.variety_code.digits' => 'کد تنوع ردیف‌های فعال باید دقیقاً ۴ رقم باشد.',
             'variants.*.model_list_id.exists' => 'مدل انتخاب‌شده برای یکی از تنوع‌های کالا معتبر نیست.',
         ]);
@@ -702,18 +704,42 @@ class ProductController extends Controller
                     return false;
                 }
 
-                $variantId = $variant['id'] ?? null;
+                $isDeleted = filter_var($variant['_delete'] ?? $variant['deleted'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $isTemplate = filter_var($variant['_template'] ?? $variant['is_template'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $isDisabled = filter_var($variant['_disabled'] ?? $variant['disabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-                if (filled($variantId) && !in_array((int) $variantId, $productVariantIds, true)) {
+                if ($isDeleted || $isTemplate || $isDisabled) {
                     return false;
                 }
 
-                return filled($variantId)
-                    || filled($variant['variant_name'] ?? null)
+                $variantId = $variant['id'] ?? null;
+                $hasRealId = filled($variantId);
+
+                if ($hasRealId && !in_array((int) $variantId, $productVariantIds, true)) {
+                    return false;
+                }
+
+                $hasAnyValue = filled($variant['variant_name'] ?? null)
                     || filled($variant['variety_name'] ?? null)
                     || filled($variant['variety_code'] ?? null)
                     || filled($variant['variant_code'] ?? null)
-                    || filled($variant['barcode'] ?? null);
+                    || filled($variant['barcode'] ?? null)
+                    || filled($variant['model_list_id'] ?? null)
+                    || filled($variant['variety_id'] ?? null);
+
+                $hasActiveFlag = array_key_exists('is_active', $variant) || array_key_exists('enabled', $variant);
+                $isActive = filter_var($variant['is_active'] ?? $variant['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                if (!$hasRealId && $hasActiveFlag && !$isActive) {
+                    return false;
+                }
+
+                return $hasRealId || $hasAnyValue || $isActive;
+            })
+            ->map(function ($variant) {
+                unset($variant['_delete'], $variant['deleted'], $variant['_template'], $variant['is_template'], $variant['_disabled'], $variant['disabled'], $variant['enabled']);
+
+                return $variant;
             })
             ->values()
             ->all();
