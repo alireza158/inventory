@@ -712,12 +712,12 @@
                                     <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
                                         <div>
                                             <div class="muted">نمونه کد تنوع‌های قابل ساخت</div>
-                                            <div class="muted">مدل‌ها/طرح‌های تازه فقط پیشنهاد هستند و تا زدن دکمه زیر به عنوان تنوع فعال ارسال نمی‌شوند.</div>
+                                            <div class="muted">هر مدل/طرحی که انتخاب شود هنگام ثبت، به‌صورت خودکار به تنوع‌های واقعی کالا اضافه می‌شود.</div>
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-outline-success" id="enableNewVariantsGeneration">تولید تنوع‌های جدید از انتخاب‌ها</button>
+                                        <button type="button" class="btn btn-sm btn-outline-success" id="enableNewVariantsGeneration">تأیید تولید تنوع‌های انتخاب‌شده</button>
                                     </div>
                                     <div class="examples-grid" id="variantExamples"></div>
-                                    <div class="muted mt-2" id="newVariantsGenerationStatus">تنوع‌های جدید پیشنهادی در ذخیره عادی ارسال نمی‌شوند.</div>
+                                    <div class="muted mt-2" id="newVariantsGenerationStatus">تنوع‌های جدید انتخاب‌شده در ثبت بعدی به کالا اضافه می‌شوند.</div>
                                 </div>
                             </div>
                         </div>
@@ -836,7 +836,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var enableNewVariantsGenerationEl = document.getElementById('enableNewVariantsGeneration');
     var newVariantsGenerationStatusEl = document.getElementById('newVariantsGenerationStatus');
     var existingVariants = @json($existingVariants);
-    var includeNewVariantsOnSubmit = false;
+    var includeNewVariantsOnSubmit = true;
 
     // مجموعه آیدی‌های انتخاب‌شده - منبع اصلی داده
     var selectedModelIds = new Set(oldModelIds.map(function (x) { return parseInt(x, 10); }));
@@ -1596,9 +1596,6 @@ function syncHiddenVariantInputs() {
             var modelListId = model ? parseInt(model.id, 10) : null;
             var existing = findExistingVariant(modelListId, design.variety_code);
 
-            if (!existing && !includeNewVariantsOnSubmit) {
-                return;
-            }
 
             var variantName = productName;
 
@@ -1646,7 +1643,7 @@ document.getElementById('productEditForm').addEventListener('submit', function (
     }
 
     if (generateNewVariantsEl) {
-        generateNewVariantsEl.value = includeNewVariantsOnSubmit ? '1' : '0';
+        generateNewVariantsEl.value = '1';
     }
 
     var ok = syncHiddenVariantInputs();
