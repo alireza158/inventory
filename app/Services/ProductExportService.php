@@ -79,12 +79,13 @@ class ProductExportService
 
     public function rows(array $filters): array
     {
-        return $this->filteredProducts($filters)->map(fn (Product $product) => $this->row($product))->all();
+        return $this->filteredProducts($filters)->map(fn (Product $product) => $this->row($product, $filters))->all();
     }
 
-    public function row(Product $product): array
+    public function row(Product $product, array $filters = []): array
     {
-        $stock = $this->stock($product);
+        $warehouseFilterActive = ! empty($filters['warehouse_id']);
+        $stock = $this->stock($product, $warehouseFilterActive);
 
         return [
             'id' => $product->id,
@@ -92,17 +93,19 @@ class ProductExportService
             'pdf_image_src' => $this->pdfImageSrc($product),
             'has_image' => $this->hasPdfImage($product),
             'name' => $product->name,
-            'sku' => $product->sku ?: ($product->code ?: '—'),
+            'display_code' => $product->sku ?: ($product->code ?: ($product->barcode ?: '—')),
+            'sku' => $product->sku ?: ($product->code ?: ($product->barcode ?: '—')),
             'category' => $product->category?->name ?: 'بدون دسته‌بندی',
             'stock' => $stock,
-            'price' => (int) ($product->price ?? $product->sale_retail ?? 0),
+            'price' => $this->productSalePrice($product),
+            'price_label' => $this->productPriceLabel($product),
             'stock_status' => $this->stockStatus($stock),
             'stock_status_class' => $this->stockStatusClass($stock),
             'updated_at' => optional($product->updated_at)->format('Y/m/d H:i'),
             'unit' => $product->unit ?: 'عدد',
             'barcode' => $product->barcode ?: ($product->short_barcode ?: ''),
             'is_sellable' => (bool) ($product->is_sellable ?? true),
-            'variants' => $product->variants->map(fn (ProductVariant $variant) => $this->variantRow($variant, $product))->values()->all(),
+            'variants' => $product->variants->map(fn (ProductVariant $variant) => $this->variantRow($variant, $product, $warehouseFilterActive))->values()->all(),
         ];
     }
 
@@ -197,15 +200,15 @@ class ProductExportService
         return 'data:image/png;base64,' . 'iVBORw0KGgoAAAANSUhEUgAAAFQAAABUCAYAAAAcaxDBAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAxUlEQVR4nO3QQQ3AIADAQMAJ/5yuwgOi8wKSpd1Z7z0AAAAAAAAAAAAAAAAAAAAAAAB8Z54H4GbEUYijEEchjkIchTgKcRTiKMTRiKMQRyGOQhyFOApxFOIoxNGIoxBHIY5CHIWE8c5zAF8rjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAK8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAG8VjiKMQhyFOApxFOIoxFGIoxBHIY5CHIWE8c5zAP8WAAAAAAAAAAAAAAAAAAAAAAAArB2lJwKTe+Ve3wAAAABJRU5ErkJggg==';
     }
 
-    public function variantRow(ProductVariant $variant, Product $product): array
+    public function variantRow(ProductVariant $variant, Product $product, bool $warehouseFilterActive = false): array
     {
-        $stock = $this->variantStock($variant);
+        $stock = $this->variantStock($variant, $warehouseFilterActive);
         $warehouseStocks = $variant->warehouseStocks->filter(fn ($stockRow) => (int) ($stockRow->quantity ?? 0) !== 0);
 
         return [
             'id' => $variant->id,
             'name' => $this->variantName($variant),
-            'code' => $variant->sku ?: ($variant->variant_code ?: ($variant->variety_code ?: ($variant->barcode ?: '—'))),
+            'code' => $variant->variant_code ?: ($variant->barcode ?: ($variant->variety_code ?: ($variant->sku ?: '—'))),
             'barcode' => $variant->barcode ?: '',
             'stock' => $stock,
             'unit' => $product->unit ?: 'عدد',
@@ -229,13 +232,43 @@ class ProductExportService
             ?: 'تنوع بدون نام';
     }
 
-    private function variantStock(ProductVariant $variant): int
+    private function variantStock(ProductVariant $variant, bool $warehouseFilterActive = false): int
     {
-        if ($variant->relationLoaded('warehouseStocks') && $variant->warehouseStocks->isNotEmpty()) {
-            return max(0, (int) $variant->warehouseStocks->sum('quantity'));
+        if ($variant->relationLoaded('warehouseStocks')) {
+            if ($warehouseFilterActive) {
+                return max(0, (int) $variant->warehouseStocks->sum('quantity'));
+            }
+
+            if ($variant->warehouseStocks->isNotEmpty()) {
+                return max(0, (int) $variant->warehouseStocks->sum('quantity'));
+            }
         }
 
         return max(0, (int) ($variant->stock ?? 0));
+    }
+
+    private function productSalePrice(Product $product): int
+    {
+        $variantPrices = $product->relationLoaded('variants')
+            ? $product->variants->pluck('sell_price')->filter(fn ($price) => (int) $price > 0)
+            : collect();
+
+        if ($variantPrices->isNotEmpty()) {
+            return (int) $variantPrices->min();
+        }
+
+        return (int) ($product->price ?? $product->sale_retail ?? 0);
+    }
+
+    private function productPriceLabel(Product $product): string
+    {
+        if (! $product->relationLoaded('variants')) {
+            return 'قیمت فروش';
+        }
+
+        $variantPrices = $product->variants->pluck('sell_price')->filter(fn ($price) => (int) $price > 0)->unique();
+
+        return $variantPrices->count() > 1 ? 'قیمت فروش از' : 'قیمت فروش';
     }
 
 
@@ -309,10 +342,10 @@ class ProductExportService
         ];
     }
 
-    public function stock(Product $product): int
+    public function stock(Product $product, bool $warehouseFilterActive = false): int
     {
         if ($product->relationLoaded('variants') && $product->variants->isNotEmpty()) {
-            return max(0, (int) $product->variants->sum(fn (ProductVariant $variant) => $this->variantStock($variant)));
+            return max(0, (int) $product->variants->sum(fn (ProductVariant $variant) => $this->variantStock($variant, $warehouseFilterActive)));
         }
 
         return max(0, (int) ($product->export_stock ?? $product->stock ?? 0));

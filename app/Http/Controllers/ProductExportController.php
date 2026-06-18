@@ -21,7 +21,7 @@ class ProductExportController extends Controller
         $categories = Category::query()->orderBy('name')->get();
         $warehouses = Warehouse::query()->orderBy('name')->get();
         $products = $this->service->filteredProducts($filters);
-        $rows = $products->map(fn ($product) => $this->service->row($product));
+        $rows = $products->map(fn ($product) => $this->service->row($product, $filters));
 
         return view('product-exports.index', compact('categories', 'warehouses', 'filters', 'rows'));
     }
