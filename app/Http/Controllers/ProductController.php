@@ -802,7 +802,9 @@ class ProductController extends Controller
         }
 
         $productVariantIds = $product->variants()->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $allowNewVariants = $request->boolean('generate_new_variants');
+        $allowNewVariants = $request->boolean('generate_new_variants')
+            || $request->boolean('use_models')
+            || $request->boolean('use_designs');
 
         $cleanVariants = collect($request->input('variants', []))
             ->filter(function ($variant) use ($productVariantIds, $allowNewVariants) {
