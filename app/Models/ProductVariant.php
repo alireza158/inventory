@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\ProductVariantStructureService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class ProductVariant extends Model
@@ -17,8 +19,6 @@ class ProductVariant extends Model
         'variant_code',
         'variety_id',
         'unique_key',
-        'sku',
-        'barcode',
 
         'buy_price',
         'sell_price',
@@ -62,9 +62,24 @@ class ProductVariant extends Model
         return max(0, (int) ($this->stock ?? 0));
     }
 
+    public function getBarcodeAttribute(): ?string
+    {
+        return $this->variant_code;
+    }
+
+    public function getSkuAttribute(): ?string
+    {
+        return $this->variant_code;
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeValidForProductStructure(Builder $query, Product $product): Builder
+    {
+        return app(ProductVariantStructureService::class)->applyValidConstraints($query, $product);
     }
 
     public function locationStocks()

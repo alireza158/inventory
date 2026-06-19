@@ -11,6 +11,7 @@ use App\Models\PurchaseItem;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Warehouse;
+use App\Services\ProductVariantStructureService;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,13 +76,13 @@ class PurchaseController extends Controller
         $products = Product::query()
             ->with($this->productVariantRelations())
             ->orderBy('name')
-            ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
+            ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku', 'models', 'has_colors']);
 
-        $variants = ProductVariant::query()
-            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
-            ->select($this->purchaseVariantSelectColumns())
-            ->get()
-            ->map(function ($v) {
+        $variantStructure = app(ProductVariantStructureService::class);
+        $products->each(fn (Product $product) => $product->setRelation('variants', $variantStructure->validVariants($product)));
+
+        $variants = $products->flatMap(function (Product $product) {
+            return $product->variants->map(function ($v) {
                 $design2 = substr((string) $v->variant_code, -2);
                 if (!preg_match('/^\d{2}$/', $design2)) $design2 = '00';
 
@@ -99,13 +100,17 @@ class PurchaseController extends Controller
                     'buy_price' => is_null($v->buy_price) ? null : (int) $v->buy_price,
                     'stock' => (int) ($v->stock ?? 0),
                     'reserved' => (int) ($v->reserved ?? 0),
-                    'model_name' => (string) ($v->model_name ?? ''),
-                    'model_code' => (string) ($v->model_code ?? ''),
-                    'barcode' => (string) ($v->barcode ?? ''),
+                    'model_name' => (string) ($v->modelList?->model_name ?? ''),
+                    'model_code' => (string) ($v->modelList?->code ?? ''),
+                    'display_code' => (string) ($v->variant_code ?? '-'),
+                    'barcode' => (string) ($v->variant_code ?? ''),
+                    'sku' => (string) ($v->variant_code ?? ''),
+                    'is_active' => (bool) ($v->is_active ?? true),
                     'color_name' => '',
                     'color_code' => '',
                 ];
             });
+        });
 
         return view('purchases.create', [
             'suppliers' => $suppliers,
@@ -118,12 +123,7 @@ class PurchaseController extends Controller
 
     public function productVariants(Product $product)
     {
-        $variants = $product->variants()
-            ->with($this->variantRelations())
-            ->select($this->variantSelectColumns())
-            ->orderBy('variant_code')
-            ->orderBy('id')
-            ->get()
+        $variants = app(ProductVariantStructureService::class)->validVariants($product)
             ->unique('id')
             ->values()
             ->map(fn (ProductVariant $variant) => $this->variantPayload($variant));
@@ -147,13 +147,13 @@ class PurchaseController extends Controller
         $products = Product::query()
             ->with($this->productVariantRelations())
             ->orderBy('name')
-            ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
+            ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku', 'models', 'has_colors']);
 
-        $variants = ProductVariant::query()
-            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
-            ->select($this->purchaseVariantSelectColumns())
-            ->get()
-            ->map(function ($v) {
+        $variantStructure = app(ProductVariantStructureService::class);
+        $products->each(fn (Product $product) => $product->setRelation('variants', $variantStructure->validVariants($product)));
+
+        $variants = $products->flatMap(function (Product $product) {
+            return $product->variants->map(function ($v) {
                 $design2 = substr((string) $v->variant_code, -2);
                 if (!preg_match('/^\d{2}$/', $design2)) $design2 = '00';
 
@@ -171,13 +171,17 @@ class PurchaseController extends Controller
                     'buy_price' => is_null($v->buy_price) ? null : (int) $v->buy_price,
                     'stock' => (int) ($v->stock ?? 0),
                     'reserved' => (int) ($v->reserved ?? 0),
-                    'model_name' => (string) ($v->model_name ?? ''),
-                    'model_code' => (string) ($v->model_code ?? ''),
-                    'barcode' => (string) ($v->barcode ?? ''),
+                    'model_name' => (string) ($v->modelList?->model_name ?? ''),
+                    'model_code' => (string) ($v->modelList?->code ?? ''),
+                    'display_code' => (string) ($v->variant_code ?? '-'),
+                    'barcode' => (string) ($v->variant_code ?? ''),
+                    'sku' => (string) ($v->variant_code ?? ''),
+                    'is_active' => (bool) ($v->is_active ?? true),
                     'color_name' => '',
                     'color_code' => '',
                 ];
             });
+        });
 
         return view('purchases.create', [
             'suppliers' => $suppliers,
@@ -308,13 +312,11 @@ class PurchaseController extends Controller
             'product_variants.buy_price',
             'product_variants.stock',
             'product_variants.reserved',
+            'product_variants.is_active',
             'model_lists.model_name as model_name',
             'model_lists.code as model_code',
         ];
 
-        if ($this->productVariantHasColumn('barcode')) {
-            $columns[] = 'product_variants.barcode';
-        }
 
         if ($this->productVariantHasColumn('color_id')) {
             $columns[] = 'product_variants.color_id';
@@ -337,11 +339,9 @@ class PurchaseController extends Controller
             'buy_price',
             'stock',
             'reserved',
+            'is_active',
         ];
 
-        if ($this->productVariantHasColumn('barcode')) {
-            $columns[] = 'barcode';
-        }
 
         if ($this->productVariantHasColumn('color_id')) {
             $columns[] = 'color_id';
@@ -365,7 +365,8 @@ class PurchaseController extends Controller
             'code' => (string) ($variant->variant_code ?? ''),
             'variant_code' => (string) ($variant->variant_code ?? ''),
             'sku' => (string) ($variant->variant_code ?? ''),
-            'barcode' => (string) ($variant->barcode ?? ''),
+            'display_code' => (string) ($variant->variant_code ?: '-'),
+            'barcode' => (string) ($variant->variant_code ?? ''),
             'color_name' => (string) ($variant->color?->name ?? ''),
             'color_code' => (string) ($variant->color?->code ?? ''),
             'central_stock' => (int) ($variant->stock ?? 0),
@@ -373,6 +374,7 @@ class PurchaseController extends Controller
             'reserved' => (int) ($variant->reserved ?? 0),
             'buy_price' => \App\Support\Currency::toRial($variant->buy_price ?? 0),
             'sell_price' => \App\Support\Currency::toRial($variant->sell_price ?? 0),
+            'is_active' => (bool) ($variant->is_active ?? true),
         ];
     }
 
@@ -502,10 +504,10 @@ class PurchaseController extends Controller
         }
 
         foreach ($data['items'] as $index => $item) {
-            $isValidVariant = ProductVariant::query()
-                ->whereKey($item['variant_id'])
-                ->where('product_id', $item['product_id'])
-                ->exists();
+            $product = Product::find((int) $item['product_id']);
+            $isValidVariant = $product
+                ? app(ProductVariantStructureService::class)->applyValidConstraints(ProductVariant::query(), $product)->whereKey($item['variant_id'])->exists()
+                : false;
 
             if (!$isValidVariant) {
                 throw ValidationException::withMessages([
@@ -942,19 +944,6 @@ class PurchaseController extends Controller
 
     private function recalcProductSummary(Product $product): void
     {
-        $product->load('variants');
-
-        if ($product->variants->count() === 0) {
-            $product->update(['stock' => 0, 'price' => 0]);
-            return;
-        }
-
-        $stock = (int) $product->variants->sum('stock');
-        $minPrice = (int) $product->variants->min('sell_price');
-
-        $product->update([
-            'stock' => max(0, $stock),
-            'price' => max(0, $minPrice),
-        ]);
+        app(ProductVariantStructureService::class)->recalculateProductSummary($product);
     }
 }

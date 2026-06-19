@@ -2,6 +2,7 @@
     $hasVariants = $p->variants && $p->variants->count() > 0;
     $variantsId = 'productVariants' . $p->id . ($mode ?? '');
     $short = $p->short_barcode ?: ((!empty($p->code) && strlen($p->code) >= 6) ? substr($p->code, 2, 4) : null);
+    $validVariantIds = $hasVariants ? $p->variants->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
     $firstVar = $hasVariants ? $p->variants->sortBy('variant_code')->first() : null;
     $sampleBarcode = $firstVar?->variant_code ?: ($p->sku ?: $p->barcode);
     $isSellable = $p->is_sellable ?? true;
@@ -9,7 +10,7 @@
     $centralRows = $centralId > 0 ? $p->warehouseStocks->where('warehouse_id', $centralId) : collect();
     $centralStock = (int) ($p->stock ?? 0);
     if ($centralId > 0 && $centralRows->isNotEmpty()) {
-        $variantCentralTotal = (int) $centralRows->whereNotNull('product_variant_id')->sum('quantity');
+        $variantCentralTotal = (int) $centralRows->whereIn('product_variant_id', $validVariantIds)->sum('quantity');
         $aggregateCentralTotal = (int) $centralRows->whereNull('product_variant_id')->sum('quantity');
         $centralStock = $variantCentralTotal > 0 || $hasVariants ? $variantCentralTotal : $aggregateCentralTotal;
     }
@@ -20,7 +21,7 @@
         return max(0, $qty);
     };
     $stockRowsPayload = [];
-    foreach ($p->warehouseStocks->whereNotNull('product_variant_id')->groupBy(fn ($row) => ((int) $row->product_variant_id) . ':' . ((int) $row->warehouse_id)) as $rows) {
+    foreach ($p->warehouseStocks->whereIn('product_variant_id', $validVariantIds)->groupBy(fn ($row) => ((int) $row->product_variant_id) . ':' . ((int) $row->warehouse_id)) as $rows) {
         $first = $rows->first();
         $variant = $p->variants->firstWhere('id', (int) $first?->product_variant_id);
         $qty = (int) $rows->sum('quantity');

@@ -52,9 +52,7 @@ class PreinvoiceApiController extends Controller
                             $variantQuery->where('variant_name', 'like', "%{$q}%")
                                 ->orWhere('variety_name', 'like', "%{$q}%")
                                 ->orWhere('variety_code', 'like', "%{$q}%")
-                                ->orWhere('variant_code', 'like', "%{$q}%")
-                                ->orWhere('sku', 'like', "%{$q}%")
-                                ->orWhere('barcode', 'like', "%{$q}%");
+                                ->orWhere('variant_code', 'like', "%{$q}%");
                         });
                 });
             })
