@@ -327,6 +327,8 @@
             .replace(/[ي]/g, 'ی')
             .replace(/[ك]/g, 'ک')
             .replace(/[\u200c\s]+/g, ' ')
+            .replace(/[\/\\_.,;:()\[\]{}\-–—]+/g, ' ')
+            .replace(/\s+/g, ' ')
             .trim()
             .toLowerCase();
     }
@@ -475,11 +477,33 @@
         return parseNumericInput(row.querySelector('[data-qty]')?.value || 0) > 0;
     }
 
+    function purchaseSearchTokens(value) {
+        return normalizePurchaseSearchText(value).split(' ').filter(Boolean);
+    }
+
+    function prepareVariantRowSearch(row) {
+        if (!row.dataset.normalizedSearch) {
+            row.dataset.normalizedSearch = normalizePurchaseSearchText([
+                row.dataset.search || '',
+                row.textContent || '',
+            ].join(' '));
+        }
+
+        return row.dataset.normalizedSearch;
+    }
+
+    function rowMatchesPurchaseSearch(row, tokens) {
+        if (!tokens.length) return true;
+
+        const haystack = prepareVariantRowSearch(row);
+        return tokens.every((token) => haystack.includes(token));
+    }
+
     function updateVariantFilter(card) {
         const searchEl = card.querySelector('[data-variant-search]');
         const onlyQtyEl = card.querySelector('[data-only-qty]');
         const rows = Array.from(card.querySelectorAll('[data-variant-row]'));
-        const term = normalizePurchaseSearchText(searchEl?.value || '');
+        const tokens = purchaseSearchTokens(searchEl?.value || '');
         const onlyQty = Boolean(onlyQtyEl?.checked);
         let visibleCount = 0;
         let qtyCount = 0;
@@ -489,9 +513,7 @@
             if (hasQty) qtyCount++;
             row.classList.toggle('has-qty', hasQty);
 
-            const haystack = row.dataset.normalizedSearch || normalizePurchaseSearchText(row.dataset.search || row.textContent || '');
-            row.dataset.normalizedSearch = haystack;
-            const matchesSearch = !term || haystack.includes(term);
+            const matchesSearch = rowMatchesPurchaseSearch(row, tokens);
             const matchesQty = !onlyQty || hasQty;
             const shouldShow = matchesSearch && matchesQty;
             row.classList.toggle('d-none', !shouldShow);
@@ -808,7 +830,11 @@
         }
 
         if (target.matches('[data-variant-search]')) {
-            debouncedVariantFilter(card);
+            if (normalizePurchaseSearchText(target.value) === '') {
+                updateVariantFilter(card);
+            } else {
+                debouncedVariantFilter(card);
+            }
             return;
         }
 
@@ -832,6 +858,14 @@
         }
 
         recalc();
+    });
+
+    productCardsEl.addEventListener('search', (event) => {
+        const target = event.target;
+        const card = target.closest('[data-product-card]');
+        if (card && target.matches('[data-variant-search]')) {
+            updateVariantFilter(card);
+        }
     });
 
     productCardsEl.addEventListener('change', (event) => {
