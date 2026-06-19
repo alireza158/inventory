@@ -48,6 +48,9 @@
                     'sell_price' => \App\Support\Currency::toRial($v->sell_price ?? 0),
                     'stock' => (int) ($v->stock ?? 0),
                     'reserved' => (int) ($v->reserved ?? 0),
+                    'barcode' => (string) ($v->barcode ?? ''),
+                    'color_name' => (string) ($v->relationLoaded('color') ? ($v->color?->name ?? '') : ''),
+                    'color_code' => (string) ($v->relationLoaded('color') ? ($v->color?->code ?? '') : ''),
                 ];
             })->values()->all(),
         ];
@@ -132,6 +135,22 @@
 
     .purchase-fast-page .qty-input { max-width: 95px; }
     .purchase-fast-page .price-input { min-width: 130px; }
+    .purchase-fast-page .purchase-variant-filter {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 10px;
+    }
+    .purchase-fast-page .purchase-variant-row.has-qty > td {
+        background: #ecfdf5;
+    }
+    .purchase-fast-page .purchase-variant-empty {
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        background: #fff7ed;
+        color: #9a3412;
+        padding: 10px;
+    }
 </style>
 
 <div class="purchase-page-wrap purchase-fast-page">
@@ -303,6 +322,23 @@
             .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0));
     }
 
+    function normalizePurchaseSearchText(value) {
+        return normalizeDigits(value)
+            .replace(/[ي]/g, 'ی')
+            .replace(/[ك]/g, 'ک')
+            .replace(/[\u200c\s]+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
+
+    function debounce(fn, delay = 200) {
+        let timer = null;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+
     function parseNumericInput(value) {
         const normalized = normalizeDigits(value).replace(/[^\d]/g, '');
         return Number(normalized || 0);
@@ -348,6 +384,9 @@
             code: variant.code || variant.variant_code || variant.sku || variant.barcode || '',
             stock: Number(variant.central_stock ?? variant.stock ?? 0),
             reserved: Number(variant.reserved || 0),
+            barcode: variant.barcode || '',
+            color_name: variant.color_name || variant.color?.name || '',
+            color_code: variant.color_code || variant.color?.code || '',
         };
     }
 
@@ -408,6 +447,69 @@
         }).join('');
     }
 
+
+    function variantSearchText(product, variant) {
+        return [
+            product.name,
+            product.code,
+            product.short_barcode,
+            product.sku,
+            variantLabel(variant),
+            variant.name,
+            variant.title,
+            variant.model_name,
+            variant.model_code,
+            variant.variety_name,
+            variant.variety_code,
+            variant.design_title,
+            variant.color_name,
+            variant.color_code,
+            variant.code,
+            variant.variant_code,
+            variant.sku,
+            variant.barcode,
+        ].filter(Boolean).join(' ');
+    }
+
+    function rowHasQty(row) {
+        return parseNumericInput(row.querySelector('[data-qty]')?.value || 0) > 0;
+    }
+
+    function updateVariantFilter(card) {
+        const searchEl = card.querySelector('[data-variant-search]');
+        const onlyQtyEl = card.querySelector('[data-only-qty]');
+        const rows = Array.from(card.querySelectorAll('[data-variant-row]'));
+        const term = normalizePurchaseSearchText(searchEl?.value || '');
+        const onlyQty = Boolean(onlyQtyEl?.checked);
+        let visibleCount = 0;
+        let qtyCount = 0;
+
+        rows.forEach((row) => {
+            const hasQty = rowHasQty(row);
+            if (hasQty) qtyCount++;
+            row.classList.toggle('has-qty', hasQty);
+
+            const haystack = row.dataset.normalizedSearch || normalizePurchaseSearchText(row.dataset.search || row.textContent || '');
+            row.dataset.normalizedSearch = haystack;
+            const matchesSearch = !term || haystack.includes(term);
+            const matchesQty = !onlyQty || hasQty;
+            const shouldShow = matchesSearch && matchesQty;
+            row.classList.toggle('d-none', !shouldShow);
+            if (shouldShow) visibleCount++;
+        });
+
+        const counterEl = card.querySelector('[data-variant-filter-counter]');
+        if (counterEl) {
+            counterEl.textContent = `${formatFa(rows.length)} تنوع | ${formatFa(visibleCount)} مورد نمایش داده شده | ${formatFa(qtyCount)} ردیف دارای تعداد`;
+        }
+
+        card.querySelector('[data-variant-empty]')?.classList.toggle('d-none', visibleCount > 0 || rows.length === 0);
+    }
+
+    function updateAllVariantFilters() {
+        productCardsEl.querySelectorAll('[data-product-card]').forEach(updateVariantFilter);
+    }
+
     function rowPriceOverridden(row) {
         return row.dataset.buyOverridden === '1' || row.dataset.sellOverridden === '1';
     }
@@ -450,7 +552,7 @@
     function productCardTemplate(product) {
         const variants = realVariantsForProduct(product);
         const variantsRows = variants.length ? variants.map((variant) => `
-            <tr data-variant-row data-variant-id="${variant.id}" data-buy-overridden="0" data-sell-overridden="0">
+            <tr class="purchase-variant-row" data-variant-row data-variant-id="${variant.id}" data-buy-overridden="0" data-sell-overridden="0" data-search="${escapeHtml(variantSearchText(product, variant))}" data-normalized-search="${escapeHtml(normalizePurchaseSearchText(variantSearchText(product, variant)))}">
                 <td>
                     <div class="variant-title">${escapeHtml(variantLabel(variant))}</div>
                     <div class="small text-muted">${escapeHtml(variant.name || '')}</div>
@@ -500,6 +602,26 @@
                             <div class="col-md-3 small text-muted">این قیمت به‌صورت پیش‌فرض روی همه تنوع‌های این محصول اعمال می‌شود.</div>
                         </div>
                     </div>
+
+                    <div class="purchase-variant-filter mb-3" data-variant-filter>
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-6">
+                                <input type="search" class="form-control form-control-sm" data-variant-search placeholder="جستجو در تنوع‌ها، مدل، طرح، رنگ، کد یا بارکد...">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-check mb-0 small">
+                                    <input class="form-check-input" type="checkbox" data-only-qty>
+                                    <span class="form-check-label">نمایش فقط ردیف‌های دارای تعداد</span>
+                                </label>
+                            </div>
+                            <div class="col-md-3 text-md-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-clear-filter>پاک کردن فیلتر</button>
+                            </div>
+                        </div>
+                        <div class="small text-muted mt-2" data-variant-filter-counter>${formatFa(variants.length)} تنوع | ${formatFa(variants.length)} مورد نمایش داده شده | ۰ ردیف دارای تعداد</div>
+                    </div>
+
+                    <div class="purchase-variant-empty d-none mb-2 small" data-variant-empty>موردی با این جستجو پیدا نشد.</div>
 
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered align-middle variants-table mb-2">
@@ -573,6 +695,7 @@
             });
         }
 
+        updateVariantFilter(card);
         recalc();
         return card;
     }
@@ -599,6 +722,7 @@
 
             card.querySelector('[data-card-qty]').textContent = formatFa(cardQty);
             card.querySelector('[data-card-total]').textContent = formatFa(cardTotal);
+            updateVariantFilter(card);
             subtotal += cardTotal;
         });
 
@@ -667,6 +791,8 @@
     quickCategoryEl.addEventListener('change', renderProductOptions);
     quickSearchEl.addEventListener('input', renderProductOptions);
 
+    const debouncedVariantFilter = debounce((card) => updateVariantFilter(card), 200);
+
     addProductBtn.addEventListener('click', () => {
         if (!quickProductEl.value) return;
         addProductCard(quickProductEl.value, []);
@@ -679,6 +805,16 @@
 
         if (target.classList.contains('formatted-number')) {
             formatInputElement(target);
+        }
+
+        if (target.matches('[data-variant-search]')) {
+            debouncedVariantFilter(card);
+            return;
+        }
+
+        if (target.matches('[data-only-qty]')) {
+            updateVariantFilter(card);
+            return;
         }
 
         if (target.matches('[data-product-buy], [data-product-sell]')) {
@@ -698,9 +834,27 @@
         recalc();
     });
 
+    productCardsEl.addEventListener('change', (event) => {
+        const target = event.target;
+        const card = target.closest('[data-product-card]');
+        if (card && target.matches('[data-only-qty]')) {
+            updateVariantFilter(card);
+        }
+    });
+
     productCardsEl.addEventListener('click', (event) => {
         const card = event.target.closest('[data-product-card]');
         if (!card) return;
+
+        if (event.target.matches('[data-clear-filter]')) {
+            const searchEl = card.querySelector('[data-variant-search]');
+            const onlyQtyEl = card.querySelector('[data-only-qty]');
+            if (searchEl) searchEl.value = '';
+            if (onlyQtyEl) onlyQtyEl.checked = false;
+            updateVariantFilter(card);
+            searchEl?.focus();
+            return;
+        }
 
         if (event.target.matches('[data-remove-product]')) {
             card.remove();
@@ -719,7 +873,31 @@
             const row = event.target.closest('[data-variant-row]');
             if (!row) return;
             row.querySelector('[data-qty]').value = '';
+            updateVariantFilter(card);
             recalc();
+        }
+    });
+
+    productCardsEl.addEventListener('keydown', (event) => {
+        const card = event.target.closest('[data-product-card]');
+        if (!card || event.key !== 'Enter') return;
+
+        if (event.target.matches('[data-variant-search]')) {
+            event.preventDefault();
+            updateVariantFilter(card);
+            const visibleRows = Array.from(card.querySelectorAll('[data-variant-row]')).filter((row) => !row.classList.contains('d-none'));
+            if (visibleRows.length === 1) {
+                const qtyEl = visibleRows[0].querySelector('[data-qty]');
+                qtyEl?.focus();
+                qtyEl?.select();
+            }
+        }
+
+        if (event.target.matches('[data-qty]')) {
+            event.preventDefault();
+            const searchEl = card.querySelector('[data-variant-search]');
+            searchEl?.focus();
+            searchEl?.select();
         }
     });
 
@@ -756,6 +934,7 @@
     renderProductOptions();
     hydrateInitialItems();
     recalc();
+    updateAllVariantFilters();
 })();
 </script>
 @endsection
