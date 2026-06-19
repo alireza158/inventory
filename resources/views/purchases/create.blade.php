@@ -49,8 +49,8 @@
                     'stock' => (int) ($v->stock ?? 0),
                     'reserved' => (int) ($v->reserved ?? 0),
                     'barcode' => (string) ($v->barcode ?? ''),
-                    'color_name' => (string) ($v->color?->name ?? ''),
-                    'color_code' => (string) ($v->color?->code ?? ''),
+                    'color_name' => (string) ($v->relationLoaded('color') ? ($v->color?->name ?? '') : ''),
+                    'color_code' => (string) ($v->relationLoaded('color') ? ($v->color?->code ?? '') : ''),
                 ];
             })->values()->all(),
         ];

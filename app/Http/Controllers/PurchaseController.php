@@ -14,6 +14,7 @@ use App\Models\Warehouse;
 use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -72,29 +73,13 @@ class PurchaseController extends Controller
             ->get(['id', 'name', 'code', 'parent_id']);
 
         $products = Product::query()
-            ->with(['variants.modelList:id,model_name,code', 'variants.color:id,name,code'])
+            ->with($this->productVariantRelations())
             ->orderBy('name')
             ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
 
         $variants = ProductVariant::query()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
-            ->select([
-                'product_variants.id',
-                'product_variants.product_id',
-                'product_variants.model_list_id',
-                'product_variants.color_id',
-                'product_variants.variant_code',
-                'product_variants.variant_name',
-                'product_variants.variety_name',
-                'product_variants.variety_code',
-                'product_variants.barcode',
-                'product_variants.sell_price',
-                'product_variants.buy_price',
-                'product_variants.stock',
-                'product_variants.reserved',
-                'model_lists.model_name as model_name',
-                'model_lists.code as model_code',
-            ])
+            ->select($this->purchaseVariantSelectColumns())
             ->get()
             ->map(function ($v) {
                 $design2 = substr((string) $v->variant_code, -2);
@@ -134,22 +119,8 @@ class PurchaseController extends Controller
     public function productVariants(Product $product)
     {
         $variants = $product->variants()
-            ->with(['modelList:id,model_name,code', 'color:id,name,code'])
-            ->select([
-                'id',
-                'product_id',
-                'model_list_id',
-                'variant_name',
-                'variant_code',
-                'variety_name',
-                'variety_code',
-                'sell_price',
-                'buy_price',
-                'stock',
-                'reserved',
-                'barcode',
-                'color_id',
-            ])
+            ->with($this->variantRelations())
+            ->select($this->variantSelectColumns())
             ->orderBy('variant_code')
             ->orderBy('id')
             ->get()
@@ -174,29 +145,13 @@ class PurchaseController extends Controller
             ->get(['id', 'name', 'code', 'parent_id']);
 
         $products = Product::query()
-            ->with(['variants.modelList:id,model_name,code', 'variants.color:id,name,code'])
+            ->with($this->productVariantRelations())
             ->orderBy('name')
             ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
 
         $variants = ProductVariant::query()
             ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
-            ->select([
-                'product_variants.id',
-                'product_variants.product_id',
-                'product_variants.model_list_id',
-                'product_variants.color_id',
-                'product_variants.variant_code',
-                'product_variants.variant_name',
-                'product_variants.variety_name',
-                'product_variants.variety_code',
-                'product_variants.barcode',
-                'product_variants.sell_price',
-                'product_variants.buy_price',
-                'product_variants.stock',
-                'product_variants.reserved',
-                'model_lists.model_name as model_name',
-                'model_lists.code as model_code',
-            ])
+            ->select($this->purchaseVariantSelectColumns())
             ->get()
             ->map(function ($v) {
                 $design2 = substr((string) $v->variant_code, -2);
@@ -300,6 +255,100 @@ class PurchaseController extends Controller
         return redirect()->route('purchases.index')->with('success', 'سند خرید با موفقیت حذف شد.');
     }
 
+
+    private function productVariantHasColumn(string $column): bool
+    {
+        static $columns = [];
+
+        if (! array_key_exists($column, $columns)) {
+            $columns[$column] = Schema::hasColumn('product_variants', $column);
+        }
+
+        return $columns[$column];
+    }
+
+    private function canLoadVariantColor(): bool
+    {
+        return $this->productVariantHasColumn('color_id') && Schema::hasTable('colors');
+    }
+
+    private function productVariantRelations(): array
+    {
+        $relations = ['variants.modelList:id,model_name,code'];
+
+        if ($this->canLoadVariantColor()) {
+            $relations[] = 'variants.color:id,name,code';
+        }
+
+        return $relations;
+    }
+
+    private function variantRelations(): array
+    {
+        $relations = ['modelList:id,model_name,code'];
+
+        if ($this->canLoadVariantColor()) {
+            $relations[] = 'color:id,name,code';
+        }
+
+        return $relations;
+    }
+
+    private function purchaseVariantSelectColumns(): array
+    {
+        $columns = [
+            'product_variants.id',
+            'product_variants.product_id',
+            'product_variants.model_list_id',
+            'product_variants.variant_code',
+            'product_variants.variant_name',
+            'product_variants.variety_name',
+            'product_variants.variety_code',
+            'product_variants.sell_price',
+            'product_variants.buy_price',
+            'product_variants.stock',
+            'product_variants.reserved',
+            'model_lists.model_name as model_name',
+            'model_lists.code as model_code',
+        ];
+
+        if ($this->productVariantHasColumn('barcode')) {
+            $columns[] = 'product_variants.barcode';
+        }
+
+        if ($this->productVariantHasColumn('color_id')) {
+            $columns[] = 'product_variants.color_id';
+        }
+
+        return $columns;
+    }
+
+    private function variantSelectColumns(): array
+    {
+        $columns = [
+            'id',
+            'product_id',
+            'model_list_id',
+            'variant_name',
+            'variant_code',
+            'variety_name',
+            'variety_code',
+            'sell_price',
+            'buy_price',
+            'stock',
+            'reserved',
+        ];
+
+        if ($this->productVariantHasColumn('barcode')) {
+            $columns[] = 'barcode';
+        }
+
+        if ($this->productVariantHasColumn('color_id')) {
+            $columns[] = 'color_id';
+        }
+
+        return $columns;
+    }
 
     private function variantPayload(ProductVariant $variant): array
     {
