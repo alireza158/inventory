@@ -229,8 +229,6 @@ class WarehouseMapController extends Controller
                 $q->where(function ($qq) use ($term) {
                     $qq->where('variant_name', 'like', "%{$term}%")
                         ->orWhere('variant_code', 'like', "%{$term}%")
-                        ->orWhere('sku', 'like', "%{$term}%")
-                        ->orWhere('barcode', 'like', "%{$term}%")
                         ->orWhereHas('product', fn ($p) => $p->where('name', 'like', "%{$term}%")->orWhere('code', 'like', "%{$term}%")->orWhere('sku', 'like', "%{$term}%")->orWhere('barcode', 'like', "%{$term}%"));
                 });
             })

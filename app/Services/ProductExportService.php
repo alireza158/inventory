@@ -84,8 +84,6 @@ class ProductExportService
                     $variantQuery
                         ->where('variant_name', 'like', "%{$search}%")
                         ->orWhere('variety_name', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%")
-                        ->orWhere('barcode', 'like', "%{$search}%")
                         ->orWhere('variant_code', 'like', "%{$search}%")
                         ->orWhere('variety_code', 'like', "%{$search}%");
                 });

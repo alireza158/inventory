@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Services\ProductVariantStructureService;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
@@ -74,6 +75,21 @@ class Product extends Model
     public function variants()
     {
         return $this->hasMany(ProductVariant::class);
+    }
+
+    public function validVariants()
+    {
+        return app(ProductVariantStructureService::class)->applyValidConstraints($this->variants(), $this);
+    }
+
+    public function validVariantCollection(bool $activeOnly = true)
+    {
+        return app(ProductVariantStructureService::class)->validVariants($this, $activeOnly);
+    }
+
+    public function invalidVariantCollection()
+    {
+        return app(ProductVariantStructureService::class)->invalidVariants($this);
     }
 
     public function warehouseStocks()

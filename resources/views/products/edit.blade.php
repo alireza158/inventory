@@ -23,8 +23,10 @@
     })->values();
 
     $oldCategoryId   = old('category_id', $product->category_id);
-    $oldModelIds     = array_map('intval', old('model_list_ids', $product->variants->pluck('model_list_id')->filter()->unique()->values()->all()));
-    $oldDesignNotes = old('design_notes');
+    $productVariantMeta = is_array($product->models ?? null) ? $product->models : [];
+    $metaModelIds = $productVariantMeta['model_list_ids'] ?? null;
+    $oldModelIds     = array_map('intval', old('model_list_ids', $metaModelIds ?: $product->variants->pluck('model_list_id')->filter()->unique()->values()->all()));
+    $oldDesignNotes = old('design_notes', $productVariantMeta['design_notes'] ?? null);
     $designIndexes = [];
 
     if ($oldDesignNotes === null) {
