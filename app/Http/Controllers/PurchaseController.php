@@ -72,7 +72,7 @@ class PurchaseController extends Controller
             ->get(['id', 'name', 'code', 'parent_id']);
 
         $products = Product::query()
-            ->with(['variants.modelList:id,model_name,code'])
+            ->with(['variants.modelList:id,model_name,code', 'variants.color:id,name,code'])
             ->orderBy('name')
             ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
 
@@ -82,10 +82,12 @@ class PurchaseController extends Controller
                 'product_variants.id',
                 'product_variants.product_id',
                 'product_variants.model_list_id',
+                'product_variants.color_id',
                 'product_variants.variant_code',
                 'product_variants.variant_name',
                 'product_variants.variety_name',
                 'product_variants.variety_code',
+                'product_variants.barcode',
                 'product_variants.sell_price',
                 'product_variants.buy_price',
                 'product_variants.stock',
@@ -114,6 +116,9 @@ class PurchaseController extends Controller
                     'reserved' => (int) ($v->reserved ?? 0),
                     'model_name' => (string) ($v->model_name ?? ''),
                     'model_code' => (string) ($v->model_code ?? ''),
+                    'barcode' => (string) ($v->barcode ?? ''),
+                    'color_name' => '',
+                    'color_code' => '',
                 ];
             });
 
@@ -129,7 +134,7 @@ class PurchaseController extends Controller
     public function productVariants(Product $product)
     {
         $variants = $product->variants()
-            ->with(['modelList:id,model_name,code'])
+            ->with(['modelList:id,model_name,code', 'color:id,name,code'])
             ->select([
                 'id',
                 'product_id',
@@ -142,6 +147,8 @@ class PurchaseController extends Controller
                 'buy_price',
                 'stock',
                 'reserved',
+                'barcode',
+                'color_id',
             ])
             ->orderBy('variant_code')
             ->orderBy('id')
@@ -167,7 +174,7 @@ class PurchaseController extends Controller
             ->get(['id', 'name', 'code', 'parent_id']);
 
         $products = Product::query()
-            ->with(['variants.modelList:id,model_name,code'])
+            ->with(['variants.modelList:id,model_name,code', 'variants.color:id,name,code'])
             ->orderBy('name')
             ->get(['id', 'name', 'category_id', 'code', 'short_barcode', 'sku']);
 
@@ -177,10 +184,12 @@ class PurchaseController extends Controller
                 'product_variants.id',
                 'product_variants.product_id',
                 'product_variants.model_list_id',
+                'product_variants.color_id',
                 'product_variants.variant_code',
                 'product_variants.variant_name',
                 'product_variants.variety_name',
                 'product_variants.variety_code',
+                'product_variants.barcode',
                 'product_variants.sell_price',
                 'product_variants.buy_price',
                 'product_variants.stock',
@@ -209,6 +218,9 @@ class PurchaseController extends Controller
                     'reserved' => (int) ($v->reserved ?? 0),
                     'model_name' => (string) ($v->model_name ?? ''),
                     'model_code' => (string) ($v->model_code ?? ''),
+                    'barcode' => (string) ($v->barcode ?? ''),
+                    'color_name' => '',
+                    'color_code' => '',
                 ];
             });
 
@@ -304,7 +316,9 @@ class PurchaseController extends Controller
             'code' => (string) ($variant->variant_code ?? ''),
             'variant_code' => (string) ($variant->variant_code ?? ''),
             'sku' => (string) ($variant->variant_code ?? ''),
-            'barcode' => null,
+            'barcode' => (string) ($variant->barcode ?? ''),
+            'color_name' => (string) ($variant->color?->name ?? ''),
+            'color_code' => (string) ($variant->color?->code ?? ''),
             'central_stock' => (int) ($variant->stock ?? 0),
             'stock' => (int) ($variant->stock ?? 0),
             'reserved' => (int) ($variant->reserved ?? 0),
