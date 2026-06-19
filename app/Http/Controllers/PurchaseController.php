@@ -101,10 +101,7 @@ class PurchaseController extends Controller
                     'reserved' => (int) ($v->reserved ?? 0),
                     'model_name' => (string) ($v->model_name ?? ''),
                     'model_code' => (string) ($v->model_code ?? ''),
-                    'display_code' => (string) ($v->variant_code ?? '-'),
-                    'barcode' => (string) ($v->variant_code ?? ''),
-                    'sku' => (string) ($v->variant_code ?? ''),
-                    'is_active' => (bool) ($v->is_active ?? true),
+                    'barcode' => (string) ($v->barcode ?? ''),
                     'color_name' => '',
                     'color_code' => '',
                 ];
@@ -176,10 +173,7 @@ class PurchaseController extends Controller
                     'reserved' => (int) ($v->reserved ?? 0),
                     'model_name' => (string) ($v->model_name ?? ''),
                     'model_code' => (string) ($v->model_code ?? ''),
-                    'display_code' => (string) ($v->variant_code ?? '-'),
-                    'barcode' => (string) ($v->variant_code ?? ''),
-                    'sku' => (string) ($v->variant_code ?? ''),
-                    'is_active' => (bool) ($v->is_active ?? true),
+                    'barcode' => (string) ($v->barcode ?? ''),
                     'color_name' => '',
                     'color_code' => '',
                 ];
@@ -314,11 +308,13 @@ class PurchaseController extends Controller
             'product_variants.buy_price',
             'product_variants.stock',
             'product_variants.reserved',
-            'product_variants.is_active',
             'model_lists.model_name as model_name',
             'model_lists.code as model_code',
         ];
 
+        if ($this->productVariantHasColumn('barcode')) {
+            $columns[] = 'product_variants.barcode';
+        }
 
         if ($this->productVariantHasColumn('color_id')) {
             $columns[] = 'product_variants.color_id';
@@ -341,9 +337,11 @@ class PurchaseController extends Controller
             'buy_price',
             'stock',
             'reserved',
-            'is_active',
         ];
 
+        if ($this->productVariantHasColumn('barcode')) {
+            $columns[] = 'barcode';
+        }
 
         if ($this->productVariantHasColumn('color_id')) {
             $columns[] = 'color_id';
@@ -367,8 +365,7 @@ class PurchaseController extends Controller
             'code' => (string) ($variant->variant_code ?? ''),
             'variant_code' => (string) ($variant->variant_code ?? ''),
             'sku' => (string) ($variant->variant_code ?? ''),
-            'display_code' => (string) ($variant->variant_code ?: '-'),
-            'barcode' => (string) ($variant->variant_code ?? ''),
+            'barcode' => (string) ($variant->barcode ?? ''),
             'color_name' => (string) ($variant->color?->name ?? ''),
             'color_code' => (string) ($variant->color?->code ?? ''),
             'central_stock' => (int) ($variant->stock ?? 0),
@@ -376,7 +373,6 @@ class PurchaseController extends Controller
             'reserved' => (int) ($variant->reserved ?? 0),
             'buy_price' => \App\Support\Currency::toRial($variant->buy_price ?? 0),
             'sell_price' => \App\Support\Currency::toRial($variant->sell_price ?? 0),
-            'is_active' => (bool) ($variant->is_active ?? true),
         ];
     }
 

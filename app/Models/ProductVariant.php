@@ -17,6 +17,8 @@ class ProductVariant extends Model
         'variant_code',
         'variety_id',
         'unique_key',
+        'sku',
+        'barcode',
 
         'buy_price',
         'sell_price',
@@ -58,16 +60,6 @@ class ProductVariant extends Model
     public function getAvailableStockAttribute(): int
     {
         return max(0, (int) ($this->stock ?? 0));
-    }
-
-    public function getBarcodeAttribute(): ?string
-    {
-        return $this->variant_code;
-    }
-
-    public function getSkuAttribute(): ?string
-    {
-        return $this->variant_code;
     }
 
     public function scopeActive($query)
