@@ -613,8 +613,6 @@ class ProductController extends Controller
                     $design2 = '00';
                 }
 
-                $variantCode = $this->buildVariantCode11((string) $product->code, $modelCode3, $design2, $ignoreId);
-
                 $variant = null;
 
                 if (!empty($v['id'])) {
@@ -630,6 +628,8 @@ class ProductController extends Controller
                 $buyPrice = array_key_exists('buy_price', $v) && $v['buy_price'] !== ''
                     ? (int) $v['buy_price']
                     : $variant?->buy_price;
+
+                $variantCode = $variant?->variant_code ?: $this->buildVariantCode11((string) $product->code, $modelCode3, $design2, $ignoreId);
 
                 $payload = [
                     'variant_name' => $v['variant_name'],
@@ -674,7 +674,7 @@ class ProductController extends Controller
 
             // ویرایش ساختار کالا نباید هیچ تنوع واقعی را صرفاً به‌خاطر نبودن در request حذف کند.
             // حذف/غیرفعال‌سازی واقعی باید بعداً از مسیر صریح و کنترل‌شده انجام شود.
-            $this->syncExpectedVariantsFromStructure($product, $request, $data);
+            $this->syncProductVariants($product, $data);
 
             foreach (($data['variant_site_ids'] ?? []) as $variantId => $siteVariantId) {
                 if ($siteVariantId === null || $siteVariantId === '') {
@@ -699,10 +699,10 @@ class ProductController extends Controller
     }
 
 
-    private function syncExpectedVariantsFromStructure(Product $product, Request $request, array $data): void
+    private function syncProductVariants(Product $product, array $data): void
     {
-        $useModels = $request->boolean('use_models');
-        $useDesigns = $request->boolean('use_designs');
+        $useModels = filter_var($data['use_models'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $useDesigns = filter_var($data['use_designs'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $modelIds = $useModels
             ? collect($data['model_list_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->unique()->values()
@@ -742,7 +742,8 @@ class ProductController extends Controller
 
                 $existingQuery = ProductVariant::query()
                     ->where('product_id', $product->id)
-                    ->whereRaw('RIGHT(variety_code, 2) = ?', [$design2]);
+                    ->where('variety_code', $varietyCode)
+                    ->whereNull('color_id');
 
                 if ($model) {
                     $existingQuery->where('model_list_id', $model->id);
@@ -751,7 +752,7 @@ class ProductController extends Controller
                 }
 
                 $variant = $existingQuery->first();
-                $variantCode = $this->buildVariantCode11((string) $product->code, $modelCode3, $design2, $variant?->id);
+                $variantCode = $variant?->variant_code ?: $this->buildVariantCode11((string) $product->code, $modelCode3, $design2, $variant?->id);
 
                 $variantName = trim(collect([
                     $product->name,
@@ -802,9 +803,7 @@ class ProductController extends Controller
         }
 
         $productVariantIds = $product->variants()->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $allowNewVariants = $request->boolean('generate_new_variants')
-            || $request->boolean('use_models')
-            || $request->boolean('use_designs');
+        $allowNewVariants = $request->boolean('generate_new_variants');
 
         $cleanVariants = collect($request->input('variants', []))
             ->filter(function ($variant) use ($productVariantIds, $allowNewVariants) {
@@ -831,7 +830,6 @@ class ProductController extends Controller
                     || filled($variant['variety_name'] ?? null)
                     || filled($variant['variety_code'] ?? null)
                     || filled($variant['variant_code'] ?? null)
-                    || filled($variant['barcode'] ?? null)
                     || filled($variant['model_list_id'] ?? null)
                     || filled($variant['variety_id'] ?? null);
 
