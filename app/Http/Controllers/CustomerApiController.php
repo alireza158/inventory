@@ -17,11 +17,32 @@ class CustomerApiController extends Controller
             return response()->json(['data' => ['customers' => []]]);
         }
 
+        $terms = collect([
+            $q,
+            $this->normalizeDigits($q),
+            $this->toPersianDigits($q),
+            $this->toArabicDigits($q),
+        ])->map(fn ($term) => trim((string) $term))
+            ->filter()
+            ->unique()
+            ->values();
+
         $items = Customer::query()
             ->withBalance()
-            ->where(function($qq) use ($q){
-                $qq->where('first_name','like',"%{$q}%")
-                   ->orWhere('mobile','like',"%{$q}%");
+            ->where(function($qq) use ($terms){
+                foreach ($terms as $term) {
+                    $like = '%' . str_replace(['%', '_'], ['\%', '\_'], $term) . '%';
+                    $compactLike = '%' . str_replace(['%', '_'], ['\%', '\_'], preg_replace('/[\s\-()]+/u', '', $term)) . '%';
+
+                    $qq->orWhere('first_name', 'like', $like)
+                       ->orWhere('last_name', 'like', $like)
+                       ->orWhereRaw("TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) LIKE ?", [$like])
+                       ->orWhere('mobile', 'like', $like);
+
+                    if ($compactLike !== '%%') {
+                        $qq->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(mobile, ''), ' ', ''), '-', ''), '(', ''), ')', '') LIKE ?", [$compactLike]);
+                    }
+                }
             })
             ->orderByDesc('id')
             ->limit(20)
@@ -44,6 +65,32 @@ class CustomerApiController extends Controller
             ->values();
 
         return response()->json(['data' => ['customers' => $items]]);
+    }
+
+    private function normalizeDigits(string $value): string
+    {
+        return strtr($value, [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]);
+    }
+
+    private function toPersianDigits(string $value): string
+    {
+        return strtr($this->normalizeDigits($value), [
+            '0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴',
+            '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹',
+        ]);
+    }
+
+    private function toArabicDigits(string $value): string
+    {
+        return strtr($this->normalizeDigits($value), [
+            '0' => '٠', '1' => '١', '2' => '٢', '3' => '٣', '4' => '٤',
+            '5' => '٥', '6' => '٦', '7' => '٧', '8' => '٨', '9' => '٩',
+        ]);
     }
 
     public function show(Customer $customer)
