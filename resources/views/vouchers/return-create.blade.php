@@ -222,9 +222,15 @@
                         <div class="form-text">برای مرجوعی‌هایی که فاکتورشان در نرم‌افزار قبلی ثبت شده است.</div>
                     </div>
                     <div class="col-lg-4">
-                        <label class="form-label">انبار مقصد خودکار</label>
-                        <input class="form-control" value="{{ $returnsWarehouse->name }}" readonly>
-                        <input type="hidden" name="to_warehouse_id" id="warehouseSelect" value="{{ $returnsWarehouse->id }}">
+                        <label class="form-label">انبار مقصد</label>
+                        <select class="form-select" name="to_warehouse_id" id="warehouseSelect" required>
+                            @foreach($warehouses as $warehouse)
+                                <option value="{{ $warehouse->id }}" @selected((int) old('to_warehouse_id', $returnsWarehouse->id) === (int) $warehouse->id)>
+                                    {{ $warehouse->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">برای کالاهای سالم می‌توانید مستقیماً انبار مرکزی را انتخاب کنید.</div>
                     </div>
                 </div>
 
