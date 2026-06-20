@@ -179,7 +179,16 @@ class VoucherController extends Controller
         }
 
         $vouchers = WarehouseTransfer::query()
-            ->with(['fromWarehouse', 'toWarehouse', 'user', 'relatedInvoice', 'customer'])
+            ->with([
+                'fromWarehouse',
+                'toWarehouse',
+                'user',
+                'relatedInvoice',
+                'customer',
+                'items.product',
+                'items.variant.modelList',
+                'items.variant.color',
+            ])
             ->where('voucher_type', $voucherType)
             ->when(
                 $voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN && $customerId > 0,
