@@ -36,6 +36,7 @@
         .col-code { width:24mm; text-align:center; direction:ltr; unicode-bidi:embed; }
         .col-map { width:34mm; text-align:center; direction:ltr; unicode-bidi:embed; font-size:10px; }
         .col-qty { width:12mm; text-align:center; }
+        .col-price { width:24mm; text-align:left; direction:ltr; unicode-bidi:embed; }
         .col-total { width:27mm; text-align:left; direction:ltr; unicode-bidi:embed; }
         body.customer-mode .warehouse-only { display:none; }
         .summary-section { display:grid; grid-template-columns:1fr 68mm; gap:8px; margin-top:7px; page-break-inside:avoid; break-inside:avoid; }
