@@ -181,7 +181,7 @@
                     <div class="col-md-4">
                         <label class="form-label">تامین‌کننده / مشتری</label>
                         <div class="d-flex gap-2">
-                            <select class="form-select form-select-sm" name="supplier_id" required>
+                            <select class="form-select form-select-sm" name="supplier_id" id="purchaseSupplierSelect" data-placeholder="جستجوی نام یا موبایل تأمین‌کننده / مشتری..." required>
                                 <option value="">انتخاب کنید...</option>
                                 @foreach($suppliers as $supplier)
                                     <option value="{{ $supplier->purchase_option_value ?? $supplier->id }}" @selected(old('supplier_id', $purchase->supplier_id ?? null)==($supplier->purchase_option_value ?? $supplier->id))>
@@ -301,6 +301,7 @@
     const addProductBtn = document.getElementById('addProductBtn');
     const invoiceDiscountTypeEl = document.getElementById('invoiceDiscountType');
     const invoiceDiscountValueEl = document.getElementById('invoiceDiscountValue');
+    const supplierSelectEl = document.getElementById('purchaseSupplierSelect');
 
     const summaryProductCountEl = document.getElementById('summaryProductCount');
     const summaryVariantCountEl = document.getElementById('summaryVariantCount');
@@ -331,6 +332,37 @@
             .replace(/\s+/g, ' ')
             .trim()
             .toLowerCase();
+    }
+
+    function initPurchaseSupplierSearch() {
+        if (!supplierSelectEl || !window.jQuery || !window.jQuery.fn?.select2) return;
+
+        const $supplierSelect = window.jQuery(supplierSelectEl);
+        const placeholder = supplierSelectEl.dataset.placeholder || 'جستجوی تأمین‌کننده / مشتری...';
+
+        if ($supplierSelect.hasClass('select2-hidden-accessible')) {
+            $supplierSelect.select2('destroy');
+        }
+
+        $supplierSelect.select2({
+            width: '100%',
+            dir: 'rtl',
+            placeholder,
+            allowClear: true,
+            minimumInputLength: 1,
+            language: {
+                inputTooShort: () => 'برای نمایش نتیجه، نام یا موبایل را جستجو کنید.',
+                noResults: () => 'نتیجه‌ای یافت نشد.',
+                searching: () => 'در حال جستجو...'
+            },
+            matcher: function (params, data) {
+                const term = normalizePurchaseSearchText(params.term || '');
+                if (term === '') return null;
+                const text = normalizePurchaseSearchText(data.text || '');
+                const tokens = term.split(' ').filter(Boolean);
+                return tokens.every(token => text.includes(token)) ? data : null;
+            }
+        });
     }
 
     function debounce(fn, delay = 200) {
@@ -965,6 +997,7 @@
         }
     }
 
+    initPurchaseSupplierSearch();
     renderProductOptions();
     hydrateInitialItems();
     recalc();
