@@ -315,7 +315,15 @@ class VoucherController extends Controller
             ->get(['id', 'first_name', 'last_name', 'mobile']);
 
         $returnsWarehouse = $this->returnsWarehouse();
-        $warehouses = collect([$returnsWarehouse]);
+        $warehouses = Warehouse::query()
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('type')
+                    ->orWhereNotIn('type', ['personnel', 'scrap']);
+            })
+            ->orderByRaw('id = ? desc', [$returnsWarehouse->id])
+            ->orderBy('name')
+            ->get(['id', 'name', 'type']);
 
         $products = Product::query()
             ->with(['variants' => fn ($q) => $q->orderBy('variant_name')])
@@ -357,6 +365,7 @@ class VoucherController extends Controller
             'return_reason' => ['required', 'in:' . implode(',', array_keys(WarehouseTransfer::returnReasonOptions()))],
             'reference' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:255'],
+            'to_warehouse_id' => ['required', 'exists:warehouses,id'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
@@ -375,6 +384,17 @@ class VoucherController extends Controller
 
         $data = $request->validate($rules);
         $returnsWarehouse = $this->returnsWarehouse();
+        $destinationWarehouse = Warehouse::query()
+            ->whereKey((int) $data['to_warehouse_id'])
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('type')
+                    ->orWhereNotIn('type', ['personnel', 'scrap']);
+            })
+            ->first();
+
+        abort_if(! $destinationWarehouse, 422, 'انبار مقصد مرجوعی معتبر نیست.');
+
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
 
         if ($data['return_type'] === WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL) {
@@ -384,7 +404,7 @@ class VoucherController extends Controller
                 'voucher_type' => WarehouseTransfer::TYPE_CUSTOMER_RETURN,
                 'return_type' => WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL,
                 'from_warehouse_id' => $centralWarehouseId,
-                'to_warehouse_id' => (int) $returnsWarehouse->id,
+                'to_warehouse_id' => (int) $destinationWarehouse->id,
                 'customer_id' => (int) $data['customer_id'],
                 'external_invoice_number' => $data['external_invoice_number'],
                 'return_reason' => $data['return_reason'],
@@ -411,7 +431,7 @@ class VoucherController extends Controller
                 'voucher_type' => WarehouseTransfer::TYPE_CUSTOMER_RETURN,
                 'return_type' => WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE,
                 'from_warehouse_id' => $centralWarehouseId,
-                'to_warehouse_id' => (int) $returnsWarehouse->id,
+                'to_warehouse_id' => (int) $destinationWarehouse->id,
                 'related_invoice_uuid' => $data['related_invoice_uuid'],
                 'return_reason' => $data['return_reason'],
                 'reference' => $data['reference'] ?? null,
@@ -1282,7 +1302,7 @@ class VoucherController extends Controller
 
                 $movementType = 'in';
                 $movementReason = 'return';
-                $movementNote = 'ورود کالا به انبار مرجوعی بابت برگشت از فروش'
+                $movementNote = 'ورود کالا به ' . $toWarehouse->name . ' بابت برگشت از فروش'
                     . (!empty($data['external_invoice_number']) ? (' فاکتور سازه‌حساب شماره ' . $data['external_invoice_number']) : '')
                     . ' - ' . ($variant->variant_name ?: 'تنوع');
             } elseif ($voucherType === WarehouseTransfer::TYPE_SCRAP) {

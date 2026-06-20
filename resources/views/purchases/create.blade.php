@@ -172,20 +172,20 @@
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                     <div>
                         <div class="section-title">اطلاعات اصلی خرید</div>
-                        <div class="small text-muted">تأمین‌کننده، انبار مقصد و توضیحات سند را وارد کنید.</div>
+                        <div class="small text-muted">تأمین‌کننده یا مشتری، انبار مقصد و توضیحات سند را وارد کنید.</div>
                     </div>
                     <button class="btn btn-sm btn-primary" type="submit">{{ $isEdit ? 'ذخیره تغییرات سند خرید' : 'ثبت نهایی خرید' }}</button>
                 </div>
 
                 <div class="row g-2 align-items-end">
                     <div class="col-md-4">
-                        <label class="form-label">تامین‌کننده</label>
+                        <label class="form-label">تامین‌کننده / مشتری</label>
                         <div class="d-flex gap-2">
                             <select class="form-select form-select-sm" name="supplier_id" required>
                                 <option value="">انتخاب کنید...</option>
                                 @foreach($suppliers as $supplier)
-                                    <option value="{{ $supplier->id }}" @selected(old('supplier_id', $purchase->supplier_id ?? null)==$supplier->id)>
-                                        {{ $supplier->name }}
+                                    <option value="{{ $supplier->purchase_option_value ?? $supplier->id }}" @selected(old('supplier_id', $purchase->supplier_id ?? null)==($supplier->purchase_option_value ?? $supplier->id))>
+                                        {{ $supplier->purchase_option_label ?? $supplier->name }}@if($supplier->phone) | {{ $supplier->phone }}@endif
                                     </option>
                                 @endforeach
                             </select>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\PurchasesExport;
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
@@ -67,7 +68,7 @@ class PurchaseController extends Controller
 
     public function create()
     {
-        $suppliers = Supplier::orderBy('name')->get(['id', 'name', 'phone']);
+        $suppliers = $this->purchaseSupplierOptions();
 
         $categories = Category::query()
             ->orderBy('name')
@@ -138,7 +139,7 @@ class PurchaseController extends Controller
     {
         $purchase->load(['items', 'items.product', 'items.variant']);
 
-        $suppliers = Supplier::orderBy('name')->get(['id', 'name', 'phone']);
+        $suppliers = $this->purchaseSupplierOptions();
 
         $categories = Category::query()
             ->orderBy('name')
@@ -442,7 +443,7 @@ class PurchaseController extends Controller
         ]);
 
         $data = $request->validate([
-            'supplier_id' => ['required', 'exists:suppliers,id'],
+            'supplier_id' => ['required', 'string', 'max:100'],
             'warehouse_id' => ['required', 'exists:warehouses,id'],
             'purchased_at' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:1000'],
@@ -468,6 +469,8 @@ class PurchaseController extends Controller
             'items.required' => 'حداقل یک قلم با تعداد معتبر باید برای خرید وارد شود.',
             'items.min' => 'حداقل یک قلم با تعداد معتبر باید برای خرید وارد شود.',
         ]);
+
+        $data['supplier_id'] = $this->resolvePurchaseSupplierId((string) $data['supplier_id']);
 
         $data['items'] = array_values(array_map(function ($item, $index) {
             $qty = $this->normalizeNumber($item['quantity'] ?? $item['qty'] ?? 0);
@@ -579,6 +582,85 @@ class PurchaseController extends Controller
             '٧' => '7',
             '٨' => '8',
             '٩' => '9',
+        ]);
+    }
+
+    private function purchaseSupplierOptions()
+    {
+        $suppliers = Supplier::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone'])
+            ->map(function (Supplier $supplier) {
+                $supplier->purchase_option_value = (string) $supplier->id;
+                $supplier->purchase_option_label = $supplier->name;
+                $supplier->purchase_option_source = 'supplier';
+
+                return $supplier;
+            });
+
+        $supplierPhones = $suppliers
+            ->pluck('phone')
+            ->filter()
+            ->map(fn ($phone) => preg_replace('/\D+/', '', (string) $phone))
+            ->filter()
+            ->flip();
+
+        $customerOptions = Customer::query()
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'mobile'])
+            ->filter(function (Customer $customer) use ($supplierPhones) {
+                $phone = preg_replace('/\D+/', '', (string) $customer->mobile);
+
+                return $phone === '' || ! $supplierPhones->has($phone);
+            })
+            ->map(function (Customer $customer) {
+                $name = $customer->display_name !== '' ? $customer->display_name : ('مشتری #' . $customer->id);
+
+                return (object) [
+                    'id' => $customer->id,
+                    'name' => $name,
+                    'phone' => $customer->mobile,
+                    'purchase_option_value' => 'customer:' . $customer->id,
+                    'purchase_option_label' => $name . ' (مشتری)',
+                    'purchase_option_source' => 'customer',
+                ];
+            });
+
+        return $suppliers->concat($customerOptions)->sortBy('name')->values();
+    }
+
+    private function resolvePurchaseSupplierId(string $value): int
+    {
+        if (preg_match('/^customer:(\d+)$/', $value, $matches)) {
+            $customer = Customer::query()->findOrFail((int) $matches[1]);
+            $name = $customer->display_name !== '' ? $customer->display_name : ('مشتری #' . $customer->id);
+
+            $attributes = [
+                'name' => $name,
+                'address' => $customer->address,
+                'postal_code' => $customer->postal_code,
+                'additional_notes' => 'ایجاد خودکار از مشتری برای ثبت خرید کالا',
+            ];
+
+            if (filled($customer->mobile)) {
+                $supplier = Supplier::query()->firstOrCreate(
+                    ['phone' => $customer->mobile],
+                    $attributes
+                );
+            } else {
+                $supplier = Supplier::query()->create($attributes);
+            }
+
+            return (int) $supplier->id;
+        }
+
+        if (ctype_digit($value) && Supplier::query()->whereKey((int) $value)->exists()) {
+            return (int) $value;
+        }
+
+        throw ValidationException::withMessages([
+            'supplier_id' => 'تامین‌کننده یا مشتری انتخاب‌شده معتبر نیست.',
         ]);
     }
 
