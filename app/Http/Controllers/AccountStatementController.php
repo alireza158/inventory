@@ -127,7 +127,8 @@ class AccountStatementController extends Controller
 
         $voucher->load([
             'items.product',
-            'items.variant',
+            'items.variant.modelList',
+            'items.variant.color',
             'fromWarehouse',
             'toWarehouse',
             'relatedInvoice',

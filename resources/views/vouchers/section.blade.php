@@ -16,6 +16,43 @@
     $pageItems = method_exists($vouchers, 'getCollection') ? $vouchers->getCollection() : collect($vouchers);
     $pageCount = $pageItems->count();
     $pageTotalAmount = (int) $pageItems->sum('total_amount');
+
+    $returnerName = function ($voucher): string {
+        $customerFullName = trim(implode(' ', array_filter([
+            $voucher->customer?->first_name,
+            $voucher->customer?->last_name,
+        ])));
+
+        return $customerFullName !== ''
+            ? $customerFullName
+            : ($voucher->beneficiary_name ?: ($voucher->customer?->display_name ?: '—'));
+    };
+
+    $variantLabel = function ($item): string {
+        $variant = $item->variant;
+        $parts = collect([
+            $variant?->variant_name,
+            $variant?->modelList?->model_name,
+            $variant?->color?->name,
+            $variant?->variety_name,
+            $item->variant_name,
+        ])->filter(fn ($value) => filled($value) && $value !== '—')->unique()->values();
+
+        return $parts->isNotEmpty() ? $parts->implode(' / ') : '—';
+    };
+
+    $returnedItemsSummary = function ($voucher) use ($variantLabel): string {
+        $items = $voucher->items->map(function ($item) use ($variantLabel) {
+            $product = $item->product?->name ?? ('#' . $item->product_id);
+            $variant = $variantLabel($item);
+            $code = $item->variant?->variant_code ?: ($item->variant_code ?: null);
+            $quantity = number_format((int) $item->quantity);
+
+            return trim($product . ' / ' . $variant . ($code ? ' (' . $code . ')' : '') . ' × ' . $quantity);
+        })->filter()->values();
+
+        return $items->isNotEmpty() ? $items->implode('، ') : '—';
+    };
 @endphp
 
 <style>
@@ -332,6 +369,10 @@
                         <th>مبدا</th>
                         <th>مقصد</th>
                         <th>کاربر</th>
+                        <th>نام و نام خانوادگی برگشت‌دهنده</th>
+                        <th>موبایل برگشت‌دهنده</th>
+                        <th>کالا / نوع دقیق برگشتی</th>
+                        <th>مبلغ برگشتی مشتری</th>
                         <th>نوع برگشت</th>
                         <th>فاکتور مرجع</th>
                         <th>شماره سازه‌حساب</th>
@@ -348,6 +389,10 @@
                             <td>{{ $voucher->fromWarehouse?->name ?: '—' }}</td>
                             <td>{{ $voucher->toWarehouse?->name ?: '—' }}</td>
                             <td>{{ $voucher->user?->name ?: '—' }}</td>
+                            <td>{{ $returnerName($voucher) }}</td>
+                            <td>{{ $voucher->customer?->mobile ?: '—' }}</td>
+                            <td class="small" style="min-width: 260px;">{{ $returnedItemsSummary($voucher) }}</td>
+                            <td>{{ $toRial($voucher->total_amount) }}</td>
                             <td>{{ \App\Models\WarehouseTransfer::returnSourceLabel($voucher->return_type ?? null) }}</td>
                             <td>{{ $voucher->relatedInvoice?->uuid ?: '—' }}</td>
                             <td>{{ $voucher->external_invoice_number ?: '—' }}</td>
@@ -363,7 +408,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="11" class="text-center py-4 text-muted">موردی ثبت نشده است.</td>
+                            <td colspan="15" class="text-center py-4 text-muted">موردی ثبت نشده است.</td>
                         </tr>
                     @endforelse
                     </tbody>

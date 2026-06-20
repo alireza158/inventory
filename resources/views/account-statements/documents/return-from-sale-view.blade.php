@@ -2,6 +2,30 @@
 
 @php
     use Morilog\Jalali\Jalalian;
+
+    $customerFullName = trim(implode(' ', array_filter([
+        $voucher->customer?->first_name,
+        $voucher->customer?->last_name,
+    ])));
+    $returnerName = $customerFullName !== ''
+        ? $customerFullName
+        : ($voucher->beneficiary_name ?: ($voucher->customer?->display_name ?: '—'));
+
+    $variantLabel = function ($item): string {
+        $variant = $item->variant;
+        $parts = collect([
+            $variant?->variant_name,
+            $variant?->modelList?->model_name,
+            $variant?->color?->name,
+            $variant?->variety_name,
+            $item->variant_name,
+        ])->filter(fn ($value) => filled($value) && $value !== '—')->unique()->values();
+
+        return $parts->isNotEmpty() ? $parts->implode(' / ') : '—';
+    };
+
+    $variantCode = fn ($item): string => $item->variant?->variant_code
+        ?: ($item->variant_code ?: '—');
 @endphp
 
 @section('content')
@@ -18,14 +42,16 @@
         <div class="row g-3">
             <div class="col-md-4"><strong>شماره سند:</strong> {{ $voucher->reference ?: ('TR-' . $voucher->id) }}</div>
             <div class="col-md-4"><strong>تاریخ:</strong> {{ $voucher->transferred_at ? Jalalian::fromDateTime($voucher->transferred_at)->format('Y/m/d H:i') : '—' }}</div>
-            <div class="col-md-4"><strong>مبلغ کل:</strong> {{ \App\Support\Currency::formatRial($voucher->total_amount) }}</div>
-            <div class="col-md-4"><strong>مشتری:</strong> {{ $voucher->customer?->display_name ?: ($voucher->beneficiary_name ?: '—') }}</div>
+            <div class="col-md-4"><strong>مبلغ برگشتی مشتری:</strong> {{ \App\Support\Currency::formatRial($voucher->total_amount) }}</div>
+            <div class="col-md-4"><strong>نام و نام خانوادگی برگشت‌دهنده:</strong> {{ $returnerName }}</div>
+            <div class="col-md-4"><strong>موبایل برگشت‌دهنده:</strong> {{ $voucher->customer?->mobile ?: '—' }}</div>
             <div class="col-md-4"><strong>نوع برگشت:</strong> {{ \App\Models\WarehouseTransfer::returnSourceLabel($voucher->return_type ?? null) }}</div>
             <div class="col-md-4"><strong>فاکتور مرجع:</strong> {{ $voucher->relatedInvoice?->uuid ?: '—' }}</div>
             <div class="col-md-4"><strong>شماره فاکتور سازه‌حساب:</strong> {{ $voucher->external_invoice_number ?: '—' }}</div>
             <div class="col-md-4"><strong>علت برگشت:</strong> {{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}</div>
             <div class="col-md-6"><strong>انبار مبدا:</strong> {{ $voucher->fromWarehouse?->name ?: '—' }}</div>
             <div class="col-md-6"><strong>انبار مقصد:</strong> {{ $voucher->toWarehouse?->name ?: '—' }}</div>
+            <div class="col-md-4"><strong>ثبت‌کننده سند:</strong> {{ $voucher->user?->name ?: '—' }}</div>
             <div class="col-md-12"><strong>توضیحات:</strong> {{ $voucher->note ?: '—' }}</div>
         </div>
     </div>
@@ -39,7 +65,8 @@
                 <tr>
                     <th>#</th>
                     <th>کالا</th>
-                    <th>تنوع</th>
+                    <th>نوع / تنوع دقیق کالا</th>
+                    <th>کد تنوع</th>
                     <th>تعداد برگشتی</th>
                     <th>قیمت واحد</th>
                     <th>جمع</th>
@@ -50,13 +77,14 @@
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td>{{ $item->product?->name ?? ('#' . $item->product_id) }}</td>
-                    <td>{{ $item->variant?->variant_name ?: ($item->variant_name ?: '—') }}</td>
+                    <td>{{ $variantLabel($item) }}</td>
+                    <td dir="ltr">{{ $variantCode($item) }}</td>
                     <td>{{ number_format((int) $item->quantity) }}</td>
                     <td>{{ number_format((int) $item->unit_price) }}</td>
                     <td>{{ number_format((int) $item->line_total) }}</td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="text-center text-muted py-4">آیتمی ثبت نشده است.</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-4">آیتمی ثبت نشده است.</td></tr>
             @endforelse
             </tbody>
         </table>
