@@ -32,6 +32,7 @@
                         <th>آدرس</th>
                         <th>کد پستی</th>
                         <th>توضیحات</th>
+                        <th>عملیات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -50,10 +51,14 @@
                             <td>{{ $person['address'] ?: '-' }}</td>
                             <td>{{ $person['postal_code'] ?: '-' }}</td>
                             <td>{{ $person['description'] ?: '-' }}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPersonModal{{ $loop->iteration }}">ویرایش</button>
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-muted py-4">شخصی یافت نشد.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-4">شخصی یافت نشد.</td></tr>
                     @endforelse
+
                 </tbody>
             </table>
         </div>
@@ -61,6 +66,45 @@
         {{ $people->links() }}
     </div>
 </div>
+
+
+
+@foreach($people as $person)
+<div class="modal fade person-edit-modal" id="editPersonModal{{ $loop->iteration }}" tabindex="-1" aria-hidden="true" data-province-id="{{ $person['province_id'] ?? '' }}" data-city-id="{{ $person['city_id'] ?? '' }}">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <form class="modal-content" method="POST" action="{{ route('persons.update', $person['key']) }}">
+            @csrf
+            @method('PUT')
+            <div class="modal-header">
+                <h5 class="modal-title">✏️ ویرایش شخص</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label">نام شخص *</label><input name="name" class="form-control" value="{{ $person['name'] }}" required></div>
+                    <div class="col-md-6"><label class="form-label">شماره تماس *</label><input name="mobile" class="form-control" value="{{ $person['mobile'] }}" required></div>
+                    <div class="col-md-12">
+                        <label class="form-label d-block mb-2">نوع شخص *</label>
+                        <div class="d-flex gap-4">
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="customer" id="edit_customer_{{ $loop->iteration }}" @checked($person['is_customer'])><label class="form-check-label" for="edit_customer_{{ $loop->iteration }}">مشتری</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="supplier" id="edit_supplier_{{ $loop->iteration }}" @checked($person['is_supplier'])><label class="form-check-label" for="edit_supplier_{{ $loop->iteration }}">تامین‌کننده</label></div>
+                        </div>
+                    </div>
+                    <div class="col-md-4"><label class="form-label">استان</label><select name="province_id" class="form-select person-province-select"><option value=""></option></select></div>
+                    <div class="col-md-4"><label class="form-label">شهر</label><select name="city_id" class="form-select person-city-select"><option value=""></option></select></div>
+                    <div class="col-md-4"><label class="form-label">کد پستی</label><input name="postal_code" class="form-control" value="{{ $person['postal_code'] }}"></div>
+                    <div class="col-md-12"><label class="form-label">آدرس</label><input name="address" class="form-control" value="{{ $person['address'] }}"></div>
+                    <div class="col-md-12"><label class="form-label">توضیحات</label><textarea name="description" rows="3" class="form-control">{{ $person['description'] }}</textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">بستن</button>
+                <button class="btn btn-primary">ذخیره تغییرات</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endforeach
 
 <div class="modal fade" id="personModal" tabindex="-1" aria-labelledby="personModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -163,12 +207,6 @@ function personInitSelect2(selectEl, placeholder) {
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
-    const provinceSelect = document.getElementById('person_province_id');
-    const citySelect = document.getElementById('person_city_id');
-    const oldProvinceId = {{ old('province_id') ? (int) old('province_id') : 'null' }};
-    const oldCityId = {{ old('city_id') ? (int) old('city_id') : 'null' }};
-    if (!provinceSelect || !citySelect) return;
-
     let provinces = [];
     try {
         const res = await fetch(PERSON_AREA_API, { headers: { 'Accept': 'application/json' } });
@@ -178,16 +216,18 @@ document.addEventListener('DOMContentLoaded', async function () {
         provinces = [];
     }
 
-    provinceSelect.innerHTML = '<option value=""></option>';
-    provinces.forEach((province) => {
-        const option = document.createElement('option');
-        option.value = province.id;
-        option.textContent = province.name;
-        if (oldProvinceId && Number(option.value) === Number(oldProvinceId)) option.selected = true;
-        provinceSelect.appendChild(option);
-    });
+    const fillProvinceOptions = (provinceSelect, selectedProvinceId = null) => {
+        provinceSelect.innerHTML = '<option value=""></option>';
+        provinces.forEach((province) => {
+            const option = document.createElement('option');
+            option.value = province.id;
+            option.textContent = province.name;
+            if (selectedProvinceId && Number(option.value) === Number(selectedProvinceId)) option.selected = true;
+            provinceSelect.appendChild(option);
+        });
+    };
 
-    const setCityOptions = (provinceId, selectedCityId = null) => {
+    const setCityOptions = (citySelect, provinceId, selectedCityId = null) => {
         const province = provinces.find((p) => Number(p.id) === Number(provinceId));
         const cities = province?.cities ?? [];
 
@@ -203,14 +243,35 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (window.jQuery) $(citySelect).trigger('change.select2');
     };
 
-    provinceSelect.addEventListener('change', function () {
-        setCityOptions(this.value, null);
+    const initLocationPair = (provinceSelect, citySelect, selectedProvinceId = null, selectedCityId = null) => {
+        if (!provinceSelect || !citySelect) return;
+
+        fillProvinceOptions(provinceSelect, selectedProvinceId);
+        setCityOptions(citySelect, provinceSelect.value, selectedCityId);
+
+        provinceSelect.addEventListener('change', function () {
+            setCityOptions(citySelect, this.value, null);
+        });
+
+        personInitSelect2(provinceSelect, 'انتخاب استان...');
+        personInitSelect2(citySelect, 'انتخاب شهر...');
+    };
+
+    initLocationPair(
+        document.getElementById('person_province_id'),
+        document.getElementById('person_city_id'),
+        {{ old('province_id') ? (int) old('province_id') : 'null' }},
+        {{ old('city_id') ? (int) old('city_id') : 'null' }}
+    );
+
+    document.querySelectorAll('.person-edit-modal').forEach((modal) => {
+        initLocationPair(
+            modal.querySelector('.person-province-select'),
+            modal.querySelector('.person-city-select'),
+            modal.dataset.provinceId || null,
+            modal.dataset.cityId || null
+        );
     });
-
-    setCityOptions(provinceSelect.value, oldCityId);
-
-    personInitSelect2(provinceSelect, 'انتخاب استان...');
-    personInitSelect2(citySelect, 'انتخاب شهر...');
 });
 </script>
 @endpush

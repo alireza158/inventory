@@ -237,6 +237,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     // Persons
     Route::get('/persons', [PersonController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.index');
     Route::post('/persons', [PersonController::class, 'store'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.store');
+    Route::put('/persons/{personKey}', [PersonController::class, 'update'])->middleware('role:admin|Admin|finance|Accountant')->name('persons.update');
 
     // Suppliers
     Route::get('/suppliers', [SupplierController::class, 'index'])->middleware('permission:suppliers.manage')->name('suppliers.index');
