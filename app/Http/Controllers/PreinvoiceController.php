@@ -1253,6 +1253,41 @@ class PreinvoiceController extends Controller
         return ! is_null($order->stock_frozen_until);
     }
 
+    private function coverReservationShortfalls($requiredByVariant, bool $centralStockMovedToReserve): void
+    {
+        if ($requiredByVariant->isEmpty()) {
+            return;
+        }
+
+        $variants = ProductVariant::query()
+            ->whereIn('id', $requiredByVariant->keys())
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        foreach ($requiredByVariant as $variantId => $requiredQty) {
+            $variant = $variants->get((int) $variantId);
+            if (! $variant) {
+                continue;
+            }
+
+            $shortfall = (int) $requiredQty - (int) $variant->reserved;
+            if ($shortfall <= 0) {
+                continue;
+            }
+
+            if ($centralStockMovedToReserve) {
+                $this->reserveStockForItem((int) $variant->product_id, (int) $variant->id, $shortfall);
+                continue;
+            }
+
+            $available = max(0, (int) $variant->stock - (int) $variant->reserved);
+            if ($available >= $shortfall) {
+                $this->changeReservedOnly((int) $variant->product_id, (int) $variant->id, $shortfall);
+            }
+        }
+    }
+
     private function changeReservedOnly(int $productId, int $variantId, int $delta): void
     {
         if ($delta === 0) {
@@ -1377,6 +1412,8 @@ class PreinvoiceController extends Controller
             $requiredByVariant = $order->items
                 ->groupBy('variant_id')
                 ->map(fn($rows) => (int) $rows->sum('quantity'));
+
+            $this->coverReservationShortfalls($requiredByVariant, $centralStockMovedToReserve);
 
             $reservedByVariant = ProductVariant::query()
                 ->whereIn('id', $requiredByVariant->keys())
