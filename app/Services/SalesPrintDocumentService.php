@@ -108,6 +108,7 @@ class SalesPrintDocumentService
                 'inventoryCode' => $this->inventoryCode($variant, $product),
                 'warehouseMap' => $variant ? $this->warehouseMap((int) $variant->id, $warehouseId) : 'بدون نقشه',
                 'quantity' => (int) $item->quantity,
+                'unitPrice' => (int) $item->price,
                 'lineTotal' => (int) ($item->line_total ?? ((int) $item->quantity * (int) $item->price)),
             ];
         });
