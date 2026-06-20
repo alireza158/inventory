@@ -369,6 +369,7 @@ class VoucherController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
+            'items.*.invoice_item_id' => ['nullable', 'exists:invoice_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ];
 
@@ -929,6 +930,18 @@ class VoucherController extends Controller
     {
         $categories = Category::orderBy('name')->get();
         $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $variants = ProductVariant::query()
+            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
+            ->orderBy('product_variants.variant_name')
+            ->get([
+                'product_variants.id',
+                'product_variants.product_id',
+                'product_variants.variant_name',
+                'product_variants.variant_code',
+                'product_variants.variety_code',
+                'product_variants.is_active',
+                'model_lists.model_name as model_name',
+            ]);
         $warehouses = $this->selectableWarehouses();
         $invoices = Invoice::query()->latest('id')->limit(300)->get(['id', 'uuid', 'customer_name']);
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
@@ -937,6 +950,7 @@ class VoucherController extends Controller
         return view('vouchers.create', compact(
             'categories',
             'products',
+            'variants',
             'warehouses',
             'voucher',
             'invoices',
@@ -950,6 +964,18 @@ class VoucherController extends Controller
     {
         $categories = Category::orderBy('name')->get();
         $products = Product::select('id', 'name', 'sku', 'category_id', 'price')->orderBy('name')->get();
+        $variants = ProductVariant::query()
+            ->leftJoin('model_lists', 'model_lists.id', '=', 'product_variants.model_list_id')
+            ->orderBy('product_variants.variant_name')
+            ->get([
+                'product_variants.id',
+                'product_variants.product_id',
+                'product_variants.variant_name',
+                'product_variants.variant_code',
+                'product_variants.variety_code',
+                'product_variants.is_active',
+                'model_lists.model_name as model_name',
+            ]);
         $warehouses = $this->selectableWarehouses();
         $invoices = Invoice::query()->latest('id')->limit(300)->get(['id', 'uuid', 'customer_name']);
         $centralWarehouseId = WarehouseStockService::centralWarehouseId();
@@ -963,6 +989,7 @@ class VoucherController extends Controller
             'voucher',
             'categories',
             'products',
+            'variants',
             'warehouses',
             'invoices',
             'centralWarehouseId',
@@ -1044,7 +1071,7 @@ class VoucherController extends Controller
 
     public function update(Request $request, WarehouseTransfer $voucher)
     {
-        $data = $this->validateTransfer($request);
+        $data = $this->validateTransfer($request, $voucher);
 
         DB::transaction(function () use ($voucher, $data) {
             $this->rollbackTransfer($voucher);
@@ -1066,7 +1093,7 @@ class VoucherController extends Controller
         return back()->with('success', 'سند حواله حذف شد.');
     }
 
-    private function validateTransfer(Request $request): array
+    private function validateTransfer(Request $request, ?WarehouseTransfer $editingVoucher = null): array
     {
         $types = implode(',', array_keys(WarehouseTransfer::typeOptions()));
         $returnReasons = implode(',', array_keys(WarehouseTransfer::returnReasonOptions()));
@@ -1084,6 +1111,7 @@ class VoucherController extends Controller
             'items.*.category_id' => ['required', 'exists:categories,id'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.variant_id' => ['required', 'exists:product_variants,id'],
+            'items.*.invoice_item_id' => ['nullable', 'exists:invoice_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.personnel_asset_code' => ['nullable', 'digits:4'],
         ]);
@@ -1127,9 +1155,15 @@ class VoucherController extends Controller
             $invoiceProductIds = $invoice->items->pluck('product_id')->map(fn ($v) => (int) $v)->unique()->values()->all();
             $invoiceVariantIds = $invoice->items->pluck('variant_id')->map(fn ($v) => (int) $v)->unique()->values()->all();
 
-            $alreadyReturnedByVariant = WarehouseTransfer::query()
+            $alreadyReturnedQuery = WarehouseTransfer::query()
                 ->where('voucher_type', WarehouseTransfer::TYPE_CUSTOMER_RETURN)
-                ->where('related_invoice_id', $invoice->id)
+                ->where('related_invoice_id', $invoice->id);
+
+            if ($editingVoucher) {
+                $alreadyReturnedQuery->whereKeyNot($editingVoucher->id);
+            }
+
+            $alreadyReturnedByVariant = $alreadyReturnedQuery
                 ->with('items')
                 ->get()
                 ->flatMap->items

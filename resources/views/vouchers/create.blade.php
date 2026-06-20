@@ -7,6 +7,8 @@
         ? $voucher->items->map(fn($it) => [
             'category_id' => $it->product?->category_id,
             'product_id' => $it->product_id,
+            'variant_id' => $it->product_variant_id,
+            'invoice_item_id' => $it->invoice_item_id,
             'quantity' => $it->quantity,
             'personnel_asset_code' => $it->personnel_asset_code,
         ])->values()->all()
@@ -14,6 +16,15 @@
 
     $categoriesJson = $categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'parent_id' => $c->parent_id])->values();
     $productsJson = $products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'category_id' => $p->category_id])->values();
+    $variantsJson = ($variants ?? collect())->map(fn($v) => [
+        'id' => $v->id,
+        'product_id' => $v->product_id,
+        'name' => $v->variant_name,
+        'code' => $v->variant_code,
+        'variety_code' => $v->variety_code,
+        'model_name' => $v->model_name,
+        'is_active' => (bool) $v->is_active,
+    ])->values();
     $invoiceOptions = ($invoices ?? collect())->map(fn($inv) => ['uuid' => $inv->uuid, 'label' => $inv->uuid . ' | ' . ($inv->customer_name ?: 'بدون نام')])->values();
 
     $voucherTypes = \App\Models\WarehouseTransfer::typeOptions();
@@ -107,21 +118,6 @@
                 </div>
 
 
-                <div class="col-md-4">
-                    <label class="form-label">فاکتور مرجع (برای مرجوعی مشتری)</label>
-                    <select name="related_invoice_uuid" class="form-select" id="relatedInvoiceSelect">
-                        <option value="">انتخاب کنید...</option>
-                        @foreach($invoiceOptions as $invoiceOption)
-                            <option value="{{ $invoiceOption['uuid'] }}" @selected(old('related_invoice_uuid', $voucher->relatedInvoice?->uuid ?? null) === $invoiceOption['uuid'])>{{ $invoiceOption['label'] }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">نام تحویل‌گیرنده / ذی‌نفع (اختیاری)</label>
-                    <input name="beneficiary_name" class="form-control" value="{{ old('beneficiary_name', $voucher->beneficiary_name ?? null) }}" placeholder="برای پرسنل / شوروم">
-                </div>
-
                 <div class="col-12">
                     <label class="form-label">توضیحات (اختیاری)</label>
                     <input name="note" class="form-control" value="{{ old('note', $voucher->note ?? null) }}">
@@ -135,6 +131,7 @@
                                     <th>سردسته</th>
                                     <th>دسته‌بندی</th>
                                     <th>کالا</th>
+                                    <th>نوع / طرح دقیق کالا</th>
                                     <th>تعداد</th>
                                     <th class="asset-col" style="display:none;">کد اموال ۴ رقمی</th>
                                     <th></th>
@@ -157,6 +154,7 @@
 <script>
 const categories = @json($categoriesJson);
 const products = @json($productsJson);
+const variants = @json($variantsJson);
 const initialItems = @json($initialItems);
 const centralWarehouseId = {{ (int) $centralWarehouseId }};
 const invoiceProductsApi = "{{ url('/vouchers/invoice') }}";
@@ -196,10 +194,33 @@ function productOptions(categoryId, selectedProductId) {
     const filtered = products.filter((p) => {
         if (String(p.category_id) !== String(categoryId || '')) return false;
         if (!isReturn) return true;
-        return allowedReturnProducts.some((x) => String(x.product_id) === String(p.id));
+        return String(selectedProductId || '') === String(p.id)
+            || allowedReturnProducts.some((x) => String(x.product_id) === String(p.id));
     });
     return [`<option value="">انتخاب...</option>`]
         .concat(filtered.map(p => `<option value="${p.id}" ${String(selectedProductId || '') === String(p.id) ? 'selected' : ''}>${p.name} (${p.sku ?? ''})</option>`))
+        .join('');
+}
+
+function variantLabel(v) {
+    const parts = [v.model_name, v.name, v.variety_code ? `طرح ${v.variety_code}` : '', v.code ? `کد ${v.code}` : ''].filter(Boolean);
+    return parts.length ? parts.join(' - ') : `تنوع #${v.id}`;
+}
+
+function variantOptions(productId, selectedVariantId) {
+    const isReturn = voucherTypeSelect.value === 'customer_return';
+    const allowedVariantIds = allowedReturnProducts
+        .filter((x) => String(x.product_id) === String(productId || ''))
+        .map((x) => String(x.variant_id));
+    const filtered = variants.filter((v) => {
+        if (String(v.product_id) !== String(productId || '')) return false;
+        if (String(selectedVariantId || '') === String(v.id)) return true;
+        if (isReturn) return allowedVariantIds.includes(String(v.id));
+        return v.is_active;
+    });
+
+    return [`<option value="">انتخاب نوع/طرح...</option>`]
+        .concat(filtered.map(v => `<option value="${v.id}" ${String(selectedVariantId || '') === String(v.id) ? 'selected' : ''}>${variantLabel(v)}</option>`))
         .join('');
 }
 
@@ -207,11 +228,16 @@ function rowTemplate(i, item = null) {
     const selectedCategoryId = item?.category_id || '';
     const selectedParentId = resolveParentCategoryId(selectedCategoryId);
     const selectedProductId = item?.product_id || '';
+    const selectedVariantId = item?.variant_id || '';
 
     return `<tr>
         <td><select class="form-select root-category-select" data-row="${i}" required>${rootCategoryOptions(selectedParentId)}</select></td>
         <td><select name="items[${i}][category_id]" class="form-select category-select" data-row="${i}" required>${childCategoryOptions(selectedParentId, selectedCategoryId)}</select></td>
         <td><select name="items[${i}][product_id]" class="form-select product-select" required>${productOptions(selectedCategoryId, selectedProductId)}</select></td>
+        <td>
+            <input type="hidden" name="items[${i}][invoice_item_id]" value="${item?.invoice_item_id || ''}">
+            <select name="items[${i}][variant_id]" class="form-select variant-select" required>${variantOptions(selectedProductId, selectedVariantId)}</select>
+        </td>
         <td><input name="items[${i}][quantity]" type="number" min="1" class="form-control" value="${item?.quantity || 1}" required></td>
         <td class="asset-col" style="display:none;"><input name="items[${i}][personnel_asset_code]" class="form-control" pattern="\\d{4}" maxlength="4" value="${item?.personnel_asset_code || ''}"></td>
         <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">حذف</button></td>
@@ -228,6 +254,7 @@ function bindCategoryEvents() {
             const productSelect = tr.querySelector('.product-select');
             categorySelect.innerHTML = childCategoryOptions(e.target.value, '');
             productSelect.innerHTML = productOptions('', null);
+            tr.querySelector('.variant-select').innerHTML = variantOptions('', null);
         });
     });
 
@@ -237,6 +264,16 @@ function bindCategoryEvents() {
         select.addEventListener('change', (e) => {
             const tr = e.target.closest('tr');
             tr.querySelector('.product-select').innerHTML = productOptions(e.target.value, null);
+            tr.querySelector('.variant-select').innerHTML = variantOptions('', null);
+        });
+    });
+
+    tbody.querySelectorAll('.product-select').forEach((select) => {
+        if (select.dataset.bound === '1') return;
+        select.dataset.bound = '1';
+        select.addEventListener('change', (e) => {
+            const tr = e.target.closest('tr');
+            tr.querySelector('.variant-select').innerHTML = variantOptions(e.target.value, null);
         });
     });
 }
@@ -314,7 +351,10 @@ function rerenderProductSelects() {
         const categorySelect = tr.querySelector('.category-select');
         const productSelect = tr.querySelector('.product-select');
         const selected = productSelect.value;
+        const variantSelect = tr.querySelector('.variant-select');
+        const selectedVariant = variantSelect.value;
         productSelect.innerHTML = productOptions(categorySelect.value, selected);
+        variantSelect.innerHTML = variantOptions(productSelect.value, selectedVariant);
     });
 }
 
