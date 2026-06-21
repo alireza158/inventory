@@ -17,6 +17,7 @@ use App\Support\IranLocations;
 use App\Support\DocumentCodeGenerator;
 use App\Support\ActivityLogger;
 use App\Services\WarehouseReviewAuditService;
+use App\Services\WarehousePendingRefreshService;
 use App\Services\WarehouseStockService;
 use App\Services\CentralInventoryService;
 use App\Services\SalesDocumentAccessService;
@@ -36,6 +37,7 @@ class PreinvoiceController extends Controller
         private readonly CentralInventoryService $centralInventoryService,
         private readonly SalesDocumentAccessService $accessService,
         private readonly WarehouseReviewAuditService $warehouseReviewAuditService,
+        private readonly WarehousePendingRefreshService $warehousePendingRefreshService,
     ) {}
 
     public function create()
@@ -476,6 +478,7 @@ class PreinvoiceController extends Controller
 
             $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), $oldStatus);
             $this->warehouseReviewAuditService->log($order->fresh(), \App\Models\WarehouseReviewLog::ACTION_RESUBMITTED_TO_WAREHOUSE, auth()->id(), $oldStatus, PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 'پیش‌فاکتور بعد از اصلاح دوباره به صف انبار ارسال شد.');
+            $this->warehousePendingRefreshService->refreshActiveWarehousePendingForDocument($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), 'preinvoice', auth()->id());
 
             $this->syncExistingInvoiceFromOrderForReapproval($order->fresh(['items', 'invoice.items']));
 

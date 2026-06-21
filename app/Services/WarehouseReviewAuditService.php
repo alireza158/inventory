@@ -12,6 +12,8 @@ use Illuminate\Support\Collection;
 
 class WarehouseReviewAuditService
 {
+    public const ACTIVE_PENDING_REFRESH_NOTE = 'اطلاعات صف تأیید انبار پس از ویرایش سند به‌روزرسانی شد.';
+
     public const REASONS = [
         'low_stock' => 'کمبود موجودی',
         'available_less_than_order' => 'موجودی قابل تخصیص کمتر از سفارش',
@@ -60,6 +62,23 @@ class WarehouseReviewAuditService
             'warehouse_reviewed_at' => now()->toDateTimeString(),
             'warehouse_note' => $note,
         ]);
+    }
+
+
+    public function refreshActivePendingSnapshot(PreinvoiceOrder $order, ?int $userId = null): WarehouseReviewSnapshot
+    {
+        $snapshot = $this->createSnapshot($order, WarehouseReviewSnapshot::TYPE_BEFORE, $userId, [
+            'review_round' => $this->currentAttempt($order),
+            'refreshed_active_pending_at' => now()->toDateTimeString(),
+            'refresh_note' => self::ACTIVE_PENDING_REFRESH_NOTE,
+        ]);
+
+        $this->log($order, WarehouseReviewLog::ACTION_CHANGES_SAVED, $userId, $order->status, $order->status, self::ACTIVE_PENDING_REFRESH_NOTE, [
+            'snapshot_id' => $snapshot->id,
+            'active_pending_refreshed' => true,
+        ]);
+
+        return $snapshot;
     }
 
     public function log(PreinvoiceOrder $order, string $action, ?int $userId = null, ?string $statusFrom = null, ?string $statusTo = null, ?string $note = null, array $meta = []): WarehouseReviewLog
