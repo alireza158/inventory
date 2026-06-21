@@ -331,12 +331,14 @@ class VoucherController extends Controller
             ->get(['id', 'name', 'code', 'sku', 'barcode', 'category_id', 'price']);
 
         $returnReasons = WarehouseTransfer::returnReasonOptions();
+        $categories = Category::query()->orderBy('name')->get(['id', 'name', 'code']);
 
         return view('vouchers.return-create', compact(
             'customers',
             'warehouses',
             'returnsWarehouse',
             'products',
+            'categories',
             'returnReasons'
         ));
     }
@@ -346,6 +348,9 @@ class VoucherController extends Controller
         $returnType = $request->input('return_type', WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE);
 
         if ($returnType === WarehouseTransfer::RETURN_SOURCE_EXTERNAL_MANUAL) {
+            $items = $this->materializeManualReturnProducts($request->input('items', []));
+            $request->merge(['items' => $items]);
+
             $items = collect($request->input('items', []))
                 ->map(function ($item) {
                     if (array_key_exists('unit_price', $item)) {
@@ -474,6 +479,83 @@ class VoucherController extends Controller
             }
             $seenVariantRows[$key] = true;
         }
+    }
+
+
+    private function materializeManualReturnProducts(array $items): array
+    {
+        return DB::transaction(function () use ($items) {
+            return collect($items)->map(function (array $item) {
+                if (($item['product_id'] ?? null) !== '__new__') {
+                    return $item;
+                }
+
+                $name = trim((string) ($item['new_product_name'] ?? ''));
+                $categoryId = (int) ($item['new_category_id'] ?? 0);
+                $variantName = trim((string) ($item['new_variant_name'] ?? ''));
+                $sellPrice = $this->normalizeMoney($item['new_sell_price'] ?? ($item['unit_price'] ?? 0));
+                $buyPrice = $this->normalizeMoney($item['new_buy_price'] ?? 0);
+
+                if ($name === '') {
+                    abort(422, 'برای کالای جدید، نام کالا الزامی است.');
+                }
+
+                $category = Category::query()->lockForUpdate()->find($categoryId);
+                if (!$category) {
+                    abort(422, 'برای کالای جدید، دسته‌بندی معتبر انتخاب کنید.');
+                }
+
+                $productCode = $this->nextQuickProductCode($category);
+                $variantCode = $productCode . '00000';
+
+                $product = Product::query()->create([
+                    'category_id' => $category->id,
+                    'name' => $name,
+                    'sku' => 'RETURN-' . now()->format('YmdHis') . '-' . random_int(1000, 9999),
+                    'code' => $productCode,
+                    'short_barcode' => substr($productCode, -4),
+                    'stock' => 0,
+                    'price' => $sellPrice,
+                    'sale_retail' => $sellPrice,
+                    'buy_retail' => $buyPrice,
+                    'is_sellable' => true,
+                ]);
+
+                $variant = ProductVariant::query()->create([
+                    'product_id' => $product->id,
+                    'is_active' => true,
+                    'variant_name' => $variantName !== '' ? $variantName : $name,
+                    'variety_name' => $variantName !== '' ? $variantName : '—',
+                    'variety_code' => '0000',
+                    'variant_code' => $variantCode,
+                    'sell_price' => $sellPrice,
+                    'buy_price' => $buyPrice,
+                    'stock' => 0,
+                    'reserved' => 0,
+                ]);
+
+                $item['product_id'] = $product->id;
+                $item['variant_id'] = $variant->id;
+                $item['unit_price'] = $sellPrice;
+
+                return $item;
+            })->all();
+        });
+    }
+
+    private function nextQuickProductCode(Category $category): string
+    {
+        $categoryCode = preg_replace('/\D+/', '', (string) ($category->code ?? ''));
+        $categoryCode = str_pad(substr($categoryCode, 0, 2) ?: '99', 2, '0', STR_PAD_LEFT);
+
+        $max = (int) DB::table('products')
+            ->lockForUpdate()
+            ->selectRaw("MAX(CAST(COALESCE(NULLIF(short_barcode,''), SUBSTRING(code, 3, 4)) AS UNSIGNED)) as mx")
+            ->value('mx');
+
+        $seq = str_pad((string) min($max + 1, 9999), 4, '0', STR_PAD_LEFT);
+
+        return $categoryCode . $seq;
     }
 
     private function normalizeMoney(mixed $value): int
