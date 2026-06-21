@@ -374,7 +374,7 @@
                             <div class="section-head">
                                 <div>
                                     <div class="section-title">کالاهای مرجوعی دستی / سازه‌حساب</div>
-                                    <div class="muted">کالا و تنوع را از محصولات تعریف‌شده انتخاب کن؛ مبلغ هر ردیف از عدد واردشده محاسبه می‌شود.</div>
+                                    <div class="muted">کالا را انتخاب کن یا اگر تعریف نشده، گزینه «تعریف کالای جدید» را بزن؛ موجودی به انبار انتخاب‌شده اضافه می‌شود.</div>
                                 </div>
                                 <button type="button" class="btn btn-sm btn-outline-primary" id="addManualItemBtn">افزودن کالا</button>
                             </div>
@@ -383,7 +383,7 @@
                                     <table class="table table-striped line-table" id="manualItemsTable">
                                         <thead>
                                             <tr>
-                                                <th>کالا</th><th>تنوع</th><th>کد / بارکد</th><th>تعداد</th><th>مبلغ واحد</th><th>مبلغ کل</th><th></th>
+                                                <th>کالا / تعریف سریع</th><th>تنوع</th><th>کد / بارکد</th><th>تعداد</th><th>مبلغ فروش واحد</th><th>مبلغ کل</th><th></th>
                                             </tr>
                                         </thead>
                                         <tbody></tbody>
@@ -395,32 +395,6 @@
                         </div>
                     </div>
 
-
-                    <div class="col-12 d-none" id="manualItemsSection">
-                        <div class="card-soft">
-                            <div class="section-head">
-                                <div>
-                                    <div class="section-title">کالاهای مرجوعی دستی / سازه‌حساب</div>
-                                    <div class="muted">کالا و تنوع را از محصولات تعریف‌شده انتخاب کن؛ مبلغ هر ردیف از عدد واردشده محاسبه می‌شود.</div>
-                                </div>
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="addManualItemBtn">افزودن کالا</button>
-                            </div>
-                            <div class="p-3">
-                                <div class="table-responsive">
-                                    <table class="table table-striped line-table" id="manualItemsTable">
-                                        <thead>
-                                            <tr>
-                                                <th>کالا</th><th>تنوع</th><th>کد / بارکد</th><th>تعداد</th><th>مبلغ واحد</th><th>مبلغ کل</th><th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
-                                <div class="empty-state d-none" id="manualItemsEmptyState">حداقل یک کالای مرجوعی دستی باید اضافه شود.</div>
-                                <div class="text-start fw-bold mt-2">جمع کل مرجوعی: <span id="manualGrandTotal">۰</span> ریال</div>
-                            </div>
-                        </div>
-                    </div>
 
                     <div class="col-md-6">
                         <label class="form-label">شماره حواله / ارجاع اختیاری</label>
@@ -559,6 +533,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const oldRelatedInvoiceUuid = @json(old('related_invoice_uuid'));
     const oldItems = @json(old('items', []));
     const products = @json($manualReturnProducts);
+    const categories = @json($categories->map(fn ($category) => ['id' => (int) $category->id, 'name' => (string) $category->name, 'code' => (string) ($category->code ?? '')])->values());
 
     let customerInvoices = [];
     let selectedInvoice = null;
@@ -1044,7 +1019,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function productOptions(selected) {
-        return '<option value="">انتخاب کالا...</option>' + products.map(function (p) {
+        return '<option value="">انتخاب کالا...</option><option value="__new__">➕ تعریف کالای جدید</option>' + products.map(function (p) {
             const variantsSearch = (p.variants || []).map(function (v) {
                 return [v.name || '', v.code || '', v.barcode || ''].join(' ');
             }).join(' ');
@@ -1060,6 +1035,26 @@ document.addEventListener('DOMContentLoaded', function () {
             const search = [v.name || '', v.code || '', v.barcode || '', product.name || '', product.code || ''].join(' ');
             return `<option value="${escapeHtml(v.id)}" data-search="${escapeHtml(search)}" data-code="${escapeHtml(v.code || v.barcode || product.code || product.barcode || '')}" data-price="${escapeHtml(v.price || product.price || 0)}" ${String(selected || '') === String(v.id) ? 'selected' : ''}>${escapeHtml(v.name)}${v.code ? ' [' + escapeHtml(v.code) + ']' : ''}</option>`;
         }).join('');
+    }
+
+
+    function categoryOptions(selected) {
+        return '<option value="">دسته‌بندی...</option>' + categories.map(function (category) {
+            return `<option value="${escapeHtml(category.id)}" ${String(selected || '') === String(category.id) ? 'selected' : ''}>${escapeHtml(category.name)}${category.code ? ' (' + escapeHtml(category.code) + ')' : ''}</option>`;
+        }).join('');
+    }
+
+    function newProductFields(index, rowData = {}) {
+        return `
+            <div class="quick-new-product d-none mt-2 border rounded-3 p-2 bg-light">
+                <div class="row g-2">
+                    <div class="col-md-4"><input name="items[${index}][new_product_name]" class="form-control form-control-sm new-product-required" placeholder="نام کالای جدید" value="${escapeHtml(rowData.new_product_name || '')}"></div>
+                    <div class="col-md-4"><select name="items[${index}][new_category_id]" class="form-select form-select-sm new-product-required">${categoryOptions(rowData.new_category_id)}</select></div>
+                    <div class="col-md-4"><input name="items[${index}][new_variant_name]" class="form-control form-control-sm" placeholder="نام تنوع (اختیاری)" value="${escapeHtml(rowData.new_variant_name || '')}"></div>
+                    <div class="col-md-6"><input name="items[${index}][new_buy_price]" inputmode="numeric" class="form-control form-control-sm quick-money" placeholder="قیمت خرید" value="${escapeHtml(rowData.new_buy_price || '')}"></div>
+                    <div class="col-md-6"><input name="items[${index}][new_sell_price]" inputmode="numeric" class="form-control form-control-sm quick-money" placeholder="قیمت فروش" value="${escapeHtml(rowData.new_sell_price || '')}"></div>
+                </div>
+            </div>`;
     }
 
 
@@ -1166,7 +1161,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const unitPrice = Number(rowData.unit_price || 0);
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><select name="items[${index}][product_id]" class="form-select manual-product" required>${productOptions(rowData.product_id)}</select></td>
+            <td><select name="items[${index}][product_id]" class="form-select manual-product" required>${productOptions(rowData.product_id)}</select>${newProductFields(index, rowData)}</td>
             <td><select name="items[${index}][variant_id]" class="form-select manual-variant" required>${variantOptions(rowData.product_id, rowData.variant_id)}</select></td>
             <td><span class="mono manual-code">—</span></td>
             <td><input name="items[${index}][quantity]" type="number" min="1" class="form-control manual-qty" value="${escapeHtml(rowData.quantity || 1)}" required></td>
@@ -1185,6 +1180,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const codeEl = tr.querySelector('.manual-code');
 
         function refreshVariantMeta(applySuggestedPrice) {
+            const isNewProduct = productSelect.value === '__new__';
+            const quickFields = tr.querySelector('.quick-new-product');
+            quickFields?.classList.toggle('d-none', !isNewProduct);
+            tr.querySelectorAll('.new-product-required').forEach(function (el) { el.required = isNewProduct; });
+            variantSelect.required = !isNewProduct;
+            variantSelect.disabled = isNewProduct;
+            if (isNewProduct) { codeEl.textContent = 'بعد از ثبت ساخته می‌شود'; recalcManualTotals(); return; }
             const product = products.find(function (p) { return String(p.id) === String(productSelect.value); });
             const option = variantSelect.selectedOptions[0];
             codeEl.textContent = option?.dataset?.code || product?.code || product?.barcode || '—';
@@ -1196,7 +1198,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function onProductChanged() {
-            fillVariantSelect(tr, productSelect.value);
+            if (productSelect.value !== '__new__') fillVariantSelect(tr, productSelect.value);
             refreshVariantMeta(true);
         }
 
@@ -1212,6 +1214,7 @@ document.addEventListener('DOMContentLoaded', function () {
             variantSelect.addEventListener('change', onVariantChanged);
         }
         tr.querySelector('.manual-qty').addEventListener('input', recalcManualTotals);
+        tr.querySelectorAll('.quick-money').forEach(function (input) { input.addEventListener('input', function () { const raw = parseMoney(input.value); input.value = input.value.trim() === '' ? '' : raw.toLocaleString('en-US'); }); });
         priceDisplayInput.addEventListener('input', function () {
             const raw = parseMoney(priceDisplayInput.value);
             priceDisplayInput.value = priceDisplayInput.value.trim() === '' ? '' : raw.toLocaleString('en-US');
@@ -1352,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         for (const row of rows) {
             const productId = row.querySelector('[name$="[product_id]"]')?.value || '';
-            const variantId = row.querySelector('[name$="[variant_id]"]')?.value || '';
+            const variantId = row.querySelector('[name$="[variant_id]"]')?.value || (productId === '__new__' ? '__new__' : '');
             const qtyInput = row.querySelector(isManualReturn() ? '.manual-qty' : '.qty-input');
             const qty = Number(qtyInput?.value || 0);
             const maxQty = isManualReturn() ? 0 : Number(qtyInput?.max || 0);
