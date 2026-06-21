@@ -7,6 +7,7 @@ use App\Services\SalesHavalehStatusService;
 use App\Services\SalesHavalehService;
 use App\Services\SalesDocumentAccessService;
 use App\Services\SalesPrintDocumentService;
+use App\Services\WarehousePendingRefreshService;
 use Carbon\Carbon;
 use Morilog\Jalali\Jalalian;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class InvoiceController extends Controller
         private readonly SalesHavalehStatusService $statusService,
         private readonly SalesHavalehService $salesHavalehService,
         private readonly SalesDocumentAccessService $accessService,
+        private readonly WarehousePendingRefreshService $warehousePendingRefreshService,
     ) {}
 
     public function index(Request $request)
@@ -238,6 +240,7 @@ class InvoiceController extends Controller
             ]);
 
             $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id());
+            $this->warehousePendingRefreshService->refreshActiveWarehousePendingForDocument($invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder.items']), 'invoice', auth()->id());
         });
 
         return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');
