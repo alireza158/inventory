@@ -435,6 +435,9 @@ class PurchaseController extends Controller
             ->all();
 
         $request->merge([
+            'supplier_id' => $request->filled('supplier_id')
+                ? (string) $request->input('supplier_id')
+                : $request->input('supplier_id'),
             'invoice_discount_type' => $invoiceDiscountType,
             'invoice_discount_value' => $invoiceDiscountValue,
             'note' => $note,
