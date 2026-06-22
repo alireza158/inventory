@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\InvoicePayment;
 use App\Models\WarehouseTransfer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AccountStatementController extends Controller
 {
@@ -15,12 +16,37 @@ class AccountStatementController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
+        $normalizedSearch = $this->normalizeSearchTerm($q);
+        $numericSearch = preg_replace('/\D+/', '', $normalizedSearch);
+
         $customers = Customer::query()
+            ->with('city:id,name')
             ->withBalance()
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($nested) use ($q) {
-                    $nested->where('first_name', 'like', "%{$q}%")
-                        ->orWhere('mobile', 'like', "%{$q}%");
+            ->when($q !== '', function ($query) use ($q, $normalizedSearch, $numericSearch) {
+                $like = "%{$q}%";
+                $normalizedLike = "%{$normalizedSearch}%";
+
+                $query->where(function ($nested) use ($like, $normalizedLike, $numericSearch) {
+                    $nested->where('first_name', 'like', $like)
+                        ->orWhere('last_name', 'like', $like)
+                        ->orWhereRaw($this->fullNameExpression() . ' LIKE ?', [$like])
+                        ->orWhere('mobile', 'like', $like)
+                        ->orWhere('crm_customer_id', 'like', $like)
+                        ->orWhereHas('city', function ($cityQuery) use ($like) {
+                            $cityQuery->where('name', 'like', $like);
+                        });
+
+                    if ($normalizedLike !== $like) {
+                        $nested->orWhere('first_name', 'like', $normalizedLike)
+                            ->orWhere('last_name', 'like', $normalizedLike)
+                            ->orWhereRaw($this->fullNameExpression() . ' LIKE ?', [$normalizedLike])
+                            ->orWhere('crm_customer_id', 'like', $normalizedLike);
+                    }
+
+                    if ($numericSearch !== '') {
+                        $nested->orWhereRaw($this->normalizedColumnExpression('mobile') . ' LIKE ?', ["%{$numericSearch}%"])
+                            ->orWhereRaw($this->castToTextExpression('id') . ' LIKE ?', ["%{$numericSearch}%"]);
+                    }
                 });
             })
             ->orderByDesc('id')
@@ -28,6 +54,41 @@ class AccountStatementController extends Controller
             ->withQueryString();
 
         return view('account-statements.index', compact('customers', 'q'));
+    }
+
+
+    private function normalizeSearchTerm(string $value): string
+    {
+        return strtr($value, [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]);
+    }
+
+    private function fullNameExpression(): string
+    {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "TRIM(COALESCE(first_name, '') || ' ' || COALESCE(last_name, ''))";
+        }
+
+        return "TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')))";
+    }
+
+
+    private function castToTextExpression(string $column): string
+    {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "CAST({$column} AS TEXT)";
+        }
+
+        return "CAST({$column} AS CHAR)";
+    }
+
+    private function normalizedColumnExpression(string $column): string
+    {
+        return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({$column}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')";
     }
 
     public function show(Customer $customer)
