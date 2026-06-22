@@ -330,9 +330,7 @@ class ProductController extends Controller
             abort(422, 'برای طرح‌بندی: تعداد طرح را وارد کنید.');
         }
 
-        $designNotes = collect($data['design_notes'] ?? [])
-            ->map(fn ($note) => trim((string) $note))
-            ->values();
+        $designNotes = $this->normalizeDesignNotes($data['design_notes'] ?? []);
 
         $isSellable = $request->boolean('is_sellable', true);
 
@@ -406,10 +404,7 @@ class ProductController extends Controller
                     $design2 = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                     $variantCode = $this->buildVariantCode11($productCode6, '000', $design2);
 
-                    $designNote = (string) ($designNotes->get($i - 1) ?? '');
-                    $designTitle = in_array($designNote, ['مشکی', 'سفید'], true)
-                            ? $designNote
-                            : ($designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i));
+                    $designTitle = $this->designTitle($i, (string) ($designNotes->get($i - 1) ?? ''));
 
                     ProductVariant::create([
                         'product_id' => $product->id,
@@ -456,10 +451,7 @@ class ProductController extends Controller
                         $design2 = str_pad((string) $i, 2, '0', STR_PAD_LEFT);
                         $variantCode = $this->buildVariantCode11($productCode6, $model3, $design2);
 
-                        $designNote = (string) ($designNotes->get($i - 1) ?? '');
-                        $designTitle = in_array($designNote, ['مشکی', 'سفید'], true)
-                            ? $designNote
-                            : ($designNote !== '' ? ('طرح ' . $i . ' (' . $designNote . ')') : ('طرح ' . $i));
+                        $designTitle = $this->designTitle($i, (string) ($designNotes->get($i - 1) ?? ''));
 
                         ProductVariant::create([
                             'product_id' => $product->id,
@@ -604,7 +596,7 @@ class ProductController extends Controller
                     $data['model_list_ids'] ?? [],
                     filter_var($data['use_designs'] ?? false, FILTER_VALIDATE_BOOLEAN),
                     $data['design_count'] ?? null,
-                    $data['design_notes'] ?? []
+                    $this->normalizeDesignNotes($data['design_notes'] ?? [])->all()
                 ),
             ];
 
@@ -653,9 +645,9 @@ class ProductController extends Controller
                 $variantCode = $variant?->variant_code ?: $this->buildVariantCode11((string) $product->code, $modelCode3, $design2, $ignoreId);
 
                 $payload = [
-                    'variant_name' => $v['variant_name'],
+                    'variant_name' => $this->normalizeDesignTitle($v['variant_name']),
                     'model_list_id' => $modelListId,
-                    'variety_name' => $v['variety_name'],
+                    'variety_name' => $this->normalizeDesignTitle($v['variety_name']),
                     'variety_code' => $v['variety_code'],
                     'variant_code' => $variantCode,
                     'sell_price' => $sellPrice,
@@ -739,7 +731,7 @@ class ProductController extends Controller
             : collect();
 
         $designCount = $useDesigns ? max(1, min(99, (int) ($data['design_count'] ?? 1))) : 0;
-        $designNotes = collect($data['design_notes'] ?? [])->map(fn ($note) => trim((string) $note))->values();
+        $designNotes = $this->normalizeDesignNotes($data['design_notes'] ?? []);
         $designIndexes = $useDesigns ? range(1, $designCount) : [0];
 
         $defaultSellPrice = array_key_exists('sell_price', $data) && $data['sell_price'] !== null
@@ -810,13 +802,21 @@ class ProductController extends Controller
 
     private function designTitle(int $index, string $note): string
     {
-        $note = trim($note);
+        $title = $this->normalizeDesignTitle($note);
 
-        if (in_array($note, ['مشکی', 'سفید'], true)) {
-            return $note;
-        }
+        return $title !== '' ? $title : ('طرح ' . $index);
+    }
 
-        return $note !== '' ? ('طرح ' . $index . ' (' . $note . ')') : ('طرح ' . $index);
+    private function normalizeDesignTitle(?string $title): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', (string) $title));
+    }
+
+    private function normalizeDesignNotes(array $notes)
+    {
+        return collect($notes)
+            ->map(fn ($note) => $this->normalizeDesignTitle(is_scalar($note) ? (string) $note : ''))
+            ->values();
     }
 
     private function sanitizeUpdateVariants(Request $request, Product $product): void
@@ -871,6 +871,12 @@ class ProductController extends Controller
             })
             ->map(function ($variant) {
                 unset($variant['_delete'], $variant['deleted'], $variant['_template'], $variant['is_template'], $variant['_disabled'], $variant['disabled'], $variant['enabled']);
+
+                foreach (['variant_name', 'variety_name', 'variety_code'] as $field) {
+                    if (array_key_exists($field, $variant) && is_scalar($variant[$field])) {
+                        $variant[$field] = $this->normalizeDesignTitle((string) $variant[$field]);
+                    }
+                }
 
                 return $variant;
             })

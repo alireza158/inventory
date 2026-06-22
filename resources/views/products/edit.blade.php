@@ -1524,33 +1524,14 @@ function findExistingVariant(modelListId, varietyCode) {
     }) || null;
 }
 
-function normalizeDesignNote(note, i) {
-    note = String(note || '').trim();
-
-    var fullPattern = new RegExp('^طرح\\s+' + i + '\\s*\\((.*)\\)$', 'u');
-    var match = note.match(fullPattern);
-
-    if (match) {
-        return String(match[1] || '').trim();
-    }
-
-    var plainPattern = new RegExp('^طرح\\s+' + i + '$', 'u');
-
-    if (plainPattern.test(note)) {
-        return '';
-    }
-
-    return note;
+function normalizeDesignNote(note) {
+    return String(note || '').replace(/\s+/gu, ' ').trim();
 }
 
 function makeDesignTitle(i, note) {
-    note = normalizeDesignNote(note, i);
+    note = normalizeDesignNote(note);
 
-    if (normalizePersianText(note) === 'مشکی' || normalizePersianText(note) === 'سفید') {
-        return note;
-    }
-
-    return note !== '' ? ('طرح ' + i + ' (' + note + ')') : ('طرح ' + i);
+    return note !== '' ? note : ('طرح ' + i);
 }
 
 function syncHiddenVariantInputs() {
