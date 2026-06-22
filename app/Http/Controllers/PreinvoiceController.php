@@ -1310,6 +1310,18 @@ class PreinvoiceController extends Controller
         }
     }
 
+    private function officialCodeForPreinvoiceConversion(PreinvoiceOrder $order): string
+    {
+        if (is_string($order->uuid) && preg_match('/^\d{5}$/', $order->uuid) === 1) {
+            return $order->uuid;
+        }
+
+        $code = DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class);
+        $order->update(['uuid' => $code]);
+
+        return $code;
+    }
+
     private function canHandleFinanceActions(): bool
     {
         $user = auth()->user();
@@ -1461,7 +1473,7 @@ class PreinvoiceController extends Controller
                 ]);
             } else {
                 $invoice = Invoice::create([
-                    'uuid' => DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class),
+                    'uuid' => $this->officialCodeForPreinvoiceConversion($order),
                     'preinvoice_order_id' => $order->id,
 
                     'customer_id' => $order->customer_id ?? null,
