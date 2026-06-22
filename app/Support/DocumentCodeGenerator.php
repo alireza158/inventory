@@ -13,6 +13,7 @@ class DocumentCodeGenerator
 {
     public const DEFAULT_WIDTH = 5;
     private const INVOICE_SEQUENCE_TYPE = 'invoice';
+    private const INITIAL_INVOICE_SEQUENCE_FLOOR = 117;
 
     /**
      * Generates the next sequential numeric document code with leading zeros.
@@ -91,7 +92,7 @@ class DocumentCodeGenerator
 
     private static function currentMaxOfficialInvoiceNumber(int $width): int
     {
-        $max = 0;
+        $max = self::INITIAL_INVOICE_SEQUENCE_FLOOR;
 
         foreach ([Invoice::class, PreinvoiceOrder::class] as $modelClass) {
             /** @var Model $model */

@@ -12,12 +12,12 @@ class DocumentCodeGeneratorTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_starts_new_preinvoice_sequence_at_five_digits_while_ignoring_legacy_four_digit_codes(): void
+    public function test_it_starts_preinvoice_sequence_after_existing_real_invoice_floor_while_ignoring_legacy_four_digit_codes(): void
     {
         PreinvoiceOrder::query()->create($this->preinvoiceData(['uuid' => '1234']));
         PreinvoiceOrder::query()->create($this->preinvoiceData(['uuid' => '9999']));
 
-        $this->assertSame('00001', DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class));
+        $this->assertSame('00118', DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class));
     }
 
     public function test_it_continues_existing_five_digit_invoice_sequence(): void
@@ -26,7 +26,15 @@ class DocumentCodeGeneratorTest extends TestCase
         Invoice::query()->create($this->invoiceData(['uuid' => '00001']));
         Invoice::query()->create($this->invoiceData(['uuid' => '00002']));
 
-        $this->assertSame('00003', DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class));
+        $this->assertSame('00118', DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class));
+    }
+
+
+    public function test_invoice_and_preinvoice_share_the_same_official_sequence(): void
+    {
+        $this->assertSame('00118', DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class));
+        $this->assertSame('00119', DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class));
+        $this->assertSame('00120', DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class));
     }
 
 

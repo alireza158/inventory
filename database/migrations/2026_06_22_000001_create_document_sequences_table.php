@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private const INITIAL_INVOICE_SEQUENCE_FLOOR = 117;
+
     public function up(): void
     {
         if (! Schema::hasTable('document_sequences')) {
@@ -33,7 +35,7 @@ return new class extends Migration
 
     private function currentMaxOfficialInvoiceNumber(): int
     {
-        $max = 0;
+        $max = self::INITIAL_INVOICE_SEQUENCE_FLOOR;
 
         foreach (['invoices', 'preinvoice_orders'] as $table) {
             if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'uuid')) {
