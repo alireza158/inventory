@@ -11,7 +11,7 @@
 <div class="card mb-3">
     <div class="card-body">
         <form class="d-flex gap-2" method="GET" action="{{ route('account-statements.index') }}">
-            <input class="form-control" name="q" value="{{ $q ?? '' }}" placeholder="جستجو نام/شماره تماس">
+            <input class="form-control" name="q" value="{{ $q ?? '' }}" placeholder="جستجو با نام، نام خانوادگی، شماره تماس، کد مشتری یا شهر">
             <button class="btn btn-outline-secondary">جستجو</button>
         </form>
     </div>
@@ -49,7 +49,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center py-4 text-muted">شخصی یافت نشد.</td></tr>
+                        <tr><td colspan="6" class="text-center py-4 text-muted">موردی با این مشخصات پیدا نشد.</td></tr>
                     @endforelse
                 </tbody>
             </table>
