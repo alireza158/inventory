@@ -9,6 +9,7 @@
     if (!is_array($initialItems)) {
         $initialItems = $isEdit
             ? $purchase->items->map(fn ($it) => [
+                'id' => $it->id,
                 'product_id' => $it->product_id,
                 'category_id' => $it->product?->category_id,
                 'variant_id' => $it->product_variant_id,
@@ -740,6 +741,7 @@
                 const row = card.querySelector(`[data-variant-row][data-variant-id="${item.variant_id}"]`);
                 if (!row) return;
 
+                row.dataset.purchaseItemId = item.id || '';
                 row.querySelector('[data-qty]').value = item.quantity || '';
                 row.querySelector('[data-buy]').value = formatNumericInput(item.buy_price || '');
                 row.querySelector('[data-sell]').value = formatNumericInput(item.sell_price || '');
@@ -824,8 +826,10 @@
 
             card.querySelectorAll('[data-variant-row]').forEach((row) => {
                 const qty = Number(row.querySelector('[data-qty]')?.value || 0);
-                if (qty <= 0) return;
+                const purchaseItemId = row.dataset.purchaseItemId || '';
+                if (qty <= 0 && !purchaseItemId) return;
 
+                if (purchaseItemId) appendHidden(index, 'id', purchaseItemId);
                 appendHidden(index, 'product_id', productId);
                 appendHidden(index, 'variant_id', row.dataset.variantId);
                 appendHidden(index, 'quantity', qty);
