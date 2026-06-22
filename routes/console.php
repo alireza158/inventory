@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\PreinvoiceController;
+use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\WarehouseStock;
@@ -13,6 +15,31 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 
+
+
+Artisan::command('preinvoice:repair-reservations {preinvoice_id}', function (int $preinvoice_id) {
+    DB::transaction(function () use ($preinvoice_id) {
+        $order = PreinvoiceOrder::query()
+            ->with('items')
+            ->whereKey($preinvoice_id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        if (! in_array($order->status, [
+            PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+            PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING,
+            PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+            PreinvoiceOrder::STATUS_FINANCE_REVIEWING,
+            PreinvoiceOrder::STATUS_RETURNED_TO_WAREHOUSE,
+        ], true) || $order->stock_released_at !== null) {
+            $this->warn('This preinvoice does not have an active stock freeze. No reservation was repaired.');
+            return;
+        }
+
+        app(PreinvoiceController::class)->syncPreinvoiceReservations($order);
+        $this->info('Preinvoice reservations were synced.');
+    });
+})->purpose('Repair active inventory reservations for one preinvoice');
 
 Artisan::command('products:add-default-electric-colors', function () {
     $service = app(DefaultProductDesignService::class);
