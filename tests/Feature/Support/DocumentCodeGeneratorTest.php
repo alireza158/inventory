@@ -29,6 +29,14 @@ class DocumentCodeGeneratorTest extends TestCase
         $this->assertSame('00003', DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class));
     }
 
+
+    public function test_invoice_and_preinvoice_share_the_same_official_sequence(): void
+    {
+        $this->assertSame('00001', DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class));
+        $this->assertSame('00002', DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class));
+        $this->assertSame('00003', DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class));
+    }
+
     private function preinvoiceData(array $overrides = []): array
     {
         return array_merge([
