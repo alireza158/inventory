@@ -127,6 +127,19 @@ class SalesHavalehService
         });
     }
 
+
+    private function officialCodeForPreinvoiceConversion(PreinvoiceOrder $order): string
+    {
+        if (is_string($order->uuid) && preg_match('/^\d{5}$/', $order->uuid) === 1) {
+            return $order->uuid;
+        }
+
+        $code = DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class);
+        $order->update(['uuid' => $code]);
+
+        return $code;
+    }
+
     private function changeReservedOnly(int $productId, int $variantId, int $delta): void
     {
         if ($delta === 0) {
@@ -166,7 +179,7 @@ class SalesHavalehService
             $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
 
             $invoice = Invoice::query()->create([
-                'uuid' => DocumentCodeGenerator::generateUnique5DigitCode(Invoice::class),
+                'uuid' => $this->officialCodeForPreinvoiceConversion($order),
                 'preinvoice_order_id' => $order->id,
                 'customer_id' => $order->customer_id,
                 'customer_name' => $order->customer_name,
