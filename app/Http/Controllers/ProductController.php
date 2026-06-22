@@ -525,6 +525,7 @@ class ProductController extends Controller
     public function edit(Request $request, Product $product)
     {
         $product->load(['variants.warehouseStocks.warehouse']);
+        $product->setRelation('variants', app(ProductVariantStructureService::class)->validVariants($product));
 
         $categories = Category::orderBy('name')->get();
 
@@ -787,6 +788,7 @@ class ProductController extends Controller
                     'variety_name' => $designTitle,
                     'variety_code' => $varietyCode,
                     'variant_code' => $variantCode,
+                    'is_active' => true,
                 ];
 
                 if ($variant) {
