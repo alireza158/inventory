@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class ProductVariantStructureService
 {
@@ -73,6 +74,8 @@ class ProductVariantStructureService
             }
 
             $query->whereIn('model_list_id', $modelIds);
+        } else {
+            $query->whereNull('model_list_id');
         }
 
         if ($structure['uses_designs'] && $structure['design_count'] !== null) {
@@ -85,6 +88,8 @@ class ProductVariantStructureService
 
                 $query->whereIn('variety_code', $validCodes);
             }
+        } else {
+            $query->where('variety_code', '0000');
         }
 
         return $query;
@@ -134,16 +139,34 @@ class ProductVariantStructureService
 
     public function deactivateInvalidVariants(Product $product): int
     {
-        $invalidIds = $this->invalidVariants($product)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $activeBefore = (int) $product->variants()->where('is_active', true)->count();
+        $validAfter = $this->validVariants($product)->count();
+        $invalid = $this->invalidVariants($product);
+        $invalidActiveIds = $invalid
+            ->filter(fn (ProductVariant $variant) => (bool) $variant->is_active)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $invalidWithStock = $invalid->filter(fn (ProductVariant $variant) => (int) ($variant->stock ?? 0) > 0 || (int) ($variant->reserved ?? 0) > 0);
 
-        if (empty($invalidIds)) {
-            return 0;
+        $deactivated = 0;
+
+        if (! empty($invalidActiveIds)) {
+            $deactivated = ProductVariant::query()
+                ->where('product_id', $product->id)
+                ->whereIn('id', $invalidActiveIds)
+                ->update(['is_active' => false]);
         }
 
-        return ProductVariant::query()
-            ->where('product_id', $product->id)
-            ->whereIn('id', $invalidIds)
-            ->update(['is_active' => false]);
+        Log::info('Product variant structure sync audit', [
+            'product_id' => (int) $product->id,
+            'active_before' => $activeBefore,
+            'valid_after' => $validAfter,
+            'deactivated' => $deactivated,
+            'invalid_with_stock_or_reserved' => $invalidWithStock->count(),
+        ]);
+
+        return $deactivated;
     }
 
     public function recalculateProductSummary(Product $product): void

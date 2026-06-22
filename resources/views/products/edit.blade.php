@@ -604,6 +604,7 @@
                                     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                                         <div>
                                             <div class="form-check form-switch">
+                                                <input type="hidden" name="use_models" value="0">
                                                 <input class="form-check-input" type="checkbox" value="1" id="useModels" name="use_models" @checked(old('use_models', $hasModels ? 1 : 0))>
                                                 <label class="form-check-label fw-bold" for="useModels">این کالا مدل‌لیست دارد</label>
                                             </div>
@@ -669,6 +670,7 @@
                             <div class="col-lg-5">
                                 <div class="helper-box">
                                     <div class="form-check form-switch">
+                                        <input type="hidden" name="use_designs" value="0">
                                         <input class="form-check-input" type="checkbox" value="1" id="useDesigns" name="use_designs" @checked(old('use_designs', $hasDesigns ? 1 : 0))>
                                         <label class="form-check-label fw-bold" for="useDesigns">این کالا طرح‌بندی دارد</label>
                                     </div>
@@ -1645,15 +1647,13 @@ document.getElementById('productEditForm').addEventListener('submit', function (
     }
 
     if (generateNewVariantsEl) {
-        generateNewVariantsEl.value = '1';
+        generateNewVariantsEl.value = '0';
     }
 
-    var ok = syncHiddenVariantInputs();
-
-    if (!ok) {
-        e.preventDefault();
-        alert('هیچ تنوعی برای ارسال ساخته نشد.');
-    }
+    // مدل‌لیست‌ها فقط با model_list_ids[] ارسال می‌شوند.
+    // ساخت/همگام‌سازی تنوع‌ها در بک‌اند و بر اساس IDهای امن انجام می‌شود تا نام نمایشی مدل
+    // (حتی شامل /، &، پرانتز یا فاصله) به index آرایه variants یا selector فنی تبدیل نشود.
+    variantsHiddenInputsContainer.innerHTML = '';
 });
     modelPickerButton.addEventListener('click', function () {
         if (modelBrandGroupEl.disabled) return;
