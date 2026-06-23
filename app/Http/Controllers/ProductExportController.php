@@ -56,61 +56,95 @@ class ProductExportController extends Controller
     public function export(Request $request)
     {
         $filters = $this->validatedFilters($request, true);
-        $rows = $this->service->rows($filters);
-
-        if (empty($rows)) {
-            return back()->with(
-                'error',
-                'محصولی مطابق فیلترهای انتخاب‌شده پیدا نشد.'
-            );
-        }
 
         try {
             $this->preparePdfEnvironment();
+            $this->prepareLongRunningExport();
 
             $mpdf = $this->createMpdf();
 
             $meta = $this->service->meta($filters);
+            $skipImages = true;
 
             $mpdf->SetHTMLFooter(
                 $this->pdfFooter($meta)
             );
 
-            $html = view('product-exports.pdf', [
-                'rows' => $rows,
+            $mpdf->WriteHTML(view('product-exports.pdf-start', [
                 'meta' => $meta,
                 'styles' => $this->pdfStyles(),
-            ])->render();
+                'skipImages' => $skipImages,
+            ])->render());
 
-            $mpdf->WriteHTML($html);
+            $buffer = [];
+
+            $rowCount = $this->service->eachRow(
+                $filters,
+                function (array $row, int $number) use (
+                    &$buffer,
+                    $mpdf,
+                    $skipImages
+                ) {
+                    $buffer[] = [
+                        'row' => $row,
+                        'number' => $number,
+                    ];
+
+                    if (count($buffer) >= 50) {
+                        $mpdf->WriteHTML(view('product-exports.partials.pdf-rows', [
+                            'rows' => $buffer,
+                            'skipImages' => $skipImages,
+                        ])->render());
+
+                        $buffer = [];
+                    }
+                }
+            );
+
+            if (! empty($buffer)) {
+                $mpdf->WriteHTML(view('product-exports.partials.pdf-rows', [
+                    'rows' => $buffer,
+                    'skipImages' => $skipImages,
+                ])->render());
+            }
+
+            if ($rowCount === 0) {
+                return back()->with(
+                    'error',
+                    'محصولی مطابق فیلترهای انتخاب‌شده پیدا نشد.'
+                );
+            }
+
+            $mpdf->WriteHTML(view('product-exports.pdf-end')->render());
 
             $filename = 'product-report-'
                 . now()->format('Ymd-His')
                 . '.pdf';
+            $pdfPath = storage_path('app/mpdf-temp/' . $filename);
 
-            $pdfContent = $mpdf->Output(
-                '',
-                Destination::STRING_RETURN
-            );
+            $mpdf->Output($pdfPath, Destination::FILE);
 
-            if (
-                $pdfContent === ''
-                || ! str_starts_with($pdfContent, '%PDF-')
-            ) {
+            $handle = fopen($pdfPath, 'rb');
+            $header = is_resource($handle) ? fread($handle, 5) : false;
+
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+
+            if ($header !== '%PDF-') {
                 throw new RuntimeException(
                     'فایل PDF معتبر تولید نشد.'
                 );
             }
 
-            return response($pdfContent, 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' =>
-                    'attachment; filename="' . $filename . '"',
-                'Content-Length' => strlen($pdfContent),
-                'Cache-Control' =>
-                    'private, no-store, no-cache, must-revalidate',
-                'Pragma' => 'no-cache',
-            ]);
+            return response()
+                ->download($pdfPath, $filename, [
+                    'Content-Type' => 'application/pdf',
+                    'Cache-Control' =>
+                        'private, no-store, no-cache, must-revalidate',
+                    'Pragma' => 'no-cache',
+                ])
+                ->deleteFileAfterSend(true);
         } catch (Throwable $exception) {
             Log::error('Product PDF export failed.', [
                 'message' => $exception->getMessage(),
@@ -124,6 +158,17 @@ class ProductExportController extends Controller
                 'error',
                 'خطا در ساخت PDF: ' . $exception->getMessage()
             );
+        }
+    }
+
+    private function prepareLongRunningExport(): void
+    {
+        @set_time_limit(0);
+
+        if (function_exists('ini_set')) {
+            @ini_set('memory_limit', '1024M');
+            @ini_set('pcre.backtrack_limit', '10000000');
+            @ini_set('pcre.recursion_limit', '10000000');
         }
     }
 
@@ -168,6 +213,9 @@ class ProductExportController extends Controller
             'useSubstitutions' => true,
 
             'use_kwt' => false,
+            'simpleTables' => true,
+            'packTableData' => true,
+            'shrink_tables_to_fit' => 1,
         ]);
 
         $mpdf->SetDirectionality('rtl');
@@ -361,7 +409,7 @@ class ProductExportController extends Controller
         }
 
         .products-table tr {
-            page-break-inside: avoid;
+            page-break-inside: auto;
         }
 
         .products-table th {
