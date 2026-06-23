@@ -9,6 +9,7 @@ use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 use Throwable;
 
 class ProductExportService
@@ -121,6 +122,53 @@ class ProductExportService
                 };
             })
             ->values();
+    }
+
+    /**
+     * پیمایش ردیف‌های خروجی به‌صورت تکه‌ای برای جلوگیری از پر شدن حافظه در PDFهای بزرگ.
+     *
+     * @param callable(array, int): void $callback
+     */
+    public function eachRow(array $filters, callable $callback, int $chunkSize = 100): int
+    {
+        if ($chunkSize < 1) {
+            throw new InvalidArgumentException('Chunk size must be greater than zero.');
+        }
+
+        $warehouseFilterActive = ! empty($filters['warehouse_id']);
+        $stockStatus = $filters['stock_status'] ?? 'all';
+        $index = 0;
+
+        $this->query($filters)
+            ->reorder('products.id')
+            ->chunkById($chunkSize, function (Collection $products) use (
+                $callback,
+                $filters,
+                $stockStatus,
+                $warehouseFilterActive,
+                &$index
+            ) {
+                foreach ($products as $product) {
+                    $stock = $this->stock($product, $warehouseFilterActive);
+
+                    $matchesStockStatus = match ($stockStatus) {
+                        'in_stock' => $stock > 0,
+                        'out_of_stock' => $stock <= 0,
+                        'low_stock' => $stock > 0 && $stock <= self::LOW_STOCK_THRESHOLD,
+                        default => true,
+                    };
+
+                    if (! $matchesStockStatus) {
+                        continue;
+                    }
+
+                    $index++;
+
+                    $callback($this->row($product, $filters), $index);
+                }
+            }, 'products.id', 'id');
+
+        return $index;
     }
 
     /**
