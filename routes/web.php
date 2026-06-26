@@ -338,6 +338,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
         Route::get('/', [BugInvestigatorController::class, 'index'])->name('index');
         Route::get('/create', [BugInvestigatorController::class, 'create'])->name('create');
         Route::post('/', [BugInvestigatorController::class, 'store'])->name('store');
+        Route::post('/{bugCase}/rerun', [BugInvestigatorController::class, 'rerun'])->name('rerun');
         Route::get('/{bugCase}', [BugInvestigatorController::class, 'show'])->name('show');
     });
 
