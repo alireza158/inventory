@@ -42,6 +42,7 @@ use App\Http\Controllers\WarehouseMapController;
 use App\Http\Controllers\WarehouseReviewController;
 use App\Http\Controllers\Admin\UserPermissionController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\BugInvestigatorController;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 
@@ -332,6 +333,13 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     // Users (External CRM)
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/users/sync', [UserController::class, 'sync'])->name('users.sync');
+
+    Route::prefix('admin/bug-investigator')->name('admin.bug-investigator.')->middleware('role:admin|Admin|Manager|manager|مدیر')->group(function () {
+        Route::get('/', [BugInvestigatorController::class, 'index'])->name('index');
+        Route::get('/create', [BugInvestigatorController::class, 'create'])->name('create');
+        Route::post('/', [BugInvestigatorController::class, 'store'])->name('store');
+        Route::get('/{bugCase}', [BugInvestigatorController::class, 'show'])->name('show');
+    });
 
     Route::get('/admin/permissions', [UserPermissionController::class, 'index'])->name('admin.permissions.index');
     Route::put('/admin/permissions/{user}', [UserPermissionController::class, 'update'])->name('admin.permissions.update');
