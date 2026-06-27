@@ -1347,7 +1347,8 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         oldCityId: @json(old('city_id', $order->city_id ?? '')),
         oldShippingId: @json(old('shipping_id', $order->shipping_id ?? '')),
         oldDiscountAmount: @json(old('discount_amount', $order->discount_amount ?? 0)),
-        isEdit: @json($isEdit)
+        isEdit: @json($isEdit),
+        orderUuid: @json($order->uuid ?? null)
     };
 
     const API = window.PREINVOICE_BOOT.api;
@@ -1362,6 +1363,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     const OLD_SHIPPING_ID = window.PREINVOICE_BOOT.oldShippingId;
     const OLD_DISCOUNT_AMOUNT = window.PREINVOICE_BOOT.oldDiscountAmount;
     const IS_EDIT = !!window.PREINVOICE_BOOT.isEdit;
+    const EDIT_ORDER_UUID = window.PREINVOICE_BOOT.orderUuid || null;
 
     let shippings = INITIAL_SHIPPINGS || [];
     let areaProvinces = [];
@@ -1879,10 +1881,11 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         const id = String(productId || '');
         if (!id) return null;
         const token = ensureReservationToken();
-        const cacheKey = id + ':' + token;
+        const cacheKey = id + ':' + token + ':' + (IS_EDIT ? (EDIT_ORDER_UUID || '') : '');
         if (!fresh && productCache.has(cacheKey)) return productCache.get(cacheKey);
         const params = new URLSearchParams();
         if (token) params.set('reservation_token', token);
+        if (IS_EDIT && EDIT_ORDER_UUID) params.set('preinvoice_uuid', EDIT_ORDER_UUID);
         if (fresh) params.set('_', Date.now());
         const qs = params.toString();
         const url = API.product + '/' + encodeURIComponent(id) + (qs ? '?' + qs : '');
@@ -2330,6 +2333,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     <span class="badge-soft">پیش‌فاکتور شده: ${formatNum(reserved)}</span>
                     <span class="badge-soft">کل موجودی: ${formatNum(totalStock)}</span>
                     <span class="badge-soft">قیمت: ${formatMoney(price)}</span>
+                    ${v?.is_current_preinvoice_item ? `<span class="badge-soft badge-brand">در پیش‌فاکتور موجود است${stock <= 0 ? ' / موجودی فعلی ناکافی است' : ''}</span>` : ''}
                     ${qty > 0 ? `<span class="badge-soft badge-brand">انتخاب: ${formatNum(qty)}</span>` : ''}
                 </div>
             </div>

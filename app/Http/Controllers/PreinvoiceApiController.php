@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PreinvoiceDraftReservation;
+use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
@@ -97,18 +98,44 @@ class PreinvoiceApiController extends Controller
 
     public function product(Request $request, Product $product)
     {
-        abort_unless((bool) $product->is_sellable, 404);
+        $editOrderUuid = trim((string) $request->query('preinvoice_uuid', ''));
+        $currentPreinvoiceItemVariantIds = [];
+
+        if ($editOrderUuid !== '' && auth()->check()) {
+            $currentPreinvoiceItemVariantIds = PreinvoiceOrder::query()
+                ->where('uuid', $editOrderUuid)
+                ->whereHas('items', fn ($query) => $query->where('product_id', $product->id))
+                ->with(['items' => fn ($query) => $query
+                    ->select(['id', 'preinvoice_order_id', 'product_id', 'variant_id'])
+                    ->where('product_id', $product->id)])
+                ->first()?->items
+                ->pluck('variant_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all() ?? [];
+        }
+
+        abort_unless((bool) $product->is_sellable || ! empty($currentPreinvoiceItemVariantIds), 404);
 
         $reservationToken = (string) $request->query('reservation_token', '');
         $reservedByVariant = $this->activeReservationQuantities($reservationToken);
         $reservedVariantIds = array_keys($reservedByVariant);
 
         $hasAvailableOrReservedVariant = $product->variants()
-            ->active()
-            ->where(function ($query) use ($reservedVariantIds) {
-                $query->where('stock', '>', 0);
-                if (! empty($reservedVariantIds)) {
-                    $query->orWhereIn('id', $reservedVariantIds);
+            ->where(function ($outerQuery) use ($reservedVariantIds, $currentPreinvoiceItemVariantIds) {
+                $outerQuery->where(function ($query) use ($reservedVariantIds) {
+                    $query->active()->where(function ($stockQuery) use ($reservedVariantIds) {
+                        $stockQuery->where('stock', '>', 0);
+                        if (! empty($reservedVariantIds)) {
+                            $stockQuery->orWhereIn('id', $reservedVariantIds);
+                        }
+                    });
+                });
+
+                if (! empty($currentPreinvoiceItemVariantIds)) {
+                    $outerQuery->orWhereIn('id', $currentPreinvoiceItemVariantIds);
                 }
             })
             ->exists();
@@ -116,11 +143,18 @@ class PreinvoiceApiController extends Controller
         abort_unless($hasAvailableOrReservedVariant, 404);
 
         $product->load(['variants' => fn ($q) => $q
-            ->active()
-            ->where(function ($query) use ($reservedVariantIds) {
-                $query->where('stock', '>', 0);
-                if (! empty($reservedVariantIds)) {
-                    $query->orWhereIn('id', $reservedVariantIds);
+            ->where(function ($outerQuery) use ($reservedVariantIds, $currentPreinvoiceItemVariantIds) {
+                $outerQuery->where(function ($query) use ($reservedVariantIds) {
+                    $query->active()->where(function ($stockQuery) use ($reservedVariantIds) {
+                        $stockQuery->where('stock', '>', 0);
+                        if (! empty($reservedVariantIds)) {
+                            $stockQuery->orWhereIn('id', $reservedVariantIds);
+                        }
+                    });
+                });
+
+                if (! empty($currentPreinvoiceItemVariantIds)) {
+                    $outerQuery->orWhereIn('id', $currentPreinvoiceItemVariantIds);
                 }
             })
             ->with('modelList')
@@ -153,6 +187,8 @@ class PreinvoiceApiController extends Controller
                 'quantity' => (int) ($v->stock ?? 0),
                 'reserved' => (int) ($v->reserved ?? 0),
                 'sellable_stock' => max(0, (int) ($v->stock ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)),
+                'is_current_preinvoice_item' => in_array((int) $v->id, $currentPreinvoiceItemVariantIds, true),
+                'is_active' => (bool) ($v->is_active ?? false),
                 'variant_name' => (string) ($v->variant_name ?? ''),
                 'variety_name' => (string) ($v->variety_name ?? ''),
                 'variety_code' => (string) ($v->variety_code ?? ''),

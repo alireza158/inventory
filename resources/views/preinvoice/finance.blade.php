@@ -82,7 +82,7 @@
     </div>
   </div>
 
-  <form method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}" enctype="multipart/form-data" class="card shadow-sm border-0">
+  <form id="finalizePreinvoiceForm" method="POST" action="{{ route('preinvoice.draft.finalize', $order->uuid) }}" enctype="multipart/form-data" class="card shadow-sm border-0">
     @csrf
     <div class="card-body">
       <div class="row g-3">
@@ -168,7 +168,7 @@
       <input name="reason" form="cancelPreinvoiceForm" class="form-control" style="max-width: 320px;" placeholder="دلیل کنسلی" required>
       <button class="btn btn-outline-danger" form="cancelPreinvoiceForm">کنسل پیش‌فاکتور</button>
       <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-outline-secondary">ویرایش فاکتور</a>
-      <button class="btn btn-success" onclick="return confirm('تاییدیه نهایی مالی ثبت شود؟ با این کار، پیش‌فاکتور به فاکتور تبدیل می‌شود و در صف حواله فروش انبار قرار می‌گیرد.')">تاییدیه نهایی پیش‌فاکتور از سمت مالی</button>
+      <button id="finalizePreinvoiceBtn" class="btn btn-success" onclick="return confirm('تاییدیه نهایی مالی ثبت شود؟ با این کار، پیش‌فاکتور به فاکتور تبدیل می‌شود و در صف حواله فروش انبار قرار می‌گیرد.')">تاییدیه نهایی پیش‌فاکتور از سمت مالی</button>
     </div>
   </form>
 
@@ -281,6 +281,8 @@
 
 <script>
   (function () {
+    const finalizeForm = document.getElementById('finalizePreinvoiceForm');
+    const finalizeBtn = document.getElementById('finalizePreinvoiceBtn');
     const defaultChequeCustomerName = @json($order->customer_name ?? '');
     const defaultChequeCustomerCode = @json(!empty($order->customer_id) ? (string) $order->customer_id : '');
     const rowsWrap = document.getElementById('paymentRows');
