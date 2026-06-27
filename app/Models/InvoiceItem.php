@@ -13,6 +13,8 @@ class InvoiceItem extends Model
         'quantity',
         'price',
         'line_total',
+        'sort_order',
+        'line_discount_amount',
     ];
 
     public function invoice()

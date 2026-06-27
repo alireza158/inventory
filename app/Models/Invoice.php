@@ -22,7 +22,7 @@ class Invoice extends Model
         ,'external_order_id', 'items_updated_at', 'items_updated_by'
     ];
 
-    public function items() { return $this->hasMany(InvoiceItem::class); }
+    public function items() { return $this->hasMany(InvoiceItem::class)->orderBy('sort_order')->orderBy('id'); }
     public function payments() { return $this->hasMany(InvoicePayment::class); }
     public function notes() { return $this->hasMany(InvoiceNote::class)->latest(); }
     public function attachments() { return $this->hasMany(InvoiceAttachment::class)->latest(); }

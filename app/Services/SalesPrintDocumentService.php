@@ -109,7 +109,9 @@ class SalesPrintDocumentService
                 'warehouseMap' => $variant ? $this->warehouseMap((int) $variant->id, $warehouseId) : 'بدون نقشه',
                 'quantity' => (int) $item->quantity,
                 'unitPrice' => (int) $item->price,
-                'lineTotal' => (int) ($item->line_total ?? ((int) $item->quantity * (int) $item->price)),
+                'lineDiscount' => (int) ($item->line_discount_amount ?? 0),
+                'netUnitPrice' => max((int) $item->price - (int) floor(((int) ($item->line_discount_amount ?? 0)) / max((int) $item->quantity, 1)), 0),
+                'lineTotal' => (int) ($item->line_total ?? max(((int) $item->quantity * (int) $item->price) - (int) ($item->line_discount_amount ?? 0), 0)),
             ];
         });
     }

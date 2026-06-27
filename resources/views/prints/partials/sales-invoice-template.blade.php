@@ -6,7 +6,7 @@
     $money = fn ($value) => \App\Support\Currency::formatRial((int) $value);
     $dash = fn ($value) => filled($value) ? $value : '—';
     $showWarehouseMap = $printData['mode'] !== 'customer';
-    $itemColspan = $showWarehouseMap ? 7 : 6;
+    $itemColspan = $showWarehouseMap ? 9 : 8;
     $totalQuantity = $printData['items']->sum('quantity');
     $totalLineAmount = $printData['items']->sum('lineTotal');
 @endphp
@@ -43,10 +43,10 @@
         </div>
     </section>
     <table class="items-table">
-        <thead><tr><th class="col-index">ردیف</th><th class="col-desc">شرح کالا</th><th class="col-code">کد انبار</th><th class="col-map warehouse-only">نقشه انبار</th><th class="col-qty">تعداد</th><th class="col-price">قیمت واحد</th><th class="col-total">مبلغ کل</th></tr></thead>
+        <thead><tr><th class="col-index">ردیف</th><th class="col-desc">شرح کالا</th><th class="col-code">کد انبار</th><th class="col-map warehouse-only">نقشه انبار</th><th class="col-qty">تعداد</th><th class="col-price">قیمت واحد</th><th class="col-price">تخفیف ردیف</th><th class="col-price">قیمت خالص</th><th class="col-total">مبلغ کل</th></tr></thead>
         <tbody>
         @forelse($printData['items'] as $item)
-            <tr><td class="col-index">{{ $loop->iteration }}</td><td class="col-desc">{{ $item['description'] }}</td><td class="col-code">{{ $item['inventoryCode'] }}</td><td class="col-map warehouse-only">{{ $item['warehouseMap'] }}</td><td class="col-qty">{{ number_format($item['quantity']) }}</td><td class="col-price">{{ number_format($item['unitPrice']) }}</td><td class="col-total">{{ number_format($item['lineTotal']) }}</td></tr>
+            <tr><td class="col-index">{{ $loop->iteration }}</td><td class="col-desc">{{ $item['description'] }}</td><td class="col-code">{{ $item['inventoryCode'] }}</td><td class="col-map warehouse-only">{{ $item['warehouseMap'] }}</td><td class="col-qty">{{ number_format($item['quantity']) }}</td><td class="col-price">{{ number_format($item['unitPrice']) }}</td><td class="col-price">{{ number_format($item['lineDiscount'] ?? 0) }}</td><td class="col-price">{{ number_format($item['netUnitPrice'] ?? $item['unitPrice']) }}</td><td class="col-total">{{ number_format($item['lineTotal']) }}</td></tr>
         @empty
             <tr><td colspan="{{ $itemColspan }}" style="text-align:center">آیتمی ثبت نشده است.</td></tr>
         @endforelse
@@ -58,6 +58,8 @@
                 <td class="col-code"></td>
                 @if($showWarehouseMap)<td class="col-map warehouse-only"></td>@endif
                 <td class="col-qty">{{ number_format($totalQuantity) }}</td>
+                <td class="col-price"></td>
+                <td class="col-price"></td>
                 <td class="col-price"></td>
                 <td class="col-total">{{ number_format($totalLineAmount) }}</td>
             </tr>

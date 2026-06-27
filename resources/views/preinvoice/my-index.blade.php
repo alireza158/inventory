@@ -109,7 +109,7 @@
               <td>
                 <div class="action-stack">
                   <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده</a>
-                  <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-sm btn-outline-warning">ویرایش</a>
+                  @if(!$invoiceUuid && !in_array($order->status, [\App\Models\PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, \App\Models\PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE], true))<a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-sm btn-outline-warning">ویرایش</a>@endif
                   <a href="{{ route('preinvoice.my.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
                 </div>
               </td>
@@ -145,7 +145,7 @@
         @endif
         <div class="action-stack mt-3 justify-content-start">
           <a href="{{ route('preinvoice.my.show', $order->uuid) }}" class="btn btn-sm btn-outline-primary">مشاهده</a>
-          <a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-sm btn-outline-warning">ویرایش</a>
+          @if(!$invoiceUuid && !in_array($order->status, [\App\Models\PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, \App\Models\PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE], true))<a href="{{ route('preinvoice.draft.edit', $order->uuid) }}" class="btn btn-sm btn-outline-warning">ویرایش</a>@endif
           <a href="{{ route('preinvoice.my.show', $order->uuid) }}?print=1" target="_blank" class="btn btn-sm btn-outline-dark">پرینت</a>
         </div>
       </div>

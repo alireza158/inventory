@@ -51,7 +51,31 @@ class ProductPurchaseLedgerController extends Controller
             });
         }
 
-        $summary = (clone $query)
+        $summaryQuery = PurchaseItem::query()
+            ->join('purchases', 'purchases.id', '=', 'purchase_items.purchase_id')
+            ->where('purchase_items.product_id', $product->id);
+
+        if ($selectedVariant) {
+            $summaryQuery->where('purchase_items.product_variant_id', $selectedVariant->id);
+        }
+        if ($request->filled('date_from')) {
+            $summaryQuery->where('purchases.purchased_at', '>=', Carbon::parse($request->input('date_from'))->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $summaryQuery->where('purchases.purchased_at', '<=', Carbon::parse($request->input('date_to'))->endOfDay());
+        }
+        if ($request->filled('q')) {
+            $q = trim((string) $request->input('q'));
+            $summaryQuery->where(function ($builder) use ($q) {
+                $builder->where('purchases.id', 'like', "%{$q}%")
+                    ->orWhere('purchase_items.product_name', 'like', "%{$q}%")
+                    ->orWhere('purchase_items.variant_name', 'like', "%{$q}%")
+                    ->orWhere('purchase_items.product_code', 'like', "%{$q}%")
+                    ->orWhere('purchases.note', 'like', "%{$q}%");
+            });
+        }
+
+        $summary = $summaryQuery
             ->selectRaw('COALESCE(SUM(purchase_items.quantity), 0) as total_quantity')
             ->selectRaw('COALESCE(SUM(purchase_items.line_total), 0) as total_amount')
             ->selectRaw('COALESCE(AVG(purchase_items.buy_price), 0) as avg_buy_price')

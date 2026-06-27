@@ -17,6 +17,11 @@
         <div class="col-md-4"><input class="form-control" name="customer_address" value="{{ old('customer_address', $invoice->customer_address) }}" placeholder="آدرس"></div>
       </div>
 
+      <div class="mb-3">
+        <label class="form-label">دلیل ویرایش مالی</label>
+        <textarea class="form-control" name="edit_reason" rows="2" required>{{ old('edit_reason') }}</textarea>
+      </div>
+
       <div class="table-responsive">
         <table class="table">
           <thead><tr><th>محصول</th><th>مدل</th><th>تعداد</th><th>قیمت</th></tr></thead>

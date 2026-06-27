@@ -64,7 +64,7 @@ class PreinvoiceOrder extends Model
 
     public function items()
     {
-        return $this->hasMany(PreinvoiceOrderItem::class);
+        return $this->hasMany(PreinvoiceOrderItem::class)->orderBy('sort_order')->orderBy('id');
     }
 
     public function creator()
