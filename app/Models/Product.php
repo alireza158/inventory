@@ -245,6 +245,8 @@ class Product extends Model
                 $codeQuery->orWhereRaw("{$expression} LIKE ?", ['%' . static::escapeProductSearchLike($searchLower) . '%']);
             }
         });
+
+        return static::applyProductSearchScore($query, $search, $tokens);
     }
 
     private static function orWhereNormalizedLike(Builder $query, string $column, string $search)
