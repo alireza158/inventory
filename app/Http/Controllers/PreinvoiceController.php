@@ -438,7 +438,7 @@ class PreinvoiceController extends Controller
             return redirect()->back()->with('error', 'این پیش‌فاکتور به فاکتور تبدیل شده است و فقط واحد مالی مجاز به ویرایش آن است.');
         }
 
-        $validated = $this->validateDraftPayload($request, false);
+        $validated = $this->validateDraftPayload($request, false, $order);
 
         DB::transaction(function () use ($order, $validated) {
             $order = PreinvoiceOrder::query()
@@ -540,7 +540,7 @@ class PreinvoiceController extends Controller
         return back()->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');
     }
 
-    private function validateDraftPayload(Request $request, bool $checkCurrentStock = true): array
+    private function validateDraftPayload(Request $request, bool $checkCurrentStock = true, ?PreinvoiceOrder $editingOrder = null): array
     {
         $shippingId = (int) $request->input('shipping_id');
         $isInPerson = $this->isInPersonShippingId($shippingId);
@@ -562,12 +562,8 @@ class PreinvoiceController extends Controller
             'total_price' => 'nullable|integer|min:0',
 
             'products' => 'required|array|min:1',
-            'products.*.id' => 'required|integer|exists:products,id,is_sellable,1',
-            'products.*.variety_id' => [
-                'required',
-                'integer',
-                Rule::exists('product_variants', 'id')->where(fn($query) => $query->where('is_active', true)),
-            ],
+            'products.*.id' => 'required|integer|exists:products,id',
+            'products.*.variety_id' => ['required', 'integer', 'exists:product_variants,id'],
             'products.*.quantity' => 'required|integer|min:1',
             'products.*.price' => 'nullable|integer|min:0',
             'products.*.item_id' => 'nullable|integer',
@@ -592,16 +588,34 @@ class PreinvoiceController extends Controller
             throw ValidationException::withMessages(['city_id' => 'شهر انتخاب‌شده با استان انتخاب‌شده همخوانی ندارد.']);
         }
 
-        foreach (($validated['products'] ?? []) as $index => $productRow) {
-            $isValidVariant = ProductVariant::query()
-                ->whereKey((int) $productRow['variety_id'])
-                ->where('product_id', (int) $productRow['id'])
-                ->where('is_active', true)
-                ->exists();
+        $existingQtyByProductVariant = [];
+        if ($editingOrder) {
+            $editingOrder->loadMissing('items');
+            foreach ($editingOrder->items as $existingItem) {
+                $key = ((int) $existingItem->product_id) . ':' . ((int) $existingItem->variant_id);
+                $existingQtyByProductVariant[$key] = ($existingQtyByProductVariant[$key] ?? 0) + (int) $existingItem->quantity;
+            }
+        }
 
-            if (!$isValidVariant) {
+        foreach (($validated['products'] ?? []) as $index => $productRow) {
+            $productId = (int) $productRow['id'];
+            $variantId = (int) $productRow['variety_id'];
+            $requestedQty = (int) $productRow['quantity'];
+            $existingQty = (int) ($existingQtyByProductVariant[$productId . ':' . $variantId] ?? 0);
+
+            $product = Product::query()->whereKey($productId)->first(['id', 'is_sellable']);
+            $variant = ProductVariant::query()->whereKey($variantId)->first(['id', 'product_id', 'is_active']);
+            $isExistingNonIncrease = $existingQty > 0 && $requestedQty <= $existingQty;
+
+            if (! $product || (! (bool) $product->is_sellable && ! $isExistingNonIncrease)) {
                 throw ValidationException::withMessages([
-                    "products.{$index}.variety_id" => 'تنوع انتخابی برای این کالا نامعتبر یا غیرفعال است.',
+                    "products.{$index}.id" => 'کالا قابل فروش نیست؛ فقط کاهش یا حذف آیتم‌های قبلی مجاز است.',
+                ]);
+            }
+
+            if (! $variant || (int) $variant->product_id !== $productId || (! (bool) $variant->is_active && ! $isExistingNonIncrease)) {
+                throw ValidationException::withMessages([
+                    "products.{$index}.variety_id" => 'تنوع انتخابی برای این کالا نامعتبر یا غیرفعال است؛ فقط کاهش یا حذف آیتم‌های قبلی مجاز است.',
                 ]);
             }
         }
@@ -1540,10 +1554,31 @@ class PreinvoiceController extends Controller
                 ->lockForUpdate()
                 ->with('items')
                 ->firstOrFail();
-            if ($lockedOrder->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
+            $order = $lockedOrder;
+            $officialInvoiceUuid = $this->officialCodeForPreinvoiceConversion($order);
+            $existingInvoice = Invoice::query()
+                ->where('preinvoice_order_id', $order->id)
+                ->orWhere('uuid', $officialInvoiceUuid)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingInvoice && (int) $existingInvoice->preinvoice_order_id !== (int) $order->id) {
+                throw ValidationException::withMessages([
+                    'invoice' => "شماره فاکتور {$officialInvoiceUuid} قبلاً برای پیش‌فاکتور دیگری ثبت شده است. لطفاً با مدیر سیستم تماس بگیرید.",
+                ]);
+            }
+
+            if ($order->status === PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE) {
+                if ($existingInvoice) {
+                    return $existingInvoice;
+                }
+
+                abort(409, 'این پیش‌فاکتور قبلاً تبدیل شده است، اما فاکتور مرتبط پیدا نشد.');
+            }
+
+            if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
                 abort(403);
             }
-            $order = $lockedOrder;
 
             $shouldDeductOnFinalize = true;
             $centralStockMovedToReserve = $this->hasCentralStockMovedToReserve($order);
@@ -1583,10 +1618,7 @@ class PreinvoiceController extends Controller
                 }
             }
 
-            $invoice = Invoice::query()
-                ->where('preinvoice_order_id', $order->id)
-                ->lockForUpdate()
-                ->first();
+            $invoice = $existingInvoice;
 
             if ($invoice) {
                 $invoice->items()->delete();
@@ -1608,7 +1640,7 @@ class PreinvoiceController extends Controller
                 ]);
             } else {
                 $invoice = Invoice::create([
-                    'uuid' => $this->officialCodeForPreinvoiceConversion($order),
+                    'uuid' => $officialInvoiceUuid,
                     'preinvoice_order_id' => $order->id,
 
                     'customer_id' => $order->customer_id ?? null,
