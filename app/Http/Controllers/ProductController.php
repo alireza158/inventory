@@ -34,18 +34,12 @@ class ProductController extends Controller
             ]);
 
         if ($request->filled('q')) {
-            $q = trim((string) $request->q);
-
-            $query->where(function ($qq) use ($q) {
-                $qq->where('name', 'like', "%{$q}%")
-                    ->orWhere('code', 'like', "%{$q}%")
-                    ->orWhere('short_barcode', 'like', "%{$q}%")
-                    ->orWhere('sku', 'like', "%{$q}%");
-            });
+            $query->search($request->input('q'));
         }
 
         if ($request->filled('category_id')) {
-            $query->where('category_id', $request->category_id);
+            $categoryIds = Category::selfAndDescendantIds((int) $request->input('category_id'));
+            $query->whereIn('category_id', $categoryIds);
         }
 
         if ($request->stock_status === 'out') {
@@ -93,7 +87,7 @@ class ProductController extends Controller
 
         $categoryTree = Category::query()
             ->whereNull('parent_id')
-            ->with(['children.children.children'])
+            ->with('descendants')
             ->orderBy('name')
             ->get();
 
