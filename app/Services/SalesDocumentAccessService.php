@@ -58,11 +58,16 @@ class SalesDocumentAccessService
 
     public function canSellerEditPreinvoiceItems(PreinvoiceOrder $order, ?User $user): bool
     {
-        if ($order->invoice || in_array((string) $order->status, [PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, PreinvoiceOrder::STATUS_FINANCE_REVIEWING, PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE], true)) {
-            return $this->isManager($user);
+        if ($this->isConvertedPreinvoice($order)) {
+            return $this->isFinance($user) || $this->isManager($user);
         }
 
-        return $this->isPreinvoiceOwner($order, $user) || $this->isManager($user);
+        return $this->isPreinvoiceOwner($order, $user) || $this->isFinance($user) || $this->isManager($user);
+    }
+
+    public function isConvertedPreinvoice(PreinvoiceOrder $order): bool
+    {
+        return (bool) $order->invoice || (string) $order->status === PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE;
     }
 
     public function canSellerEditInvoiceItems(Invoice $invoice, ?User $user): bool

@@ -415,7 +415,9 @@ class PreinvoiceController extends Controller
     public function editDraft(string $uuid)
     {
         $order = PreinvoiceOrder::with(['items.product:id,name,code,sku', 'items.variant:id,variant_name', 'invoice'])->where('uuid', $uuid)->firstOrFail();
-        abort_unless($this->accessService->canSellerEditPreinvoiceItems($order, auth()->user()) || $this->canHandleFinanceActions(), 403);
+        if (! $this->accessService->canSellerEditPreinvoiceItems($order, auth()->user())) {
+            return redirect()->back()->with('error', 'این پیش‌فاکتور به فاکتور تبدیل شده است و فقط واحد مالی مجاز به ویرایش آن است.');
+        }
 
         $shippingMethods = ShippingMethod::query()
             ->select(['id', 'name', 'price'])
@@ -432,7 +434,9 @@ class PreinvoiceController extends Controller
     {
         abort_unless(auth()->check(), 403);
         $order = PreinvoiceOrder::with(['items', 'invoice.items'])->where('uuid', $uuid)->firstOrFail();
-        abort_unless($this->accessService->canSellerEditPreinvoiceItems($order, auth()->user()), 403);
+        if (! $this->accessService->canSellerEditPreinvoiceItems($order, auth()->user())) {
+            return redirect()->back()->with('error', 'این پیش‌فاکتور به فاکتور تبدیل شده است و فقط واحد مالی مجاز به ویرایش آن است.');
+        }
 
         $validated = $this->validateDraftPayload($request, false);
 
@@ -442,7 +446,11 @@ class PreinvoiceController extends Controller
                 ->whereKey($order->id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            abort_unless($this->accessService->canSellerEditPreinvoiceItems($order, auth()->user()), 403);
+            if (! $this->accessService->canSellerEditPreinvoiceItems($order, auth()->user())) {
+                throw ValidationException::withMessages([
+                    'preinvoice' => 'این پیش‌فاکتور به فاکتور تبدیل شده است و فقط واحد مالی مجاز به ویرایش آن است.',
+                ]);
+            }
 
             $customer = $this->resolveCustomer($validated);
             $shippingId = (int) $validated['shipping_id'];
