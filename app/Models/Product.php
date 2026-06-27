@@ -4,7 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Services\ProductVariantStructureService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Product extends Model
 {
@@ -112,14 +114,81 @@ class Product extends Model
         return $query->where('stock', 0);
     }
 
-    public function scopeSearch($query, $q)
+    public function scopeSearch(Builder $query, $q): Builder
     {
-        if (!$q) return $query;
+        $search = static::normalizeSearchTerm((string) $q);
 
-        return $query->where(function ($qq) use ($q) {
-            $qq->where('name', 'like', "%{$q}%")
-                ->orWhere('sku', 'like', "%{$q}%")
-                ->orWhere('code', 'like', "%{$q}%");
+        if ($search === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $productQuery) use ($search) {
+            foreach (static::searchableColumns() as $column) {
+                $productQuery->orWhere(function (Builder $columnQuery) use ($column, $search) {
+                    static::whereNormalizedLike($columnQuery, 'products.' . $column, $search);
+                });
+            }
+
+            $productQuery->orWhereHas('variants', function (Builder $variantQuery) use ($search) {
+                foreach (['variant_name', 'variant_code', 'variety_name', 'variety_code', 'unique_key'] as $column) {
+                    $variantQuery->orWhere(function (Builder $columnQuery) use ($column, $search) {
+                        static::whereNormalizedLike($columnQuery, 'product_variants.' . $column, $search);
+                    });
+                }
+            });
         });
+    }
+
+    public static function normalizeSearchTerm(string $term): string
+    {
+        return trim(strtr($term, [
+            'ي' => 'ی',
+            'ى' => 'ی',
+            'ك' => 'ک',
+            'ة' => 'ه',
+            'ۀ' => 'ه',
+            "\u{200C}" => ' ',
+            "\u{200D}" => ' ',
+            "\u{0640}" => '',
+        ]));
+    }
+
+    private static function searchableColumns(): array
+    {
+        return collect(['name', 'code', 'sku', 'barcode', 'short_barcode', 'description'])
+            ->filter(fn (string $column) => Schema::hasColumn('products', $column))
+            ->values()
+            ->all();
+    }
+
+    private static function whereNormalizedLike(Builder $query, string $column, string $search): void
+    {
+        $expression = static::normalizedSqlExpression($column);
+        $compactExpression = "REPLACE({$expression}, ' ', '')";
+        $compactSearch = str_replace(' ', '', $search);
+
+        $query->whereRaw("{$expression} LIKE ?", ['%' . mb_strtolower($search) . '%']);
+
+        $query->orWhereRaw("{$compactExpression} LIKE ?", ['%' . mb_strtolower($compactSearch) . '%']);
+    }
+
+    private static function normalizedSqlExpression(string $column): string
+    {
+        $expression = "LOWER(COALESCE({$column}, ''))";
+
+        foreach ([
+            'ي' => 'ی',
+            'ى' => 'ی',
+            'ك' => 'ک',
+            'ة' => 'ه',
+            'ۀ' => 'ه',
+            "\u{200C}" => ' ',
+            "\u{200D}" => ' ',
+            "\u{0640}" => '',
+        ] as $from => $to) {
+            $expression = "REPLACE({$expression}, '{$from}', '{$to}')";
+        }
+
+        return $expression;
     }
 }
