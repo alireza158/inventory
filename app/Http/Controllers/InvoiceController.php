@@ -174,7 +174,7 @@ class InvoiceController extends Controller
         $data = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.id' => 'required|exists:invoice_items,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|integer|min:0',
             'items.*.price' => 'required|integer|min:0',
         ]);
 
@@ -229,7 +229,7 @@ class InvoiceController extends Controller
             'customer_address' => 'nullable|string|max:2000',
             'items' => 'required|array|min:1',
             'items.*.id' => 'required|exists:invoice_items,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|integer|min:0',
             'items.*.price' => 'required|integer|min:0',
             'edit_reason' => 'required|string|max:2000',
         ]);

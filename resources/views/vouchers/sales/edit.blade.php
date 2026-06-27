@@ -52,7 +52,7 @@
 
       <div class="table-responsive">
         <table class="table align-middle">
-          <thead><tr><th>محصول</th><th>مدل</th><th>تعداد</th><th>قیمت</th></tr></thead>
+          <thead><tr><th>محصول</th><th>مدل</th><th>تعداد</th><th>قیمت</th><th>حذف</th></tr></thead>
           <tbody>
             @foreach($invoice->items as $it)
               <tr>
@@ -60,9 +60,10 @@
                 <td>{{ $it->variant?->variant_name ?? '—' }}</td>
                 <td>
                   <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $it->id }}">
-                  <input type="number" min="1" name="items[{{ $loop->index }}][quantity]" value="{{ (int)$it->quantity }}" class="form-control" @disabled(!$canEditItems)>
+                  <input type="number" min="0" name="items[{{ $loop->index }}][quantity]" value="{{ (int)$it->quantity }}" class="form-control" @disabled(!$canEditItems)>
                 </td>
                 <td><input type="number" min="0" name="items[{{ $loop->index }}][price]" value="{{ (int)$it->price }}" class="form-control" @disabled(!$canEditItems)></td>
+                <td><button type="button" class="btn btn-outline-danger btn-sm js-zero-item" @disabled(!$canEditItems)>حذف از فاکتور</button></td>
               </tr>
             @endforeach
           </tbody>
@@ -74,4 +75,16 @@
     </div>
   </form>
 </div>
+<script>
+document.querySelectorAll('.js-zero-item').forEach((button) => {
+  button.addEventListener('click', () => {
+    const row = button.closest('tr');
+    const quantity = row?.querySelector('input[name$="[quantity]"]');
+    if (quantity) {
+      quantity.value = 0;
+      row.classList.add('table-danger');
+    }
+  });
+});
+</script>
 @endsection
