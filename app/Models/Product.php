@@ -116,26 +116,100 @@ class Product extends Model
 
     public function scopeSearch(Builder $query, $q): Builder
     {
-        $search = static::normalizeSearchTerm((string) $q);
+        $patterns = static::searchPatterns((string) $q);
 
-        if ($search === '') {
+        if ($patterns === []) {
             return $query;
         }
 
-        return $query->where(function (Builder $productQuery) use ($search) {
+        return $query->where(function (Builder $productQuery) use ($patterns) {
             foreach (static::searchableColumns() as $column) {
-                $productQuery->orWhere(function (Builder $columnQuery) use ($column, $search) {
-                    static::whereNormalizedLike($columnQuery, 'products.' . $column, $search);
-                });
+                static::orWhereColumnLikeAny($productQuery, 'products.' . $column, $patterns);
             }
 
-            $productQuery->orWhereHas('variants', function (Builder $variantQuery) use ($search) {
+            $productQuery->orWhereHas('variants', function (Builder $variantQuery) use ($patterns) {
                 foreach (['variant_name', 'variant_code', 'variety_name', 'variety_code', 'unique_key'] as $column) {
-                    $variantQuery->orWhere(function (Builder $columnQuery) use ($column, $search) {
-                        static::whereNormalizedLike($columnQuery, 'product_variants.' . $column, $search);
-                    });
+                    static::orWhereColumnLikeAny($variantQuery, 'product_variants.' . $column, $patterns);
                 }
             });
+        });
+    }
+
+    public static function normalizeSearchTerm(string $term): string
+    {
+        $term = strtr($term, [
+            'ي' => 'ی',
+            'ى' => 'ی',
+            'ك' => 'ک',
+            'ة' => 'ه',
+            'ۀ' => 'ه',
+            "\u{200C}" => ' ',
+            "\u{200D}" => ' ',
+            "\u{0640}" => '',
+        ]);
+
+        return trim((string) preg_replace('/\s+/u', ' ', $term));
+    }
+
+    private static function searchPatterns(string $term): array
+    {
+        $normalized = static::normalizeSearchTerm($term);
+
+        if ($normalized === '') {
+            return [];
+        }
+
+        $tokens = preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $loosePattern = '%' . implode('%', array_map([static::class, 'escapeLike'], $tokens)) . '%';
+        $exactPattern = '%' . static::escapeLike($normalized) . '%';
+
+        return collect([$exactPattern, $loosePattern])
+            ->flatMap(fn (string $pattern) => static::persianArabicPatternVariants($pattern))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private static function persianArabicPatternVariants(string $pattern): array
+    {
+        $patterns = [$pattern];
+
+        foreach ([['ی', 'ي'], ['ک', 'ك']] as [$persian, $arabic]) {
+            $patterns = collect($patterns)
+                ->flatMap(fn (string $item) => [$item, str_replace($persian, $arabic, $item)])
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return $patterns;
+    }
+
+    private static function escapeLike(string $value): string
+    {
+        return addcslashes($value, '\\%_');
+    }
+
+    private static function searchableColumns(): array
+    {
+        static $columns = null;
+
+        if ($columns !== null) {
+            return $columns;
+        }
+
+        return $columns = collect(['name', 'code', 'sku', 'barcode', 'short_barcode', 'description'])
+            ->filter(fn (string $column) => Schema::hasColumn('products', $column))
+            ->values()
+            ->all();
+    }
+
+    private static function orWhereColumnLikeAny(Builder $query, string $column, array $patterns): void
+    {
+        $query->orWhere(function (Builder $columnQuery) use ($column, $patterns) {
+            foreach ($patterns as $pattern) {
+                $columnQuery->orWhere($column, 'like', $pattern);
+            }
         });
     }
 
