@@ -226,7 +226,7 @@ class Product extends Model
             && (preg_match('/\d/u', $search) === 1 || mb_strlen($search) <= 16);
     }
 
-    private static function orWhereProductCodeMatches(Builder $query, string $search, bool $isCodeLike): void
+    private static function orWhereProductCodeMatches(Builder $query, string $search, bool $isCodeLike)
     {
         if (! $isCodeLike) {
             return;
@@ -249,66 +249,13 @@ class Product extends Model
         return static::applyProductSearchScore($query, $search, $tokens);
     }
 
-    private static function applyProductSearchScore(Builder $query, string $search, array $tokens): Builder
-    {
-        $name = static::normalizedSqlExpression('products.name');
-        $searchLower = mb_strtolower($search);
-        $compactSearch = str_replace(' ', '', $searchLower);
-        $isCodeLike = preg_match('/^[\p{L}\d\-_\.\/]+$/u', $search) === 1 && (preg_match('/\d/u', $search) === 1 || mb_strlen($search) <= 16);
-
-        $scoreSql = '0';
-        $bindings = [];
-
-        foreach (['products.barcode', 'products.sku', 'products.code', 'products.short_barcode'] as $column) {
-            if (! static::hasProductColumnFromQualifiedName($column)) {
-                continue;
-            }
-
-            $codeExpression = static::normalizedSqlExpression($column);
-            $scoreSql .= " + CASE WHEN {$codeExpression} = ? THEN " . ($isCodeLike ? 1000 : 240) . " ELSE 0 END";
-            $bindings[] = $searchLower;
-        }
-
-        $scoreSql .= " + CASE WHEN {$name} = ? THEN 800 ELSE 0 END";
-        $bindings[] = $searchLower;
-        $scoreSql .= " + CASE WHEN {$name} LIKE ? THEN 650 ELSE 0 END";
-        $bindings[] = static::escapeProductSearchLike($searchLower) . '%';
-        $scoreSql .= " + CASE WHEN {$name} LIKE ? THEN 360 ELSE 0 END";
-        $bindings[] = '%' . static::escapeProductSearchLike($searchLower) . '%';
-        $scoreSql .= " + CASE WHEN REPLACE({$name}, ' ', '') LIKE ? THEN 220 ELSE 0 END";
-        $bindings[] = '%' . static::escapeProductSearchLike($compactSearch) . '%';
-
-        foreach ($tokens as $token) {
-            $token = mb_strtolower($token);
-            $scoreSql .= " + CASE WHEN {$name} LIKE ? THEN 90 ELSE 0 END";
-            $bindings[] = '%' . static::escapeProductSearchLike($token) . '%';
-        }
-
-        $categoryName = static::normalizedSqlExpression('categories.name');
-        $query->leftJoin('categories as search_categories', 'search_categories.id', '=', 'products.category_id');
-        $categoryName = str_replace('categories.', 'search_categories.', $categoryName);
-        $scoreSql .= " + CASE WHEN {$categoryName} LIKE ? THEN 35 ELSE 0 END";
-        $bindings[] = '%' . static::escapeProductSearchLike($searchLower) . '%';
-
-        if (static::hasProductColumnFromQualifiedName('products.description')) {
-            $description = static::normalizedSqlExpression('products.description');
-            $scoreSql .= " + CASE WHEN {$description} LIKE ? THEN 20 ELSE 0 END";
-            $bindings[] = '%' . static::escapeProductSearchLike($searchLower) . '%';
-        }
-
-        return $query
-            ->select('products.*')
-            ->orderByRaw("({$scoreSql}) DESC", $bindings)
-            ->orderByDesc('products.id');
-    }
-
-    private static function orWhereNormalizedLike(Builder $query, string $column, string $search): void
+    private static function orWhereNormalizedLike(Builder $query, string $column, string $search)
     {
         $expression = static::normalizedSqlExpression($column);
         $query->orWhereRaw("{$expression} LIKE ?", ['%' . static::escapeProductSearchLike(mb_strtolower($search)) . '%']);
     }
 
-    private static function orWhereAllTokensInColumn(Builder $query, string $column, array $tokens): void
+    private static function orWhereAllTokensInColumn(Builder $query, string $column, array $tokens)
     {
         $expression = static::normalizedSqlExpression($column);
 
@@ -393,7 +340,7 @@ class Product extends Model
             ->all();
     }
 
-    private static function orWhereProductSearchColumnLikeAny(Builder $query, string $column, array $patterns): void
+    private static function orWhereProductSearchColumnLikeAny(Builder $query, string $column, array $patterns)
     {
         $query->orWhere(function (Builder $columnQuery) use ($column, $patterns) {
             foreach ($patterns as $pattern) {
@@ -424,7 +371,7 @@ class Product extends Model
             ->all();
     }
 
-    private static function whereNormalizedLike(Builder $query, string $column, string $search): void
+    private static function whereNormalizedLike(Builder $query, string $column, string $search)
     {
         $expression = static::normalizedSqlExpression($column);
         $compactExpression = "REPLACE({$expression}, ' ', '')";
