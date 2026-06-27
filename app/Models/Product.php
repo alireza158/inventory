@@ -116,20 +116,20 @@ class Product extends Model
 
     public function scopeSearch(Builder $query, $q): Builder
     {
-        $patterns = static::searchPatterns((string) $q);
+        $patterns = static::buildProductSearchPatterns((string) $q);
 
         if ($patterns === []) {
             return $query;
         }
 
         return $query->where(function (Builder $productQuery) use ($patterns) {
-            foreach (static::searchableColumns() as $column) {
-                static::orWhereColumnLikeAny($productQuery, 'products.' . $column, $patterns);
+            foreach (static::productSearchableColumns() as $column) {
+                static::orWhereProductSearchColumnLikeAny($productQuery, 'products.' . $column, $patterns);
             }
 
             $productQuery->orWhereHas('variants', function (Builder $variantQuery) use ($patterns) {
                 foreach (['variant_name', 'variant_code', 'variety_name', 'variety_code', 'unique_key'] as $column) {
-                    static::orWhereColumnLikeAny($variantQuery, 'product_variants.' . $column, $patterns);
+                    static::orWhereProductSearchColumnLikeAny($variantQuery, 'product_variants.' . $column, $patterns);
                 }
             });
         });
@@ -151,7 +151,7 @@ class Product extends Model
         return trim((string) preg_replace('/\s+/u', ' ', $term));
     }
 
-    private static function searchPatterns(string $term): array
+    private static function buildProductSearchPatterns(string $term): array
     {
         $normalized = static::normalizeProductSearchTerm($term);
 
@@ -160,17 +160,17 @@ class Product extends Model
         }
 
         $tokens = preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $loosePattern = '%' . implode('%', array_map([static::class, 'escapeLike'], $tokens)) . '%';
-        $exactPattern = '%' . static::escapeLike($normalized) . '%';
+        $loosePattern = '%' . implode('%', array_map([static::class, 'escapeProductSearchLike'], $tokens)) . '%';
+        $exactPattern = '%' . static::escapeProductSearchLike($normalized) . '%';
 
         return collect([$exactPattern, $loosePattern])
-            ->flatMap(fn (string $pattern) => static::persianArabicPatternVariants($pattern))
+            ->flatMap(fn (string $pattern) => static::productSearchPersianArabicVariants($pattern))
             ->unique()
             ->values()
             ->all();
     }
 
-    private static function persianArabicPatternVariants(string $pattern): array
+    private static function productSearchPersianArabicVariants(string $pattern): array
     {
         $patterns = [$pattern];
 
@@ -185,12 +185,12 @@ class Product extends Model
         return $patterns;
     }
 
-    private static function escapeLike(string $value): string
+    private static function escapeProductSearchLike(string $value): string
     {
         return addcslashes($value, '\\%_');
     }
 
-    private static function searchableColumns(): array
+    private static function productSearchableColumns(): array
     {
         static $columns = null;
 
@@ -204,85 +204,7 @@ class Product extends Model
             ->all();
     }
 
-    private static function orWhereColumnLikeAny(Builder $query, string $column, array $patterns): void
-    {
-        $query->orWhere(function (Builder $columnQuery) use ($column, $patterns) {
-            foreach ($patterns as $pattern) {
-                $columnQuery->orWhere($column, 'like', $pattern);
-            }
-        });
-    }
-
-    public static function normalizeSearchTerm(string $term): string
-    {
-        $term = strtr($term, [
-            'ي' => 'ی',
-            'ى' => 'ی',
-            'ك' => 'ک',
-            'ة' => 'ه',
-            'ۀ' => 'ه',
-            "\u{200C}" => ' ',
-            "\u{200D}" => ' ',
-            "\u{0640}" => '',
-        ]);
-
-        return trim((string) preg_replace('/\s+/u', ' ', $term));
-    }
-
-    private static function searchPatterns(string $term): array
-    {
-        $normalized = static::normalizeSearchTerm($term);
-
-        if ($normalized === '') {
-            return [];
-        }
-
-        $tokens = preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $loosePattern = '%' . implode('%', array_map([static::class, 'escapeLike'], $tokens)) . '%';
-        $exactPattern = '%' . static::escapeLike($normalized) . '%';
-
-        return collect([$exactPattern, $loosePattern])
-            ->flatMap(fn (string $pattern) => static::persianArabicPatternVariants($pattern))
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    private static function persianArabicPatternVariants(string $pattern): array
-    {
-        $patterns = [$pattern];
-
-        foreach ([['ی', 'ي'], ['ک', 'ك']] as [$persian, $arabic]) {
-            $patterns = collect($patterns)
-                ->flatMap(fn (string $item) => [$item, str_replace($persian, $arabic, $item)])
-                ->unique()
-                ->values()
-                ->all();
-        }
-
-        return $patterns;
-    }
-
-    private static function escapeLike(string $value): string
-    {
-        return addcslashes($value, '\\%_');
-    }
-
-    private static function searchableColumns(): array
-    {
-        static $columns = null;
-
-        if ($columns !== null) {
-            return $columns;
-        }
-
-        return $columns = collect(['name', 'code', 'sku', 'barcode', 'short_barcode', 'description'])
-            ->filter(fn (string $column) => Schema::hasColumn('products', $column))
-            ->values()
-            ->all();
-    }
-
-    private static function orWhereColumnLikeAny(Builder $query, string $column, array $patterns): void
+    private static function orWhereProductSearchColumnLikeAny(Builder $query, string $column, array $patterns): void
     {
         $query->orWhere(function (Builder $columnQuery) use ($column, $patterns) {
             foreach ($patterns as $pattern) {
