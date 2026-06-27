@@ -791,8 +791,8 @@ class PurchaseController extends Controller
             StockMovement::create([
                 'product_id' => $product->id,
                 'user_id' => auth()->id(),
-                'type' => 'in',
-                'reason' => 'purchase',
+                'type' => StockMovement::TYPE_IN,
+                'reason' => StockMovement::REASON_PURCHASE,
                 'quantity' => $quantity,
                 'stock_before' => $before,
                 'stock_after' => $after,
@@ -893,6 +893,7 @@ class PurchaseController extends Controller
             ->keyBy('id');
 
         $affectedProductIds = [];
+        $handledOldItemIds = [];
 
         foreach ($requestItems as $newItem) {
             $variant = $variants->get($newItem['variant_id']);
@@ -906,6 +907,10 @@ class PurchaseController extends Controller
             }
             if (!$oldItem) {
                 $oldItem = $oldItemsByVariant->get($newItem['variant_id']);
+            }
+
+            if ($oldItem) {
+                $handledOldItemIds[] = (int) $oldItem->id;
             }
 
             $oldQty = $oldItem ? (int) $oldItem->quantity : 0;
@@ -940,21 +945,11 @@ class PurchaseController extends Controller
                 $after = $before + $delta;
                 $variant->update(['stock' => $after]);
 
-                StockMovement::create([
-                    'product_id' => $product->id,
-                    'warehouse_id' => $warehouseId,
-                    'user_id' => auth()->id(),
-                    'type' => $delta > 0 ? 'in' : 'out',
-                    'reason' => $oldItem ? 'purchase_item_quantity_changed' : 'purchase_item_added',
-                    'transaction_type' => 'purchase_adjustment',
-                    'quantity' => abs($delta),
-                    'stock_before' => $before,
-                    'stock_after' => $after,
-                    'reference' => 'PUR-ADJ-' . $purchase->id,
-                    'reference_type' => Purchase::class,
-                    'reference_id' => $purchase->id,
-                    'note' => 'اصلاح تعداد خرید کالا - مدل: ' . $variant->variant_name,
-                ]);
+                $reason = $oldItem
+                    ? StockMovement::REASON_PURCHASE_ITEM_CHANGED
+                    : StockMovement::REASON_PURCHASE_ITEM_ADDED;
+
+                $this->recordPurchaseAdjustmentMovement($purchase, $product, $variant, $warehouseId, $delta, $before, $after, $reason);
 
                 WarehouseStockService::change($warehouseId, $product->id, $delta, (int) $variant->id);
             }
@@ -999,12 +994,90 @@ class PurchaseController extends Controller
             $affectedProductIds[] = $product->id;
         }
 
+        $removedItems = $purchase->items->filter(fn ($item) => !in_array((int) $item->id, $handledOldItemIds, true));
+
+        foreach ($removedItems as $removedItem) {
+            $variantId = (int) $removedItem->product_variant_id;
+            if ($variantId <= 0) {
+                $removedItem->delete();
+                continue;
+            }
+
+            $variant = $variants->get($variantId) ?: ProductVariant::whereKey($variantId)->lockForUpdate()->first();
+            if (!$variant) {
+                $removedItem->delete();
+                continue;
+            }
+
+            $quantity = (int) $removedItem->quantity;
+            if ($quantity > 0 && (int) $variant->stock < $quantity) {
+                throw ValidationException::withMessages([
+                    'items' => 'امکان کاهش یا حذف این آیتم وجود ندارد، چون موجودی فعلی برای برگشت مقدار خرید کافی نیست.',
+                ]);
+            }
+
+            $product = $products->get((int) $variant->product_id) ?: Product::whereKey((int) $variant->product_id)->lockForUpdate()->first();
+            if ($product && $quantity > 0) {
+                $before = (int) $variant->stock;
+                $after = $before - $quantity;
+                $variant->update(['stock' => $after]);
+
+                $this->recordPurchaseAdjustmentMovement(
+                    $purchase,
+                    $product,
+                    $variant,
+                    $warehouseId,
+                    -$quantity,
+                    $before,
+                    $after,
+                    StockMovement::REASON_PURCHASE_ITEM_REMOVED
+                );
+
+                WarehouseStockService::change($warehouseId, $product->id, -$quantity, (int) $variant->id);
+                $affectedProductIds[] = $product->id;
+            }
+
+            $removedItem->delete();
+        }
+
         foreach (array_unique($affectedProductIds) as $productId) {
             $product = $products->get((int) $productId) ?: Product::find($productId);
             if ($product) $this->recalcProductSummary($product);
         }
 
         return $this->purchaseSummaryFromItems($purchase, $data);
+    }
+
+
+    private function recordPurchaseAdjustmentMovement(
+        Purchase $purchase,
+        Product $product,
+        ProductVariant $variant,
+        int $warehouseId,
+        int $delta,
+        int $before,
+        int $after,
+        string $reason
+    ): void {
+        if ($delta === 0) {
+            return;
+        }
+
+        StockMovement::create([
+            'product_id' => $product->id,
+            'warehouse_id' => $warehouseId,
+            'user_id' => auth()->id(),
+            'type' => $delta > 0 ? StockMovement::TYPE_IN : StockMovement::TYPE_OUT,
+            'reason' => $reason,
+            'transaction_type' => StockMovement::TRANSACTION_PURCHASE_ADJUSTMENT,
+            'quantity' => abs($delta),
+            'stock_before' => $before,
+            'stock_after' => $after,
+            'reference' => 'PUR-ADJ-' . $purchase->id,
+            'reference_type' => Purchase::class,
+            'reference_id' => $purchase->id,
+            'note' => 'اصلاح تعداد خرید کالا - مدل: ' . $variant->variant_name,
+        ]);
     }
 
     private function purchaseSummaryFromItems(Purchase $purchase, array $data): array

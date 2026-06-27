@@ -6,6 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class StockMovement extends Model
 {
+    public const TYPE_IN = 'in';
+    public const TYPE_OUT = 'out';
+
+    public const REASON_PURCHASE = 'purchase';
+    public const REASON_SALE = 'sale';
+    public const REASON_RETURN = 'return';
+    public const REASON_TRANSFER = 'transfer';
+    public const REASON_ADJUSTMENT = 'adjustment';
+    public const REASON_PURCHASE_ITEM_ADDED = 'purchase_item_added';
+    public const REASON_PURCHASE_ITEM_CHANGED = 'purchase_item_quantity_changed';
+    public const REASON_PURCHASE_ITEM_REMOVED = 'purchase_item_removed';
+
+    public const TRANSACTION_PURCHASE_ADJUSTMENT = 'purchase_adjustment';
+
     protected $fillable = [
         'product_id',
         'warehouse_id',
