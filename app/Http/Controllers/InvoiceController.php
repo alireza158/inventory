@@ -209,7 +209,9 @@ class InvoiceController extends Controller
             ->where('uuid', $uuid)
             ->firstOrFail();
 
-        abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
+        if (! $this->accessService->canSellerEditInvoiceItems($invoice, auth()->user())) {
+            return redirect()->back()->with('error', 'این فاکتور قابل ویرایش توسط اپراتور نیست و ویرایش آن باید توسط واحد مالی انجام شود.');
+        }
 
         return view('invoices.edit', compact('invoice'));
     }
@@ -217,7 +219,9 @@ class InvoiceController extends Controller
     public function update(string $uuid, Request $request)
     {
         $invoice = Invoice::query()->with(['items', 'preinvoiceOrder:id,created_by'])->where('uuid', $uuid)->firstOrFail();
-        abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
+        if (! $this->accessService->canSellerEditInvoiceItems($invoice, auth()->user())) {
+            return redirect()->back()->with('error', 'این فاکتور قابل ویرایش توسط اپراتور نیست و ویرایش آن باید توسط واحد مالی انجام شود.');
+        }
 
         $data = $request->validate([
             'customer_name' => 'required|string|max:255',
@@ -232,7 +236,9 @@ class InvoiceController extends Controller
 
         DB::transaction(function () use ($invoice, $data) {
             $invoice = Invoice::query()->with(['items', 'preinvoiceOrder'])->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
-            abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
+            if (! $this->accessService->canSellerEditInvoiceItems($invoice, auth()->user())) {
+                abort(403, 'این فاکتور قابل ویرایش توسط اپراتور نیست و ویرایش آن باید توسط واحد مالی انجام شود.');
+            }
             $beforeAudit = [
                 'invoice' => $invoice->only(['customer_name', 'customer_mobile', 'customer_address', 'subtotal', 'discount_amount', 'total', 'status']),
                 'items' => $invoice->items->map->only(['id', 'product_id', 'variant_id', 'quantity', 'price', 'line_total'])->values()->all(),
