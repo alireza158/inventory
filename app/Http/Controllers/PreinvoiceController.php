@@ -474,8 +474,7 @@ class PreinvoiceController extends Controller
                 'total_price' => 0,
             ]);
 
-            $order->items()->delete();
-            $this->syncItems($order, $validated['products']);
+            $this->syncItems($order, $validated['products'], true);
 
             if ($stockLocked) {
                 $this->syncPreinvoiceReservations($order->fresh('items'));
@@ -564,6 +563,7 @@ class PreinvoiceController extends Controller
             'products.*.quantity' => 'required|integer|min:1',
             'products.*.price' => 'nullable|integer|min:0',
             'products.*.item_id' => 'nullable|integer',
+            'products.*.line_discount_amount' => 'nullable|integer|min:0',
         ], [
             'customer_name.required' => 'نام مشتری الزامی است.',
             'customer_mobile.required' => 'شماره موبایل مشتری الزامی است.',
@@ -750,7 +750,7 @@ class PreinvoiceController extends Controller
     {
         $order->items()->delete();
 
-        foreach ($items as $row) {
+        foreach (array_values($items) as $index => $row) {
             $variant = ProductVariant::query()
                 ->whereKey((int) $row['variant_id'])
                 ->where('product_id', (int) $row['product_id'])
@@ -760,6 +760,7 @@ class PreinvoiceController extends Controller
                 'variant_id' => (int) $row['variant_id'],
                 'quantity' => (int) $row['quantity'],
                 'price' => (int) ($variant->sell_price ?? 0),
+                'sort_order' => $index + 1,
             ]);
         }
     }
@@ -890,7 +891,9 @@ class PreinvoiceController extends Controller
                 'variant_id' => (int) $item->variant_id,
                 'quantity' => (int) $item->quantity,
                 'price' => (int) $item->price,
-                'line_total' => (int) $item->quantity * (int) $item->price,
+                'line_total' => max(((int) $item->quantity * (int) $item->price) - (int) ($item->line_discount_amount ?? 0), 0),
+                'sort_order' => (int) ($item->sort_order ?: 0),
+                'line_discount_amount' => (int) ($item->line_discount_amount ?? 0),
             ]);
         }
 
@@ -1042,19 +1045,35 @@ class PreinvoiceController extends Controller
         return str_contains($name, 'حضوری') || str_contains($name, 'مراجعه');
     }
 
-    private function syncItems(PreinvoiceOrder $order, array $products): void
+    private function syncItems(PreinvoiceOrder $order, array $products, bool $preserveExistingOrder = false): void
     {
-        foreach ($products as $p) {
+        $existingById = $preserveExistingOrder ? $order->items()->get()->keyBy('id') : collect();
+        $keepIds = [];
+        $nextOrder = (int) $order->items()->max('sort_order');
+        foreach (array_values($products) as $index => $p) {
             $variant = ProductVariant::query()
                 ->whereKey((int) $p['variety_id'])
                 ->where('product_id', (int) $p['id'])
                 ->firstOrFail(['sell_price']);
-            $order->items()->create([
+            $attrs = [
                 'product_id' => (int) $p['id'],
                 'variant_id' => (int) $p['variety_id'],
                 'quantity' => (int) $p['quantity'],
                 'price' => (int) ($p['price'] ?? $variant->sell_price ?? 0),
-            ]);
+                'line_discount_amount' => (int) ($p['line_discount_amount'] ?? 0),
+            ];
+            $itemId = (int) ($p['item_id'] ?? 0);
+            if ($preserveExistingOrder && $itemId > 0 && $existingById->has($itemId)) {
+                $item = $existingById->get($itemId);
+                $item->update($attrs);
+                $keepIds[] = $item->id;
+            } else {
+                $attrs['sort_order'] = $preserveExistingOrder ? ++$nextOrder : ($index + 1);
+                $keepIds[] = $order->items()->create($attrs)->id;
+            }
+        }
+        if ($preserveExistingOrder) {
+            $order->items()->whereNotIn('id', $keepIds)->delete();
         }
     }
 
@@ -1478,7 +1497,13 @@ class PreinvoiceController extends Controller
     {
         abort_unless($this->canHandleFinanceActions(), 403);
 
-        $order = PreinvoiceOrder::with('items')->where('uuid', $uuid)->firstOrFail();
+        $order = PreinvoiceOrder::with(['items', 'invoice'])->where('uuid', $uuid)->firstOrFail();
+        if ($order->invoice || $order->status === PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE) {
+            if ($order->invoice) {
+                return redirect()->route('invoices.show', $order->invoice->uuid)->with('success', 'این پیش‌فاکتور قبلاً به فاکتور تبدیل شده است.');
+            }
+            abort(409, 'این پیش‌فاکتور قبلاً تبدیل شده است.');
+        }
         abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
 
         $validated = $request->validate([
@@ -1601,7 +1626,9 @@ class PreinvoiceController extends Controller
                     'variant_id' => (int) $it->variant_id,
                     'quantity' => (int) $it->quantity,
                     'price' => (int) $it->price,
-                    'line_total' => (int) $it->price * (int) $it->quantity,
+                    'line_total' => max(((int) $it->price * (int) $it->quantity) - (int) ($it->line_discount_amount ?? 0), 0),
+                    'sort_order' => (int) ($it->sort_order ?: 0),
+                    'line_discount_amount' => (int) ($it->line_discount_amount ?? 0),
                 ]);
 
                 if ($shouldDeductOnFinalize) {

@@ -227,11 +227,16 @@ class InvoiceController extends Controller
             'items.*.id' => 'required|exists:invoice_items,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|integer|min:0',
+            'edit_reason' => 'required|string|max:2000',
         ]);
 
         DB::transaction(function () use ($invoice, $data) {
             $invoice = Invoice::query()->with(['items', 'preinvoiceOrder'])->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
             abort_unless($this->accessService->canSellerEditInvoiceItems($invoice, auth()->user()), 403);
+            $beforeAudit = [
+                'invoice' => $invoice->only(['customer_name', 'customer_mobile', 'customer_address', 'subtotal', 'discount_amount', 'total', 'status']),
+                'items' => $invoice->items->map->only(['id', 'product_id', 'variant_id', 'quantity', 'price', 'line_total'])->values()->all(),
+            ];
 
             $invoice->update([
                 'customer_name' => $data['customer_name'],
@@ -240,7 +245,20 @@ class InvoiceController extends Controller
             ]);
 
             $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id());
-            $this->warehousePendingRefreshService->refreshActiveWarehousePendingForDocument($invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder.items']), 'invoice', auth()->id());
+            $fresh = $invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder.items']);
+            DB::table('invoice_edit_audits')->insert([
+                'invoice_id' => $invoice->id,
+                'user_id' => auth()->id(),
+                'reason' => $data['edit_reason'],
+                'changes_before' => json_encode($beforeAudit, JSON_UNESCAPED_UNICODE),
+                'changes_after' => json_encode([
+                    'invoice' => $fresh->only(['customer_name', 'customer_mobile', 'customer_address', 'subtotal', 'discount_amount', 'total', 'status']),
+                    'items' => $fresh->items->map->only(['id', 'product_id', 'variant_id', 'quantity', 'price', 'line_total'])->values()->all(),
+                ], JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->warehousePendingRefreshService->refreshActiveWarehousePendingForDocument($fresh, 'invoice', auth()->id());
         });
 
         return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');

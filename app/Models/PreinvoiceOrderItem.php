@@ -12,6 +12,8 @@ class PreinvoiceOrderItem extends Model
         'variant_id',
         'quantity',
         'price',
+        'sort_order',
+        'line_discount_amount',
     ];
 
     protected $casts = [
@@ -19,6 +21,8 @@ class PreinvoiceOrderItem extends Model
         'variant_id' => 'integer',
         'quantity' => 'integer',
         'price' => 'integer',
+        'sort_order' => 'integer',
+        'line_discount_amount' => 'integer',
     ];
 
     public function order()
