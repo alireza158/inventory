@@ -212,4 +212,57 @@ class Product extends Model
             }
         });
     }
+
+    public static function normalizeSearchTerm(string $term): string
+    {
+        return trim(strtr($term, [
+            'ي' => 'ی',
+            'ى' => 'ی',
+            'ك' => 'ک',
+            'ة' => 'ه',
+            'ۀ' => 'ه',
+            "\u{200C}" => ' ',
+            "\u{200D}" => ' ',
+            "\u{0640}" => '',
+        ]));
+    }
+
+    private static function searchableColumns(): array
+    {
+        return collect(['name', 'code', 'sku', 'barcode', 'short_barcode', 'description'])
+            ->filter(fn (string $column) => Schema::hasColumn('products', $column))
+            ->values()
+            ->all();
+    }
+
+    private static function whereNormalizedLike(Builder $query, string $column, string $search): void
+    {
+        $expression = static::normalizedSqlExpression($column);
+        $compactExpression = "REPLACE({$expression}, ' ', '')";
+        $compactSearch = str_replace(' ', '', $search);
+
+        $query->whereRaw("{$expression} LIKE ?", ['%' . mb_strtolower($search) . '%']);
+
+        $query->orWhereRaw("{$compactExpression} LIKE ?", ['%' . mb_strtolower($compactSearch) . '%']);
+    }
+
+    private static function normalizedSqlExpression(string $column): string
+    {
+        $expression = "LOWER(COALESCE({$column}, ''))";
+
+        foreach ([
+            'ي' => 'ی',
+            'ى' => 'ی',
+            'ك' => 'ک',
+            'ة' => 'ه',
+            'ۀ' => 'ه',
+            "\u{200C}" => ' ',
+            "\u{200D}" => ' ',
+            "\u{0640}" => '',
+        ] as $from => $to) {
+            $expression = "REPLACE({$expression}, '{$from}', '{$to}')";
+        }
+
+        return $expression;
+    }
 }
