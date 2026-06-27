@@ -475,8 +475,8 @@ class PurchaseController extends Controller
             'items.*.discount_type' => ['nullable', 'in:amount,percent'],
             'items.*.discount_value' => ['nullable', 'integer', 'min:0'],
         ], [
-            'items.required' => 'حداقل یک قلم با تعداد معتبر باید برای خرید وارد شود.',
-            'items.min' => 'حداقل یک قلم با تعداد معتبر باید برای خرید وارد شود.',
+            'items.required' => 'حداقل یک تنوع را برای خرید انتخاب کنید.',
+            'items.min' => 'حداقل یک تنوع را برای خرید انتخاب کنید.',
         ]);
 
         $data['supplier_id'] = $this->resolvePurchaseSupplierId((string) $data['supplier_id']);
@@ -494,15 +494,28 @@ class PurchaseController extends Controller
             $buySource = $this->filledPrice($buyRaw) ? $buyRaw : $productBuyRaw;
             $sellSource = $this->filledPrice($sellRaw) ? $sellRaw : $productSellRaw;
 
-            if (! $this->validPrice($buySource) || ! $this->validPrice($sellSource)) {
-                throw ValidationException::withMessages([
-                    "items.{$index}.buy_price" => 'برای همه اقلام خرید باید قیمت خرید و قیمت فروش مشخص شود.',
-                ]);
+            $item['quantity'] = $allowZeroExistingItems ? max(0, $qty) : max(1, $qty);
+            $isDeletionRow = $allowZeroExistingItems && $item['quantity'] === 0 && !empty($item['id']);
+
+            if (! $isDeletionRow) {
+                $variantLabel = $this->purchaseItemVariantLabel($item);
+                $messages = [];
+
+                if (! $this->validPrice($buySource)) {
+                    $messages["items.{$index}.buy_price"] = "برای تنوع {$variantLabel} قیمت خرید را وارد کنید.";
+                }
+
+                if (! $this->validPrice($sellSource)) {
+                    $messages["items.{$index}.sell_price"] = "برای تنوع {$variantLabel} قیمت فروش را وارد کنید.";
+                }
+
+                if ($messages !== []) {
+                    throw ValidationException::withMessages($messages);
+                }
             }
 
-            $item['quantity'] = $allowZeroExistingItems ? max(0, $qty) : max(1, $qty);
-            $item['buy_price'] = max(0, $this->parsePrice($buySource));
-            $item['sell_price'] = max(0, $this->parsePrice($sellSource));
+            $item['buy_price'] = $isDeletionRow ? 0 : max(0, $this->parsePrice($buySource));
+            $item['sell_price'] = $isDeletionRow ? 0 : max(0, $this->parsePrice($sellSource));
             $item['product_buy_price'] = $this->filledPrice($productBuyRaw) ? max(0, $this->parsePrice($productBuyRaw)) : null;
             $item['product_sell_price'] = $this->filledPrice($productSellRaw) ? max(0, $this->parsePrice($productSellRaw)) : null;
             $item['discount_value'] = $this->filledNumber($item['discount_value'] ?? null)
@@ -542,6 +555,34 @@ class PurchaseController extends Controller
         return $data;
     }
 
+
+
+    private function purchaseItemVariantLabel(array $item): string
+    {
+        $label = trim((string) ($item['variant_name'] ?? ''));
+
+        if ($label !== '') {
+            return $label;
+        }
+
+        $variantId = (int) ($item['variant_id'] ?? $item['product_variant_id'] ?? 0);
+        if ($variantId > 0) {
+            $variant = ProductVariant::query()->find($variantId, ['variant_name', 'variety_name', 'variant_code']);
+            if ($variant) {
+                $parts = array_filter([
+                    trim((string) $variant->variant_name),
+                    trim((string) $variant->variety_name),
+                    trim((string) $variant->variant_code),
+                ]);
+
+                if ($parts !== []) {
+                    return implode(' / ', array_unique($parts));
+                }
+            }
+        }
+
+        return 'انتخاب‌شده';
+    }
 
     private function filledPrice(mixed $value): bool
     {
