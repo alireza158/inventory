@@ -62,6 +62,22 @@ class SalesHavalehService
                 }
 
                 $oldQty = (int) $item->quantity;
+
+                if ($newQty <= 0) {
+                    $this->inventoryService->adjustCentralStock(
+                        (int) $item->product_id,
+                        $oldQty,
+                        $invoice->uuid,
+                        'برگشت موجودی بابت حذف آیتم حواله فروش'
+                    );
+                    $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, -$oldQty);
+                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, 'حذف آیتم از حواله فروش با تعداد صفر', $userId);
+                    $this->historyService->log($invoice, 'inventory_returned', 'product_id', (string) $item->product_id, (string) $oldQty, 'برگشت موجودی به انبار مرکزی', $userId);
+                    $item->delete();
+
+                    continue;
+                }
+
                 $delta = $newQty - $oldQty;
 
                 if ($delta > 0) {
