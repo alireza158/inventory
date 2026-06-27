@@ -33,30 +33,37 @@ class ProductController extends Controller
                 'warehouseStocks.warehouse',
             ]);
 
-        if ($request->filled('q')) {
-            $query->search($request->input('q'));
+        $search = $request->input('q', $request->input('search'));
+        $categoryId = $request->input('category_id', $request->input('category'));
+        $stockStatus = $request->input('stock_status');
+        $sellableStatus = $request->input('sellable_status', $request->input('sale_status'));
+        $minPrice = $request->input('min_price', $request->input('price_min'));
+        $maxPrice = $request->input('max_price', $request->input('price_max'));
+
+        if (filled($search)) {
+            $query->search($search);
         }
 
-        if ($request->filled('category_id')) {
-            $categoryIds = Category::selfAndDescendantIds((int) $request->input('category_id'));
+        if (filled($categoryId)) {
+            $categoryIds = Category::selfAndDescendantIds((int) $categoryId);
             $query->whereIn('category_id', $categoryIds);
         }
 
-        if ($request->stock_status === 'out') {
+        if ($stockStatus === 'out') {
             $query->where('stock', 0);
         }
 
-        if ($request->filled('min_price')) {
-            $query->where('price', '>=', (int) preg_replace('/[^\d]/', '', $request->min_price));
+        if (filled($minPrice)) {
+            $query->where('price', '>=', (int) preg_replace('/[^\d]/', '', $minPrice));
         }
 
-        if ($request->filled('max_price')) {
-            $query->where('price', '<=', (int) preg_replace('/[^\d]/', '', $request->max_price));
+        if (filled($maxPrice)) {
+            $query->where('price', '<=', (int) preg_replace('/[^\d]/', '', $maxPrice));
         }
 
-        if ($request->sellable_status === 'sellable') {
+        if ($sellableStatus === 'sellable') {
             $query->where('is_sellable', true);
-        } elseif ($request->sellable_status === 'unsellable') {
+        } elseif ($sellableStatus === 'unsellable') {
             $query->where('is_sellable', false);
         }
 
@@ -75,8 +82,8 @@ class ProductController extends Controller
         $sortColumn = $allowedSorts[$sort] ?? 'id';
 
         $products = $query
-            ->orderBy($sortColumn, $dir)
-            ->orderByDesc('id')
+            ->when(! filled($search), fn ($productQuery) => $productQuery->orderBy($sortColumn, $dir))
+            ->orderByDesc('products.id')
             ->paginate(20)
             ->withQueryString();
 
