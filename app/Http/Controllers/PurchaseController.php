@@ -469,8 +469,10 @@ class PurchaseController extends Controller
 
             'items.*.buy_price' => ['nullable'],
             'items.*.sell_price' => ['nullable'],
+            'items.*.sale_price' => ['nullable'],
             'items.*.product_buy_price' => ['nullable'],
             'items.*.product_sell_price' => ['nullable'],
+            'items.*.product_sale_price' => ['nullable'],
 
             'items.*.discount_type' => ['nullable', 'in:amount,percent'],
             'items.*.discount_value' => ['nullable', 'integer', 'min:0'],
@@ -487,12 +489,17 @@ class PurchaseController extends Controller
             $item['variant_id'] = $variantId;
 
             $buyRaw = $item['buy_price'] ?? null;
-            $sellRaw = $item['sell_price'] ?? null;
+            $sellRaw = $item['sell_price'] ?? ($item['sale_price'] ?? null);
             $productBuyRaw = $item['product_buy_price'] ?? null;
-            $productSellRaw = $item['product_sell_price'] ?? null;
+            $productSellRaw = $item['product_sell_price'] ?? ($item['product_sale_price'] ?? null);
 
-            $buySource = $this->filledPrice($buyRaw) ? $buyRaw : $productBuyRaw;
-            $sellSource = $this->filledPrice($sellRaw) ? $sellRaw : $productSellRaw;
+            $buyPrice = $this->normalizeMoneyValue($buyRaw);
+            $sellPrice = $this->normalizeMoneyValue($sellRaw);
+            $productBuyPrice = $this->normalizeMoneyValue($productBuyRaw);
+            $productSellPrice = $this->normalizeMoneyValue($productSellRaw);
+
+            $buyPrice = $buyPrice ?? $productBuyPrice;
+            $sellPrice = $sellPrice ?? $productSellPrice;
 
             $item['quantity'] = $allowZeroExistingItems ? max(0, $qty) : max(1, $qty);
             $isDeletionRow = $allowZeroExistingItems && $item['quantity'] === 0 && !empty($item['id']);
@@ -501,23 +508,25 @@ class PurchaseController extends Controller
                 $variantLabel = $this->purchaseItemVariantLabel($item);
                 $messages = [];
 
-                if (! $this->validPrice($buySource)) {
+                if ($buyPrice === null) {
                     $messages["items.{$index}.buy_price"] = "برای تنوع {$variantLabel} قیمت خرید را وارد کنید.";
                 }
 
-                if (! $this->validPrice($sellSource)) {
+                if ($sellPrice === null) {
                     $messages["items.{$index}.sell_price"] = "برای تنوع {$variantLabel} قیمت فروش را وارد کنید.";
                 }
 
                 if ($messages !== []) {
+                    $this->logInvalidPurchaseItemPrice($index, $item, $buyRaw, $sellRaw, $productBuyRaw, $productSellRaw);
+
                     throw ValidationException::withMessages($messages);
                 }
             }
 
-            $item['buy_price'] = $isDeletionRow ? 0 : max(0, $this->parsePrice($buySource));
-            $item['sell_price'] = $isDeletionRow ? 0 : max(0, $this->parsePrice($sellSource));
-            $item['product_buy_price'] = $this->filledPrice($productBuyRaw) ? max(0, $this->parsePrice($productBuyRaw)) : null;
-            $item['product_sell_price'] = $this->filledPrice($productSellRaw) ? max(0, $this->parsePrice($productSellRaw)) : null;
+            $item['buy_price'] = $isDeletionRow ? 0 : max(0, (int) $buyPrice);
+            $item['sell_price'] = $isDeletionRow ? 0 : max(0, (int) $sellPrice);
+            $item['product_buy_price'] = $productBuyPrice === null ? null : max(0, (int) $productBuyPrice);
+            $item['product_sell_price'] = $productSellPrice === null ? null : max(0, (int) $productSellPrice);
             $item['discount_value'] = $this->filledNumber($item['discount_value'] ?? null)
                 ? max(0, $this->normalizeNumber($item['discount_value']))
                 : 0;
@@ -584,9 +593,25 @@ class PurchaseController extends Controller
         return 'انتخاب‌شده';
     }
 
-    private function filledPrice(mixed $value): bool
+
+    private function logInvalidPurchaseItemPrice(int $index, array $item, mixed $buyRaw, mixed $sellRaw, mixed $productBuyRaw, mixed $productSellRaw): void
     {
-        return $this->filledNumber($value);
+        if (! config('app.debug')) {
+            return;
+        }
+
+        \Log::debug('Purchase item price before validation', [
+            'index' => $index,
+            'variant_id' => $item['variant_id'] ?? $item['product_variant_id'] ?? null,
+            'quantity' => $item['quantity'] ?? $item['qty'] ?? null,
+            'buy_price_raw' => $buyRaw,
+            'sell_price_raw' => $sellRaw,
+            'sale_price_raw' => $item['sale_price'] ?? null,
+            'product_buy_price_raw' => $productBuyRaw,
+            'product_sell_price_raw' => $productSellRaw,
+            'product_sale_price_raw' => $item['product_sale_price'] ?? null,
+            'row_keys' => array_keys($item),
+        ]);
     }
 
     private function filledNumber(mixed $value): bool
@@ -594,14 +619,26 @@ class PurchaseController extends Controller
         return trim((string) ($value ?? '')) !== '';
     }
 
-    private function validPrice(mixed $value): bool
+    private function normalizeMoneyValue(mixed $value): ?int
     {
-        return $this->filledPrice($value) && preg_match('/\d/', $this->normalizePriceDigits($value)) === 1;
-    }
+        if ($value === null) {
+            return null;
+        }
 
-    private function parsePrice(mixed $value): int
-    {
-        return $this->normalizeNumber($value);
+        $normalized = trim($this->normalizePriceDigits($value));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        $normalized = str_replace([',', '،', '٬', ' ', "\xc2\xa0", "\u{200c}"], '', $normalized);
+        $normalized = preg_replace('/(?<=\d)\.(?=\d{3}(\D|$))/', '', $normalized);
+
+        if (! is_numeric($normalized)) {
+            return null;
+        }
+
+        return (int) $normalized;
     }
 
     private function normalizeNumber(mixed $value): int

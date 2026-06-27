@@ -128,6 +128,52 @@ class PurchaseFlowTest extends TestCase
         $this->assertSame(2, (int) WarehouseStock::query()->where('product_variant_id', $variants[0]->id)->whereNotNull('product_variant_id')->value('quantity'));
     }
 
+    public function test_purchase_accepts_sale_price_alias_for_selected_variant_row(): void
+    {
+        [$user, $supplier, $product, $variants] = $this->purchaseFixture(3);
+
+        $response = $this->actingAs($user)->post(route('purchases.store'), [
+            'supplier_id' => $supplier->id,
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'variant_id' => $variants[0]->id,
+                    'quantity' => 1,
+                    'buy_price' => '۱۲۰٬۰۰۰',
+                    'sale_price' => '۱۲۰,۰۰۰',
+                ],
+                ['product_id' => $product->id, 'variant_id' => $variants[1]->id, 'quantity' => '', 'buy_price' => '', 'sale_price' => ''],
+                ['product_id' => $product->id, 'variant_id' => $variants[2]->id, 'quantity' => '', 'buy_price' => '', 'sell_price' => ''],
+            ],
+        ]);
+
+        $response->assertRedirect(route('purchases.index'));
+        $purchase = Purchase::query()->firstOrFail();
+
+        $this->assertSame(1, $purchase->items()->count());
+        $this->assertDatabaseHas('purchase_items', [
+            'purchase_id' => $purchase->id,
+            'product_variant_id' => $variants[0]->id,
+            'buy_price' => 120000,
+            'sell_price' => 120000,
+        ]);
+    }
+
+    public function test_purchase_accepts_dot_thousand_separator_for_sell_price(): void
+    {
+        [$user, $supplier, $product, $variants] = $this->purchaseFixture(1);
+
+        $response = $this->actingAs($user)->post(route('purchases.store'), [
+            'supplier_id' => $supplier->id,
+            'items' => [
+                ['product_id' => $product->id, 'variant_id' => $variants[0]->id, 'quantity' => 1, 'buy_price' => '100.000', 'sell_price' => '120.000'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('purchases.index'));
+        $this->assertDatabaseHas('purchase_items', ['product_variant_id' => $variants[0]->id, 'buy_price' => 100000, 'sell_price' => 120000]);
+    }
+
     public function test_purchase_reports_missing_price_only_for_selected_variant_row(): void
     {
         [$user, $supplier, $product, $variants] = $this->purchaseFixture(2);
@@ -164,7 +210,7 @@ class PurchaseFlowTest extends TestCase
             'supplier_id' => $supplier->id,
             'items' => [
                 ['id' => $existingItem->id, 'product_id' => $product->id, 'variant_id' => $variants[0]->id, 'quantity' => 2, 'buy_price' => 100000, 'sell_price' => 150000],
-                ['product_id' => $product->id, 'variant_id' => $variants[1]->id, 'quantity' => 4, 'buy_price' => 110000, 'sell_price' => 160000],
+                ['product_id' => $product->id, 'variant_id' => $variants[1]->id, 'quantity' => 4, 'buy_price' => 110000, 'sale_price' => '۱۶۰,۰۰۰'],
                 ['product_id' => $product->id, 'variant_id' => $variants[2]->id, 'quantity' => '', 'buy_price' => '', 'sell_price' => ''],
             ],
         ])->assertRedirect(route('purchases.index'));
