@@ -399,9 +399,7 @@ class CrmProductSyncService
             $staleQuery->whereNotIn('id', $keptIds);
         }
 
-        $staleUpdate = [
-            'stock' => 0,
-        ];
+        $staleUpdate = [];
 
         if ($this->hasColumn('product_variants', 'is_active')) {
             $staleUpdate['is_active'] = false;
@@ -412,7 +410,9 @@ class CrmProductSyncService
         }
 
         $staleCount = (clone $staleQuery)->count();
-        $staleQuery->update($staleUpdate);
+        if ($staleUpdate !== []) {
+            $staleQuery->update($staleUpdate);
+        }
 
         Log::info('[CRM_SYNC] Stale variants disabled', [
             'product_id' => $product->id,
@@ -504,10 +504,13 @@ class CrmProductSyncService
             $disableOthers['synced_at'] = Carbon::now();
         }
 
-        $disabledCount = ProductVariant::query()
-            ->where('product_id', $product->id)
-            ->where('id', '!=', $variant->id)
-            ->update($disableOthers);
+        $disabledCount = 0;
+        if ($disableOthers !== []) {
+            $disabledCount = ProductVariant::query()
+                ->where('product_id', $product->id)
+                ->where('id', '!=', $variant->id)
+                ->update($disableOthers);
+        }
 
         Log::info('[CRM_SYNC] Other variants disabled for base product', [
             'product_id' => $product->id,
@@ -523,7 +526,8 @@ class CrmProductSyncService
             ->sum('stock');
 
         $priceQuery = ProductVariant::query()
-            ->where('product_id', $product->id);
+            ->where('product_id', $product->id)
+            ->where('sell_price', '>', 0);
 
         if ($this->hasColumn('product_variants', 'is_active')) {
             $priceQuery->where('is_active', true);
@@ -538,10 +542,15 @@ class CrmProductSyncService
             'fallback_price' => $fallbackPrice,
         ]);
 
-        $product->update([
+        $summaryUpdate = [
             'stock' => max(0, $stock),
-            'price' => max(0, (int) ($minPrice ?? $fallbackPrice)),
-        ]);
+        ];
+
+        if ($minPrice !== null && (int) $minPrice > 0) {
+            $summaryUpdate['price'] = (int) $minPrice;
+        }
+
+        $product->update($summaryUpdate);
     }
 
     private function extractProductPrice(array $item, array $varieties): int
