@@ -485,6 +485,37 @@ class SalesHavalehService
 
             $this->historyService->log($invoice, 'cancelled', 'status', $oldStatus, SalesHavalehStatusService::NOT_SHIPPED, $note ?: 'کنسلی فاکتور و برگشت موجودی', $userId);
 
+            $order = $invoice->preinvoiceOrder()
+                ->lockForUpdate()
+                ->first();
+
+            if ($order && (string) $order->status !== PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE) {
+                $oldPreinvoiceStatus = (string) $order->status;
+
+                $order->update([
+                    'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+                    'warehouse_reject_reason' => $note ?: 'کنسلی فاکتور و برگشت موجودی',
+                    'stock_frozen_until' => null,
+                    'stock_released_at' => $order->stock_released_at ?: now(),
+                ]);
+
+                $order->reviews()->create([
+                    'user_id' => $userId,
+                    'action' => 'invoice_cancelled',
+                    'reason' => $note ?: 'کنسلی فاکتور و برگشت موجودی',
+                    'before_items' => $order->items()->get()->toArray(),
+                    'after_items' => $order->items()->get()->toArray(),
+                ]);
+
+                ActivityLogger::log('invoice_cancelled_preinvoice_cancelled', $order->fresh(), 'پیش‌فاکتور به دلیل کنسلی فاکتور مرتبط لغو شد.', [
+                    'invoice_id' => $invoice->id,
+                    'invoice_uuid' => $invoice->uuid,
+                    'old_status' => $oldPreinvoiceStatus,
+                    'new_status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+                    'reason' => $note,
+                ]);
+            }
+
             return $invoice->fresh();
         });
     }
