@@ -131,11 +131,12 @@ class StockCountDocumentService
                 }
 
                 $before = $this->getSystemQuantity((int) $document->warehouse_id, (int) $item->product_id, true);
-                WarehouseStockService::change((int) $document->warehouse_id, (int) $item->product_id, $difference);
+                WarehouseStockService::change((int) $document->warehouse_id, (int) $item->product_id, $difference, (int) $item->product_variant_id);
                 $after = $before + $difference;
 
                 StockMovement::create([
                     'product_id' => (int) $item->product_id,
+                    'product_variant_id' => (int) $item->product_variant_id,
                     'warehouse_id' => (int) $document->warehouse_id,
                     'user_id' => $userId,
                     'type' => $difference > 0 ? 'in' : 'out',
