@@ -85,16 +85,18 @@ class SalesHavalehStatusService
         }
 
         $allowedNext = [
-            self::PENDING_WAREHOUSE_APPROVAL => [self::COLLECTING],
-            self::COLLECTING => [self::CHECKING_DISCREPANCY],
-            self::CHECKING_DISCREPANCY => [self::FINAL_CHECK],
-            self::FINAL_CHECK => [self::PACKING],
-            self::PACKING => [self::SHIPPED, self::NOT_SHIPPED],
+            self::PENDING_WAREHOUSE_APPROVAL => [self::COLLECTING, self::CHECKING_DISCREPANCY, self::NOT_SHIPPED],
+            self::COLLECTING => [self::FINAL_CHECK, self::CHECKING_DISCREPANCY, self::NOT_SHIPPED],
+            self::CHECKING_DISCREPANCY => [self::COLLECTING, self::FINAL_CHECK, self::NOT_SHIPPED],
+            self::FINAL_CHECK => [self::PACKING, self::CHECKING_DISCREPANCY, self::NOT_SHIPPED],
+            self::PACKING => [self::SHIPPED, self::CHECKING_DISCREPANCY, self::NOT_SHIPPED],
             self::SHIPPED => [],
             self::NOT_SHIPPED => [],
         ];
 
-       
+        if (! in_array($newStatus, $allowedNext[$current] ?? [], true)) {
+            abort(422, 'تغییر وضعیت انتخاب‌شده با روند حواله فروش مجاز نیست.');
+        }
     }
 
     private function isAdmin(?User $user): bool
@@ -104,7 +106,7 @@ class SalesHavalehStatusService
         }
 
         $hasRole = method_exists($user, 'hasAnyRole')
-            ? $user->hasAnyRole(['admin', 'super-admin'])
+            ? $user->hasAnyRole(['admin', 'Admin', 'super-admin', 'warehouse', 'Warehouse', 'manager', 'Manager'])
             : false;
 
         $hasPermission = method_exists($user, 'can')

@@ -26,14 +26,18 @@ class SalesHavalehService
     {
         return DB::transaction(function () use ($invoice, $itemPayloads, $userId) {
             $user = auth()->user();
-            if (! $this->accessService->canSellerEditInvoiceItems($invoice, $user)) {
-                abort(403, 'فقط فروشنده ثبت‌کننده سند یا مدیر مجاز به ویرایش اقلام است.');
+            if (! $this->canEditSalesHavalehItems($invoice, $user)) {
+                abort(403, 'فقط فروشنده ثبت‌کننده سند، مدیر یا انبار مجاز به ویرایش اقلام است.');
+            }
+
+            if (! $changeReason) {
+                abort(422, 'ثبت دلیل تغییر اقلام الزامی است.');
             }
 
             $invoice->loadMissing('items');
             $itemsById = $invoice->items->keyBy('id');
 
-            $requestedIds = collect($itemPayloads)->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $requestedIds = collect($itemPayloads)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
 
             foreach ($invoice->items as $item) {
                 if (!in_array((int) $item->id, $requestedIds, true)) {
@@ -52,7 +56,12 @@ class SalesHavalehService
             }
 
             foreach ($itemPayloads as $row) {
-                $itemId = (int) $row['id'];
+                $itemId = (int) ($row['id'] ?? 0);
+                if ($itemId <= 0) {
+                    $this->addInvoiceItem($invoice, $row, $changeReason, $changeNote, $userId);
+                    continue;
+                }
+
                 $newQty = (int) $row['quantity'];
                 $newPrice = (int) $row['price'];
 
@@ -141,6 +150,117 @@ class SalesHavalehService
 
             return $invoice->fresh(['items.product', 'items.variant']);
         });
+    }
+
+
+
+    private function addInvoiceItem(Invoice $invoice, array $row, ?string $reason, ?string $note, ?int $userId): void
+    {
+        $variantId = (int) ($row['variant_id'] ?? 0);
+        $quantity = (int) ($row['quantity'] ?? 0);
+        $price = (int) ($row['price'] ?? 0);
+
+        if ($quantity <= 0) {
+            return;
+        }
+        if ($variantId <= 0) {
+            abort(422, 'برای اضافه کردن کالا، انتخاب تنوع کالا الزامی است.');
+        }
+
+        $variant = ProductVariant::query()->with('product')->whereKey($variantId)->lockForUpdate()->firstOrFail();
+        if (! $variant->is_active) {
+            abort(422, 'تنوع کالای انتخاب‌شده فعال نیست.');
+        }
+        if ($variant->product && $variant->product->is_sellable === false) {
+            abort(422, 'کالای انتخاب‌شده قابل فروش نیست.');
+        }
+
+        $this->centralInventoryService->assertVariantAvailable($variantId, $quantity);
+
+        $item = InvoiceItem::query()->create([
+            'invoice_id' => $invoice->id,
+            'product_id' => (int) $variant->product_id,
+            'product_name_snapshot' => $variant->product?->name,
+            'variant_id' => $variantId,
+            'variant_name_snapshot' => $variant->variant_name,
+            'variant_code_snapshot' => $variant->variant_code,
+            'quantity' => $quantity,
+            'price' => $price,
+            'line_total' => $quantity * $price,
+        ]);
+
+        $this->adjustSaleItemStock($invoice, $item, -$quantity, StockMovement::REASON_SALE_ITEM_QUANTITY_INCREASED, 'کسر موجودی بابت افزودن آیتم جدید به حواله فروش', $reason, $note);
+        $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $quantity);
+        $this->historyService->log($invoice, 'item_added', 'items', null, (string) $item->id, 'افزودن آیتم جدید به حواله فروش', $userId);
+        $this->logItemStockAudit($invoice, $item, 0, $quantity, $reason, $note, $userId);
+    }
+
+    private function canEditSalesHavalehItems(Invoice $invoice, $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+        if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'Admin', 'warehouse', 'Warehouse', 'manager', 'Manager'])) {
+            return true;
+        }
+
+        return $this->accessService->canSellerEditInvoiceItems($invoice, $user);
+    }
+
+    private function logItemStockAudit(Invoice $invoice, InvoiceItem $item, int $oldQty, int $newQty, ?string $reason, ?string $note, ?int $userId): void
+    {
+        $delta = $newQty - $oldQty;
+        $this->historyService->log(
+            $invoice,
+            $newQty <= 0 ? 'item_removed_stock_adjusted' : ($delta > 0 ? 'item_quantity_increased_stock_adjusted' : 'item_quantity_decreased_stock_adjusted'),
+            'quantity',
+            (string) $oldQty,
+            (string) $newQty,
+            ($reason === 'physical_shortage')
+                ? 'موجودی به انبار مرکزی برگشت داده شد. برای اصلاح موجودی واقعی، لطفاً انبارگردانی/کسری کالا ثبت کنید.'
+                : 'ثبت audit تغییر تعداد/حذف آیتم فروش و اصلاح موجودی متناظر.',
+            $userId,
+            [
+                'invoice_item_id' => $item->id,
+                'product_id' => $item->product_id,
+                'variant_id' => $item->variant_id,
+                'old_quantity' => $oldQty,
+                'new_quantity' => $newQty,
+                'delta' => $delta,
+                'returned_to_stock_quantity' => $delta < 0 ? abs($delta) : ($newQty <= 0 ? $oldQty : 0),
+                'consumed_from_stock_quantity' => $delta > 0 ? $delta : 0,
+                'reason' => $reason ?: 'other',
+                'note' => $note,
+            ]
+        );
+    }
+
+    private function adjustSaleItemStock(Invoice $invoice, InvoiceItem $item, int $quantityDelta, string $movementReason, string $message, ?string $reason, ?string $note): void
+    {
+        if ($quantityDelta === 0) {
+            return;
+        }
+
+        if ((int) $item->variant_id <= 0) {
+            abort(422, 'برگشت یا کسر موجودی آیتم فروش بدون تنوع کالا مجاز نیست.');
+        }
+
+        $businessReason = $reason ?: 'other';
+        $noteText = trim($message . ($businessReason ? ' | دلیل: ' . $businessReason : '') . ($note ? ' | توضیح: ' . $note : ''));
+
+        $this->inventoryService->adjustCentralStock(
+            (int) $item->product_id,
+            (int) $item->variant_id,
+            $quantityDelta,
+            $invoice->uuid,
+            $noteText,
+            [
+                'reason' => $movementReason,
+                'transaction_type' => StockMovement::TRANSACTION_SALES_HAVALEH_ADJUSTMENT,
+                'reference_type' => Invoice::class,
+                'reference_id' => $invoice->id,
+            ]
+        );
     }
 
 
@@ -242,6 +362,11 @@ class SalesHavalehService
     {
         return DB::transaction(function () use ($invoice, $newStatus, $note, $userId) {
             $user = auth()->user();
+            if ($newStatus === SalesHavalehStatusService::SHIPPED && trim((string) $note) === '') {
+                abort(422, 'برای ثبت وضعیت ارسال‌شده، وارد کردن یادداشت نهایی الزامی است.');
+            }
+
+            $invoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
             $this->statusService->assertValidTransition($invoice, $newStatus, $user);
 
             $oldStatus = (string) $invoice->status;
@@ -253,7 +378,7 @@ class SalesHavalehService
 
             $this->historyService->log(
                 $invoice,
-                'status_changed',
+                $newStatus === SalesHavalehStatusService::SHIPPED ? 'shipped' : 'status_changed',
                 'status',
                 $oldStatus,
                 $newStatus,

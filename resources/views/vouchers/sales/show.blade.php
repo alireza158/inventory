@@ -49,7 +49,7 @@
       </div>
       <div class="col-md-5">
         <label class="form-label">یادداشت</label>
-        <input name="note" class="form-control" placeholder="اختیاری">
+        <input name="note" class="form-control" placeholder="برای ارسال‌شده الزامی است">
       </div>
       <div class="col-md-2">
         <button class="btn btn-primary w-100">ثبت وضعیت</button>
@@ -92,6 +92,17 @@
           @endforeach
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white">یادداشت‌ها</div>
+    <div class="card-body">
+      @forelse($invoice->notes as $note)
+        <div class="border-bottom py-2">{{ $note->body ?? $note->note ?? $note->description ?? '—' }}</div>
+      @empty
+        <div class="text-muted">یادداشتی ثبت نشده است.</div>
+      @endforelse
     </div>
   </div>
 
