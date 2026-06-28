@@ -340,11 +340,18 @@ class CrmProductSyncService
                 'variety_name'  => $title,
                 'variety_code'  => str_pad((string) ((int) $design2), 4, '0', STR_PAD_LEFT),
                 'variant_code'  => $this->buildVariantCode11((string) $product->code, '000', $design2, $existing?->id),
-                'sell_price'    => $sellPrice,
-                'buy_price'     => $buyPrice,
-                'stock'         => $stock,
                 'reserved'      => $existing?->reserved ?? 0,
             ];
+
+            if (! $existing) {
+                $payload['stock'] = $stock;
+            }
+            if (! $existing || $sellPrice > 0) {
+                $payload['sell_price'] = $sellPrice;
+            }
+            if (! $existing || ((int) $buyPrice) > 0) {
+                $payload['buy_price'] = $buyPrice;
+            }
 
             if ($this->hasColumn('product_variants', 'is_active')) {
                 $payload['is_active'] = true;
@@ -456,11 +463,15 @@ class CrmProductSyncService
             'variety_name'  => '—',
             'variety_code'  => '0000',
             'variant_code'  => $this->buildVariantCode11((string) $product->code, '000', '00', $variant?->id),
-            'sell_price'    => max(0, $basePrice),
-            'buy_price'     => null,
-            'stock'         => max(0, $baseQty),
             'reserved'      => $variant?->reserved ?? 0,
         ];
+
+        if (! $variant) {
+            $payload['stock'] = max(0, $baseQty);
+        }
+        if (! $variant || $basePrice > 0) {
+            $payload['sell_price'] = max(0, $basePrice);
+        }
 
         if ($this->hasColumn('product_variants', 'is_active')) {
             $payload['is_active'] = true;
