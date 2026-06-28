@@ -111,8 +111,7 @@ class InventoryReconciliationService
         return $rows->filter(function (array $row) {
             return (int) $row['purchase_qty'] === 0
                 && ((int) $row['current_stock'] > 0 || (int) $row['warehouse_stock'] > 0)
-                && (int) $row['current_sell_price'] <= 0
-                && ! $row['has_purchase_sell_price_source'];
+                && (int) $row['current_sell_price'] <= 0;
         })->map(function (array $row) {
             $flags = ['cleanup_no_purchase_no_price'];
             if ((int) $row['invoice_qty'] > 0) {
