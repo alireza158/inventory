@@ -25,7 +25,7 @@ class StockCountDocumentService
             ]);
 
             foreach ($payload['items'] as $item) {
-                $systemQty = $this->getSystemQuantity((int) $document->warehouse_id, (int) $item['product_id']);
+                $systemQty = $this->getSystemQuantity((int) $document->warehouse_id, (int) $item['product_id'], (int) $item['variant_id']);
                 StockCountDocumentItem::create([
                     'document_id' => $document->id,
                     'product_id' => (int) $item['product_id'],
@@ -71,7 +71,7 @@ class StockCountDocumentService
 
             $newItems = [];
             foreach ($payload['items'] as $item) {
-                $systemQty = $this->getSystemQuantity((int) $document->warehouse_id, (int) $item['product_id']);
+                $systemQty = $this->getSystemQuantity((int) $document->warehouse_id, (int) $item['product_id'], (int) $item['variant_id']);
                 $row = StockCountDocumentItem::create([
                     'document_id' => $document->id,
                     'product_id' => (int) $item['product_id'],
@@ -120,7 +120,7 @@ class StockCountDocumentService
 
         return DB::transaction(function () use ($document, $userId) {
             $document = StockCountDocument::query()->lockForUpdate()->findOrFail($document->id);
-            $items = $document->items()->with('product')->lockForUpdate()->get();
+            $items = $document->items()->with(['product', 'variant'])->lockForUpdate()->get();
 
             foreach ($items as $item) {
                 $difference = (int) $item->actual_quantity - (int) $item->system_quantity;
@@ -130,12 +130,13 @@ class StockCountDocumentService
                     continue;
                 }
 
-                $before = $this->getSystemQuantity((int) $document->warehouse_id, (int) $item->product_id, true);
-                WarehouseStockService::change((int) $document->warehouse_id, (int) $item->product_id, $difference);
+                $before = $this->getSystemQuantity((int) $document->warehouse_id, (int) $item->product_id, (int) $item->product_variant_id, true);
+                WarehouseStockService::change((int) $document->warehouse_id, (int) $item->product_id, $difference, (int) $item->product_variant_id);
                 $after = $before + $difference;
 
                 StockMovement::create([
                     'product_id' => (int) $item->product_id,
+                    'product_variant_id' => (int) $item->product_variant_id,
                     'warehouse_id' => (int) $document->warehouse_id,
                     'user_id' => $userId,
                     'type' => $difference > 0 ? 'in' : 'out',
@@ -184,11 +185,12 @@ class StockCountDocumentService
         return $document->fresh(['warehouse', 'items.product', 'items.variant', 'creator', 'updater']);
     }
 
-    public function getSystemQuantity(int $warehouseId, int $productId, bool $lock = false): int
+    public function getSystemQuantity(int $warehouseId, int $productId, int $variantId, bool $lock = false): int
     {
         $query = WarehouseStock::query()
             ->where('warehouse_id', $warehouseId)
-            ->where('product_id', $productId);
+            ->where('product_id', $productId)
+            ->where('product_variant_id', $variantId);
 
         if ($lock) {
             $query->lockForUpdate();

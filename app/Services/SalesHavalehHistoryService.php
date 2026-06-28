@@ -14,10 +14,12 @@ class SalesHavalehHistoryService
         mixed $oldValue,
         mixed $newValue,
         ?string $description = null,
-        ?int $doneBy = null
+        ?int $doneBy = null,
+        array $extra = []
     ): SalesHavalehHistory {
-        return SalesHavalehHistory::query()->create([
+        return SalesHavalehHistory::query()->create(array_merge([
             'invoice_id' => $invoice->id,
+            'invoice_uuid' => $invoice->uuid,
             'action_type' => $actionType,
             'field_name' => $fieldName,
             'old_value' => $oldValue !== null ? (string) $oldValue : null,
@@ -25,6 +27,6 @@ class SalesHavalehHistoryService
             'description' => $description,
             'done_by' => $doneBy,
             'done_at' => now(),
-        ]);
+        ], $extra));
     }
 }
