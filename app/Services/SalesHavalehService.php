@@ -47,6 +47,12 @@ class SalesHavalehService
             $invoice->loadMissing('items');
             $itemsById = $invoice->items->keyBy('id');
 
+            if ($this->itemsActuallyChanged($invoice, $itemPayloads) && blank($changeReason)) {
+                throw ValidationException::withMessages([
+                    'change_reason' => 'برای حذف، اضافه یا ویرایش اقلام حواله فروش، انتخاب دلیل الزامی است.',
+                ]);
+            }
+
             $requestedIds = collect($itemPayloads)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
 
             foreach ($invoice->items as $item) {
@@ -163,6 +169,43 @@ class SalesHavalehService
     }
 
 
+
+
+    private function itemsActuallyChanged(Invoice $invoice, array $itemPayloads): bool
+    {
+        $itemsById = $invoice->items->keyBy('id');
+        $requestedIds = collect($itemPayloads)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
+
+        foreach ($invoice->items as $item) {
+            if (! in_array((int) $item->id, $requestedIds, true)) {
+                return true;
+            }
+        }
+
+        foreach ($itemPayloads as $row) {
+            $itemId = (int) ($row['id'] ?? 0);
+            $newQty = (int) ($row['quantity'] ?? 0);
+            $newPrice = (int) ($row['price'] ?? 0);
+
+            if ($itemId <= 0) {
+                if ($newQty > 0 && (int) ($row['variant_id'] ?? 0) > 0) {
+                    return true;
+                }
+                continue;
+            }
+
+            $item = $itemsById->get($itemId);
+            if (! $item) {
+                continue;
+            }
+
+            if ($newQty !== (int) $item->quantity || $newPrice !== (int) $item->price) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private function addInvoiceItem(Invoice $invoice, array $row, ?string $reason, ?string $note, ?int $userId): void
     {

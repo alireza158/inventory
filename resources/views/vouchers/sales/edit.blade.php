@@ -61,17 +61,17 @@
                 <td>{{ $it->variant?->variant_name ?? '—' }}</td>
                 <td>
                   <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $it->id }}">
-                  <input type="number" min="0" name="items[{{ $loop->index }}][quantity]" value="{{ (int)$it->quantity }}" class="form-control" @disabled(!$canEditItems)>
+                  <input type="number" min="0" name="items[{{ $loop->index }}][quantity]" value="{{ (int)$it->quantity }}" data-original="{{ (int)$it->quantity }}" class="form-control js-item-field" @disabled(!$canEditItems)>
                 </td>
-                <td><input type="number" min="0" name="items[{{ $loop->index }}][price]" value="{{ (int)$it->price }}" class="form-control" @disabled(!$canEditItems)></td>
+                <td><input type="number" min="0" name="items[{{ $loop->index }}][price]" value="{{ (int)$it->price }}" data-original="{{ (int)$it->price }}" class="form-control js-item-field" @disabled(!$canEditItems)></td>
                 <td><button type="button" class="btn btn-outline-danger btn-sm js-zero-item" @disabled(!$canEditItems)>حذف از فاکتور</button></td>
               </tr>
             @endforeach
             <tr class="table-info">
                 <td><input name="items[999][product_id]" class="form-control" placeholder="شناسه محصول جدید" @disabled(!$canEditItems)></td>
-                <td><input name="items[999][variant_id]" class="form-control" placeholder="شناسه تنوع فعال" @disabled(!$canEditItems)></td>
-                <td><input type="number" min="0" name="items[999][quantity]" value="0" class="form-control" @disabled(!$canEditItems)></td>
-                <td><input type="number" min="0" name="items[999][price]" value="0" class="form-control" @disabled(!$canEditItems)></td>
+                <td><input name="items[999][variant_id]" data-original="" class="form-control js-item-field" placeholder="شناسه تنوع فعال" @disabled(!$canEditItems)></td>
+                <td><input type="number" min="0" name="items[999][quantity]" value="0" data-original="0" class="form-control js-item-field" @disabled(!$canEditItems)></td>
+                <td><input type="number" min="0" name="items[999][price]" value="0" data-original="0" class="form-control js-item-field" @disabled(!$canEditItems)></td>
                 <td class="text-muted small">برای افزودن کالا، شناسه تنوع و تعداد را وارد کنید.</td>
               </tr>
           </tbody>
@@ -80,7 +80,7 @@
       <div class="row g-2">
         <div class="col-md-4">
           <label class="form-label">دلیل تغییر اقلام <span class="text-danger">*</span></label>
-          <select name="change_reason" class="form-select" required @disabled(!$canEditItems)>
+          <select name="change_reason" class="form-select" @disabled(!$canEditItems)>
             <option value="">انتخاب کنید</option>
             <option value="physical_shortage">کالا در نرم‌افزار موجود بود ولی فیزیکی پیدا نشد</option>
             <option value="customer_cancelled">انصراف مشتری</option>
@@ -103,6 +103,15 @@
   </form>
 </div>
 <script>
+const reasonSelect = document.querySelector('select[name="change_reason"]');
+const itemFields = document.querySelectorAll('.js-item-field');
+const syncChangeReasonRequired = () => {
+  const changed = Array.from(itemFields).some((field) => String(field.value || '') !== String(field.dataset.original || ''));
+  if (reasonSelect) {
+    reasonSelect.required = changed;
+  }
+};
+itemFields.forEach((field) => field.addEventListener('input', syncChangeReasonRequired));
 document.querySelectorAll('.js-zero-item').forEach((button) => {
   button.addEventListener('click', () => {
     const row = button.closest('tr');
@@ -110,9 +119,24 @@ document.querySelectorAll('.js-zero-item').forEach((button) => {
     if (quantity) {
       quantity.value = 0;
       row.classList.add('table-danger');
+      syncChangeReasonRequired();
     }
   });
 });
+syncChangeReasonRequired();
+</script>
+
+<script>
+(() => {
+  const statusSelect = document.querySelector('#sales-status-form select[name="status"]');
+  const note = document.querySelector('#status-note');
+  const syncRequired = () => {
+    if (!statusSelect || !note) return;
+    note.required = statusSelect.value === 'shipped';
+  };
+  statusSelect?.addEventListener('change', syncRequired);
+  syncRequired();
+})();
 </script>
 
 <script>
