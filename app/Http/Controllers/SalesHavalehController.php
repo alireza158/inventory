@@ -77,7 +77,7 @@ class SalesHavalehController extends Controller
             'edit_reason' => 'nullable|string|max:2000',
         ]);
 
-        $updated = $this->service->updateItems($invoice, $data['items'], auth()->id(), $data['edit_reason'] ?? 'other', $data['edit_reason'] ?? null);
+        $updated = $this->service->updateItems($invoice, $data['items'], (int) auth()->id(), $data['edit_reason'] ?? 'other', $data['edit_reason'] ?? null);
 
         return response()->json([
             'message' => 'حواله فروش بروزرسانی شد.',
