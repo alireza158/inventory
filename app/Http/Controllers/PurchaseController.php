@@ -777,19 +777,21 @@ class PurchaseController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $before = (int) $variant->stock;
-            $after = $before + $quantity;
+            $before = WarehouseStockService::available($warehouseId, $product->id, (int) $variant->id);
+            WarehouseStockService::change($warehouseId, $product->id, $quantity, (int) $variant->id);
+            $after = WarehouseStockService::available($warehouseId, $product->id, (int) $variant->id);
 
             $variant->update([
                 'buy_price' => $buyPrice,
                 'sell_price' => $sellPrice,
-                'stock' => $after,
             ]);
 
             $this->recalcProductSummary($product);
 
             StockMovement::create([
                 'product_id' => $product->id,
+                'product_variant_id' => $variant->id,
+                'warehouse_id' => $warehouseId,
                 'user_id' => auth()->id(),
                 'type' => StockMovement::TYPE_IN,
                 'reason' => StockMovement::REASON_PURCHASE,
@@ -800,7 +802,6 @@ class PurchaseController extends Controller
                 'note' => 'ثبت/ویرایش خرید کالا - مدل: ' . $variant->variant_name,
             ]);
 
-            WarehouseStockService::change($warehouseId, $product->id, $quantity, (int) $variant->id);
 
             $purchase->items()->create([
                 'product_id' => $product->id,
@@ -941,9 +942,9 @@ class PurchaseController extends Controller
             $lineTotal = max(0, $lineSubtotal - $itemDiscountAmount);
 
             if ($delta !== 0) {
-                $before = (int) $variant->stock;
-                $after = $before + $delta;
-                $variant->update(['stock' => $after]);
+                $before = WarehouseStockService::available($warehouseId, $product->id, (int) $variant->id);
+                WarehouseStockService::change($warehouseId, $product->id, $delta, (int) $variant->id);
+                $after = WarehouseStockService::available($warehouseId, $product->id, (int) $variant->id);
 
                 $reason = $oldItem
                     ? StockMovement::REASON_PURCHASE_ITEM_CHANGED
@@ -951,7 +952,6 @@ class PurchaseController extends Controller
 
                 $this->recordPurchaseAdjustmentMovement($purchase, $product, $variant, $warehouseId, $delta, $before, $after, $reason);
 
-                WarehouseStockService::change($warehouseId, $product->id, $delta, (int) $variant->id);
             }
 
             if ($newQty <= 0) {
@@ -1018,9 +1018,9 @@ class PurchaseController extends Controller
 
             $product = $products->get((int) $variant->product_id) ?: Product::whereKey((int) $variant->product_id)->lockForUpdate()->first();
             if ($product && $quantity > 0) {
-                $before = (int) $variant->stock;
-                $after = $before - $quantity;
-                $variant->update(['stock' => $after]);
+                $before = WarehouseStockService::available($warehouseId, $product->id, (int) $variant->id);
+                WarehouseStockService::change($warehouseId, $product->id, -$quantity, (int) $variant->id);
+                $after = WarehouseStockService::available($warehouseId, $product->id, (int) $variant->id);
 
                 $this->recordPurchaseAdjustmentMovement(
                     $purchase,
@@ -1033,7 +1033,6 @@ class PurchaseController extends Controller
                     StockMovement::REASON_PURCHASE_ITEM_REMOVED
                 );
 
-                WarehouseStockService::change($warehouseId, $product->id, -$quantity, (int) $variant->id);
                 $affectedProductIds[] = $product->id;
             }
 
@@ -1065,6 +1064,7 @@ class PurchaseController extends Controller
 
         StockMovement::create([
             'product_id' => $product->id,
+            'product_variant_id' => $variant->id,
             'warehouse_id' => $warehouseId,
             'user_id' => auth()->id(),
             'type' => $delta > 0 ? StockMovement::TYPE_IN : StockMovement::TYPE_OUT,
