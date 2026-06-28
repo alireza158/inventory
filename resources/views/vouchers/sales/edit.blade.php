@@ -138,4 +138,17 @@ syncChangeReasonRequired();
   syncRequired();
 })();
 </script>
+
+<script>
+(() => {
+  const statusSelect = document.querySelector('#sales-status-form select[name="status"]');
+  const note = document.querySelector('#status-note');
+  const syncRequired = () => {
+    if (!statusSelect || !note) return;
+    note.required = statusSelect.value === 'shipped';
+  };
+  statusSelect?.addEventListener('change', syncRequired);
+  syncRequired();
+})();
+</script>
 @endsection
