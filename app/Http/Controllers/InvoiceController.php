@@ -435,6 +435,19 @@ class InvoiceController extends Controller
         return back()->with('success', '✅ فاکتور کنسل شد و موجودی به انبار برگشت.');
     }
 
+    public function undoCancel(string $uuid, Request $request)
+    {
+        abort_unless($this->canHandleFinanceActions(), 403);
+
+        $invoice = Invoice::where('uuid', $uuid)->firstOrFail();
+        $data = $request->validate([
+            'note' => 'nullable|string|max:1000',
+        ]);
+        $this->salesHavalehService->undoCancelAndReserve($invoice, $data['note'] ?? null, auth()->id());
+
+        return back()->with('success', '✅ کنسلی فاکتور لغو شد و سند دوباره به صف تایید انبار برگشت.');
+    }
+
     private function invoiceReportQuery(array $filters, ?Carbon $dateFrom, ?Carbon $dateTo)
     {
         $query = Invoice::query()

@@ -203,6 +203,16 @@
             <textarea name="note" class="form-control mb-2" rows="2" placeholder="دلیل کنسلی (اختیاری)"></textarea>
             <button class="btn btn-danger w-100" @disabled($invoice->status==='not_shipped')>کنسل کردن فاکتور و برگشت موجودی</button>
           </form>
+
+          @if($invoice->status === 'not_shipped' && $canFinanceApprove)
+            <hr class="my-3">
+            <div class="section-title mb-2 text-success">↩️ لغو کنسلی توسط مالی</div>
+            <form method="POST" action="{{ route('invoices.cancel.undo', $invoice->uuid) }}" onsubmit="return confirm('کنسلی فاکتور لغو شود و موجودی دوباره از انبار کسر شود؟')">
+              @csrf
+              <textarea name="note" class="form-control mb-2" rows="2" placeholder="توضیح لغو کنسلی (اختیاری)"></textarea>
+              <button class="btn btn-success w-100">لغو کنسلی و بازگشت به صف انبار</button>
+            </form>
+          @endif
         </div>
 
         {{-- Payments --}}
