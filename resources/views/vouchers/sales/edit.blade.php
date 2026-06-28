@@ -20,11 +20,12 @@
     <div class="alert alert-warning">این حواله در وضعیت «{{ $statusLabels[$invoice->status] ?? $invoice->status }}» قابل ویرایش آیتم نیست.</div>
   @endunless
 
-  <form method="POST" action="{{ route('vouchers.sales.status', $invoice->uuid) }}" class="card border-0 shadow-sm mb-3">
+  <form method="POST" action="{{ route('vouchers.sales.status', $invoice->uuid) }}" class="card border-0 shadow-sm mb-3" id="sales-status-form">
     @csrf
+    <div class="card-header bg-white fw-bold">تغییر وضعیت حواله فروش</div>
     <div class="card-body row g-2 align-items-end">
       <div class="col-md-5">
-        <label class="form-label">تغییر وضعیت حواله</label>
+        <label class="form-label">وضعیت جدید</label>
         <select name="status" class="form-select">
           @foreach($statusLabels as $key => $label)
             <option value="{{ $key }}" @selected($invoice->status===$key)>{{ $label }}</option>
@@ -33,10 +34,10 @@
       </div>
       <div class="col-md-5">
         <label class="form-label">یادداشت</label>
-        <input name="note" class="form-control" placeholder="برای ارسال‌شده الزامی است">
+        <textarea name="note" id="status-note" class="form-control" rows="2" placeholder="برای ارسال‌شده الزامی است"></textarea>
       </div>
       <div class="col-md-2">
-        <button class="btn btn-primary w-100">ثبت وضعیت</button>
+        <button class="btn btn-primary w-100">ثبت تغییر وضعیت</button>
       </div>
     </div>
   </form>
@@ -79,7 +80,7 @@
       <div class="row g-2">
         <div class="col-md-4">
           <label class="form-label">دلیل تغییر اقلام <span class="text-danger">*</span></label>
-          <select name="edit_reason" class="form-select" required @disabled(!$canEditItems)>
+          <select name="change_reason" class="form-select" required @disabled(!$canEditItems)>
             <option value="">انتخاب کنید</option>
             <option value="physical_shortage">کالا در نرم‌افزار موجود بود ولی فیزیکی پیدا نشد</option>
             <option value="customer_cancelled">انصراف مشتری</option>
@@ -92,7 +93,7 @@
         </div>
         <div class="col-md-8">
           <label class="form-label">توضیح تغییر</label>
-          <input name="edit_note" class="form-control" placeholder="توضیح تکمیلی حذف، کاهش، افزایش یا افزودن کالا" @disabled(!$canEditItems)>
+          <input name="change_note" class="form-control" placeholder="توضیح تکمیلی حذف، کاهش، افزایش یا افزودن کالا" @disabled(!$canEditItems)>
         </div>
       </div>
     </div>
@@ -112,5 +113,18 @@ document.querySelectorAll('.js-zero-item').forEach((button) => {
     }
   });
 });
+</script>
+
+<script>
+(() => {
+  const statusSelect = document.querySelector('#sales-status-form select[name="status"]');
+  const note = document.querySelector('#status-note');
+  const syncRequired = () => {
+    if (!statusSelect || !note) return;
+    note.required = statusSelect.value === 'shipped';
+  };
+  statusSelect?.addEventListener('change', syncRequired);
+  syncRequired();
+})();
 </script>
 @endsection

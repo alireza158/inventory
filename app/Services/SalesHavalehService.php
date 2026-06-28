@@ -22,12 +22,18 @@ class SalesHavalehService
         private readonly SalesDocumentAccessService $accessService,
     ) {}
 
-    public function updateItems(Invoice $invoice, array $itemPayloads, ?int $userId = null): Invoice
+    public function updateItems(Invoice $invoice, array $itemPayloads, int $userId, ?string $changeReason = null, ?string $changeNote = null): Invoice
     {
         return DB::transaction(function () use ($invoice, $itemPayloads, $userId) {
             $user = auth()->user();
             if (! $this->canEditSalesHavalehItems($invoice, $user)) {
                 abort(403, 'فقط فروشنده ثبت‌کننده سند، مدیر یا انبار مجاز به ویرایش اقلام است.');
+            }
+
+            if (blank($changeReason)) {
+                throw ValidationException::withMessages([
+                    'change_reason' => 'برای حذف، اضافه یا ویرایش اقلام حواله فروش، انتخاب دلیل الزامی است.',
+                ]);
             }
 
             if (! $changeReason) {
@@ -53,8 +59,8 @@ class SalesHavalehService
                     );
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, -((int) $item->quantity));
 
-                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, 'حذف آیتم از حواله فروش', $userId);
-                    $this->historyService->log($invoice, 'inventory_returned', 'product_id', (string) $item->product_id, (string) $item->quantity, 'برگشت موجودی به انبار مرکزی', $userId);
+                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, $this->itemChangeDescription('کالا از حواله حذف شد.', $changeReason, $changeNote), $userId);
+                    $this->logItemStockAudit($invoice, $item, (int) $item->quantity, 0, $changeReason, $changeNote, $userId);
                     $item->delete();
                 }
             }
@@ -84,8 +90,8 @@ class SalesHavalehService
                         'برگشت موجودی بابت حذف آیتم حواله فروش'
                     );
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, -$oldQty);
-                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, 'حذف آیتم از حواله فروش با تعداد صفر', $userId);
-                    $this->historyService->log($invoice, 'inventory_returned', 'product_id', (string) $item->product_id, (string) $oldQty, 'برگشت موجودی به انبار مرکزی', $userId);
+                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, $this->itemChangeDescription('کالا از حواله حذف شد.', $changeReason, $changeNote), $userId);
+                    $this->logItemStockAudit($invoice, $item, $oldQty, 0, $changeReason, $changeNote, $userId);
                     $item->delete();
 
                     continue;
@@ -97,13 +103,13 @@ class SalesHavalehService
                     $this->centralInventoryService->assertVariantAvailable((int) $item->variant_id, $delta);
                     $this->inventoryService->adjustCentralStock((int) $item->product_id, -$delta, $invoice->uuid, 'کسر موجودی بابت افزایش تعداد آیتم حواله فروش');
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $delta);
-                    $this->historyService->log($invoice, 'item_quantity_increased', 'quantity', (string) $oldQty, (string) $newQty, 'افزایش تعداد آیتم', $userId);
-                    $this->historyService->log($invoice, 'inventory_deducted', 'product_id', (string) $item->product_id, (string) $delta, 'کسر موجودی انبار مرکزی', $userId);
+                    $this->historyService->log($invoice, 'item_quantity_increased', 'quantity', (string) $oldQty, (string) $newQty, $this->itemChangeDescription('تعداد کالا در حواله افزایش یافت.', $changeReason, $changeNote), $userId);
+                    $this->logItemStockAudit($invoice, $item, $oldQty, $newQty, $changeReason, $changeNote, $userId);
                 } elseif ($delta < 0) {
                     $this->inventoryService->adjustCentralStock((int) $item->product_id, abs($delta), $invoice->uuid, 'برگشت موجودی بابت کاهش تعداد آیتم حواله فروش');
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $delta);
-                    $this->historyService->log($invoice, 'item_quantity_decreased', 'quantity', (string) $oldQty, (string) $newQty, 'کاهش تعداد آیتم', $userId);
-                    $this->historyService->log($invoice, 'inventory_returned', 'product_id', (string) $item->product_id, (string) abs($delta), 'برگشت موجودی به انبار مرکزی', $userId);
+                    $this->historyService->log($invoice, 'item_quantity_decreased', 'quantity', (string) $oldQty, (string) $newQty, $this->itemChangeDescription('تعداد کالا در حواله کاهش یافت.', $changeReason, $changeNote), $userId);
+                    $this->logItemStockAudit($invoice, $item, $oldQty, $newQty, $changeReason, $changeNote, $userId);
                 }
 
                 $lineTotal = $newQty * $newPrice;
@@ -195,8 +201,35 @@ class SalesHavalehService
 
         $this->adjustSaleItemStock($invoice, $item, -$quantity, StockMovement::REASON_SALE_ITEM_QUANTITY_INCREASED, 'کسر موجودی بابت افزودن آیتم جدید به حواله فروش', $reason, $note);
         $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $quantity);
-        $this->historyService->log($invoice, 'item_added', 'items', null, (string) $item->id, 'افزودن آیتم جدید به حواله فروش', $userId);
+        $this->historyService->log($invoice, 'item_added', 'items', null, (string) $item->id, $this->itemChangeDescription('کالا به حواله اضافه شد.', $reason, $note), $userId);
         $this->logItemStockAudit($invoice, $item, 0, $quantity, $reason, $note, $userId);
+    }
+
+
+    private function itemChangeDescription(string $prefix, ?string $reason, ?string $note): string
+    {
+        $description = $prefix;
+        if ($reason) {
+            $description .= ' دلیل: ' . $this->reasonLabel($reason) . '.';
+        }
+        if ($note) {
+            $description .= ' توضیح: ' . $note;
+        }
+
+        return $description;
+    }
+
+    private function reasonLabel(string $reason): string
+    {
+        return [
+            'physical_shortage' => 'کسری فیزیکی / کالا در انبار پیدا نشد',
+            'customer_cancelled' => 'انصراف مشتری',
+            'wrong_item' => 'کالای اشتباه',
+            'warehouse_correction' => 'اصلاح انبار',
+            'finance_correction' => 'اصلاح مالی',
+            'replacement' => 'جایگزینی کالا',
+            'other' => 'سایر',
+        ][$reason] ?? $reason;
     }
 
     private function canEditSalesHavalehItems(Invoice $invoice, $user): bool

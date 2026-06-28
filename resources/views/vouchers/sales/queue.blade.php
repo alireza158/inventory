@@ -46,23 +46,10 @@
               <td class="text-end">
                 <a class="btn btn-sm btn-outline-secondary" href="{{ route('vouchers.sales.show', $inv->uuid) }}">مشاهده</a>
                 @unless($isShippedPage)
-                  <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.sales.edit', $inv->uuid) }}">ویرایش اقلام</a>
+                  <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.sales.edit', $inv->uuid) }}">ویرایش</a>
                 @endunless
                 <a class="btn btn-sm btn-outline-success" target="_blank" href="{{ route('vouchers.sales.print', $inv->uuid) }}">چاپ</a>
                 <a class="btn btn-sm btn-outline-dark" href="{{ route('vouchers.sales.history', $inv->uuid) }}">تاریخچه</a>
-                @unless($isShippedPage)
-                  <form method="POST" action="{{ route('vouchers.sales.status', $inv->uuid) }}" class="d-inline-flex gap-1 mt-1">
-                    @csrf
-                    <select name="status" class="form-select form-select-sm" required>
-                      @foreach($queueStatuses as $st)
-                        <option value="{{ $st }}" @selected($inv->status === $st)>{{ $statusLabels[$st] ?? $st }}</option>
-                      @endforeach
-                      <option value="shipped">ارسال شد</option>
-                    </select>
-                    <input name="note" class="form-control form-control-sm" placeholder="یادداشت/ثبت یادداشت">
-                    <button class="btn btn-sm btn-warning">تغییر وضعیت</button>
-                  </form>
-                @endunless
               </td>
             </tr>
           @empty
@@ -90,7 +77,7 @@ setInterval(async () => {
         <td>${row.items_count}</td><td>${Number(row.total).toLocaleString()}</td>
         <td><span class="badge bg-light text-dark border">${row.status_label}</span></td>
         <td>${row.created_at ?? ''}</td><td>${row.updated_at ?? ''}</td><td>${row.seller ?? '—'}</td>
-        <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="${row.show_url}">مشاهده</a> <a class="btn btn-sm btn-outline-primary" href="${row.edit_url}">ویرایش اقلام</a> <a class="btn btn-sm btn-outline-success" target="_blank" href="${row.print_url}">چاپ</a> <a class="btn btn-sm btn-outline-dark" href="${row.history_url}">تاریخچه</a></td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="${row.show_url}">مشاهده</a> <a class="btn btn-sm btn-outline-primary" href="${row.edit_url}">ویرایش</a> <a class="btn btn-sm btn-outline-success" target="_blank" href="${row.print_url}">چاپ</a> <a class="btn btn-sm btn-outline-dark" href="${row.history_url}">تاریخچه</a></td>
       </tr>`).join('') || '<tr><td colspan="10" class="text-center text-muted py-3">موردی نیست</td></tr>';
   } catch (e) {}
 }, 30000);
