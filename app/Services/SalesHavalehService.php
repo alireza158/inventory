@@ -216,6 +216,39 @@ class SalesHavalehService
 
         $this->centralInventoryService->assertVariantAvailable($variantId, $quantity);
 
+        $existingItem = InvoiceItem::query()
+            ->where('invoice_id', $invoice->id)
+            ->where('product_id', (int) $variant->product_id)
+            ->where('variant_id', $variantId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existingItem) {
+            $existingItem->loadMissing(['product', 'variant']);
+            $oldQty = (int) $existingItem->quantity;
+            $oldPrice = (int) $existingItem->price;
+            $newQty = $oldQty + $quantity;
+
+            $this->adjustSaleItemStock($invoice, $existingItem, -$quantity, StockMovement::REASON_SALE, 'کسر موجودی بابت افزودن تعداد به آیتم موجود حواله فروش', $reason, $note);
+
+            if ($oldPrice !== $price) {
+                $this->historyService->log($invoice, 'item_price_changed', 'price', (string) $oldPrice, (string) $price, $this->itemChangeDescription('قیمت آیتم ' . $this->itemLabel($existingItem) . ' از ' . number_format($oldPrice) . ' به ' . number_format($price) . ' تغییر کرد.', $reason, $note), $userId);
+            }
+
+            $existingItem->update([
+                'quantity' => $newQty,
+                'price' => $price,
+                'line_total' => max(($newQty * $price) - (int) ($existingItem->line_discount_amount ?? 0), 0),
+            ]);
+
+            $this->historyService->log($invoice, 'item_quantity_increased', 'quantity', (string) $oldQty, (string) $newQty, $this->itemChangeDescription('آیتم ' . $this->itemLabel($existingItem) . ' قبلاً در حواله وجود داشت؛ تعداد از ' . number_format($oldQty) . ' به ' . number_format($newQty) . ' افزایش یافت و ' . number_format($quantity) . ' عدد از موجودی مرکزی کم شد.', $reason, $note), $userId);
+            $this->logItemStockAudit($invoice, $existingItem, $oldQty, $newQty, $reason, $note, $userId);
+
+            return;
+        }
+
+        $nextSortOrder = $this->nextInvoiceItemSortOrder($invoice);
+
         $item = InvoiceItem::query()->create([
             'invoice_id' => $invoice->id,
             'product_id' => (int) $variant->product_id,
@@ -226,6 +259,7 @@ class SalesHavalehService
             'quantity' => $quantity,
             'price' => $price,
             'line_total' => max(($quantity * $price) - (int) ($row['line_discount_amount'] ?? 0), 0),
+            'sort_order' => $nextSortOrder,
         ]);
 
         $this->adjustSaleItemStock($invoice, $item, -$quantity, StockMovement::REASON_SALE, 'کسر موجودی بابت افزودن آیتم جدید به حواله فروش', $reason, $note);
@@ -233,6 +267,16 @@ class SalesHavalehService
         $this->logItemStockAudit($invoice, $item, 0, $quantity, $reason, $note, $userId);
     }
 
+
+    private function nextInvoiceItemSortOrder(Invoice $invoice): int
+    {
+        $maxSortOrder = InvoiceItem::query()
+            ->where('invoice_id', $invoice->id)
+            ->selectRaw('MAX(COALESCE(sort_order, id)) as max_order')
+            ->value('max_order');
+
+        return ((int) $maxSortOrder) + 1;
+    }
 
     private function itemLabel(InvoiceItem $item): string
     {

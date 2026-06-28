@@ -61,6 +61,7 @@
                 <td>{{ $it->variant?->variant_name ?? '—' }}</td>
                 <td>
                   <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $it->id }}">
+                  <input type="hidden" name="items[{{ $loop->index }}][sort_order]" value="{{ $it->sort_order ?? $it->id }}">
                   <input type="number" min="0" name="items[{{ $loop->index }}][quantity]" value="{{ (int)$it->quantity }}" data-original="{{ (int)$it->quantity }}" class="form-control js-item-field" @disabled(!$canEditItems)>
                 </td>
                 <td>

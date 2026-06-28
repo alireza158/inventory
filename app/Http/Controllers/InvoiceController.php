@@ -267,6 +267,7 @@ class InvoiceController extends Controller
             'items.*.id' => 'nullable|exists:invoice_items,id',
             'items.*.product_id' => 'nullable|exists:products,id',
             'items.*.variant_id' => 'nullable|exists:product_variants,id',
+            'items.*.sort_order' => 'nullable|integer|min:0',
             'items.*.quantity' => 'required|integer|min:0',
             'items.*.price' => 'required|integer|min:0',
             'change_reason' => ['nullable', 'string', 'max:100', Rule::in(['price_correction', 'customer_quantity_change', 'item_removed', 'item_added', 'warehouse_correction', 'other', 'physical_shortage', 'customer_cancelled', 'wrong_item', 'finance_correction', 'replacement'])],
