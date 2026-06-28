@@ -86,6 +86,11 @@
             @php
               $statusLabel = $statusLabels[$order->status] ?? $order->status_label ?? $order->status;
               $invoiceUuid = $order->invoice?->uuid;
+              $isCancelled = in_array($order->status, [
+                \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+                \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+              ], true);
+              $documentKind = $isCancelled ? 'کنسل شده' : ($order->invoice ? 'فاکتور شده' : 'پیش‌فاکتور');
             @endphp
             <tr>
               <td><span class="code-cell fw-bold" title="{{ $order->uuid }}">{{ Str::limit($order->uuid, 10, '…') }}</span></td>
@@ -95,7 +100,7 @@
               <td>{{ number_format($order->items_count) }}</td>
               <td class="text-nowrap">{{ \App\Support\Currency::formatRial($order->total_price) }}</td>
               <td>
-                <span class="badge {{ $statusBadge($order->status) }}">{{ $order->invoice ? 'فاکتور شده' : 'پیش‌فاکتور' }}</span>
+                <span class="badge {{ $statusBadge($order->status) }}">{{ $documentKind }}</span>
                 <div class="small text-muted mt-1">{{ $statusLabel }}</div>
               </td>
               <td>
@@ -127,6 +132,11 @@
       @php
         $statusLabel = $statusLabels[$order->status] ?? $order->status_label ?? $order->status;
         $invoiceUuid = $order->invoice?->uuid;
+        $isCancelled = in_array($order->status, [
+          \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+          \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+        ], true);
+        $documentKind = $isCancelled ? 'کنسل شده' : ($order->invoice ? 'فاکتور شده' : 'پیش‌فاکتور');
       @endphp
       <div class="preinvoice-mobile-card">
         <div class="d-flex justify-content-between gap-2 mb-2">
@@ -135,7 +145,7 @@
         </div>
         <div class="small text-muted mb-2">{{ $order->customer_mobile ?: '—' }}</div>
         <div class="d-flex flex-wrap gap-2 mb-2">
-          <span class="badge {{ $statusBadge($order->status) }}">{{ $order->invoice ? 'فاکتور شده' : 'پیش‌فاکتور' }}</span>
+          <span class="badge {{ $statusBadge($order->status) }}">{{ $documentKind }}</span>
           <span class="badge text-bg-light border">{{ $statusLabel }}</span>
         </div>
         <div class="small text-muted mb-2">{{ $order->description ? Str::limit($order->description, 120) : 'بدون توضیحات' }}</div>
