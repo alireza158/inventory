@@ -267,8 +267,11 @@
                     @canPermission('preinvoices.warehouse.reviews.view')
                     <a class="sidebar-sublink {{ $is('warehouse.reviews.*') }}" href="{{ route('warehouse.reviews.index') }}">سوابق تأیید انبار</a>
                     @endcanPermission
+                    @canPermission('stock_out.view')
+                    <a class="sidebar-sublink {{ $is('vouchers.sales.queue', 'vouchers.sales.shipped') }}" href="{{ route('vouchers.sales.queue') }}">صف جمع‌آوری و ارسال انبار</a>
+                    @endcanPermission
                     @canPermission('issues.view')
-                    <a class="sidebar-sublink {{ $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
+                    <a class="sidebar-sublink {{ $isRoute('vouchers.sales.queue', 'vouchers.sales.shipped') ? '' : $is('vouchers.*') }}" href="{{ route('vouchers.index') }}">حواله‌های انبار</a>
                     @endcanPermission
                     @canPermission('inventory.count.view')
                     <a class="sidebar-sublink {{ $is('stocktake.*', 'stocktake.index') }}" href="{{ route('stocktake.index') }}">انبارگردانی</a>

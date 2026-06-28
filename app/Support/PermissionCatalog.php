@@ -287,6 +287,7 @@ class PermissionCatalog
                 ['permission' => 'products.create', 'label' => 'افزودن کالا'],
                 ['permission' => 'preinvoices.warehouse.view', 'label' => 'در انتظار تایید انبار'],
                 ['permission' => 'preinvoices.warehouse.reviews.view', 'label' => 'سوابق تأیید انبار'],
+                ['permission' => 'stock_out.view', 'label' => 'صف جمع‌آوری و ارسال انبار'],
                 ['permission' => 'issues.view', 'label' => 'حواله‌های انبار'],
                 ['permission' => 'inventory.count.view', 'label' => 'انبارگردانی'],
                 ['permission' => 'assets.view', 'label' => 'امین اموال'],

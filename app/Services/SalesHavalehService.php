@@ -34,6 +34,10 @@ class SalesHavalehService
                 abort(422, 'ثبت دلیل تغییر اقلام الزامی است.');
             }
 
+            if (! $changeReason) {
+                abort(422, 'ثبت دلیل تغییر اقلام الزامی است.');
+            }
+
             $invoice->loadMissing('items');
             $itemsById = $invoice->items->keyBy('id');
 
