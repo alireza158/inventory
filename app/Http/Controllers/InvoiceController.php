@@ -257,11 +257,11 @@ class InvoiceController extends Controller
             'items.*.variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:0',
             'items.*.price' => 'required|integer|min:0',
-            'change_reason' => 'nullable|in:physical_shortage,customer_cancelled,wrong_item,warehouse_correction,finance_correction,replacement,other',
+            'change_reason' => ['required', 'string', 'max:100', Rule::in(['physical_shortage', 'customer_cancelled', 'wrong_item', 'warehouse_correction', 'finance_correction', 'replacement', 'other'])],
             'change_note' => 'nullable|string|max:2000',
         ]);
 
-        $this->salesHavalehService->updateItems($invoice, $data['items'], (int) auth()->id(), $data['change_reason'] ?? null, $data['change_note'] ?? null);
+        $this->salesHavalehService->updateItems($invoice, $data['items'], (int) auth()->id(), $data['change_reason'], $data['change_note'] ?? null);
 
         return redirect()->route('vouchers.sales.edit', $invoice->uuid)
             ->with('success', '✅ آیتم‌های حواله فروش با موفقیت بروزرسانی شد.');

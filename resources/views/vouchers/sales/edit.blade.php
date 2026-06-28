@@ -80,7 +80,7 @@
       <div class="row g-2">
         <div class="col-md-4">
           <label class="form-label">دلیل تغییر اقلام <span class="text-danger">*</span></label>
-          <select name="change_reason" class="form-select" @disabled(!$canEditItems)>
+          <select name="change_reason" class="form-select" required @disabled(!$canEditItems)>
             <option value="">انتخاب کنید</option>
             <option value="physical_shortage">کالا در نرم‌افزار موجود بود ولی فیزیکی پیدا نشد</option>
             <option value="customer_cancelled">انصراف مشتری</option>
@@ -124,19 +124,6 @@ document.querySelectorAll('.js-zero-item').forEach((button) => {
   });
 });
 syncChangeReasonRequired();
-</script>
-
-<script>
-(() => {
-  const statusSelect = document.querySelector('#sales-status-form select[name="status"]');
-  const note = document.querySelector('#status-note');
-  const syncRequired = () => {
-    if (!statusSelect || !note) return;
-    note.required = statusSelect.value === 'shipped';
-  };
-  statusSelect?.addEventListener('change', syncRequired);
-  syncRequired();
-})();
 </script>
 
 <script>

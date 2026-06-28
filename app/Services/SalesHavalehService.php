@@ -22,9 +22,17 @@ class SalesHavalehService
         private readonly SalesDocumentAccessService $accessService,
     ) {}
 
-    public function updateItems(Invoice $invoice, array $itemPayloads, int $userId, ?string $changeReason = null, ?string $changeNote = null): Invoice
-    {
-        return DB::transaction(function () use ($invoice, $itemPayloads, $userId) {
+    public function updateItems(
+        Invoice $invoice,
+        array $items,
+        int $userId,
+        ?string $changeReason = null,
+        ?string $changeNote = null
+    ): Invoice {
+        $changeReason = trim((string) $changeReason);
+        $changeNote = $changeNote !== null ? trim((string) $changeNote) : null;
+
+        return DB::transaction(function () use ($invoice, $items, $userId, $changeReason, $changeNote) {
             $user = auth()->user();
             if (! $this->canEditSalesHavalehItems($invoice, $user)) {
                 abort(403, 'فقط فروشنده ثبت‌کننده سند، مدیر یا انبار مجاز به ویرایش اقلام است.');
@@ -47,13 +55,13 @@ class SalesHavalehService
             $invoice->loadMissing('items');
             $itemsById = $invoice->items->keyBy('id');
 
-            if ($this->itemsActuallyChanged($invoice, $itemPayloads) && blank($changeReason)) {
+            if ($this->itemsActuallyChanged($invoice, $items) && blank($changeReason)) {
                 throw ValidationException::withMessages([
                     'change_reason' => 'برای حذف، اضافه یا ویرایش اقلام حواله فروش، انتخاب دلیل الزامی است.',
                 ]);
             }
 
-            $requestedIds = collect($itemPayloads)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
+            $requestedIds = collect($items)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
 
             foreach ($invoice->items as $item) {
                 if (!in_array((int) $item->id, $requestedIds, true)) {
@@ -71,7 +79,7 @@ class SalesHavalehService
                 }
             }
 
-            foreach ($itemPayloads as $row) {
+            foreach ($items as $row) {
                 $itemId = (int) ($row['id'] ?? 0);
                 if ($itemId <= 0) {
                     $this->addInvoiceItem($invoice, $row, $changeReason, $changeNote, $userId);
@@ -171,10 +179,10 @@ class SalesHavalehService
 
 
 
-    private function itemsActuallyChanged(Invoice $invoice, array $itemPayloads): bool
+    private function itemsActuallyChanged(Invoice $invoice, array $items): bool
     {
         $itemsById = $invoice->items->keyBy('id');
-        $requestedIds = collect($itemPayloads)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
+        $requestedIds = collect($items)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
 
         foreach ($invoice->items as $item) {
             if (! in_array((int) $item->id, $requestedIds, true)) {
@@ -182,7 +190,7 @@ class SalesHavalehService
             }
         }
 
-        foreach ($itemPayloads as $row) {
+        foreach ($items as $row) {
             $itemId = (int) ($row['id'] ?? 0);
             $newQty = (int) ($row['quantity'] ?? 0);
             $newPrice = (int) ($row['price'] ?? 0);
