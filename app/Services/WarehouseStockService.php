@@ -130,8 +130,12 @@ class WarehouseStockService
         ]);
     }
 
-    public static function syncAllCentralVariantStocksFromVariants(): void
+    public static function syncAllCentralVariantStocksFromVariants(bool $confirmed = false): void
     {
+        if (! $confirmed) {
+            abort(422, 'همگام‌سازی گروهی warehouse_stocks از product_variants فقط با تایید مدیر مجاز است.');
+        }
+
         $centralId = self::centralWarehouseId();
 
         DB::transaction(function () use ($centralId) {
@@ -174,8 +178,12 @@ class WarehouseStockService
         });
     }
 
-    public static function migrateSingleVariantOldWarehouseStocks(): void
+    public static function migrateSingleVariantOldWarehouseStocks(bool $confirmed = false): void
     {
+        if (! $confirmed) {
+            abort(422, 'مهاجرت موجودی قدیمی فقط با تایید مدیر و پس از بررسی idempotency مجاز است.');
+        }
+
         DB::transaction(function () {
             WarehouseStock::query()
                 ->whereNull('product_variant_id')
@@ -211,6 +219,8 @@ class WarehouseStockService
                                 'quantity' => max(0, (int) $oldStock->quantity),
                             ]);
                         }
+
+                        $oldStock->delete();
 
                         self::syncVariantStockFromCentral($variantId);
                         self::syncProductStockFromCentral((int) $oldStock->product_id);

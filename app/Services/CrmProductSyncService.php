@@ -329,10 +329,6 @@ class CrmProductSyncService
             $reservedDesign2[$design2] = true;
 
             $title = $this->resolveVariantTitle($variety, $index);
-            $sellPrice = $this->extractVariantPrice($variety);
-            $buyPrice = $this->extractVariantBuyPrice($variety);
-            $stock = max(0, (int) (Arr::get($variety, 'quantity') ?? 0));
-
             $payload = [
                 'product_id'    => $product->id,
                 'model_list_id' => null,
@@ -344,13 +340,9 @@ class CrmProductSyncService
             ];
 
             if (! $existing) {
-                $payload['stock'] = $stock;
-            }
-            if (! $existing || $sellPrice > 0) {
-                $payload['sell_price'] = $sellPrice;
-            }
-            if (! $existing || ((int) $buyPrice) > 0) {
-                $payload['buy_price'] = $buyPrice;
+                $payload['stock'] = 0;
+                $payload['sell_price'] = 0;
+                $payload['buy_price'] = null;
             }
 
             if ($this->hasColumn('product_variants', 'is_active')) {
@@ -467,10 +459,9 @@ class CrmProductSyncService
         ];
 
         if (! $variant) {
-            $payload['stock'] = max(0, $baseQty);
-        }
-        if (! $variant || $basePrice > 0) {
-            $payload['sell_price'] = max(0, $basePrice);
+            $payload['stock'] = 0;
+            $payload['sell_price'] = 0;
+            $payload['buy_price'] = null;
         }
 
         if ($this->hasColumn('product_variants', 'is_active')) {
@@ -503,9 +494,7 @@ class CrmProductSyncService
             ]);
         }
 
-        $disableOthers = [
-            'stock' => 0,
-        ];
+        $disableOthers = [];
 
         if ($this->hasColumn('product_variants', 'is_active')) {
             $disableOthers['is_active'] = false;

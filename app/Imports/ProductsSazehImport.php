@@ -21,38 +21,46 @@ class ProductsSazehImport implements ToCollection, WithHeadingRow
 
             if ($name === '') continue; // اگر نام کالا خالی بود، رد کن
 
-            $stock = (int)($row['موجودي'] ?? 0);
-
             // قیمت‌ها: ممکنه تو اکسل با کاما بیاد
             $saleRetail = $this->money($row['ف جزئي'] ?? null);
             $saleWholesale = $this->money($row['ف كلي'] ?? null);
             $buyRetail = $this->money($row['خ جزئي'] ?? null);
             $buyWholesale = $this->money($row['خ كلي'] ?? null);
 
-            $reserved = (int)($row['رزرو'] ?? 0);
-
             // آپسرت: اگر code موجود بود با code آپدیت کن، اگر نبود با نام
             $key = $code !== '' ? ['code' => $code] : ['name' => $name];
+            $product = Product::firstOrNew($key);
 
-            Product::updateOrCreate($key, [
+            $payload = [
                 'name' => $name,
                 'code' => $code !== '' ? $code : null,
                 'short_barcode' => $this->clean($row['باركد/اختصاري'] ?? null),
-                'stock' => $stock,
                 'unit' => $this->clean($row['واحد'] ?? null),
+                'barcode' => $this->clean($row['بارکد'] ?? null),
+                'color' => $this->clean($row['رنگ'] ?? null),
+            ];
 
-                // price را برابر ف جزئی می‌گذاریم (نمایش اصلی)
-                'price' => $saleRetail ?? 0,
+            if (! $product->exists) {
+                $payload['stock'] = 0;
+                $payload['reserved'] = 0;
+            }
 
+            foreach ([
                 'sale_retail' => $saleRetail,
                 'sale_wholesale' => $saleWholesale,
                 'buy_retail' => $buyRetail,
                 'buy_wholesale' => $buyWholesale,
+            ] as $field => $value) {
+                if ($value !== null && $value > 0) {
+                    $payload[$field] = $value;
+                }
+            }
 
-                'reserved' => $reserved,
-                'barcode' => $this->clean($row['بارکد'] ?? null),
-                'color' => $this->clean($row['رنگ'] ?? null),
-            ]);
+            if ($saleRetail !== null && $saleRetail > 0) {
+                $payload['price'] = $saleRetail;
+            }
+
+            $product->fill($payload)->save();
         }
     }
 
