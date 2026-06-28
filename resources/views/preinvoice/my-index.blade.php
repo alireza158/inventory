@@ -13,6 +13,15 @@
       }
       return optional($date)->format('Y/m/d H:i') ?? '—';
   };
+  $isCancelledStatus = fn($order) => in_array($order->status, [
+      \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+      \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+  ], true) || (($order->invoice?->status ?? null) === \App\Models\Invoice::STATUS_NOT_SHIPPED);
+  $effectiveStatus = fn($order) => $isCancelledStatus($order) ? \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE : $order->status;
+  $effectiveStatusLabel = fn($order) => (($order->invoice?->status ?? null) === \App\Models\Invoice::STATUS_NOT_SHIPPED && ! in_array($order->status, [\App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE, \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE], true))
+      ? 'لغوشده به دلیل کنسلی فاکتور مرتبط'
+      : ($statusLabels[$order->status] ?? $order->status_label ?? $order->status);
+
   $statusBadge = fn($status) => match($status) {
       \App\Models\PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE => 'text-bg-success',
       \App\Models\PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
@@ -84,13 +93,11 @@
         <tbody>
           @forelse($orders as $order)
             @php
-              $statusLabel = $statusLabels[$order->status] ?? $order->status_label ?? $order->status;
+              $statusLabel = $effectiveStatusLabel($order);
               $invoiceUuid = $order->invoice?->uuid;
-              $isCancelled = in_array($order->status, [
-                \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
-                \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
-              ], true);
+              $isCancelled = $isCancelledStatus($order);
               $documentKind = $isCancelled ? 'کنسل شده' : ($order->invoice ? 'فاکتور شده' : 'پیش‌فاکتور');
+              $badgeStatus = $effectiveStatus($order);
             @endphp
             <tr>
               <td><span class="code-cell fw-bold" title="{{ $order->uuid }}">{{ Str::limit($order->uuid, 10, '…') }}</span></td>
@@ -100,7 +107,7 @@
               <td>{{ number_format($order->items_count) }}</td>
               <td class="text-nowrap">{{ \App\Support\Currency::formatRial($order->total_price) }}</td>
               <td>
-                <span class="badge {{ $statusBadge($order->status) }}">{{ $documentKind }}</span>
+                <span class="badge {{ $statusBadge($badgeStatus) }}">{{ $documentKind }}</span>
                 <div class="small text-muted mt-1">{{ $statusLabel }}</div>
               </td>
               <td>
@@ -130,13 +137,11 @@
   <div class="d-lg-none vstack gap-2">
     @forelse($orders as $order)
       @php
-        $statusLabel = $statusLabels[$order->status] ?? $order->status_label ?? $order->status;
+        $statusLabel = $effectiveStatusLabel($order);
         $invoiceUuid = $order->invoice?->uuid;
-        $isCancelled = in_array($order->status, [
-          \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
-          \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
-        ], true);
+        $isCancelled = $isCancelledStatus($order);
         $documentKind = $isCancelled ? 'کنسل شده' : ($order->invoice ? 'فاکتور شده' : 'پیش‌فاکتور');
+        $badgeStatus = $effectiveStatus($order);
       @endphp
       <div class="preinvoice-mobile-card">
         <div class="d-flex justify-content-between gap-2 mb-2">
@@ -145,7 +150,7 @@
         </div>
         <div class="small text-muted mb-2">{{ $order->customer_mobile ?: '—' }}</div>
         <div class="d-flex flex-wrap gap-2 mb-2">
-          <span class="badge {{ $statusBadge($order->status) }}">{{ $documentKind }}</span>
+          <span class="badge {{ $statusBadge($badgeStatus) }}">{{ $documentKind }}</span>
           <span class="badge text-bg-light border">{{ $statusLabel }}</span>
         </div>
         <div class="small text-muted mb-2">{{ $order->description ? Str::limit($order->description, 120) : 'بدون توضیحات' }}</div>

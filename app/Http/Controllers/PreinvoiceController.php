@@ -75,7 +75,7 @@ class PreinvoiceController extends Controller
                 'creator:id,name',
                 'warehouseReviewer:id,name',
                 'reviews.user:id,name',
-                'invoice:id,uuid,preinvoice_order_id,created_at',
+                'invoice:id,uuid,preinvoice_order_id,status,created_at',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();
@@ -99,7 +99,7 @@ class PreinvoiceController extends Controller
             'creator:id,name',
             'warehouseReviewer:id,name',
             'reviews.user:id,name',
-            'invoice:id,uuid,preinvoice_order_id,created_at',
+            'invoice:id,uuid,preinvoice_order_id,status,created_at',
         ]);
 
         $products = Product::query()
@@ -319,7 +319,7 @@ class PreinvoiceController extends Controller
         $status = (string) $request->query('status', '');
         $query = PreinvoiceOrder::query()
             ->where('created_by', auth()->id())
-            ->with(['invoice:id,uuid,preinvoice_order_id,created_at'])
+            ->with(['invoice:id,uuid,preinvoice_order_id,status,created_at'])
             ->withCount('items');
 
         if ($status !== '') {
@@ -344,7 +344,7 @@ class PreinvoiceController extends Controller
                 'creator:id,name',
                 'warehouseReviewer:id,name',
                 'reviews.user:id,name',
-                'invoice:id,uuid,preinvoice_order_id,created_at',
+                'invoice:id,uuid,preinvoice_order_id,status,created_at',
             ])
             ->where('uuid', $uuid)
             ->where('created_by', auth()->id())

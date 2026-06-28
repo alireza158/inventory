@@ -21,6 +21,7 @@ class ArchiveController extends Controller
                 'shippingMethod:id,name,price',
                 'reviews.user:id,name',
                 'activityLogs.user:id,name',
+                'invoice:id,uuid,preinvoice_order_id,status,created_at',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();
@@ -46,6 +47,7 @@ class ArchiveController extends Controller
                 'notes.user:id,name',
                 'histories.actor:id,name',
                 'activityLogs.user:id,name',
+                'invoice:id,uuid,preinvoice_order_id,status,created_at',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();
