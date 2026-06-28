@@ -15,7 +15,24 @@
     }
   };
 
+  $isInvoiceCancelled = (($order->invoice?->status ?? null) === \App\Models\Invoice::STATUS_NOT_SHIPPED);
+  $isCancelled = in_array($order->status, [
+    \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+    \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+  ], true) || $isInvoiceCancelled;
+  $effectiveStatus = $isCancelled ? \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE : ($order->status ?? '');
+  $effectiveStatusLabel = $isInvoiceCancelled && ! in_array($order->status, [\App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE, \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE], true)
+    ? 'لغوشده به دلیل کنسلی فاکتور مرتبط'
+    : $order->status_label;
+
   $statusClass = fn($s) => match($s) {
+    \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+    \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE => 'status-danger',
+    \App\Models\PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE => 'status-success',
+    \App\Models\PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+    \App\Models\PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING,
+    \App\Models\PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+    \App\Models\PreinvoiceOrder::STATUS_FINANCE_REVIEWING => 'status-warning',
     'draft' => 'status-draft',
     'pending' => 'status-warning',
     'pending_warehouse_approval' => 'status-warning',
@@ -682,6 +699,18 @@
 
 <div class="container py-4 preinvoice-show-page">
 
+
+  @if($isCancelled)
+    <div class="alert alert-danger border-0 shadow-sm mb-4">
+      <div class="fw-bold mb-1">این پیش‌فاکتور کنسل شده است.</div>
+      <div class="small">وضعیت فعلی: {{ $effectiveStatusLabel }}{{ $order->warehouse_reject_reason ? ' | دلیل: ' . $order->warehouse_reject_reason : '' }}</div>
+    </div>
+  @else
+    <div class="alert alert-success border-0 shadow-sm mb-4">
+      <div class="fw-bold">این پیش‌فاکتور کنسل نشده است.</div>
+    </div>
+  @endif
+
   <div class="preinvoice-hero mb-4">
     <div class="hero-content">
       <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-4">
@@ -704,7 +733,7 @@
 
         <div class="d-flex flex-column align-items-stretch align-items-lg-end gap-3">
           <span class="status-pill glass-status">
-            {{ $order->status_label }}
+            {{ $effectiveStatusLabel }}
           </span>
 
           <div class="d-flex flex-wrap gap-2 no-print justify-content-lg-end">
@@ -764,8 +793,8 @@
           <div>
             <div class="summary-label">وضعیت</div>
             <div class="summary-value">
-              <span class="status-pill {{ $statusClass($order->status ?? '') }}">
-                {{ $order->status_label }}
+              <span class="status-pill {{ $statusClass($effectiveStatus) }}">
+                {{ $effectiveStatusLabel }}
               </span>
             </div>
           </div>
@@ -826,8 +855,8 @@
             <div class="info-item">
               <span>وضعیت فعلی</span>
               <strong>
-                <span class="status-pill {{ $statusClass($order->status ?? '') }}">
-                  {{ $order->status_label }}
+                <span class="status-pill {{ $statusClass($effectiveStatus) }}">
+                  {{ $effectiveStatusLabel }}
                 </span>
               </strong>
             </div>
