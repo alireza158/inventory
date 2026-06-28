@@ -125,6 +125,10 @@ Route::get('/vouchers/sales', [InvoiceController::class, 'salesVouchers'])->name
 Route::get('/vouchers/sales/queue', [InvoiceController::class, 'salesQueue'])->middleware('role:admin|Admin|warehouse|Warehouse|manager|Manager')->name('vouchers.sales.queue');
 Route::get('/vouchers/sales/queue/data', [InvoiceController::class, 'salesQueueData'])->middleware('role:admin|Admin|warehouse|Warehouse|manager|Manager')->name('vouchers.sales.queue.data');
 Route::get('/vouchers/sales/shipped', [InvoiceController::class, 'salesShipped'])->middleware('role:admin|Admin|warehouse|Warehouse|manager|Manager')->name('vouchers.sales.shipped');
+Route::get('/vouchers/sales/ajax/categories', [InvoiceController::class, 'salesVoucherAjaxCategories'])->name('vouchers.sales.ajax.categories');
+Route::get('/vouchers/sales/ajax/subcategories', [InvoiceController::class, 'salesVoucherAjaxSubcategories'])->name('vouchers.sales.ajax.subcategories');
+Route::get('/vouchers/sales/ajax/products', [InvoiceController::class, 'salesVoucherAjaxProducts'])->name('vouchers.sales.ajax.products');
+Route::get('/vouchers/sales/ajax/products/{product}/variants', [InvoiceController::class, 'salesVoucherAjaxProductVariants'])->name('vouchers.sales.ajax.product-variants');
 Route::get('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherEdit'])->name('vouchers.sales.edit');
 Route::get('/vouchers/sales/{uuid}/view', [InvoiceController::class, 'salesVoucherShow'])->name('vouchers.sales.show');
 Route::get('/vouchers/sales/{uuid}/history', [InvoiceController::class, 'salesVoucherHistory'])->name('vouchers.sales.history');

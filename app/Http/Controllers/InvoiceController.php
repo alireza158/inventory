@@ -2,18 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Invoice;
+use App\Models\Product;
+use App\Models\WarehouseStock;
 use App\Services\SalesHavalehStatusService;
 use App\Services\SalesHavalehService;
 use App\Services\SalesDocumentAccessService;
 use App\Services\SalesPrintDocumentService;
 use App\Services\WarehousePendingRefreshService;
+use App\Services\WarehouseStockService;
 use Carbon\Carbon;
 use Morilog\Jalali\Jalalian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Validation\ValidationException;
 
 class InvoiceController extends Controller
 {
@@ -250,6 +255,13 @@ class InvoiceController extends Controller
     {
         $invoice = Invoice::query()->with('items')->where('uuid', $uuid)->firstOrFail();
 
+        $normalizedItems = collect($request->input('items', []))->map(function (array $row) {
+            $row['quantity'] = $this->normalizeIntegerInput($row['quantity'] ?? 0);
+            $row['price'] = $this->normalizeIntegerInput($row['price'] ?? 0);
+            return $row;
+        })->values()->all();
+        $request->merge(['items' => $normalizedItems]);
+
         $data = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.id' => 'nullable|exists:invoice_items,id',
@@ -257,14 +269,76 @@ class InvoiceController extends Controller
             'items.*.variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:0',
             'items.*.price' => 'required|integer|min:0',
-            'change_reason' => ['required', 'string', 'max:100', Rule::in(['physical_shortage', 'customer_cancelled', 'wrong_item', 'warehouse_correction', 'finance_correction', 'replacement', 'other'])],
+            'change_reason' => ['nullable', 'string', 'max:100', Rule::in(['price_correction', 'customer_quantity_change', 'item_removed', 'item_added', 'warehouse_correction', 'other', 'physical_shortage', 'customer_cancelled', 'wrong_item', 'finance_correction', 'replacement'])],
             'change_note' => 'nullable|string|max:2000',
         ]);
 
-        $this->salesHavalehService->updateItems($invoice, $data['items'], (int) auth()->id(), $data['change_reason'], $data['change_note'] ?? null);
+        try {
+            $this->salesHavalehService->updateItemsForInvoice($invoice, $data['items'], (int) auth()->id(), $data['change_reason'] ?? '', $data['change_note'] ?? null);
+        } catch (ValidationException $e) {
+            throw $e;
+        }
 
         return redirect()->route('vouchers.sales.edit', $invoice->uuid)
             ->with('success', '✅ آیتم‌های حواله فروش با موفقیت بروزرسانی شد.');
+    }
+
+    public function salesVoucherAjaxCategories()
+    {
+        return response()->json(Category::query()->whereNull('parent_id')->orderBy('name')->get(['id', 'name']));
+    }
+
+    public function salesVoucherAjaxSubcategories(Request $request)
+    {
+        $parentId = (int) $request->query('parent_id');
+        return response()->json(Category::query()->where('parent_id', $parentId)->orderBy('name')->get(['id', 'name']));
+    }
+
+    public function salesVoucherAjaxProducts(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $categoryId = (int) $request->query('category_id');
+
+        $products = Product::query()
+            ->when($categoryId > 0, fn ($query) => $query->whereIn('category_id', Category::selfAndDescendantIds($categoryId)))
+            ->when($q !== '', fn ($query) => $query->search($q))
+            ->orderBy('name')
+            ->limit(30)
+            ->get(['id', 'name', 'sku', 'code', 'barcode']);
+
+        return response()->json($products);
+    }
+
+    public function salesVoucherAjaxProductVariants(Product $product)
+    {
+        $centralId = WarehouseStockService::centralWarehouseId();
+        $variants = $product->variants()->active()->orderBy('variant_name')->get();
+        $stocks = WarehouseStock::query()
+            ->where('warehouse_id', $centralId)
+            ->where('product_id', $product->id)
+            ->whereIn('product_variant_id', $variants->pluck('id'))
+            ->pluck('quantity', 'product_variant_id');
+
+        return response()->json($variants->map(fn ($variant) => [
+            'id' => (int) $variant->id,
+            'name' => (string) ($variant->variant_name ?: $product->name),
+            'variant_code' => (string) ($variant->variant_code ?? ''),
+            'sell_price' => (int) ($variant->sell_price ?? 0),
+            'available_stock' => max(0, (int) ($stocks[$variant->id] ?? 0)),
+        ])->values());
+    }
+
+    private function normalizeIntegerInput($value): int
+    {
+        $normalized = strtr((string) $value, [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+            ',' => '', '٬' => '', ' ' => '', "\u{00A0}" => '',
+        ]);
+
+        return (int) preg_replace('/[^0-9]/', '', $normalized);
     }
 
     public function salesVoucherHistory(string $uuid)

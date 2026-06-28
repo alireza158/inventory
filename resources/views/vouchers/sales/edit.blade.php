@@ -42,7 +42,7 @@
     </div>
   </form>
 
-  <form method="POST" action="{{ route('vouchers.sales.update', $invoice->uuid) }}" class="card border-0 shadow-sm">
+  <form method="POST" action="{{ route('vouchers.sales.update', $invoice->uuid) }}" class="card border-0 shadow-sm" id="sales-items-form">
     @csrf
     @method('PUT')
     <div class="card-body">
@@ -63,31 +63,27 @@
                   <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $it->id }}">
                   <input type="number" min="0" name="items[{{ $loop->index }}][quantity]" value="{{ (int)$it->quantity }}" data-original="{{ (int)$it->quantity }}" class="form-control js-item-field" @disabled(!$canEditItems)>
                 </td>
-                <td><input type="number" min="0" name="items[{{ $loop->index }}][price]" value="{{ (int)$it->price }}" data-original="{{ (int)$it->price }}" class="form-control js-item-field" @disabled(!$canEditItems)></td>
+                <td>
+                  <input type="text" inputmode="numeric" value="{{ number_format((int)$it->price) }}" data-raw-target="item-price-{{ $loop->index }}" class="form-control js-money" @disabled(!$canEditItems)>
+                  <input id="item-price-{{ $loop->index }}" type="hidden" name="items[{{ $loop->index }}][price]" value="{{ (int)$it->price }}" data-original="{{ (int)$it->price }}" class="js-item-field">
+                </td>
                 <td><button type="button" class="btn btn-outline-danger btn-sm js-zero-item" @disabled(!$canEditItems)>حذف از فاکتور</button></td>
               </tr>
             @endforeach
-            <tr class="table-info">
-                <td><input name="items[999][product_id]" class="form-control" placeholder="شناسه محصول جدید" @disabled(!$canEditItems)></td>
-                <td><input name="items[999][variant_id]" data-original="" class="form-control js-item-field" placeholder="شناسه تنوع فعال" @disabled(!$canEditItems)></td>
-                <td><input type="number" min="0" name="items[999][quantity]" value="0" data-original="0" class="form-control js-item-field" @disabled(!$canEditItems)></td>
-                <td><input type="number" min="0" name="items[999][price]" value="0" data-original="0" class="form-control js-item-field" @disabled(!$canEditItems)></td>
-                <td class="text-muted small">برای افزودن کالا، شناسه تنوع و تعداد را وارد کنید.</td>
-              </tr>
           </tbody>
         </table>
+        <button type="button" class="btn btn-outline-primary" id="open-add-item-modal" @disabled(!$canEditItems)>افزودن کالا</button>
       </div>
       <div class="row g-2">
         <div class="col-md-4">
           <label class="form-label">دلیل تغییر اقلام <span class="text-danger">*</span></label>
           <select name="change_reason" class="form-select" required @disabled(!$canEditItems)>
             <option value="">انتخاب کنید</option>
-            <option value="physical_shortage">کالا در نرم‌افزار موجود بود ولی فیزیکی پیدا نشد</option>
-            <option value="customer_cancelled">انصراف مشتری</option>
-            <option value="wrong_item">کالای اشتباه ثبت شده بود</option>
+            <option value="price_correction">اصلاح قیمت برای همین فاکتور</option>
+            <option value="customer_quantity_change">تغییر تعداد به درخواست مشتری</option>
+            <option value="item_removed">حذف کالا از فاکتور</option>
+            <option value="item_added">افزودن کالا به فاکتور</option>
             <option value="warehouse_correction">اصلاح انبار</option>
-            <option value="finance_correction">اصلاح مالی</option>
-            <option value="replacement">جایگزینی کالا</option>
             <option value="other">سایر</option>
           </select>
         </div>
@@ -101,29 +97,101 @@
       <button class="btn btn-success" @disabled(!$canEditItems)>ذخیره تغییرات حواله فروش</button>
     </div>
   </form>
+
+  <div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">افزودن کالا به حواله</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body row g-3">
+        <div class="col-md-6"><label class="form-label">دسته‌بندی اصلی</label><select id="modal-category" class="form-select"><option value="">انتخاب کنید...</option></select></div>
+        <div class="col-md-6"><label class="form-label">زیر دسته‌بندی</label><select id="modal-subcategory" class="form-select"><option value="">ابتدا دسته اصلی...</option></select></div>
+        <div class="col-md-8"><label class="form-label">جستجوی نام کالا / کد کالا / SKU</label><input id="modal-product-search" class="form-control" placeholder="حداقل ۲ حرف وارد کنید"></div>
+        <div class="col-md-4"><label class="form-label">کالا</label><select id="modal-product" class="form-select"><option value="">جستجو کنید...</option></select></div>
+        <div class="col-md-6"><label class="form-label">تنوع کالا</label><select id="modal-variant" class="form-select"><option value="">ابتدا کالا...</option></select></div>
+        <div class="col-md-6"><label class="form-label">موجودی آزاد انبار مرکزی</label><input id="modal-stock" class="form-control" readonly value="—"></div>
+        <div class="col-md-6"><label class="form-label">تعداد</label><input id="modal-quantity" type="number" min="1" value="1" class="form-control"></div>
+        <div class="col-md-6"><label class="form-label">قیمت همین فاکتور</label><input id="modal-price" inputmode="numeric" class="form-control js-money-standalone"></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button><button type="button" class="btn btn-primary" id="add-modal-item">افزودن به حواله</button></div>
+    </div></div>
+  </div>
 </div>
 <script>
+const form = document.getElementById('sales-items-form');
 const reasonSelect = document.querySelector('select[name="change_reason"]');
-const itemFields = document.querySelectorAll('.js-item-field');
+const tbody = form?.querySelector('tbody');
+let nextItemIndex = 1000;
+const faMap = {'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9','٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
+const rawNumber = (value) => String(value || '').replace(/[۰-۹٠-٩]/g, ch => faMap[ch] || ch).replace(/[٬,\s]/g, '').replace(/[^0-9]/g, '');
+const formatMoney = (value) => { const raw = rawNumber(value); return raw ? Number(raw).toLocaleString('en-US') : ''; };
+function bindMoneyInputs(root = document) {
+  root.querySelectorAll('.js-money').forEach((input) => {
+    const sync = () => {
+      const raw = rawNumber(input.value);
+      const target = document.getElementById(input.dataset.rawTarget);
+      if (target) { target.value = raw || '0'; target.dispatchEvent(new Event('input', {bubbles:true})); }
+      input.value = formatMoney(raw);
+    };
+    input.addEventListener('input', sync); sync();
+  });
+  root.querySelectorAll('.js-money-standalone').forEach((input) => input.addEventListener('input', () => input.value = formatMoney(input.value)));
+}
+const itemFields = () => Array.from(document.querySelectorAll('.js-item-field'));
 const syncChangeReasonRequired = () => {
-  const changed = Array.from(itemFields).some((field) => String(field.value || '') !== String(field.dataset.original || ''));
-  if (reasonSelect) {
-    reasonSelect.required = changed;
-  }
+  const changed = itemFields().some((field) => String(field.value || '') !== String(field.dataset.original || ''));
+  if (reasonSelect) reasonSelect.required = changed;
 };
-itemFields.forEach((field) => field.addEventListener('input', syncChangeReasonRequired));
+document.addEventListener('input', (e) => { if (e.target.classList.contains('js-item-field')) syncChangeReasonRequired(); });
 document.querySelectorAll('.js-zero-item').forEach((button) => {
   button.addEventListener('click', () => {
     const row = button.closest('tr');
     const quantity = row?.querySelector('input[name$="[quantity]"]');
-    if (quantity) {
-      quantity.value = 0;
-      row.classList.add('table-danger');
-      syncChangeReasonRequired();
-    }
+    if (quantity) { quantity.value = 0; quantity.dispatchEvent(new Event('input', {bubbles:true})); row.classList.add('table-danger'); }
   });
 });
-syncChangeReasonRequired();
+bindMoneyInputs(); syncChangeReasonRequired();
+
+const modalEl = document.getElementById('addItemModal');
+const modal = modalEl && window.bootstrap ? new bootstrap.Modal(modalEl) : null;
+const urls = {
+  categories: @json(route('vouchers.sales.ajax.categories')),
+  subcategories: @json(route('vouchers.sales.ajax.subcategories')),
+  products: @json(route('vouchers.sales.ajax.products')),
+  variants: @json(url('/vouchers/sales/ajax/products')),
+};
+const category = document.getElementById('modal-category'), subcategory = document.getElementById('modal-subcategory'), productSearch = document.getElementById('modal-product-search'), product = document.getElementById('modal-product'), variant = document.getElementById('modal-variant'), stock = document.getElementById('modal-stock'), qty = document.getElementById('modal-quantity'), price = document.getElementById('modal-price');
+const option = (v,t,d={}) => `<option value="${String(v).replaceAll('"','&quot;')}" ${Object.entries(d).map(([k,val])=>`data-${k}="${String(val ?? '').replaceAll('"','&quot;')}"`).join(' ')}>${t}</option>`;
+async function loadJson(url) { const r = await fetch(url, {headers:{'Accept':'application/json'}}); if (!r.ok) throw new Error('خطا در دریافت اطلاعات'); return await r.json(); }
+document.getElementById('open-add-item-modal')?.addEventListener('click', async () => {
+  if (category && category.options.length <= 1) (await loadJson(urls.categories)).forEach(c => category.insertAdjacentHTML('beforeend', option(c.id, c.name)));
+  modal?.show();
+});
+category?.addEventListener('change', async () => {
+  subcategory.innerHTML = '<option value="">همه زیرگروه‌ها</option>';
+  if (category.value) (await loadJson(`${urls.subcategories}?parent_id=${category.value}`)).forEach(c => subcategory.insertAdjacentHTML('beforeend', option(c.id, c.name)));
+});
+async function searchProducts() {
+  const cat = subcategory.value || category.value || '';
+  const q = encodeURIComponent(productSearch.value || '');
+  product.innerHTML = '<option value="">انتخاب کنید...</option>';
+  (await loadJson(`${urls.products}?category_id=${cat}&q=${q}`)).forEach(p => product.insertAdjacentHTML('beforeend', option(p.id, `${p.name}${p.code ? ' ['+p.code+']' : ''}`)));
+}
+productSearch?.addEventListener('input', () => { clearTimeout(productSearch._t); productSearch._t = setTimeout(searchProducts, 300); });
+subcategory?.addEventListener('change', searchProducts);
+product?.addEventListener('change', async () => {
+  variant.innerHTML = '<option value="">انتخاب تنوع...</option>'; stock.value = '—'; price.value = '';
+  if (!product.value) return;
+  (await loadJson(`${urls.variants}/${product.value}/variants`)).forEach(v => variant.insertAdjacentHTML('beforeend', option(v.id, `${v.name}${v.variant_code ? ' ['+v.variant_code+']' : ''}`, {stock:v.available_stock, price:v.sell_price})));
+});
+variant?.addEventListener('change', () => {
+  const opt = variant.selectedOptions[0]; stock.value = opt?.dataset.stock ?? '—'; price.value = formatMoney(opt?.dataset.price || '0');
+});
+document.getElementById('add-modal-item')?.addEventListener('click', () => {
+  if (!product.value || !variant.value || Number(qty.value || 0) < 1) { alert('کالا، تنوع و تعداد معتبر را انتخاب کنید.'); return; }
+  const i = nextItemIndex++;
+  const tr = document.createElement('tr'); tr.className = 'table-success';
+  tr.innerHTML = `<td>${product.selectedOptions[0].text}<input type="hidden" name="items[${i}][product_id]" value="${product.value}"></td><td>${variant.selectedOptions[0].text}<input type="hidden" name="items[${i}][variant_id]" value="${variant.value}" class="js-item-field" data-original=""></td><td><input type="number" min="1" name="items[${i}][quantity]" value="${qty.value}" data-original="0" class="form-control js-item-field"></td><td><input type="text" inputmode="numeric" value="${formatMoney(price.value)}" data-raw-target="item-price-${i}" class="form-control js-money"><input id="item-price-${i}" type="hidden" name="items[${i}][price]" value="${rawNumber(price.value) || 0}" data-original="0" class="js-item-field"></td><td><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove(); syncChangeReasonRequired();">حذف</button></td>`;
+  tbody.appendChild(tr); bindMoneyInputs(tr); syncChangeReasonRequired(); modal?.hide();
+});
 </script>
 
 <script>
