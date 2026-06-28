@@ -780,16 +780,21 @@ class PurchaseController extends Controller
             $before = (int) $variant->stock;
             $after = $before + $quantity;
 
-            $variant->update([
-                'buy_price' => $buyPrice,
-                'sell_price' => $sellPrice,
-                'stock' => $after,
-            ]);
+            $variantUpdates = ['stock' => $after];
+            if ($buyPrice > 0) {
+                $variantUpdates['buy_price'] = $buyPrice;
+            }
+            if ($sellPrice > 0) {
+                $variantUpdates['sell_price'] = $sellPrice;
+            }
+            $variant->update($variantUpdates);
 
             $this->recalcProductSummary($product);
 
             StockMovement::create([
                 'product_id' => $product->id,
+                'product_variant_id' => $variant->id,
+                'warehouse_id' => $warehouseId,
                 'user_id' => auth()->id(),
                 'type' => StockMovement::TYPE_IN,
                 'reason' => StockMovement::REASON_PURCHASE,
@@ -963,10 +968,16 @@ class PurchaseController extends Controller
             }
 
             if ($this->purchaseCanRefreshVariantPrice($purchase, (int) $variant->id)) {
-                $variant->update([
-                    'buy_price' => $buyPrice,
-                    'sell_price' => $sellPrice,
-                ]);
+                $priceUpdates = [];
+                if ($buyPrice > 0) {
+                    $priceUpdates['buy_price'] = $buyPrice;
+                }
+                if ($sellPrice > 0) {
+                    $priceUpdates['sell_price'] = $sellPrice;
+                }
+                if ($priceUpdates !== []) {
+                    $variant->update($priceUpdates);
+                }
             }
 
             $payload = [
@@ -1065,6 +1076,7 @@ class PurchaseController extends Controller
 
         StockMovement::create([
             'product_id' => $product->id,
+            'product_variant_id' => $variant->id,
             'warehouse_id' => $warehouseId,
             'user_id' => auth()->id(),
             'type' => $delta > 0 ? StockMovement::TYPE_IN : StockMovement::TYPE_OUT,

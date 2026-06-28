@@ -82,7 +82,13 @@ Artisan::command('products:add-default-electric-colors', function () {
     return 0;
 })->purpose('Add missing black and white default variants to electric category products');
 
-Artisan::command('inventory:set-central-stock {quantity=500 : Quantity to set for every product variant}', function (int $quantity) {
+Artisan::command('inventory:set-central-stock {quantity=500 : Quantity to set for every product variant} {--force : Confirm intentional bulk stock overwrite}', function (int $quantity) {
+    if (! $this->option('force')) {
+        $this->error('This command overwrites inventory. Re-run with --force after backup and approval.');
+
+        return 1;
+    }
+
     if ($quantity < 0) {
         $this->error('Quantity cannot be negative.');
 
@@ -120,20 +126,20 @@ Artisan::command('inventory:set-central-stock {quantity=500 : Quantity to set fo
                         );
                     }
 
-                    $productQuantity = $productVariantCount > 0 ? $productVariantCount * $quantity : $quantity;
+                    if ($productVariantCount === 0) {
+                        WarehouseStock::query()->updateOrCreate(
+                            [
+                                'warehouse_id' => $centralWarehouseId,
+                                'product_id' => $productId,
+                                'product_variant_id' => null,
+                            ],
+                            [
+                                'quantity' => $quantity,
+                            ]
+                        );
+                    }
 
-                    WarehouseStock::query()->updateOrCreate(
-                        [
-                            'warehouse_id' => $centralWarehouseId,
-                            'product_id' => $productId,
-                            'product_variant_id' => null,
-                        ],
-                        [
-                            'quantity' => $productQuantity,
-                        ]
-                    );
-
-                    $product->forceFill(['stock' => $productQuantity])->save();
+                    $product->forceFill(['stock' => $productVariantCount > 0 ? $productVariantCount * $quantity : $quantity])->save();
                 }
 
                 ProductVariant::query()
