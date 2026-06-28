@@ -332,7 +332,7 @@ class InvoiceController extends Controller
                 'customer_address' => $data['customer_address'] ?? '',
             ]);
 
-            $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id(), $data['edit_reason'], $data['edit_reason']);
+            $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id());
             $fresh = $invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder.items']);
             DB::table('invoice_edit_audits')->insert([
                 'invoice_id' => $invoice->id,
