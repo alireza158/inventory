@@ -16,6 +16,17 @@ class SalesHavalehHistory extends Model
         'new_value',
         'description',
         'done_by',
+        'invoice_uuid',
+        'invoice_item_id',
+        'product_id',
+        'variant_id',
+        'old_quantity',
+        'new_quantity',
+        'delta',
+        'returned_to_stock_quantity',
+        'consumed_from_stock_quantity',
+        'reason',
+        'note',
         'done_at',
     ];
 

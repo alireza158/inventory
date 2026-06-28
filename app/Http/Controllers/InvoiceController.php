@@ -176,9 +176,10 @@ class InvoiceController extends Controller
             'items.*.id' => 'required|exists:invoice_items,id',
             'items.*.quantity' => 'required|integer|min:0',
             'items.*.price' => 'required|integer|min:0',
+            'edit_reason' => 'nullable|string|max:2000',
         ]);
 
-        $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id());
+        $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id(), $data['edit_reason'] ?? 'other', $data['edit_reason'] ?? null);
 
         return redirect()->route('vouchers.sales.edit', $invoice->uuid)
             ->with('success', '✅ آیتم‌های حواله فروش با موفقیت بروزرسانی شد.');
@@ -250,7 +251,7 @@ class InvoiceController extends Controller
                 'customer_address' => $data['customer_address'] ?? '',
             ]);
 
-            $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id());
+            $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id(), $data['edit_reason'], $data['edit_reason']);
             $fresh = $invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder.items']);
             DB::table('invoice_edit_audits')->insert([
                 'invoice_id' => $invoice->id,
