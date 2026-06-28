@@ -33,7 +33,7 @@
       </div>
       <div class="col-md-5">
         <label class="form-label">یادداشت</label>
-        <input name="note" class="form-control" placeholder="اختیاری">
+        <input name="note" class="form-control" placeholder="برای ارسال‌شده الزامی است">
       </div>
       <div class="col-md-2">
         <button class="btn btn-primary w-100">ثبت وضعیت</button>
@@ -66,8 +66,34 @@
                 <td><button type="button" class="btn btn-outline-danger btn-sm js-zero-item" @disabled(!$canEditItems)>حذف از فاکتور</button></td>
               </tr>
             @endforeach
+            <tr class="table-info">
+                <td><input name="items[999][product_id]" class="form-control" placeholder="شناسه محصول جدید" @disabled(!$canEditItems)></td>
+                <td><input name="items[999][variant_id]" class="form-control" placeholder="شناسه تنوع فعال" @disabled(!$canEditItems)></td>
+                <td><input type="number" min="0" name="items[999][quantity]" value="0" class="form-control" @disabled(!$canEditItems)></td>
+                <td><input type="number" min="0" name="items[999][price]" value="0" class="form-control" @disabled(!$canEditItems)></td>
+                <td class="text-muted small">برای افزودن کالا، شناسه تنوع و تعداد را وارد کنید.</td>
+              </tr>
           </tbody>
         </table>
+      </div>
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label">دلیل تغییر اقلام <span class="text-danger">*</span></label>
+          <select name="edit_reason" class="form-select" required @disabled(!$canEditItems)>
+            <option value="">انتخاب کنید</option>
+            <option value="physical_shortage">کالا در نرم‌افزار موجود بود ولی فیزیکی پیدا نشد</option>
+            <option value="customer_cancelled">انصراف مشتری</option>
+            <option value="wrong_item">کالای اشتباه ثبت شده بود</option>
+            <option value="warehouse_correction">اصلاح انبار</option>
+            <option value="finance_correction">اصلاح مالی</option>
+            <option value="replacement">جایگزینی کالا</option>
+            <option value="other">سایر</option>
+          </select>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">توضیح تغییر</label>
+          <input name="edit_note" class="form-control" placeholder="توضیح تکمیلی حذف، کاهش، افزایش یا افزودن کالا" @disabled(!$canEditItems)>
+        </div>
       </div>
     </div>
     <div class="card-footer text-end">
