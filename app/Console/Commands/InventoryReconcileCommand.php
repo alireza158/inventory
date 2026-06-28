@@ -9,7 +9,7 @@ use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
 class InventoryReconcileCommand extends Command
 {
-    protected $signature = 'inventory:reconcile {--product= : Reconcile one product id} {--dry-run : Report only} {--apply : Apply safe rows} {--backup : Create backup tables before apply} {--exclude-suspicious-reservations : Ignore suspicious active reservations in expected stock/reserved calculations}';
+    protected $signature = 'inventory:reconcile {--product= : Reconcile one product id} {--dry-run : Report only} {--apply : Apply safe rows} {--backup : Create backup tables before apply} {--exclude-suspicious-reservations : Ignore suspicious active reservations in expected stock/reserved calculations} {--cleanup-no-purchase-no-price : Zero fake stock for variants with no purchases and no sell price}';
     protected $description = 'Audit and safely reconcile product variant stock, warehouse stock, reservations, and sell prices.';
 
     public function handle(InventoryReconciliationService $service): int
@@ -17,6 +17,7 @@ class InventoryReconcileCommand extends Command
         $productId = $this->option('product') !== null ? (int) $this->option('product') : null;
         $apply = (bool) $this->option('apply');
         $excludeSuspiciousReservations = (bool) $this->option('exclude-suspicious-reservations');
+        $cleanupNoPurchaseNoPrice = (bool) $this->option('cleanup-no-purchase-no-price');
         if ($apply && ! $this->option('backup')) { $this->error('Refusing apply without --backup.'); return SymfonyCommand::FAILURE; }
 
         $invalid = $service->invalidInvoiceStatuses($productId);
@@ -35,18 +36,35 @@ class InventoryReconcileCommand extends Command
         }
 
         $rows = $productId === 24 ? $product24Rows : $service->rows($productId, $excludeSuspiciousReservations);
+        $cleanupRows = $cleanupNoPurchaseNoPrice ? $service->cleanupNoPurchaseNoPriceRows($rows) : collect();
         $reportRows = $rows->filter(fn($r)=>$r['blocked'] || $r['flags'] || $r['difference'] !== 0 || $r['current_reserved'] !== $r['expected_reserved'])->values();
         $this->info($apply ? 'APPLY mode: only safe rows will be updated.' : 'DRY-RUN mode: no data changed.');
-        $this->table(array_keys($service->summary($rows)), [$service->summary($rows)]);
+        $summary = $service->summary($rows, $cleanupRows);
+        $this->table(array_keys($summary), [$summary]);
         if ($reportRows->isNotEmpty()) $this->table(['variant_id','product_id','product_name','variant_name','current_stock','current_reserved','warehouse_stock','purchase_qty','invoice_qty','active_reserved_qty','expected_stock','expected_reserved','difference','flags','suspicious_preinvoices','ignored_suspicious_reservation'], $reportRows->map(fn($r)=>[...array_intersect_key($r, array_flip(['variant_id','product_id','product_name','variant_name','current_stock','current_reserved','warehouse_stock','purchase_qty','invoice_qty','active_reserved_qty','expected_stock','expected_reserved','difference'])), 'flags'=>$r['flags_text'], 'suspicious_preinvoices'=>$r['suspicious_preinvoices'], 'ignored_suspicious_reservation'=>$r['ignored_suspicious_reservation']])->all());
+        if ($cleanupRows->isNotEmpty()) {
+            $this->warn('Cleanup no-purchase/no-price rows planned for zeroing:');
+            $this->table(['variant_id','product_id','product_name','variant_name','current_stock','warehouse_stock','purchase_qty','invoice_qty','sell_price','expected_stock_after_cleanup','flags'], $cleanupRows->map(fn($r)=>[
+                'variant_id'=>$r['variant_id'], 'product_id'=>$r['product_id'], 'product_name'=>$r['product_name'], 'variant_name'=>$r['variant_name'],
+                'current_stock'=>$r['current_stock'], 'warehouse_stock'=>$r['warehouse_stock'], 'purchase_qty'=>$r['purchase_qty'], 'invoice_qty'=>$r['invoice_qty'],
+                'sell_price'=>$r['current_sell_price'], 'expected_stock_after_cleanup'=>0, 'flags'=>$r['cleanup_flags_text'],
+            ])->all());
+        }
         if (! $apply) return SymfonyCommand::SUCCESS;
 
         $central = $service->centralWarehouseId();
         if (! $central) { $this->error('Central warehouse not found.'); return SymfonyCommand::FAILURE; }
         $backups = $this->createBackups(); $this->info('Backup tables created: '.implode(', ', $backups));
         $safe = $rows->where('blocked', false);
-        DB::transaction(function() use ($safe, $central) {
+        $cleanupVariantIds = $cleanupRows->pluck('variant_id')->map(fn ($id) => (int) $id)->all();
+        $safe = $safe->reject(fn ($row) => in_array((int) $row['variant_id'], $cleanupVariantIds, true));
+        DB::transaction(function() use ($safe, $cleanupRows, $central) {
             $touched=[];
+            foreach ($cleanupRows as $r) {
+                DB::table('product_variants')->where('id',$r['variant_id'])->lockForUpdate()->update(['stock'=>0, 'reserved'=>0, 'updated_at'=>now()]);
+                $this->setWarehouse($central, $r['product_id'], $r['variant_id'], 0);
+                $touched[$r['product_id']] = true;
+            }
             foreach ($safe as $r) {
                 $update = ['stock'=>$r['expected_stock'], 'reserved'=>$r['expected_reserved'], 'updated_at'=>now()];
                 if ($r['expected_sell_price'] && $r['current_stock'] >= 0) { if ($r['expected_buy_price']) $update['buy_price']=$r['expected_buy_price']; $update['sell_price']=$r['expected_sell_price']; }

@@ -96,23 +96,42 @@ class InventoryReconciliationService
                 $blocked = $expected < 0 || count(array_intersect($flags, $blockingFlags)) > 0;
                 return [
                     'variant_id'=>$vid,'product_id'=>$pid,'product_name'=>$r->product_name,'variant_name'=>$r->variant_name,
-                    'current_stock'=>(int)$r->stock,'current_reserved'=>(int)$r->reserved,'warehouse_stock'=>$wh,
+                    'current_stock'=>(int)$r->stock,'current_reserved'=>(int)$r->reserved,'warehouse_stock'=>$wh,'current_sell_price'=>(int)$r->sell_price,
                     'purchase_qty'=>$pq,'invoice_qty'=>$iq,'active_reserved_qty'=>$rq,'expected_stock'=>$expected,'expected_reserved'=>$rq,
                     'difference'=>$expected - (int)$r->stock,'movement_in'=>(int)$mov['in'],'movement_out'=>(int)$mov['out'],'movement_net'=>(int)$mov['in']-(int)$mov['out'],'document_net'=>$pq-$iq,
-                    'expected_buy_price'=>$price['buy_price'] ?? null,'expected_sell_price'=>$price['sell_price'] ?? null,'price_source'=>$price['source'] ?? null,
+                    'expected_buy_price'=>$price['buy_price'] ?? null,'expected_sell_price'=>$price['sell_price'] ?? null,'price_source'=>$price['source'] ?? null,'has_purchase_sell_price_source'=>($price['source'] ?? null) === 'purchase_item',
                     'flags'=>$flags,'flags_text'=>implode(',', $flags),'blocked'=>$blocked,'suspicious_preinvoices'=>$suspicious[$pid] ?? '',
                     'ignored_suspicious_reservation'=>$excludeSuspiciousReservations ? ($suspiciousQty[$vid]['text'] ?? '') : '',
                 ];
             });
     }
 
-    public function summary(Collection $rows): array
+    public function cleanupNoPurchaseNoPriceRows(Collection $rows): Collection
     {
+        return $rows->filter(function (array $row) {
+            return (int) $row['purchase_qty'] === 0
+                && ((int) $row['current_stock'] > 0 || (int) $row['warehouse_stock'] > 0)
+                && (int) $row['current_sell_price'] <= 0
+                && ! $row['has_purchase_sell_price_source'];
+        })->map(function (array $row) {
+            $flags = ['cleanup_no_purchase_no_price'];
+            if ((int) $row['invoice_qty'] > 0) {
+                $flags[] = 'sold_without_purchase_left_for_manual_review';
+            }
+            $row['cleanup_flags'] = $flags;
+            $row['cleanup_flags_text'] = implode(',', $flags);
+            return $row;
+        })->values();
+    }
+
+    public function summary(Collection $rows, ?Collection $cleanupRows = null): array
+    {
+        $cleanupRows ??= collect();
         $countFlag = fn ($f) => $rows->filter(fn ($r) => in_array($f, $r['flags'], true))->count();
         return [
             'total_variants'=>$rows->count(), 'safe_to_apply_count'=>$rows->where('blocked', false)->count(), 'blocked_conflicts_count'=>$rows->where('blocked', true)->count(),
             'fake_30000_count'=>$countFlag('fake_30000'), 'no_purchase_but_stock_count'=>$countFlag('no_purchase_but_stock'), 'reservation_without_purchase_count'=>$countFlag('reservation_without_purchase'),
-            'sold_more_than_purchased_count'=>$countFlag('sold_more_than_purchased'), 'suspicious_reservation_count'=>$countFlag('suspicious_reservation'), 'missing_sell_price_count'=>$countFlag('missing_sell_price'),
+            'sold_more_than_purchased_count'=>$countFlag('sold_more_than_purchased'), 'suspicious_reservation_count'=>$countFlag('suspicious_reservation'), 'missing_sell_price_count'=>$countFlag('missing_sell_price'), 'cleanup_no_purchase_no_price_count'=>$cleanupRows->count(), 'cleanup_no_purchase_no_price_with_invoice_count'=>$cleanupRows->filter(fn ($r) => (int) $r['invoice_qty'] > 0)->count(),
         ];
     }
 
