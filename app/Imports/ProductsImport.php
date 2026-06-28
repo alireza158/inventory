@@ -22,21 +22,23 @@ class ProductsImport implements ToCollection, WithHeadingRow
             }
 
             $category = Category::firstOrCreate(['name' => $categoryName]);
-
-            $stock = (int)($row['stock'] ?? 0);
-            $low   = (int)($row['low_stock_threshold'] ?? 5);
             $price = (int) preg_replace('/[^\d]/', '', (string)($row['price'] ?? 0));
 
-            Product::updateOrCreate(
-                ['sku' => $sku],
-                [
-                    'name' => $name,
-                    'category_id' => $category->id,
-                    'stock' => max(0, $stock),
-                    'low_stock_threshold' => max(0, $low),
-                    'price' => max(0, $price),
-                ]
-            );
+            $product = Product::firstOrNew(['sku' => $sku]);
+            $payload = [
+                'name' => $name,
+                'category_id' => $category->id,
+            ];
+
+            if (! $product->exists) {
+                $payload['stock'] = 0;
+            }
+
+            if ($price > 0) {
+                $payload['price'] = $price;
+            }
+
+            $product->fill($payload)->save();
         }
     }
 }

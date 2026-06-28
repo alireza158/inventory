@@ -4,11 +4,9 @@ use App\Http\Controllers\PreinvoiceController;
 use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\WarehouseStock;
 use App\Services\AriyajanebiSyncService;
 use App\Services\DefaultProductDesignService;
 use App\Services\InventoryWebhookService;
-use App\Services\WarehouseStockService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -82,70 +80,12 @@ Artisan::command('products:add-default-electric-colors', function () {
     return 0;
 })->purpose('Add missing black and white default variants to electric category products');
 
-Artisan::command('inventory:set-central-stock {quantity=500 : Quantity to set for every product variant}', function (int $quantity) {
-    if ($quantity < 0) {
-        $this->error('Quantity cannot be negative.');
+Artisan::command('inventory:set-central-stock {quantity=500 : Quantity to set for every product variant} {--force : Disabled legacy option}', function (int $quantity) {
+    $this->error('This legacy bulk stock overwrite command is disabled because inventory must come from documents or approved stock-count corrections.');
+    $this->warn('Use php artisan inventory:audit-corruption first, take a backup, then apply a reviewed repair script/SQL only for confirmed corrupted rows.');
 
-        return 1;
-    }
-
-    $centralWarehouseId = WarehouseStockService::centralWarehouseId();
-    $productCount = 0;
-    $variantCount = 0;
-
-    Product::query()
-        ->with(['variants:id,product_id'])
-        ->orderBy('id')
-        ->chunkById(100, function ($products) use ($centralWarehouseId, $quantity, &$productCount, &$variantCount) {
-            DB::transaction(function () use ($products, $centralWarehouseId, $quantity, &$productCount, &$variantCount) {
-                foreach ($products as $product) {
-                    $productCount++;
-                    $productId = (int) $product->id;
-                    $productVariantCount = 0;
-
-                    foreach ($product->variants as $variant) {
-                        $variantCount++;
-                        $productVariantCount++;
-                        $variantId = (int) $variant->id;
-
-                        WarehouseStock::query()->updateOrCreate(
-                            [
-                                'warehouse_id' => $centralWarehouseId,
-                                'product_variant_id' => $variantId,
-                            ],
-                            [
-                                'product_id' => $productId,
-                                'quantity' => $quantity,
-                            ]
-                        );
-                    }
-
-                    $productQuantity = $productVariantCount > 0 ? $productVariantCount * $quantity : $quantity;
-
-                    WarehouseStock::query()->updateOrCreate(
-                        [
-                            'warehouse_id' => $centralWarehouseId,
-                            'product_id' => $productId,
-                            'product_variant_id' => null,
-                        ],
-                        [
-                            'quantity' => $productQuantity,
-                        ]
-                    );
-
-                    $product->forceFill(['stock' => $productQuantity])->save();
-                }
-
-                ProductVariant::query()
-                    ->whereIn('product_id', $products->pluck('id'))
-                    ->update(['stock' => $quantity]);
-            });
-        });
-
-    $this->info("Central warehouse stock set to {$quantity} for {$productCount} products and {$variantCount} variants.");
-
-    return 0;
-})->purpose('Set central warehouse stock quantity for every product and product variant');
+    return 1;
+})->purpose('Disabled legacy bulk stock overwrite command');
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
