@@ -23,12 +23,18 @@ class SalesHavalehService
         private readonly SalesDocumentAccessService $accessService,
     ) {}
 
-    public function updateItems(Invoice $invoice, array $itemPayloads, ?int $userId = null, ?string $changeReason = null, ?string $changeNote = null): Invoice
+    public function updateItems(Invoice $invoice, array $itemPayloads, int $userId, ?string $changeReason = null, ?string $changeNote = null): Invoice
     {
         return DB::transaction(function () use ($invoice, $itemPayloads, $userId, $changeReason, $changeNote) {
             $user = auth()->user();
-            if (! $this->accessService->canSellerEditInvoiceItems($invoice, $user)) {
-                abort(403, 'فقط فروشنده ثبت‌کننده سند یا مدیر مجاز به ویرایش اقلام است.');
+            if (! $this->canEditSalesHavalehItems($invoice, $user)) {
+                abort(403, 'فقط فروشنده ثبت‌کننده سند، مدیر یا انبار مجاز به ویرایش اقلام است.');
+            }
+
+            if (blank($changeReason)) {
+                throw ValidationException::withMessages([
+                    'change_reason' => 'برای حذف، اضافه یا ویرایش اقلام حواله فروش، انتخاب دلیل الزامی است.',
+                ]);
             }
 
             $invoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
@@ -36,21 +42,26 @@ class SalesHavalehService
             $invoice->load('items');
             $itemsById = $invoice->items->keyBy('id');
 
-            $requestedIds = collect($itemPayloads)->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $requestedIds = collect($itemPayloads)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
 
             foreach ($invoice->items as $item) {
                 if (!in_array((int) $item->id, $requestedIds, true)) {
                     $this->adjustSaleItemStock($invoice, $item, (int) $item->quantity, StockMovement::REASON_SALE_ITEM_REMOVED, 'برگشت موجودی بابت حذف آیتم حواله فروش', $changeReason, $changeNote);
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, -((int) $item->quantity));
 
-                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, 'حذف آیتم از حواله فروش', $userId);
+                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, $this->itemChangeDescription('کالا از حواله حذف شد.', $changeReason, $changeNote), $userId);
                     $this->logItemStockAudit($invoice, $item, (int) $item->quantity, 0, $changeReason, $changeNote, $userId);
                     $item->delete();
                 }
             }
 
             foreach ($itemPayloads as $row) {
-                $itemId = (int) $row['id'];
+                $itemId = (int) ($row['id'] ?? 0);
+                if ($itemId <= 0) {
+                    $this->addInvoiceItem($invoice, $row, $changeReason, $changeNote, $userId);
+                    continue;
+                }
+
                 $newQty = (int) $row['quantity'];
                 $newPrice = (int) $row['price'];
 
@@ -64,7 +75,7 @@ class SalesHavalehService
                 if ($newQty <= 0) {
                     $this->adjustSaleItemStock($invoice, $item, $oldQty, StockMovement::REASON_SALE_ITEM_REMOVED, 'برگشت موجودی بابت حذف آیتم حواله فروش', $changeReason, $changeNote);
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, -$oldQty);
-                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, 'حذف آیتم از حواله فروش با تعداد صفر', $userId);
+                    $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, $this->itemChangeDescription('کالا از حواله حذف شد.', $changeReason, $changeNote), $userId);
                     $this->logItemStockAudit($invoice, $item, $oldQty, 0, $changeReason, $changeNote, $userId);
                     $item->delete();
 
@@ -77,12 +88,12 @@ class SalesHavalehService
                     $this->centralInventoryService->assertVariantAvailable((int) $item->variant_id, $delta);
                     $this->adjustSaleItemStock($invoice, $item, -$delta, StockMovement::REASON_SALE_ITEM_QUANTITY_INCREASED, 'کسر موجودی بابت افزایش تعداد آیتم حواله فروش', $changeReason, $changeNote);
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $delta);
-                    $this->historyService->log($invoice, 'item_quantity_increased', 'quantity', (string) $oldQty, (string) $newQty, 'افزایش تعداد آیتم', $userId);
+                    $this->historyService->log($invoice, 'item_quantity_increased', 'quantity', (string) $oldQty, (string) $newQty, $this->itemChangeDescription('تعداد کالا در حواله افزایش یافت.', $changeReason, $changeNote), $userId);
                     $this->logItemStockAudit($invoice, $item, $oldQty, $newQty, $changeReason, $changeNote, $userId);
                 } elseif ($delta < 0) {
                     $this->adjustSaleItemStock($invoice, $item, abs($delta), StockMovement::REASON_SALE_ITEM_QUANTITY_REDUCED, 'برگشت موجودی بابت کاهش تعداد آیتم حواله فروش', $changeReason, $changeNote);
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $delta);
-                    $this->historyService->log($invoice, 'item_quantity_decreased', 'quantity', (string) $oldQty, (string) $newQty, 'کاهش تعداد آیتم', $userId);
+                    $this->historyService->log($invoice, 'item_quantity_decreased', 'quantity', (string) $oldQty, (string) $newQty, $this->itemChangeDescription('تعداد کالا در حواله کاهش یافت.', $changeReason, $changeNote), $userId);
                     $this->logItemStockAudit($invoice, $item, $oldQty, $newQty, $changeReason, $changeNote, $userId);
                 }
 
@@ -136,6 +147,87 @@ class SalesHavalehService
         });
     }
 
+
+
+    private function addInvoiceItem(Invoice $invoice, array $row, ?string $reason, ?string $note, ?int $userId): void
+    {
+        $variantId = (int) ($row['variant_id'] ?? 0);
+        $quantity = (int) ($row['quantity'] ?? 0);
+        $price = (int) ($row['price'] ?? 0);
+
+        if ($quantity <= 0) {
+            return;
+        }
+        if ($variantId <= 0) {
+            abort(422, 'برای اضافه کردن کالا، انتخاب تنوع کالا الزامی است.');
+        }
+
+        $variant = ProductVariant::query()->with('product')->whereKey($variantId)->lockForUpdate()->firstOrFail();
+        if (! $variant->is_active) {
+            abort(422, 'تنوع کالای انتخاب‌شده فعال نیست.');
+        }
+        if ($variant->product && $variant->product->is_sellable === false) {
+            abort(422, 'کالای انتخاب‌شده قابل فروش نیست.');
+        }
+
+        $this->centralInventoryService->assertVariantAvailable($variantId, $quantity);
+
+        $item = InvoiceItem::query()->create([
+            'invoice_id' => $invoice->id,
+            'product_id' => (int) $variant->product_id,
+            'product_name_snapshot' => $variant->product?->name,
+            'variant_id' => $variantId,
+            'variant_name_snapshot' => $variant->variant_name,
+            'variant_code_snapshot' => $variant->variant_code,
+            'quantity' => $quantity,
+            'price' => $price,
+            'line_total' => $quantity * $price,
+        ]);
+
+        $this->adjustSaleItemStock($invoice, $item, -$quantity, StockMovement::REASON_SALE_ITEM_QUANTITY_INCREASED, 'کسر موجودی بابت افزودن آیتم جدید به حواله فروش', $reason, $note);
+        $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $quantity);
+        $this->historyService->log($invoice, 'item_added', 'items', null, (string) $item->id, $this->itemChangeDescription('کالا به حواله اضافه شد.', $reason, $note), $userId);
+        $this->logItemStockAudit($invoice, $item, 0, $quantity, $reason, $note, $userId);
+    }
+
+
+    private function itemChangeDescription(string $prefix, ?string $reason, ?string $note): string
+    {
+        $description = $prefix;
+        if ($reason) {
+            $description .= ' دلیل: ' . $this->reasonLabel($reason) . '.';
+        }
+        if ($note) {
+            $description .= ' توضیح: ' . $note;
+        }
+
+        return $description;
+    }
+
+    private function reasonLabel(string $reason): string
+    {
+        return [
+            'physical_shortage' => 'کسری فیزیکی / کالا در انبار پیدا نشد',
+            'customer_cancelled' => 'انصراف مشتری',
+            'wrong_item' => 'کالای اشتباه',
+            'warehouse_correction' => 'اصلاح انبار',
+            'finance_correction' => 'اصلاح مالی',
+            'replacement' => 'جایگزینی کالا',
+            'other' => 'سایر',
+        ][$reason] ?? $reason;
+    }
+
+    private function canEditSalesHavalehItems(Invoice $invoice, $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+        if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'Admin', 'warehouse', 'Warehouse', 'manager', 'Manager'])) {
+            return true;
+        }
+
+        return $this->accessService->canSellerEditInvoiceItems($invoice, $user);
+    }
 
     private function logItemStockAudit(Invoice $invoice, InvoiceItem $item, int $oldQty, int $newQty, ?string $reason, ?string $note, ?int $userId): void
     {
@@ -302,6 +394,11 @@ class SalesHavalehService
     {
         return DB::transaction(function () use ($invoice, $newStatus, $note, $userId) {
             $user = auth()->user();
+            if ($newStatus === SalesHavalehStatusService::SHIPPED && trim((string) $note) === '') {
+                abort(422, 'برای ثبت وضعیت ارسال‌شده، وارد کردن یادداشت نهایی الزامی است.');
+            }
+
+            $invoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
             $this->statusService->assertValidTransition($invoice, $newStatus, $user);
 
             $oldStatus = (string) $invoice->status;
@@ -313,7 +410,7 @@ class SalesHavalehService
 
             $this->historyService->log(
                 $invoice,
-                'status_changed',
+                $newStatus === SalesHavalehStatusService::SHIPPED ? 'shipped' : 'status_changed',
                 'status',
                 $oldStatus,
                 $newStatus,

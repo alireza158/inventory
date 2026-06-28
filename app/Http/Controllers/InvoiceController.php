@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Morilog\Jalali\Jalalian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends Controller
@@ -142,10 +143,88 @@ class InvoiceController extends Controller
         return view('vouchers.sales.index', compact('invoices', 'q', 'status', 'statusLabels', 'allowedStatuses'));
     }
 
+
+    public function salesQueue(Request $request)
+    {
+        $invoices = $this->salesQueueQuery(false)
+            ->orderBy('status_changed_at')
+            ->orderBy('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('vouchers.sales.queue', [
+            'invoices' => $invoices,
+            'statusLabels' => $this->statusService->labels(),
+            'queueStatuses' => $this->queueStatuses(),
+            'title' => 'حواله‌های آماده جمع‌آوری',
+            'isShippedPage' => false,
+        ]);
+    }
+
+    public function salesShipped(Request $request)
+    {
+        $invoices = $this->salesQueueQuery(true)
+            ->orderByDesc('status_changed_at')
+            ->orderByDesc('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('vouchers.sales.queue', [
+            'invoices' => $invoices,
+            'statusLabels' => $this->statusService->labels(),
+            'queueStatuses' => [SalesHavalehStatusService::SHIPPED],
+            'title' => 'حواله‌های ارسال‌شده',
+            'isShippedPage' => true,
+        ]);
+    }
+
+    public function salesQueueData(Request $request)
+    {
+        $invoices = $this->salesQueueQuery(false)->orderBy('status_changed_at')->orderBy('id')->limit(100)->get();
+
+        return response()->json([
+            'rows' => $invoices->map(fn (Invoice $invoice) => [
+                'uuid' => $invoice->uuid,
+                'customer_name' => $invoice->customer_name,
+                'customer_mobile' => $invoice->customer_mobile,
+                'items_count' => (int) $invoice->items->sum('quantity'),
+                'total' => (int) $invoice->total,
+                'status' => $invoice->status,
+                'status_label' => $this->statusService->labels()[$invoice->status] ?? $invoice->status,
+                'created_at' => optional($invoice->created_at)->format('Y-m-d H:i'),
+                'updated_at' => optional($invoice->updated_at)->format('Y-m-d H:i'),
+                'seller' => $invoice->preinvoiceOrder?->creator?->name,
+                'show_url' => route('vouchers.sales.show', $invoice->uuid),
+                'edit_url' => route('vouchers.sales.edit', $invoice->uuid),
+                'print_url' => route('vouchers.sales.print', $invoice->uuid),
+                'history_url' => route('vouchers.sales.history', $invoice->uuid),
+            ])->values(),
+        ]);
+    }
+
+    private function salesQueueQuery(bool $shipped)
+    {
+        return Invoice::query()
+            ->with(['items.product', 'items.variant', 'preinvoiceOrder.creator:id,name'])
+            ->when($shipped, fn ($query) => $query->where('status', SalesHavalehStatusService::SHIPPED), fn ($query) => $query->whereIn('status', $this->queueStatuses()));
+    }
+
+    private function queueStatuses(): array
+    {
+        return [
+            SalesHavalehStatusService::PENDING_WAREHOUSE_APPROVAL,
+            SalesHavalehStatusService::COLLECTING,
+            SalesHavalehStatusService::CHECKING_DISCREPANCY,
+            SalesHavalehStatusService::FINAL_CHECK,
+            SalesHavalehStatusService::PACKING,
+            SalesHavalehStatusService::NOT_SHIPPED,
+        ];
+    }
+
     public function salesVoucherShow(string $uuid)
     {
         $invoice = Invoice::query()
-            ->with(['items.product', 'items.variant', 'histories.actor'])
+            ->with(['items.product', 'items.variant', 'histories.actor', 'notes'])
             ->where('uuid', $uuid)
             ->firstOrFail();
 
@@ -173,13 +252,16 @@ class InvoiceController extends Controller
 
         $data = $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.id' => 'required|exists:invoice_items,id',
+            'items.*.id' => 'nullable|exists:invoice_items,id',
+            'items.*.product_id' => 'nullable|exists:products,id',
+            'items.*.variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:0',
             'items.*.price' => 'required|integer|min:0',
-            'edit_reason' => 'nullable|string|max:2000',
+            'change_reason' => 'required|in:physical_shortage,customer_cancelled,wrong_item,warehouse_correction,finance_correction,replacement,other',
+            'change_note' => 'nullable|string|max:2000',
         ]);
 
-        $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id(), $data['edit_reason'] ?? 'other', $data['edit_reason'] ?? null);
+        $this->salesHavalehService->updateItems($invoice, $data['items'], (int) auth()->id(), $data['change_reason'], $data['change_note'] ?? null);
 
         return redirect()->route('vouchers.sales.edit', $invoice->uuid)
             ->with('success', '✅ آیتم‌های حواله فروش با موفقیت بروزرسانی شد.');
@@ -251,7 +333,7 @@ class InvoiceController extends Controller
                 'customer_address' => $data['customer_address'] ?? '',
             ]);
 
-            $this->salesHavalehService->updateItems($invoice, $data['items'], auth()->id(), $data['edit_reason'], $data['edit_reason']);
+            $this->salesHavalehService->updateItems($invoice, $data['items'], (int) auth()->id(), $data['edit_reason'], $data['edit_reason']);
             $fresh = $invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder.items']);
             DB::table('invoice_edit_audits')->insert([
                 'invoice_id' => $invoice->id,
@@ -320,13 +402,26 @@ class InvoiceController extends Controller
         $invoice = Invoice::where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
-            'status' => 'required|string',
-            'note' => 'nullable|string|max:1000',
+            'status' => ['required', 'string', Rule::in($this->statusService->all())],
+            'note' => [
+                Rule::requiredIf($request->input('status') === Invoice::STATUS_SHIPPED),
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+        ], [
+            'note.required' => 'برای ثبت وضعیت ارسال‌شده، وارد کردن یادداشت نهایی الزامی است.',
         ]);
 
-        $this->salesHavalehService->changeStatus($invoice, $data['status'], $data['note'] ?? null, auth()->id());
+        $updatedInvoice = $this->salesHavalehService->changeStatus($invoice, $data['status'], $data['note'] ?? null, auth()->id());
 
-        return back()->with('success', '✅ وضعیت بروزرسانی شد.');
+        if ((string) $updatedInvoice->status === Invoice::STATUS_SHIPPED) {
+            return redirect()->route('vouchers.sales.queue')
+                ->with('success', '✅ حواله ارسال شد و از صف جمع‌آوری خارج شد.');
+        }
+
+        return redirect()->route('vouchers.sales.edit', $updatedInvoice->uuid)
+            ->with('success', '✅ وضعیت حواله بروزرسانی شد.');
     }
 
     public function cancel(string $uuid, Request $request)
