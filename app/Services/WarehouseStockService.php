@@ -28,7 +28,9 @@ class WarehouseStockService
                 'quantity' => $newQty,
             ]);
 
-            self::syncVariantStockFromCentral((int) $variantId);
+            if ($variantId) {
+                self::syncVariantStockFromCentral((int) $variantId);
+            }
             self::syncProductStockFromCentral($productId);
             self::syncWarehouseProductAggregate($warehouseId, $productId);
             self::syncExternalProductIfCentralWarehouse($warehouseId, $productId);
@@ -52,7 +54,9 @@ class WarehouseStockService
                 'quantity' => $quantity,
             ]);
 
-            self::syncVariantStockFromCentral((int) $variantId);
+            if ($variantId) {
+                self::syncVariantStockFromCentral((int) $variantId);
+            }
             self::syncProductStockFromCentral($productId);
             self::syncWarehouseProductAggregate($warehouseId, $productId);
             self::syncExternalProductIfCentralWarehouse($warehouseId, $productId);
@@ -126,8 +130,12 @@ class WarehouseStockService
         ]);
     }
 
-    public static function syncAllCentralVariantStocksFromVariants(): void
+    public static function syncAllCentralVariantStocksFromVariants(bool $confirmed = false): void
     {
+        if (! $confirmed) {
+            abort(422, 'همگام‌سازی گروهی warehouse_stocks از product_variants فقط با تایید مدیر مجاز است.');
+        }
+
         $centralId = self::centralWarehouseId();
 
         DB::transaction(function () use ($centralId) {
@@ -170,8 +178,12 @@ class WarehouseStockService
         });
     }
 
-    public static function migrateSingleVariantOldWarehouseStocks(): void
+    public static function migrateSingleVariantOldWarehouseStocks(bool $confirmed = false): void
     {
+        if (! $confirmed) {
+            abort(422, 'مهاجرت موجودی قدیمی فقط با تایید مدیر و پس از بررسی idempotency مجاز است.');
+        }
+
         DB::transaction(function () {
             WarehouseStock::query()
                 ->whereNull('product_variant_id')
@@ -208,6 +220,8 @@ class WarehouseStockService
                             ]);
                         }
 
+                        $oldStock->delete();
+
                         self::syncVariantStockFromCentral($variantId);
                         self::syncProductStockFromCentral((int) $oldStock->product_id);
                     }
@@ -219,6 +233,12 @@ class WarehouseStockService
     private static function assertVariantBelongsToProduct(int $productId, ?int $variantId): void
     {
         if (!$variantId) {
+            $hasVariants = ProductVariant::query()->where('product_id', $productId)->exists();
+
+            if ($hasVariants) {
+                abort(422, 'تغییر موجودی کالای دارای تنوع بدون product_variant_id مجاز نیست.');
+            }
+
             return;
         }
 
@@ -297,33 +317,19 @@ class WarehouseStockService
 
     private static function syncWarehouseProductAggregate(int $warehouseId, int $productId): void
     {
-        $total = (int) WarehouseStock::query()
-            ->where('warehouse_id', $warehouseId)
-            ->where('product_id', $productId)
-            ->whereNotNull('product_variant_id')
-            ->sum('quantity');
-
-        $aggregate = WarehouseStock::query()
-            ->where('warehouse_id', $warehouseId)
-            ->where('product_id', $productId)
-            ->whereNull('product_variant_id')
-            ->lockForUpdate()
-            ->first();
-
-        if ($aggregate) {
-            $aggregate->update([
-                'quantity' => max(0, $total),
-            ]);
-
+        if (ProductVariant::query()->where('product_id', $productId)->exists()) {
             return;
         }
 
-        WarehouseStock::create([
-            'warehouse_id' => $warehouseId,
-            'product_id' => $productId,
-            'product_variant_id' => null,
-            'quantity' => max(0, $total),
-        ]);
+        $total = (int) WarehouseStock::query()
+            ->where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)
+            ->whereNull('product_variant_id')
+            ->sum('quantity');
+
+        Product::query()
+            ->whereKey($productId)
+            ->update(['stock' => max(0, $total)]);
     }
 
     public static function centralWarehouseId(): int

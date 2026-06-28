@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Services\WarehouseStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -26,6 +27,10 @@ class StockMovementController extends Controller
 
         DB::transaction(function () use ($data, $product) {
             $p = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+
+            if ($p->variants()->exists()) {
+                abort(422, 'ثبت گردش موجودی سطح کالا برای کالای دارای تنوع مجاز نیست.');
+            }
 
             $before = (int) $p->stock;
             $qty = (int) $data['quantity'];
@@ -50,7 +55,12 @@ class StockMovementController extends Controller
                 'note' => $data['note'] ?? null,
             ]);
 
-            $p->update(['stock' => $after]);
+            WarehouseStockService::change(
+                WarehouseStockService::centralWarehouseId(),
+                (int) $p->id,
+                $data['type'] === 'in' ? $qty : -$qty,
+                null
+            );
         });
 
         return redirect()

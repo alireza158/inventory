@@ -7,6 +7,7 @@ use App\Models\InvoiceItem;
 use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\StockMovement;
 use App\Support\DocumentCodeGenerator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
@@ -65,12 +66,7 @@ class SalesHavalehService
 
             foreach ($invoice->items as $item) {
                 if (!in_array((int) $item->id, $requestedIds, true)) {
-                    $this->inventoryService->adjustCentralStock(
-                        (int) $item->product_id,
-                        (int) $item->quantity,
-                        $invoice->uuid,
-                        'برگشت موجودی بابت حذف آیتم حواله فروش'
-                    );
+                    $this->adjustSaleItemStock($invoice, $item, (int) $item->quantity, StockMovement::REASON_RETURN, 'برگشت موجودی بابت حذف آیتم حواله فروش', $changeReason, $changeNote);
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, -((int) $item->quantity));
 
                     $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, $this->itemChangeDescription('کالا از حواله حذف شد.', $changeReason, $changeNote), $userId);
@@ -97,12 +93,7 @@ class SalesHavalehService
                 $oldQty = (int) $item->quantity;
 
                 if ($newQty <= 0) {
-                    $this->inventoryService->adjustCentralStock(
-                        (int) $item->product_id,
-                        $oldQty,
-                        $invoice->uuid,
-                        'برگشت موجودی بابت حذف آیتم حواله فروش'
-                    );
+                    $this->adjustSaleItemStock($invoice, $item, $oldQty, StockMovement::REASON_RETURN, 'برگشت موجودی بابت حذف آیتم حواله فروش', $changeReason, $changeNote);
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, -$oldQty);
                     $this->historyService->log($invoice, 'item_removed', 'items', (string) $item->id, null, $this->itemChangeDescription('کالا از حواله حذف شد.', $changeReason, $changeNote), $userId);
                     $this->logItemStockAudit($invoice, $item, $oldQty, 0, $changeReason, $changeNote, $userId);
@@ -115,12 +106,12 @@ class SalesHavalehService
 
                 if ($delta > 0) {
                     $this->centralInventoryService->assertVariantAvailable((int) $item->variant_id, $delta);
-                    $this->inventoryService->adjustCentralStock((int) $item->product_id, -$delta, $invoice->uuid, 'کسر موجودی بابت افزایش تعداد آیتم حواله فروش');
+                    $this->adjustSaleItemStock($invoice, $item, -$delta, StockMovement::REASON_SALE, 'کسر موجودی بابت افزایش تعداد آیتم حواله فروش', $changeReason, $changeNote);
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $delta);
                     $this->historyService->log($invoice, 'item_quantity_increased', 'quantity', (string) $oldQty, (string) $newQty, $this->itemChangeDescription('تعداد کالا در حواله افزایش یافت.', $changeReason, $changeNote), $userId);
                     $this->logItemStockAudit($invoice, $item, $oldQty, $newQty, $changeReason, $changeNote, $userId);
                 } elseif ($delta < 0) {
-                    $this->inventoryService->adjustCentralStock((int) $item->product_id, abs($delta), $invoice->uuid, 'برگشت موجودی بابت کاهش تعداد آیتم حواله فروش');
+                    $this->adjustSaleItemStock($invoice, $item, abs($delta), StockMovement::REASON_RETURN, 'برگشت موجودی بابت کاهش تعداد آیتم حواله فروش', $changeReason, $changeNote);
                     $this->changeReservedOnly((int) $item->product_id, (int) $item->variant_id, $delta);
                     $this->historyService->log($invoice, 'item_quantity_decreased', 'quantity', (string) $oldQty, (string) $newQty, $this->itemChangeDescription('تعداد کالا در حواله کاهش یافت.', $changeReason, $changeNote), $userId);
                     $this->logItemStockAudit($invoice, $item, $oldQty, $newQty, $changeReason, $changeNote, $userId);
@@ -431,12 +422,7 @@ class SalesHavalehService
                     'line_total' => (int) $item->quantity * (int) $item->price,
                 ]);
 
-                $this->inventoryService->adjustCentralStock(
-                    (int) $item->product_id,
-                    -((int) $item->quantity),
-                    $invoice->uuid,
-                    'کسر موجودی بابت ایجاد حواله فروش از رکورد مالی'
-                );
+                $this->adjustSaleItemStock($invoice, $invoice->items()->where('variant_id', (int) $item->variant_id)->latest('id')->firstOrFail(), -((int) $item->quantity), StockMovement::REASON_SALE, 'کسر موجودی بابت ایجاد حواله فروش از رکورد مالی', null, null);
             }
 
             $this->ledgerService->syncInvoiceDebit($invoice);
@@ -487,17 +473,7 @@ class SalesHavalehService
             }
 
             foreach ($invoice->items as $item) {
-                $variant = ProductVariant::query()->whereKey((int) $item->variant_id)->lockForUpdate()->first();
-                if ($variant) {
-                    $variant->stock = (int) $variant->stock + (int) $item->quantity;
-                    $variant->save();
-                }
-                $this->inventoryService->adjustCentralStock(
-                    (int) $item->product_id,
-                    (int) $item->quantity,
-                    $invoice->uuid,
-                    'برگشت موجودی بابت کنسلی حواله فروش'
-                );
+                $this->adjustSaleItemStock($invoice, $item, (int) $item->quantity, StockMovement::REASON_RETURN, 'برگشت موجودی بابت کنسلی حواله فروش', null, $note);
             }
 
             $oldStatus = (string) $invoice->status;
