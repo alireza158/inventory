@@ -5,8 +5,8 @@
     };
     $money = fn ($value) => \App\Support\Currency::formatRial((int) $value);
     $dash = fn ($value) => filled($value) ? $value : '—';
-    $showWarehouseMap = $printData['mode'] !== 'customer';
-    $itemColspan = $showWarehouseMap ? 9 : 8;
+    $isWarehouseMode = $printData['mode'] !== 'customer';
+    $itemColspan = $isWarehouseMode ? 6 : 8;
     $totalQuantity = $printData['items']->sum('quantity');
     $totalLineAmount = $printData['items']->sum('lineTotal');
 @endphp
@@ -43,10 +43,18 @@
         </div>
     </section>
     <table class="items-table">
-        <thead><tr><th class="col-index">ردیف</th><th class="col-desc">شرح کالا</th><th class="col-code">کد انبار</th><th class="col-map warehouse-only">نقشه انبار</th><th class="col-qty">تعداد</th><th class="col-price">قیمت واحد</th><th class="col-price">تخفیف ردیف</th><th class="col-price">قیمت خالص</th><th class="col-total">مبلغ کل</th></tr></thead>
+        @if($isWarehouseMode)
+            <thead><tr><th class="col-index">ردیف</th><th class="col-desc">شرح کالا</th><th class="col-code">کد انبار</th><th class="col-map">نقشه انبار</th><th class="col-qty">تعداد</th><th class="col-check">کنترل انبار</th></tr></thead>
+        @else
+            <thead><tr><th class="col-index">ردیف</th><th class="col-desc">شرح کالا</th><th class="col-code">کد انبار</th><th class="col-qty">تعداد</th><th class="col-price">قیمت واحد</th><th class="col-price">تخفیف ردیف</th><th class="col-price">قیمت خالص</th><th class="col-total">مبلغ کل</th></tr></thead>
+        @endif
         <tbody>
         @forelse($printData['items'] as $item)
-            <tr><td class="col-index">{{ $loop->iteration }}</td><td class="col-desc">{{ $item['description'] }}</td><td class="col-code">{{ $item['inventoryCode'] }}</td><td class="col-map warehouse-only">{{ $item['warehouseMap'] }}</td><td class="col-qty">{{ number_format($item['quantity']) }}</td><td class="col-price">{{ number_format($item['unitPrice']) }}</td><td class="col-price">{{ number_format($item['lineDiscount'] ?? 0) }}</td><td class="col-price">{{ number_format($item['netUnitPrice'] ?? $item['unitPrice']) }}</td><td class="col-total">{{ number_format($item['lineTotal']) }}</td></tr>
+            @if($isWarehouseMode)
+                <tr><td class="col-index">{{ $loop->iteration }}</td><td class="col-desc">{{ $item['description'] }}</td><td class="col-code">{{ $item['inventoryCode'] }}</td><td class="col-map">{{ $item['warehouseMap'] }}</td><td class="col-qty">{{ number_format($item['quantity']) }}</td><td class="col-check"></td></tr>
+            @else
+                <tr><td class="col-index">{{ $loop->iteration }}</td><td class="col-desc">{{ $item['description'] }}</td><td class="col-code">{{ $item['inventoryCode'] }}</td><td class="col-qty">{{ number_format($item['quantity']) }}</td><td class="col-price">{{ number_format($item['unitPrice']) }}</td><td class="col-price">{{ number_format($item['lineDiscount'] ?? 0) }}</td><td class="col-price">{{ number_format($item['netUnitPrice'] ?? $item['unitPrice']) }}</td><td class="col-total">{{ number_format($item['lineTotal']) }}</td></tr>
+            @endif
         @empty
             <tr><td colspan="{{ $itemColspan }}" style="text-align:center">آیتمی ثبت نشده است.</td></tr>
         @endforelse
@@ -56,30 +64,37 @@
                 <td class="col-index"></td>
                 <td class="col-desc">جمع کل</td>
                 <td class="col-code"></td>
-                @if($showWarehouseMap)<td class="col-map warehouse-only"></td>@endif
-                <td class="col-qty">{{ number_format($totalQuantity) }}</td>
-                <td class="col-price"></td>
-                <td class="col-price"></td>
-                <td class="col-price"></td>
-                <td class="col-total">{{ number_format($totalLineAmount) }}</td>
+                @if($isWarehouseMode)
+                    <td class="col-map"></td>
+                    <td class="col-qty">{{ number_format($totalQuantity) }}</td>
+                    <td class="col-check"></td>
+                @else
+                    <td class="col-qty">{{ number_format($totalQuantity) }}</td>
+                    <td class="col-price"></td>
+                    <td class="col-price"></td>
+                    <td class="col-price"></td>
+                    <td class="col-total">{{ number_format($totalLineAmount) }}</td>
+                @endif
             </tr>
         </tfoot>
     </table>
-    <section class="summary-section">
-        <div></div><table class="summary-table"><tbody>
-            <tr><td>جمع کالاها</td><td>{{ $money($printData['totals']['subtotal']) }}</td></tr>
-            <tr><td>تخفیف</td><td>{{ $money($printData['totals']['discount']) }}</td></tr>
-            <tr><td>هزینه ارسال</td><td>{{ $money($printData['totals']['shipping']) }}</td></tr>
-            @if(!is_null($printData['totals']['paid']))<tr><td>مبلغ پرداخت‌شده</td><td>{{ $money($printData['totals']['paid']) }}</td></tr>@endif
-            @if(!is_null($printData['totals']['remaining']))<tr><td>مانده</td><td>{{ $money($printData['totals']['remaining']) }}</td></tr>@endif
-            <tr class="final-row"><td>مبلغ نهایی</td><td>{{ $money($printData['totals']['total']) }}</td></tr>
-        </tbody></table>
-    </section>
-    <section class="company-box"><div class="info-title">اطلاعات شرکت و پرداخت</div>
-        <div><strong>{{ $printData['company']['name'] }}</strong> | تلفن: {{ $printData['company']['phone'] }}</div>
-        <div>آدرس: {{ $printData['company']['address'] }}</div>
-        @if(filled($printData['company']['bank_account']))<div>شماره حساب شرکت: {{ $printData['company']['bank_account'] }}</div>@endif
-        @if(filled($printData['company']['sheba']))<div>شماره شبا شرکت: {{ $printData['company']['sheba'] }}</div>@endif
-    </section>
+    @unless($isWarehouseMode)
+        <section class="summary-section">
+            <div></div><table class="summary-table"><tbody>
+                <tr><td>جمع کالاها</td><td>{{ $money($printData['totals']['subtotal']) }}</td></tr>
+                <tr><td>تخفیف</td><td>{{ $money($printData['totals']['discount']) }}</td></tr>
+                <tr><td>هزینه ارسال</td><td>{{ $money($printData['totals']['shipping']) }}</td></tr>
+                @if(!is_null($printData['totals']['paid']))<tr><td>مبلغ پرداخت‌شده</td><td>{{ $money($printData['totals']['paid']) }}</td></tr>@endif
+                @if(!is_null($printData['totals']['remaining']))<tr><td>مانده</td><td>{{ $money($printData['totals']['remaining']) }}</td></tr>@endif
+                <tr class="final-row"><td>مبلغ نهایی</td><td>{{ $money($printData['totals']['total']) }}</td></tr>
+            </tbody></table>
+        </section>
+        <section class="company-box"><div class="info-title">اطلاعات شرکت و پرداخت</div>
+            <div><strong>{{ $printData['company']['name'] }}</strong> | تلفن: {{ $printData['company']['phone'] }}</div>
+            <div>آدرس: {{ $printData['company']['address'] }}</div>
+            @if(filled($printData['company']['bank_account']))<div>شماره حساب شرکت: {{ $printData['company']['bank_account'] }}</div>@endif
+            @if(filled($printData['company']['sheba']))<div>شماره شبا شرکت: {{ $printData['company']['sheba'] }}</div>@endif
+        </section>
+    @endunless
     <section class="signature-section"><div class="signature-box">امضا و مهر فروشنده</div><div class="signature-box">امضای مشتری / تحویل‌گیرنده</div></section>
 </main>
