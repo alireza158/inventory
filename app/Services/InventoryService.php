@@ -2,63 +2,43 @@
 
 namespace App\Services;
 
-use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\StockMovement;
-use App\Models\ProductVariant;
 
 class InventoryService
 {
-    public function adjustCentralStock(
-        int $productId,
-        int $variantId,
-        int $quantityDelta,
-        string $reference,
-        string $note = '',
-        array $meta = []
-    ): void {
+    public function adjustCentralStock(int $productId, int $quantityDelta, string $reference, string $note = ''): void
+    {
         if ($quantityDelta === 0) {
             return;
         }
 
-        if ($variantId <= 0) {
-            abort(422, 'تغییر موجودی کالا بدون مشخص بودن تنوع کالا مجاز نیست.');
+        $warehouseId = WarehouseStockService::centralWarehouseId();
+        WarehouseStockService::change($warehouseId, $productId, $quantityDelta);
+
+        $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+        if (!$product) {
+            return;
         }
 
-        $variant = ProductVariant::query()
-            ->whereKey($variantId)
-            ->where('product_id', $productId)
-            ->lockForUpdate()
-            ->first();
-
-        if (! $variant) {
-            abort(422, 'تنوع انتخاب‌شده برای این کالا معتبر نیست.');
-        }
-
-        $warehouseId = (int) ($meta['warehouse_id'] ?? WarehouseStockService::centralWarehouseId());
-        $before = WarehouseStockService::available($warehouseId, $productId, $variantId);
+        $before = (int) $product->stock;
         $after = $before + $quantityDelta;
 
         if ($after < 0) {
-            abort(422, 'موجودی این تنوع در انبار مرکزی کافی نیست و نمی‌تواند منفی شود.');
+            abort(422, 'موجودی کالا نمی‌تواند منفی شود.');
         }
 
-        WarehouseStockService::change($warehouseId, $productId, $quantityDelta, $variantId);
+        $product->update(['stock' => $after]);
 
         StockMovement::create([
-            'product_id' => $productId,
-            'product_variant_id' => $variantId,
-            'warehouse_id' => $warehouseId,
+            'product_id' => $product->id,
             'user_id' => auth()->id(),
-            'type' => $quantityDelta > 0 ? StockMovement::TYPE_IN : StockMovement::TYPE_OUT,
-            'reason' => $meta['reason'] ?? ($quantityDelta > 0 ? StockMovement::REASON_ADJUSTMENT : StockMovement::REASON_SALE),
-            'transaction_type' => $meta['transaction_type'] ?? null,
+            'type' => $quantityDelta > 0 ? 'in' : 'out',
+            'reason' => $quantityDelta > 0 ? 'adjustment' : 'sale',
             'quantity' => abs($quantityDelta),
             'stock_before' => $before,
             'stock_after' => $after,
             'reference' => $reference,
-            'reference_type' => $meta['reference_type'] ?? Invoice::class,
-            'reference_id' => $meta['reference_id'] ?? null,
             'note' => $note,
         ]);
     }
