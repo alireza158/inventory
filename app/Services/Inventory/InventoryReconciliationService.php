@@ -33,6 +33,29 @@ class InventoryReconciliationService
             ->groupBy('i.status')->orderBy('i.status')->get();
     }
 
+
+    public function activeReservationRowsForProduct(int $productId): Collection
+    {
+        return DB::table('preinvoice_order_items AS poi')
+            ->join('preinvoice_orders AS po', 'po.id', '=', 'poi.preinvoice_order_id')
+            ->where('poi.product_id', $productId)
+            ->whereNotNull('poi.variant_id')
+            ->whereNull('po.stock_released_at')
+            ->whereIn('po.status', self::ACTIVE_PREINVOICE_STATUSES)
+            ->get(['poi.id', 'poi.preinvoice_order_id', 'po.uuid', 'poi.variant_id', 'poi.quantity']);
+    }
+
+    public function hasReservationCalculationMismatchForProduct(int $productId): bool
+    {
+        $activeRows = $this->activeReservationRowsForProduct($productId);
+
+        if ($activeRows->isNotEmpty()) {
+            return false;
+        }
+
+        return $this->rows($productId)->contains(fn (array $row) => (int) $row['active_reserved_qty'] !== 0 || (int) $row['expected_reserved'] !== 0);
+    }
+
     public function rows(?int $productId = null): Collection
     {
         $central = $this->centralWarehouseId();

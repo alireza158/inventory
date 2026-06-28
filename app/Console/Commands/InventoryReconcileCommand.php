@@ -22,6 +22,11 @@ class InventoryReconcileCommand extends Command
         if ($invalid->isNotEmpty()) { $this->warn('Invoice statuses excluded from stock calculation:'); $this->table(['status','invoices_count','qty'], $invalid->map(fn($r)=>(array)$r)->all()); }
         if ($apply && $invalid->isNotEmpty()) { $this->error('Resolve/report excluded invoice statuses before apply.'); return SymfonyCommand::FAILURE; }
 
+        if ($service->hasReservationCalculationMismatchForProduct(24)) {
+            $this->error('Reservation calculation mismatch for product_id=24');
+            return SymfonyCommand::FAILURE;
+        }
+
         $rows = $service->rows($productId);
         $reportRows = $rows->filter(fn($r)=>$r['blocked'] || $r['flags'] || $r['difference'] !== 0 || $r['current_reserved'] !== $r['expected_reserved'])->values();
         $this->info($apply ? 'APPLY mode: only safe rows will be updated.' : 'DRY-RUN mode: no data changed.');
