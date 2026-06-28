@@ -17,16 +17,11 @@ class StockMovement extends Model
     public const REASON_PURCHASE_ITEM_ADDED = 'purchase_item_added';
     public const REASON_PURCHASE_ITEM_CHANGED = 'purchase_item_quantity_changed';
     public const REASON_PURCHASE_ITEM_REMOVED = 'purchase_item_removed';
-    public const REASON_SALE_ITEM_REMOVED = 'sale_item_removed';
-    public const REASON_SALE_ITEM_QUANTITY_REDUCED = 'sale_item_quantity_reduced';
-    public const REASON_SALE_ITEM_QUANTITY_INCREASED = 'sale_item_quantity_increased';
 
     public const TRANSACTION_PURCHASE_ADJUSTMENT = 'purchase_adjustment';
-    public const TRANSACTION_SALES_HAVALEH_ADJUSTMENT = 'sales_havaleh_adjustment';
 
     protected $fillable = [
         'product_id',
-        'product_variant_id',
         'warehouse_id',
         'user_id',
         'type',
@@ -42,7 +37,6 @@ class StockMovement extends Model
     ];
 
     public function product() { return $this->belongsTo(Product::class); }
-    public function variant() { return $this->belongsTo(ProductVariant::class, 'product_variant_id'); }
     public function warehouse() { return $this->belongsTo(Warehouse::class); }
     public function user() { return $this->belongsTo(User::class); }
 }
