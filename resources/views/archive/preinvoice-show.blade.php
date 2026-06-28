@@ -15,7 +15,19 @@
     }
   };
 
+  $isCancelled = in_array($order->status, [
+    \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+    \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+  ], true);
+
   $statusClass = fn($s) => match($s) {
+    \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
+    \App\Models\PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE => 'status-danger',
+    \App\Models\PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE => 'status-success',
+    \App\Models\PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+    \App\Models\PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING,
+    \App\Models\PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+    \App\Models\PreinvoiceOrder::STATUS_FINANCE_REVIEWING => 'status-warning',
     'draft' => 'status-draft',
     'pending' => 'status-warning',
     'pending_warehouse_approval' => 'status-warning',
@@ -681,6 +693,18 @@
 </section>
 
 <div class="container py-4 preinvoice-show-page">
+
+
+  @if($isCancelled)
+    <div class="alert alert-danger border-0 shadow-sm mb-4">
+      <div class="fw-bold mb-1">این پیش‌فاکتور کنسل شده است.</div>
+      <div class="small">وضعیت فعلی: {{ $order->status_label }}{{ $order->warehouse_reject_reason ? ' | دلیل: ' . $order->warehouse_reject_reason : '' }}</div>
+    </div>
+  @else
+    <div class="alert alert-success border-0 shadow-sm mb-4">
+      <div class="fw-bold">این پیش‌فاکتور کنسل نشده است.</div>
+    </div>
+  @endif
 
   <div class="preinvoice-hero mb-4">
     <div class="hero-content">

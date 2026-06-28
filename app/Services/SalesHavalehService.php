@@ -8,6 +8,7 @@ use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
+use App\Support\ActivityLogger;
 use App\Support\DocumentCodeGenerator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
@@ -484,8 +485,110 @@ class SalesHavalehService
             ]);
 
             $this->historyService->log($invoice, 'cancelled', 'status', $oldStatus, SalesHavalehStatusService::NOT_SHIPPED, $note ?: 'کنسلی فاکتور و برگشت موجودی', $userId);
+            $this->markLinkedPreinvoiceCancelled($invoice, $note, $userId);
 
             return $invoice->fresh();
         });
+    }
+
+    public function undoCancelAndReserve(Invoice $invoice, ?string $note = null, ?int $userId = null): Invoice
+    {
+        return DB::transaction(function () use ($invoice, $note, $userId) {
+            $invoice = Invoice::query()->with('items')->lockForUpdate()->findOrFail($invoice->id);
+            if ((string) $invoice->status !== SalesHavalehStatusService::NOT_SHIPPED) {
+                return $invoice;
+            }
+
+            foreach ($invoice->items as $item) {
+                $this->adjustSaleItemStock($invoice, $item, -((int) $item->quantity), StockMovement::REASON_SALE, 'کسر مجدد موجودی بابت لغو کنسلی فاکتور', null, $note);
+            }
+
+            $invoice->update([
+                'status' => SalesHavalehStatusService::PENDING_WAREHOUSE_APPROVAL,
+                'status_changed_at' => now(),
+                'status_changed_by' => $userId,
+            ]);
+
+            $this->historyService->log($invoice, 'cancel_reverted', 'status', SalesHavalehStatusService::NOT_SHIPPED, SalesHavalehStatusService::PENDING_WAREHOUSE_APPROVAL, $note ?: 'لغو کنسلی فاکتور توسط مالی', $userId);
+            $this->restoreLinkedPreinvoiceAfterCancelUndo($invoice, $note, $userId);
+
+            return $invoice->fresh();
+        });
+    }
+
+    private function markLinkedPreinvoiceCancelled(Invoice $invoice, ?string $note, ?int $userId): void
+    {
+        $order = $invoice->preinvoiceOrder()
+            ->lockForUpdate()
+            ->first();
+
+        if (! $order || (string) $order->status === PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE) {
+            return;
+        }
+
+        $oldPreinvoiceStatus = (string) $order->status;
+        $reason = $note ?: 'کنسلی فاکتور و برگشت موجودی';
+        $itemsSnapshot = $order->items()->get()->toArray();
+
+        $order->update([
+            'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+            'warehouse_reject_reason' => $reason,
+            'stock_frozen_until' => null,
+            'stock_released_at' => $order->stock_released_at ?: now(),
+        ]);
+
+        $order->reviews()->create([
+            'user_id' => $userId,
+            'action' => 'invoice_cancelled',
+            'reason' => $reason,
+            'before_items' => $itemsSnapshot,
+            'after_items' => $itemsSnapshot,
+        ]);
+
+        ActivityLogger::log('invoice_cancelled_preinvoice_cancelled', $order->fresh(), 'پیش‌فاکتور به دلیل کنسلی فاکتور مرتبط لغو شد.', [
+            'invoice_id' => $invoice->id,
+            'invoice_uuid' => $invoice->uuid,
+            'old_status' => $oldPreinvoiceStatus,
+            'new_status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
+            'reason' => $note,
+        ]);
+    }
+
+    private function restoreLinkedPreinvoiceAfterCancelUndo(Invoice $invoice, ?string $note, ?int $userId): void
+    {
+        $order = $invoice->preinvoiceOrder()
+            ->lockForUpdate()
+            ->first();
+
+        if (! $order) {
+            return;
+        }
+
+        $oldPreinvoiceStatus = (string) $order->status;
+        $reason = $note ?: 'لغو کنسلی فاکتور توسط مالی';
+        $itemsSnapshot = $order->items()->get()->toArray();
+
+        $order->update([
+            'status' => PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE,
+            'warehouse_reject_reason' => null,
+            'stock_frozen_until' => null,
+            'stock_released_at' => now(),
+        ]);
+
+        $order->reviews()->create([
+            'user_id' => $userId,
+            'action' => 'invoice_cancel_reverted',
+            'reason' => $reason,
+            'before_items' => $itemsSnapshot,
+            'after_items' => $itemsSnapshot,
+        ]);
+
+        ActivityLogger::log('invoice_cancel_reverted_preinvoice_restored', $order->fresh(), 'کنسلی پیش‌فاکتور به دلیل لغو کنسلی فاکتور مرتبط برگشت خورد.', [
+            'invoice_id' => $invoice->id,
+            'invoice_uuid' => $invoice->uuid,
+            'old_status' => $oldPreinvoiceStatus,
+            'new_status' => PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE,
+            'reason' => $note,
+        ]);
     }
 }
