@@ -9,29 +9,36 @@ use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
 class InventoryReconcileCommand extends Command
 {
-    protected $signature = 'inventory:reconcile {--product= : Reconcile one product id} {--dry-run : Report only} {--apply : Apply safe rows} {--backup : Create backup tables before apply}';
+    protected $signature = 'inventory:reconcile {--product= : Reconcile one product id} {--dry-run : Report only} {--apply : Apply safe rows} {--backup : Create backup tables before apply} {--exclude-suspicious-reservations : Ignore suspicious active reservations in expected stock/reserved calculations}';
     protected $description = 'Audit and safely reconcile product variant stock, warehouse stock, reservations, and sell prices.';
 
     public function handle(InventoryReconciliationService $service): int
     {
         $productId = $this->option('product') !== null ? (int) $this->option('product') : null;
         $apply = (bool) $this->option('apply');
+        $excludeSuspiciousReservations = (bool) $this->option('exclude-suspicious-reservations');
         if ($apply && ! $this->option('backup')) { $this->error('Refusing apply without --backup.'); return SymfonyCommand::FAILURE; }
 
         $invalid = $service->invalidInvoiceStatuses($productId);
         if ($invalid->isNotEmpty()) { $this->warn('Invoice statuses excluded from stock calculation:'); $this->table(['status','invoices_count','qty'], $invalid->map(fn($r)=>(array)$r)->all()); }
         if ($apply && $invalid->isNotEmpty()) { $this->error('Resolve/report excluded invoice statuses before apply.'); return SymfonyCommand::FAILURE; }
 
-        if ($service->hasReservationCalculationMismatchForProduct(24)) {
+        if ($service->hasReservationCalculationMismatchForProduct(24, $excludeSuspiciousReservations)) {
             $this->error('Reservation calculation mismatch for product_id=24');
             return SymfonyCommand::FAILURE;
         }
 
-        $rows = $service->rows($productId);
+        $product24Rows = $service->rows(24, $excludeSuspiciousReservations);
+        if ($apply && ! $excludeSuspiciousReservations && $product24Rows->contains(fn ($row) => in_array('suspicious_reservation', $row['flags'], true))) {
+            $this->error('Product_id=24 has suspicious reservations. Re-run dry-run with --exclude-suspicious-reservations and review before apply.');
+            return SymfonyCommand::FAILURE;
+        }
+
+        $rows = $productId === 24 ? $product24Rows : $service->rows($productId, $excludeSuspiciousReservations);
         $reportRows = $rows->filter(fn($r)=>$r['blocked'] || $r['flags'] || $r['difference'] !== 0 || $r['current_reserved'] !== $r['expected_reserved'])->values();
         $this->info($apply ? 'APPLY mode: only safe rows will be updated.' : 'DRY-RUN mode: no data changed.');
         $this->table(array_keys($service->summary($rows)), [$service->summary($rows)]);
-        if ($reportRows->isNotEmpty()) $this->table(['variant_id','product_id','product_name','variant_name','current_stock','current_reserved','warehouse_stock','purchase_qty','invoice_qty','active_reserved_qty','expected_stock','expected_reserved','difference','flags','suspicious_preinvoices'], $reportRows->map(fn($r)=>[...array_intersect_key($r, array_flip(['variant_id','product_id','product_name','variant_name','current_stock','current_reserved','warehouse_stock','purchase_qty','invoice_qty','active_reserved_qty','expected_stock','expected_reserved','difference'])), 'flags'=>$r['flags_text'], 'suspicious_preinvoices'=>$r['suspicious_preinvoices']])->all());
+        if ($reportRows->isNotEmpty()) $this->table(['variant_id','product_id','product_name','variant_name','current_stock','current_reserved','warehouse_stock','purchase_qty','invoice_qty','active_reserved_qty','expected_stock','expected_reserved','difference','flags','suspicious_preinvoices','ignored_suspicious_reservation'], $reportRows->map(fn($r)=>[...array_intersect_key($r, array_flip(['variant_id','product_id','product_name','variant_name','current_stock','current_reserved','warehouse_stock','purchase_qty','invoice_qty','active_reserved_qty','expected_stock','expected_reserved','difference'])), 'flags'=>$r['flags_text'], 'suspicious_preinvoices'=>$r['suspicious_preinvoices'], 'ignored_suspicious_reservation'=>$r['ignored_suspicious_reservation']])->all());
         if (! $apply) return SymfonyCommand::SUCCESS;
 
         $central = $service->centralWarehouseId();
@@ -54,7 +61,7 @@ class InventoryReconcileCommand extends Command
                 $this->setWarehouse($central, $pid, null, $sum);
             }
         });
-        $after = $service->rows($productId); $this->info('Post-apply audit:');
+        $after = $service->rows($productId, $excludeSuspiciousReservations); $this->info('Post-apply audit:');
         $this->table(['fake_30000_remaining','mismatch_remaining','reservation_or_sales_conflicts_remaining'], [[
             $after->filter(fn($r)=>in_array('fake_30000',$r['flags'],true))->count(),
             $after->filter(fn($r)=>in_array('warehouse_mismatch',$r['flags'],true) || $r['difference'] !== 0)->count(),

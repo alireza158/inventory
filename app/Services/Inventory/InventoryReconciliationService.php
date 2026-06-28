@@ -45,7 +45,7 @@ class InventoryReconciliationService
             ->get(['poi.id', 'poi.preinvoice_order_id', 'po.uuid', 'poi.variant_id', 'poi.quantity']);
     }
 
-    public function hasReservationCalculationMismatchForProduct(int $productId): bool
+    public function hasReservationCalculationMismatchForProduct(int $productId, bool $excludeSuspiciousReservations = false): bool
     {
         $activeRows = $this->activeReservationRowsForProduct($productId);
 
@@ -53,10 +53,10 @@ class InventoryReconciliationService
             return false;
         }
 
-        return $this->rows($productId)->contains(fn (array $row) => (int) $row['active_reserved_qty'] !== 0 || (int) $row['expected_reserved'] !== 0);
+        return $this->rows($productId, $excludeSuspiciousReservations)->contains(fn (array $row) => (int) $row['active_reserved_qty'] !== 0 || (int) $row['expected_reserved'] !== 0);
     }
 
-    public function rows(?int $productId = null): Collection
+    public function rows(?int $productId = null, bool $excludeSuspiciousReservations = false): Collection
     {
         $central = $this->centralWarehouseId();
         $purchase = $this->sumByVariant('purchase_items', 'product_variant_id', $productId);
@@ -65,16 +65,20 @@ class InventoryReconciliationService
         $warehouse = $this->warehouseQty($central, $productId);
         $movement = $this->movementQty($productId);
         $prices = $this->priceSources($productId);
-        $suspicious = $this->suspiciousReservations($productId);
+        $suspiciousReservations = $this->suspiciousReservations($productId);
+        $suspicious = $suspiciousReservations['by_product'];
+        $suspiciousQty = $suspiciousReservations['qty_by_variant'];
 
         return DB::table('product_variants AS pv')
             ->join('products AS p', 'p.id', '=', 'pv.product_id')
             ->when($productId, fn ($q) => $q->where('pv.product_id', $productId))
             ->orderBy('pv.product_id')->orderBy('pv.id')
             ->get(['pv.id AS variant_id','pv.product_id','p.name AS product_name','pv.variant_name','pv.stock','pv.reserved','pv.buy_price','pv.sell_price'])
-            ->map(function ($r) use ($purchase, $invoice, $reserved, $warehouse, $movement, $prices, $suspicious) {
+            ->map(function ($r) use ($purchase, $invoice, $reserved, $warehouse, $movement, $prices, $suspicious, $suspiciousQty, $excludeSuspiciousReservations) {
                 $vid = (int) $r->variant_id; $pid = (int) $r->product_id;
-                $pq = (int) ($purchase[$vid] ?? 0); $iq = (int) ($invoice[$vid] ?? 0); $rq = (int) ($reserved[$vid] ?? 0);
+                $pq = (int) ($purchase[$vid] ?? 0); $iq = (int) ($invoice[$vid] ?? 0);
+                $rawReserved = (int) ($reserved[$vid] ?? 0); $ignoredSuspiciousReserved = (int) ($suspiciousQty[$vid]['qty'] ?? 0);
+                $rq = $excludeSuspiciousReservations ? max(0, $rawReserved - $ignoredSuspiciousReserved) : $rawReserved;
                 $expected = ($pq === 0 && $iq === 0) ? 0 : $pq - $iq - $rq;
                 $wh = (int) ($warehouse[$vid] ?? 0); $mov = $movement[$vid] ?? ['in'=>0,'out'=>0];
                 $flags = [];
@@ -88,7 +92,8 @@ class InventoryReconciliationService
                 if ((int) $r->sell_price <= 0) $flags[] = 'missing_sell_price';
                 $price = $prices[$vid] ?? null;
                 if ((int) $r->sell_price <= 0 && ! $price) $flags[] = 'missing_sell_price_source';
-                $blocked = $expected < 0 || count(array_intersect($flags, self::BLOCKING_FLAGS)) > 0;
+                $blockingFlags = $excludeSuspiciousReservations ? array_diff(self::BLOCKING_FLAGS, ['suspicious_reservation']) : self::BLOCKING_FLAGS;
+                $blocked = $expected < 0 || count(array_intersect($flags, $blockingFlags)) > 0;
                 return [
                     'variant_id'=>$vid,'product_id'=>$pid,'product_name'=>$r->product_name,'variant_name'=>$r->variant_name,
                     'current_stock'=>(int)$r->stock,'current_reserved'=>(int)$r->reserved,'warehouse_stock'=>$wh,
@@ -96,6 +101,7 @@ class InventoryReconciliationService
                     'difference'=>$expected - (int)$r->stock,'movement_in'=>(int)$mov['in'],'movement_out'=>(int)$mov['out'],'movement_net'=>(int)$mov['in']-(int)$mov['out'],'document_net'=>$pq-$iq,
                     'expected_buy_price'=>$price['buy_price'] ?? null,'expected_sell_price'=>$price['sell_price'] ?? null,'price_source'=>$price['source'] ?? null,
                     'flags'=>$flags,'flags_text'=>implode(',', $flags),'blocked'=>$blocked,'suspicious_preinvoices'=>$suspicious[$pid] ?? '',
+                    'ignored_suspicious_reservation'=>$excludeSuspiciousReservations ? ($suspiciousQty[$vid]['text'] ?? '') : '',
                 ];
             });
     }
@@ -137,7 +143,18 @@ class InventoryReconciliationService
     {
         $variantCounts = DB::table('product_variants')->when($productId, fn($q)=>$q->where('product_id',$productId))->select('product_id',DB::raw('COUNT(*) c'))->groupBy('product_id')->pluck('c','product_id');
         $rows = DB::table('preinvoice_order_items AS poi')->join('preinvoice_orders AS po','po.id','=','poi.preinvoice_order_id')->whereNotNull('poi.variant_id')->whereNull('po.stock_released_at')->whereIn('po.status', self::ACTIVE_PREINVOICE_STATUSES)->when($productId, fn($q)=>$q->where('poi.product_id',$productId))->select('poi.product_id','po.id','po.uuid','poi.quantity',DB::raw('COUNT(DISTINCT poi.variant_id) variants'))->groupBy('poi.product_id','po.id','po.uuid','poi.quantity')->get();
-        $out=[]; foreach($rows as $r){ $total=(int)($variantCounts[$r->product_id]??0); if($total>1 && (int)$r->variants >= max(2, (int)ceil($total*0.8))) $out[(int)$r->product_id][] = "#{$r->id}/{$r->uuid}/qty:{$r->quantity}"; }
-        return array_map(fn($v)=>implode('; ', $v), $out);
+        $byProduct=[]; $qtyByVariant=[];
+        foreach($rows as $r){
+            $total=(int)($variantCounts[$r->product_id]??0);
+            if($total<=1 || (int)$r->variants < max(2, (int)ceil($total*0.8))) continue;
+            $text = "#{$r->id}/{$r->uuid}/qty:{$r->quantity}";
+            $byProduct[(int)$r->product_id][] = $text;
+            DB::table('preinvoice_order_items')->where('preinvoice_order_id',$r->id)->where('product_id',$r->product_id)->where('quantity',$r->quantity)->whereNotNull('variant_id')->get(['variant_id','quantity'])->each(function($item) use (&$qtyByVariant, $text){
+                $variantId = (int) $item->variant_id;
+                $qtyByVariant[$variantId]['qty'] = (int)($qtyByVariant[$variantId]['qty'] ?? 0) + (int)$item->quantity;
+                $qtyByVariant[$variantId]['text'] = trim(($qtyByVariant[$variantId]['text'] ?? '').'; '.$text, '; ');
+            });
+        }
+        return ['by_product'=>array_map(fn($v)=>implode('; ', $v), $byProduct), 'qty_by_variant'=>$qtyByVariant];
     }
 }
