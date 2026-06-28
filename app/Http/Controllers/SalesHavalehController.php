@@ -74,10 +74,9 @@ class SalesHavalehController extends Controller
             'items.*.id' => 'required|exists:invoice_items,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|integer|min:0',
-            'edit_reason' => 'nullable|string|max:2000',
         ]);
 
-        $updated = $this->service->updateItems($invoice, $data['items'], auth()->id(), $data['edit_reason'] ?? 'other', $data['edit_reason'] ?? null);
+        $updated = $this->service->updateItems($invoice, $data['items'], auth()->id());
 
         return response()->json([
             'message' => 'حواله فروش بروزرسانی شد.',
