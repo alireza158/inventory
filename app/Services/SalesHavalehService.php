@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\CustomerLedger;
 use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
 use App\Support\DocumentCodeGenerator;
+use App\Support\ActivityLogger;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 
@@ -128,6 +130,9 @@ class SalesHavalehService
             $invoice->update([
                 'subtotal' => $subtotal,
                 'total' => $newTotal,
+                'status' => Invoice::STATUS_PENDING_FINANCE_REAPPROVAL,
+                'status_changed_at' => now(),
+                'status_changed_by' => $userId,
                 'items_updated_at' => now(),
                 'items_updated_by' => $userId,
             ]);
@@ -138,9 +143,9 @@ class SalesHavalehService
                 $this->historyService->log($invoice, 'amount_recalculated', 'total', (string) $oldTotal, (string) $newTotal, 'بروزرسانی مبلغ کل حواله فروش', $userId);
             }
 
-            $this->ledgerService->syncInvoiceDebit($invoice->fresh());
+            $this->syncLinkedPreinvoiceForFinanceReapproval($invoice->fresh(['items', 'preinvoiceOrder.items']), $userId, $changeReason, $changeNote, $oldTotal, $newTotal);
 
-            return $invoice->fresh(['items.product', 'items.variant']);
+            return $invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder']);
         });
     }
 
@@ -155,6 +160,64 @@ class SalesHavalehService
         ?string $changeNote = null
     ): Invoice {
         return $this->updateItemsForInvoice($invoice, $items, $userId, (string) $changeReason, $changeNote);
+    }
+
+
+    private function syncLinkedPreinvoiceForFinanceReapproval(Invoice $invoice, int $userId, ?string $reason, ?string $note, int $oldTotal, int $newTotal): void
+    {
+        $order = $invoice->preinvoiceOrder()->lockForUpdate()->first();
+        if (! $order) {
+            return;
+        }
+
+        $oldStatus = (string) $order->status;
+        $order->items()->delete();
+        foreach ($invoice->items as $item) {
+            $order->items()->create([
+                'product_id' => (int) $item->product_id,
+                'variant_id' => (int) $item->variant_id,
+                'quantity' => (int) $item->quantity,
+                'price' => (int) $item->price,
+                'line_total' => max(((int) $item->quantity * (int) $item->price) - (int) ($item->line_discount_amount ?? 0), 0),
+                'sort_order' => (int) ($item->sort_order ?: 0),
+                'line_discount_amount' => (int) ($item->line_discount_amount ?? 0),
+            ]);
+        }
+
+        $order->update([
+            'customer_id' => $invoice->customer_id,
+            'customer_name' => $invoice->customer_name,
+            'customer_mobile' => $invoice->customer_mobile,
+            'customer_address' => $invoice->customer_address,
+            'province_id' => $invoice->province_id,
+            'city_id' => $invoice->city_id,
+            'shipping_id' => $invoice->shipping_id,
+            'shipping_price' => (int) $invoice->shipping_price,
+            'discount_amount' => (int) $invoice->discount_amount,
+            'total_price' => (int) $invoice->total,
+            'status' => PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+            'stock_frozen_until' => null,
+            'stock_released_at' => null,
+            'items_updated_at' => now(),
+            'items_updated_by' => $userId,
+        ]);
+
+        CustomerLedger::query()
+            ->where('reference_type', Invoice::class)
+            ->where('reference_id', $invoice->id)
+            ->where('type', 'debit')
+            ->delete();
+
+        $this->historyService->log($invoice, 'sent_to_finance_reapproval', 'status', null, Invoice::STATUS_PENDING_FINANCE_REAPPROVAL, 'ویرایش اقلام توسط انبار ثبت شد و سند با همان شماره برای تایید مالی مجدد ارسال شد.', $userId);
+        ActivityLogger::log('invoice_warehouse_edit_finance_reapproval', $invoice->fresh(), 'فاکتور توسط انبار ویرایش و برای تایید مالی مجدد ارسال شد.', [
+            'preinvoice_order_id' => $order->id,
+            'old_preinvoice_status' => $oldStatus,
+            'new_preinvoice_status' => PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+            'old_total' => $oldTotal,
+            'new_total' => $newTotal,
+            'reason' => $reason,
+            'note' => $note,
+        ]);
     }
 
     private function itemsActuallyChanged(Invoice $invoice, array $items): bool
@@ -477,6 +540,7 @@ class SalesHavalehService
             }
 
             $invoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+            $oldStatus = (string) $invoice->status;
             $this->statusService->assertValidTransition($invoice, $newStatus, $user);
 
             $invoice->update([
@@ -503,6 +567,7 @@ class SalesHavalehService
     {
         return DB::transaction(function () use ($invoice, $note, $userId) {
             $invoice = Invoice::query()->with('items')->lockForUpdate()->findOrFail($invoice->id);
+            $oldStatus = (string) $invoice->status;
             if ((string) $invoice->status === SalesHavalehStatusService::NOT_SHIPPED) {
                 return $invoice;
             }

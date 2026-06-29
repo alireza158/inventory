@@ -150,7 +150,7 @@ class VoucherController extends Controller
                 ]);
             }
 
-            $subtotal = (int) $invoice->items()->sum('line_total');
+            $subtotal = (int) $invoice->items()->reorder()->sum('line_total');
             $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
             $invoice->update([
                 'subtotal' => $subtotal,
@@ -761,7 +761,7 @@ class VoucherController extends Controller
                 ]);
             }
 
-            $subtotal = (int) $invoice->items()->sum('line_total');
+            $subtotal = (int) $invoice->items()->reorder()->sum('line_total');
             $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
 
             $invoice->update([
