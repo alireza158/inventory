@@ -527,6 +527,7 @@ class InvoiceController extends Controller
     {
         $query = Invoice::query()
             ->select('invoices.*')
+            ->where('invoices.status', '!=', Invoice::STATUS_PENDING_FINANCE_REAPPROVAL)
             ->selectSub('select coalesce(sum(amount), 0) from invoice_payments where invoice_payments.invoice_id = invoices.id', 'paid_total')
             ->when($filters['invoice_number'] !== '', fn ($q) => $q->where('uuid', 'like', '%' . $filters['invoice_number'] . '%'))
             ->when($filters['customer_name'] !== '', function ($query) use ($filters) {

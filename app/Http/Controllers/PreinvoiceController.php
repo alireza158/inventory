@@ -807,7 +807,10 @@ class PreinvoiceController extends Controller
 
     private function calculateOrderTotal(PreinvoiceOrder $order): int
     {
-        $subtotal = (int) $order->items()->selectRaw('COALESCE(SUM(quantity * price),0) as total')->value('total');
+        $subtotal = (int) $order->items()
+            ->reorder()
+            ->selectRaw('COALESCE(SUM(quantity * price), 0) as total')
+            ->value('total');
 
         return max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
     }
@@ -1520,13 +1523,10 @@ class PreinvoiceController extends Controller
         abort_unless($this->canHandleFinanceActions(), 403);
 
         $order = PreinvoiceOrder::with(['items', 'invoice'])->where('uuid', $uuid)->firstOrFail();
-        if ($order->invoice || $order->status === PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE) {
-            if ($order->invoice) {
-                return redirect()->route('invoices.show', $order->invoice->uuid)->with('success', 'این پیش‌فاکتور قبلاً به فاکتور تبدیل شده است.');
-            }
-            abort(409, 'این پیش‌فاکتور قبلاً تبدیل شده است.');
-        }
         abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
+        if ($order->invoice && (string) $order->invoice->status !== Invoice::STATUS_PENDING_FINANCE_REAPPROVAL) {
+            return redirect()->route('invoices.show', $order->invoice->uuid)->with('success', 'این پیش‌فاکتور قبلاً به فاکتور تبدیل شده است.');
+        }
 
         $validated = $request->validate([
             'payments' => 'nullable|array',
@@ -1568,19 +1568,14 @@ class PreinvoiceController extends Controller
                 ]);
             }
 
-            if ($order->status === PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE) {
-                if ($existingInvoice) {
-                    return $existingInvoice;
-                }
-
-                abort(409, 'این پیش‌فاکتور قبلاً تبدیل شده است، اما فاکتور مرتبط پیدا نشد.');
-            }
-
             if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
                 abort(403);
             }
 
-            $shouldDeductOnFinalize = true;
+            $isFinanceReapproval = $existingInvoice && (string) $existingInvoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL;
+            $oldInvoiceStatus = $existingInvoice ? (string) $existingInvoice->status : null;
+            $oldInvoiceTotal = $existingInvoice ? (int) $existingInvoice->total : null;
+            $shouldDeductOnFinalize = ! $existingInvoice;
             $centralStockMovedToReserve = $this->hasCentralStockMovedToReserve($order);
 
             foreach ($order->items as $it) {
@@ -1598,23 +1593,25 @@ class PreinvoiceController extends Controller
                 ->groupBy('variant_id')
                 ->map(fn($rows) => (int) $rows->sum('quantity'));
 
-            $this->coverReservationShortfalls($requiredByVariant, $centralStockMovedToReserve);
+            if ($shouldDeductOnFinalize) {
+                $this->coverReservationShortfalls($requiredByVariant, $centralStockMovedToReserve);
 
-            $reservedByVariant = ProductVariant::query()
-                ->whereIn('id', $requiredByVariant->keys())
-                ->lockForUpdate()
-                ->pluck('reserved', 'id');
+                $reservedByVariant = ProductVariant::query()
+                    ->whereIn('id', $requiredByVariant->keys())
+                    ->lockForUpdate()
+                    ->pluck('reserved', 'id');
 
-            foreach ($requiredByVariant as $variantId => $requiredQty) {
-                $reservedQty = (int) ($reservedByVariant[(int) $variantId] ?? 0);
+                foreach ($requiredByVariant as $variantId => $requiredQty) {
+                    $reservedQty = (int) ($reservedByVariant[(int) $variantId] ?? 0);
 
-                if ($reservedQty < $requiredQty) {
-                    $variant = ProductVariant::query()->with('product:id,name')->whereKey((int) $variantId)->first();
-                    $productName = (string) ($variant?->product?->name ?? 'نامشخص');
+                    if ($reservedQty < $requiredQty) {
+                        $variant = ProductVariant::query()->with('product:id,name')->whereKey((int) $variantId)->first();
+                        $productName = (string) ($variant?->product?->name ?? 'نامشخص');
 
-                    throw ValidationException::withMessages([
-                        'products' => "موجودی رزروشده برای محصول «{$productName}» کافی نیست. رزروشده: {$reservedQty} | درخواست: {$requiredQty}",
-                    ]);
+                        throw ValidationException::withMessages([
+                            'products' => "موجودی رزروشده برای محصول «{$productName}» کافی نیست. رزروشده: {$reservedQty} | درخواست: {$requiredQty}",
+                        ]);
+                    }
                 }
             }
 
@@ -1634,7 +1631,7 @@ class PreinvoiceController extends Controller
                     'discount_amount' => (int) $order->discount_amount,
                     'subtotal' => (int) $subtotal,
                     'total' => (int) $total,
-                    'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+                    'status' => $isFinanceReapproval ? Invoice::STATUS_FINANCE_APPROVED : Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
                     'status_changed_at' => now(),
                     'status_changed_by' => auth()->id(),
                 ]);
@@ -1723,6 +1720,16 @@ class PreinvoiceController extends Controller
                 );
             }
 
+            ActivityLogger::log($isFinanceReapproval ? 'finance_reapproved' : 'finance_approved', $invoice->fresh(), $isFinanceReapproval ? 'فاکتور ویرایش‌شده توسط انبار مجدداً تایید مالی شد و بدون ورود مجدد به صف انبار نهایی شد.' : 'پیش‌فاکتور توسط مالی تایید و به فاکتور تبدیل شد.', [
+                'preinvoice_order_id' => $order->id,
+                'invoice_uuid' => $invoice->uuid,
+                'old_status' => $oldInvoiceStatus,
+                'new_status' => (string) $invoice->status,
+                'old_total' => $oldInvoiceTotal,
+                'new_total' => (int) $invoice->total,
+                'total_changed' => $oldInvoiceTotal !== null && $oldInvoiceTotal !== (int) $invoice->total,
+            ]);
+
             foreach (($validated['payments'] ?? []) as $paymentRow) {
                 $payload = $paymentRow;
                 if (($payload['method'] ?? null) === 'cheque') {
@@ -1744,22 +1751,24 @@ class PreinvoiceController extends Controller
                 'stock_released_at' => now(),
             ]);
 
-            $this->notificationService->notifyRole(
-                'warehouse',
-                'invoice_ready_for_sales_voucher',
-                'فاکتور جدید آماده حواله فروش است',
-                "فاکتور شماره {$invoice->uuid} برای مشتری {$invoice->customer_name} صادر شد و آماده جمع‌آوری/چاپ حواله فروش است.",
-                route('vouchers.sales.print', $invoice->uuid),
-                ['level' => 'success', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => "warehouse_invoice_ready:{$invoice->id}"]
-            );
+            if (! $isFinanceReapproval) {
+                $this->notificationService->notifyRole(
+                    'warehouse',
+                    'invoice_ready_for_sales_voucher',
+                    'فاکتور جدید آماده حواله فروش است',
+                    "فاکتور شماره {$invoice->uuid} برای مشتری {$invoice->customer_name} صادر شد و آماده جمع‌آوری/چاپ حواله فروش است.",
+                    route('vouchers.sales.print', $invoice->uuid),
+                    ['level' => 'success', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => "warehouse_invoice_ready:{$invoice->id}"]
+                );
+            }
             if (!empty($order->created_by)) {
                 $this->notificationService->notifyUser(
                     (int)$order->created_by,
-                    'preinvoice_finance_approved',
-                    'پیش‌فاکتور شما تایید مالی شد',
-                    "پیش‌فاکتور مشتری {$order->customer_name} به فاکتور شماره {$invoice->uuid} تبدیل شد.",
+                    $isFinanceReapproval ? 'invoice_finance_reapproved' : 'preinvoice_finance_approved',
+                    $isFinanceReapproval ? 'فاکتور شما مجدداً تایید مالی شد' : 'پیش‌فاکتور شما تایید مالی شد',
+                    $isFinanceReapproval ? "فاکتور شماره {$invoice->uuid} برای مشتری {$order->customer_name} پس از ویرایش انبار مجدداً تایید مالی شد." : "پیش‌فاکتور مشتری {$order->customer_name} به فاکتور شماره {$invoice->uuid} تبدیل شد.",
                     route('invoices.show', $invoice->uuid),
-                    ['level' => 'success', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => "operator_finance_approved:{$order->id}:{$order->created_by}"]
+                    ['level' => 'success', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => ($isFinanceReapproval ? "operator_finance_reapproved:{$order->id}:{$order->created_by}:" . now()->timestamp : "operator_finance_approved:{$order->id}:{$order->created_by}")]
                 );
             }
 
@@ -1767,14 +1776,16 @@ class PreinvoiceController extends Controller
         });
 
         return redirect()->route('invoices.show', $invoice->uuid)
-            ->with('success', '✅ تایید مالی انجام شد و پیش‌فاکتور به فاکتور/حواله انبار تبدیل شد.');
+            ->with('success', (string) $invoice->status === Invoice::STATUS_FINANCE_APPROVED
+                ? '✅ تایید مالی مجدد انجام شد و همان فاکتور بدون ورود به صف انبار نهایی شد.'
+                : '✅ تایید مالی انجام شد و پیش‌فاکتور به فاکتور/حواله انبار تبدیل شد.');
     }
 
     public function financeCancel(string $uuid, Request $request)
     {
         abort_unless($this->canHandleFinanceActions(), 403);
 
-        $order = PreinvoiceOrder::query()->where('uuid', $uuid)->firstOrFail();
+        $order = PreinvoiceOrder::query()->with('invoice.items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
 
         $data = $request->validate([
@@ -1787,7 +1798,15 @@ class PreinvoiceController extends Controller
                 'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
                 'warehouse_reject_reason' => $data['reason'],
             ]);
-            $this->releaseReservedStock($order);
+            if ($order->invoice && (string) $order->invoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL) {
+                foreach ($order->invoice->items as $item) {
+                    WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $item->product_id, (int) $item->quantity, (int) $item->variant_id);
+                }
+                CustomerLedger::query()->where('reference_type', Invoice::class)->where('reference_id', $order->invoice->id)->delete();
+                $order->invoice->update(['status' => Invoice::STATUS_NOT_SHIPPED, 'status_changed_at' => now(), 'status_changed_by' => auth()->id()]);
+            } else {
+                $this->releaseReservedStock($order);
+            }
             $order->reviews()->create([
                 'user_id' => auth()->id(),
                 'action' => 'finance_rejected',
