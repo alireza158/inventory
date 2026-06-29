@@ -42,7 +42,7 @@
         </div>
         <div class="col-md-3 col-sm-6">
           <div class="text-muted small mb-1">تاریخ ثبت پیش‌فاکتور</div>
-          <div class="fw-semibold">{{ $order->created_at ? Jalalian::fromDateTime($order->created_at)->format('Y/m/d H:i') : '—' }}</div>
+          <div class="fw-semibold">{{ \App\Support\JalaliDate::dateTime($order->display_document_date) }}</div>
         </div>
         <div class="col-md-3 col-sm-6">
           <div class="text-muted small mb-1">مشتری</div>

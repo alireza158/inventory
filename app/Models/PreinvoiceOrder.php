@@ -9,6 +9,20 @@ class PreinvoiceOrder extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $order): void {
+            if (! $order->document_date) {
+                $order->document_date = $order->created_at ?? now();
+            }
+        });
+    }
+
+    public function getDisplayDocumentDateAttribute()
+    {
+        return $this->document_date ?? $this->created_at;
+    }
+
     public const STATUS_DRAFT = 'draft';
     public const STATUS_RESERVED_WAITING_WAREHOUSE = 'reserved_waiting_warehouse';
     public const STATUS_WAREHOUSE_REVIEWING = 'warehouse_reviewing';
@@ -23,6 +37,7 @@ class PreinvoiceOrder extends Model
         'uuid',
         'external_order_id',
         'created_by',
+        'document_date',
         'status',
         'customer_id', // <-- این فیلد اضافه شد تا باگ ذخیره نشدن مشتری رفع شود
         'customer_name',
@@ -60,6 +75,7 @@ class PreinvoiceOrder extends Model
         'stock_released_at' => 'datetime',
         'items_updated_at' => 'datetime',
         'items_updated_by' => 'integer',
+        'document_date' => 'datetime',
     ];
 
     public function items()

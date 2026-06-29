@@ -110,7 +110,7 @@
             <h1 class="doc-title">فاکتور فروش</h1>
             <div class="doc-meta">
                 <div>شماره: <strong>{{ $invoice->uuid }}</strong></div>
-                <div>تاریخ: {{ $fmtDate($invoice->created_at) }}</div>
+                <div>تاریخ: {{ $fmtDate($invoice->display_document_date) }}</div>
             </div>
         </div>
     </header>

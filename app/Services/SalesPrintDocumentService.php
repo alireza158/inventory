@@ -24,8 +24,8 @@ class SalesPrintDocumentService
             'numberLabel' => 'شماره فاکتور',
             'number' => $invoice->uuid,
             'customerNumber' => $invoice->external_order_id ?: null,
-            'registeredAt' => $invoice->preinvoiceOrder?->created_at ?? $invoice->created_at,
-            'issuedAt' => $invoice->created_at,
+            'registeredAt' => $invoice->display_document_date,
+            'issuedAt' => $invoice->display_document_date,
             'status' => $this->statusLabel($invoice->status),
             'customer' => [
                 'name' => $invoice->customer_name ?: $invoice->customer?->display_name,
@@ -65,7 +65,7 @@ class SalesPrintDocumentService
             'numberLabel' => 'شماره پیش‌فاکتور',
             'number' => $order->uuid,
             'customerNumber' => $order->external_order_id ?: null,
-            'registeredAt' => $order->created_at,
+            'registeredAt' => $order->display_document_date,
             'issuedAt' => null,
             'status' => $this->statusLabel($order->status),
             'customer' => [

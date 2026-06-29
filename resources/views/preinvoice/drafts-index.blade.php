@@ -54,7 +54,7 @@
                 {{ $o->description ? \Illuminate\Support\Str::limit($o->description, 120) : '—' }}
               </td>
               <td>{{ number_format((int)$o->total_price) }}</td>
-              <td>{{ $o->created_at ? Jalalian::fromDateTime($o->created_at)->format('Y/m/d H:i') : '—' }}</td>
+              <td>{{ \App\Support\JalaliDate::dateTime($o->display_document_date) }}</td>
               <td class="text-end">
                 <div class="d-flex gap-2 justify-content-end">
                   <a class="btn btn-sm btn-outline-primary" href="{{ route('preinvoice.draft.edit', $o->uuid) }}">ویرایش</a>

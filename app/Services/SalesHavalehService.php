@@ -498,6 +498,7 @@ class SalesHavalehService
             $invoice = Invoice::query()->create([
                 'uuid' => $this->officialCodeForPreinvoiceConversion($order),
                 'preinvoice_order_id' => $order->id,
+                'document_date' => $order->display_document_date,
                 'customer_id' => $order->customer_id,
                 'customer_name' => $order->customer_name,
                 'customer_mobile' => $order->customer_mobile,
