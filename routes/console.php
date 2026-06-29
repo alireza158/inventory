@@ -15,29 +15,102 @@ use Illuminate\Support\Facades\Schedule;
 
 
 
-Artisan::command('preinvoice:repair-reservations {preinvoice_id}', function (int $preinvoice_id) {
-    DB::transaction(function () use ($preinvoice_id) {
+Artisan::command('preinvoice:repair-reservations {--order= : Preinvoice order id} {--dry-run : Only report planned changes} {--apply : Apply the repair}', function () {
+    $orderId = (int) $this->option('order');
+    $apply = (bool) $this->option('apply');
+    $dryRun = (bool) $this->option('dry-run') || ! $apply;
+
+    if ($orderId <= 0) {
+        $this->error('Use --order=<id>.');
+        return 1;
+    }
+
+    if ($apply && (bool) $this->option('dry-run')) {
+        $this->error('Use either --dry-run or --apply, not both.');
+        return 1;
+    }
+
+    $activeStatuses = [
+        PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+        PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING,
+        PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+        PreinvoiceOrder::STATUS_FINANCE_REVIEWING,
+        PreinvoiceOrder::STATUS_RETURNED_TO_WAREHOUSE,
+    ];
+
+    return DB::transaction(function () use ($orderId, $apply, $dryRun, $activeStatuses) {
         $order = PreinvoiceOrder::query()
             ->with('items')
-            ->whereKey($preinvoice_id)
+            ->whereKey($orderId)
             ->lockForUpdate()
             ->firstOrFail();
 
-        if (! in_array($order->status, [
-            PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
-            PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING,
-            PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
-            PreinvoiceOrder::STATUS_FINANCE_REVIEWING,
-            PreinvoiceOrder::STATUS_RETURNED_TO_WAREHOUSE,
-        ], true) || $order->stock_released_at !== null) {
-            $this->warn('This preinvoice does not have an active stock freeze. No reservation was repaired.');
-            return;
+        $isActive = in_array($order->status, $activeStatuses, true) && $order->stock_released_at === null;
+        if (! $isActive) {
+            $this->warn('This preinvoice is not an active unreleased order. No reservation was repaired.');
+            return 0;
+        }
+
+        $required = $order->items
+            ->groupBy('variant_id')
+            ->map(fn ($rows) => [
+                'product_id' => (int) $rows->first()->product_id,
+                'variant_id' => (int) $rows->first()->variant_id,
+                'quantity' => (int) $rows->sum('quantity'),
+            ]);
+
+        $existing = DB::table('preinvoice_draft_reservations')
+            ->where('preinvoice_order_id', $order->id)
+            ->whereNotNull('converted_at')
+            ->select('variant_id', DB::raw('SUM(quantity) AS quantity'))
+            ->groupBy('variant_id')
+            ->pluck('quantity', 'variant_id')
+            ->map(fn ($quantity) => (int) $quantity);
+
+        $this->info(($dryRun ? 'DRY RUN: ' : 'APPLY: ') . "repairing preinvoice #{$order->id}");
+        $this->table(['variant_id', 'product_id', 'required', 'converted_reserved', 'delta'], $required->map(fn ($row, $variantId) => [
+            $variantId,
+            $row['product_id'],
+            $row['quantity'],
+            (int) ($existing[(int) $variantId] ?? 0),
+            $row['quantity'] - (int) ($existing[(int) $variantId] ?? 0),
+        ])->values()->all());
+
+        if ($order->stock_frozen_until !== null) {
+            $this->line('Will set preinvoice_orders.stock_frozen_until to NULL.');
+        }
+
+        $convertedWithExpiry = DB::table('preinvoice_draft_reservations')
+            ->where('preinvoice_order_id', $order->id)
+            ->whereNotNull('converted_at')
+            ->whereNotNull('expires_at')
+            ->count();
+        $this->line("Converted reservation rows with expires_at to NULL: {$convertedWithExpiry}");
+
+        if (! $apply) {
+            $this->warn('No changes applied. Re-run with --apply to repair.');
+            return 0;
         }
 
         app(PreinvoiceController::class)->syncPreinvoiceReservations($order);
-        $this->info('Preinvoice reservations were synced.');
+
+        $order->update(['stock_frozen_until' => null]);
+        DB::table('preinvoice_draft_reservations')
+            ->where('preinvoice_order_id', $order->id)
+            ->whereNotNull('converted_at')
+            ->update(['expires_at' => null, 'updated_at' => now()]);
+
+        \App\Support\ActivityLogger::log('preinvoice_reservations_repaired', $order->fresh(), 'رزروهای پیش‌فاکتور فعال ترمیم شد.', [
+            'command' => 'preinvoice:repair-reservations',
+            'order_id' => $order->id,
+            'required_by_variant' => $required->values()->all(),
+            'previous_converted_by_variant' => $existing->all(),
+        ]);
+
+        $this->info('Preinvoice reservations were repaired.');
+        return 0;
     });
-})->purpose('Repair active inventory reservations for one preinvoice');
+})->purpose('Dry-run or repair active inventory reservations for one preinvoice');
 
 Artisan::command('products:add-default-electric-colors', function () {
     $service = app(DefaultProductDesignService::class);
