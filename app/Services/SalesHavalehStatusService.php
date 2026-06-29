@@ -38,6 +38,7 @@ class SalesHavalehStatusService
             self::PACKING => 'در حال بسته‌بندی',
             self::SHIPPED => 'ارسال شده',
             self::NOT_SHIPPED => 'کنسل شده',
+            Invoice::STATUS_PENDING_FINANCE_REAPPROVAL => 'در انتظار تایید مالی مجدد',
         ];
     }
 
@@ -53,7 +54,7 @@ class SalesHavalehStatusService
 
     public function isEditable(Invoice $invoice, ?User $user): bool
     {
-        if ($invoice->status === self::SHIPPED) {
+        if ($invoice->status === self::SHIPPED || $invoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL) {
             return false;
         }
 

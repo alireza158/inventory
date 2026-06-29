@@ -1520,13 +1520,10 @@ class PreinvoiceController extends Controller
         abort_unless($this->canHandleFinanceActions(), 403);
 
         $order = PreinvoiceOrder::with(['items', 'invoice'])->where('uuid', $uuid)->firstOrFail();
-        if ($order->invoice || $order->status === PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE) {
-            if ($order->invoice) {
-                return redirect()->route('invoices.show', $order->invoice->uuid)->with('success', 'این پیش‌فاکتور قبلاً به فاکتور تبدیل شده است.');
-            }
-            abort(409, 'این پیش‌فاکتور قبلاً تبدیل شده است.');
-        }
         abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
+        if ($order->invoice && (string) $order->invoice->status !== Invoice::STATUS_PENDING_FINANCE_REAPPROVAL) {
+            return redirect()->route('invoices.show', $order->invoice->uuid)->with('success', 'این پیش‌فاکتور قبلاً به فاکتور تبدیل شده است.');
+        }
 
         $validated = $request->validate([
             'payments' => 'nullable|array',
@@ -1568,19 +1565,11 @@ class PreinvoiceController extends Controller
                 ]);
             }
 
-            if ($order->status === PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE) {
-                if ($existingInvoice) {
-                    return $existingInvoice;
-                }
-
-                abort(409, 'این پیش‌فاکتور قبلاً تبدیل شده است، اما فاکتور مرتبط پیدا نشد.');
-            }
-
             if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
                 abort(403);
             }
 
-            $shouldDeductOnFinalize = true;
+            $shouldDeductOnFinalize = ! $existingInvoice;
             $centralStockMovedToReserve = $this->hasCentralStockMovedToReserve($order);
 
             foreach ($order->items as $it) {
@@ -1598,23 +1587,25 @@ class PreinvoiceController extends Controller
                 ->groupBy('variant_id')
                 ->map(fn($rows) => (int) $rows->sum('quantity'));
 
-            $this->coverReservationShortfalls($requiredByVariant, $centralStockMovedToReserve);
+            if ($shouldDeductOnFinalize) {
+                $this->coverReservationShortfalls($requiredByVariant, $centralStockMovedToReserve);
 
-            $reservedByVariant = ProductVariant::query()
-                ->whereIn('id', $requiredByVariant->keys())
-                ->lockForUpdate()
-                ->pluck('reserved', 'id');
+                $reservedByVariant = ProductVariant::query()
+                    ->whereIn('id', $requiredByVariant->keys())
+                    ->lockForUpdate()
+                    ->pluck('reserved', 'id');
 
-            foreach ($requiredByVariant as $variantId => $requiredQty) {
-                $reservedQty = (int) ($reservedByVariant[(int) $variantId] ?? 0);
+                foreach ($requiredByVariant as $variantId => $requiredQty) {
+                    $reservedQty = (int) ($reservedByVariant[(int) $variantId] ?? 0);
 
-                if ($reservedQty < $requiredQty) {
-                    $variant = ProductVariant::query()->with('product:id,name')->whereKey((int) $variantId)->first();
-                    $productName = (string) ($variant?->product?->name ?? 'نامشخص');
+                    if ($reservedQty < $requiredQty) {
+                        $variant = ProductVariant::query()->with('product:id,name')->whereKey((int) $variantId)->first();
+                        $productName = (string) ($variant?->product?->name ?? 'نامشخص');
 
-                    throw ValidationException::withMessages([
-                        'products' => "موجودی رزروشده برای محصول «{$productName}» کافی نیست. رزروشده: {$reservedQty} | درخواست: {$requiredQty}",
-                    ]);
+                        throw ValidationException::withMessages([
+                            'products' => "موجودی رزروشده برای محصول «{$productName}» کافی نیست. رزروشده: {$reservedQty} | درخواست: {$requiredQty}",
+                        ]);
+                    }
                 }
             }
 
@@ -1723,6 +1714,12 @@ class PreinvoiceController extends Controller
                 );
             }
 
+            ActivityLogger::log($existingInvoice ? 'finance_reapproved' : 'finance_approved', $invoice->fresh(), $existingInvoice ? 'فاکتور ویرایش‌شده توسط انبار مجدداً تایید مالی شد.' : 'پیش‌فاکتور توسط مالی تایید و به فاکتور تبدیل شد.', [
+                'preinvoice_order_id' => $order->id,
+                'invoice_uuid' => $invoice->uuid,
+                'total' => (int) $invoice->total,
+            ]);
+
             foreach (($validated['payments'] ?? []) as $paymentRow) {
                 $payload = $paymentRow;
                 if (($payload['method'] ?? null) === 'cheque') {
@@ -1774,7 +1771,7 @@ class PreinvoiceController extends Controller
     {
         abort_unless($this->canHandleFinanceActions(), 403);
 
-        $order = PreinvoiceOrder::query()->where('uuid', $uuid)->firstOrFail();
+        $order = PreinvoiceOrder::query()->with('invoice.items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
 
         $data = $request->validate([
@@ -1787,7 +1784,15 @@ class PreinvoiceController extends Controller
                 'status' => PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
                 'warehouse_reject_reason' => $data['reason'],
             ]);
-            $this->releaseReservedStock($order);
+            if ($order->invoice && (string) $order->invoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL) {
+                foreach ($order->invoice->items as $item) {
+                    WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), (int) $item->product_id, (int) $item->quantity, (int) $item->variant_id);
+                }
+                CustomerLedger::query()->where('reference_type', Invoice::class)->where('reference_id', $order->invoice->id)->delete();
+                $order->invoice->update(['status' => Invoice::STATUS_NOT_SHIPPED, 'status_changed_at' => now(), 'status_changed_by' => auth()->id()]);
+            } else {
+                $this->releaseReservedStock($order);
+            }
             $order->reviews()->create([
                 'user_id' => auth()->id(),
                 'action' => 'finance_rejected',
