@@ -1590,7 +1590,7 @@ class PreinvoiceController extends Controller
             $isFinanceReapproval = $existingInvoice && (string) $existingInvoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL;
             $oldInvoiceStatus = $existingInvoice ? (string) $existingInvoice->status : null;
             $oldInvoiceTotal = $existingInvoice ? (int) $existingInvoice->total : null;
-            $shouldDeductOnFinalize = ! $existingInvoice;
+            $shouldDeductOnFinalize = false;
             $centralStockMovedToReserve = $this->hasCentralStockMovedToReserve($order);
 
             foreach ($order->items as $it) {
@@ -1764,7 +1764,7 @@ class PreinvoiceController extends Controller
                 'status' => PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE,
                 'total_price' => (int) $total,
                 'stock_frozen_until' => null,
-                'stock_released_at' => now(),
+                'stock_released_at' => null,
             ]);
 
             if (! $isFinanceReapproval) {
