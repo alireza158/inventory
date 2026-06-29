@@ -68,7 +68,7 @@
           @foreach(['today'=>'امروز','yesterday'=>'دیروز','this_week'=>'این هفته','this_month'=>'این ماه','last_month'=>'ماه قبل'] as $key => $label)
             <button class="btn btn-outline-primary" name="quick_range" value="{{ $key }}">{{ $label }}</button>
           @endforeach
-          <span class="small text-muted align-self-center">ملاک تاریخ: created_at (تاریخ ثبت فاکتور)</span>
+          <span class="small text-muted align-self-center">ملاک تاریخ: تاریخ اصلی سند (ثبت اولیه پیش‌فاکتور)</span>
         </div>
         <div class="col-sm-6 col-xl-2"><label class="form-label">از تاریخ شمسی</label><input type="text" class="form-control" name="date_from" value="{{ $filters['date_from'] ?? '' }}" dir="ltr" data-jdp data-jdp-only-date placeholder="1403/03/01"></div>
         <div class="col-sm-6 col-xl-2"><label class="form-label">تا تاریخ شمسی</label><input type="text" class="form-control" name="date_to" value="{{ $filters['date_to'] ?? '' }}" dir="ltr" data-jdp data-jdp-only-date placeholder="1403/03/31"></div>
@@ -114,7 +114,7 @@
             @php $paid=(int)($inv->paid_total??0); $remaining=max((int)$inv->total-$paid,0); $customerCode=$inv->customer?->crm_customer_id ?: $inv->customer_id; $customerName=$inv->customer_name ?: $inv->customer?->display_name ?: '—'; @endphp
             <tr>
               <td><span class="code-cell fw-bold" title="{{ $inv->uuid }}">{{ Str::limit($inv->uuid, 10, '…') }}</span></td>
-              <td class="text-nowrap">{{ $inv->created_at ? Jalalian::fromDateTime($inv->created_at)->format('Y/m/d') : '—' }}</td>
+              <td class="text-nowrap">{{ \App\Support\JalaliDate::date($inv->display_document_date) }}</td>
               <td><span class="customer-cell" title="{{ $customerName }}">{{ $customerName }}</span></td><td>{{ $customerCode ?: '—' }}</td><td>{{ $inv->customer_mobile ?: $inv->customer?->mobile ?: '—' }}</td>
               <td class="money-cell">{{ $rial($inv->total) }}</td><td class="money-cell text-success">{{ $rial($paid) }}</td><td class="money-cell fw-bold {{ $remaining>0?'text-danger':'text-success' }}">{{ $rial($remaining) }}</td>
               <td><span class="badge {{ $payClass($paid,$inv->total) }}">{{ $payLabel($paid,$inv->total) }}</span></td><td><span class="badge {{ $statusBadge($inv->status) }}">{{ $statusFa($inv->status) }}</span></td><td><span class="customer-cell">{{ $inv->preinvoiceOrder?->creator?->name ?? '—' }}</span></td>

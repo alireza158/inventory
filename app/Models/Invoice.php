@@ -17,12 +17,32 @@ class Invoice extends Model
     public const STATUS_FINANCE_APPROVED = 'finance_approved';
 
     protected $fillable = [
-        'uuid','customer_id','preinvoice_order_id',
+        'uuid','customer_id','preinvoice_order_id','document_date',
         'customer_name','customer_mobile','customer_address',
         'province_id','city_id','shipping_id','shipping_price',
         'discount_amount','subtotal','total','status','status_changed_at','status_changed_by'
         ,'external_order_id', 'items_updated_at', 'items_updated_by'
     ];
+
+    protected $casts = [
+        'document_date' => 'datetime',
+        'status_changed_at' => 'datetime',
+        'items_updated_at' => 'datetime',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $invoice): void {
+            if (! $invoice->document_date) {
+                $invoice->document_date = $invoice->preinvoiceOrder?->display_document_date ?? $invoice->created_at ?? now();
+            }
+        });
+    }
+
+    public function getDisplayDocumentDateAttribute()
+    {
+        return $this->document_date ?? $this->preinvoiceOrder?->display_document_date ?? $this->created_at;
+    }
 
     public function items()
     {

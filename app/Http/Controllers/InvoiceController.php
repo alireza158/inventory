@@ -196,7 +196,7 @@ class InvoiceController extends Controller
                 'total' => (int) $invoice->total,
                 'status' => $invoice->status,
                 'status_label' => $this->statusService->labels()[$invoice->status] ?? $invoice->status,
-                'created_at' => optional($invoice->created_at)->format('Y-m-d H:i'),
+                'created_at' => \App\Support\JalaliDate::dateTime($invoice->display_document_date),
                 'updated_at' => optional($invoice->updated_at)->format('Y-m-d H:i'),
                 'seller' => $invoice->preinvoiceOrder?->creator?->name,
                 'show_url' => route('vouchers.sales.show', $invoice->uuid),
@@ -566,10 +566,10 @@ class InvoiceController extends Controller
             ->when($filters['max_amount'] !== '', fn ($q) => $q->where('total', '<=', (int) $filters['max_amount']));
 
         if ($dateFrom) {
-            $query->where('created_at', '>=', $dateFrom->copy()->startOfDay());
+            $query->where('document_date', '>=', $dateFrom->copy()->startOfDay());
         }
         if ($dateTo) {
-            $query->where('created_at', '<=', $dateTo->copy()->endOfDay());
+            $query->where('document_date', '<=', $dateTo->copy()->endOfDay());
         }
 
         $paidExpr = '(select coalesce(sum(amount), 0) from invoice_payments where invoice_payments.invoice_id = invoices.id)';
@@ -693,7 +693,7 @@ class InvoiceController extends Controller
                 $remaining = max((int) $invoice->total - $paid, 0);
                 fputcsv($handle, [
                     $invoice->uuid,
-                    optional($invoice->created_at)->format('Y-m-d'),
+                    \App\Support\JalaliDate::date($invoice->display_document_date),
                     $invoice->customer_name ?: $invoice->customer?->display_name,
                     $invoice->customer?->crm_customer_id ?: $invoice->customer_id,
                     $invoice->customer_mobile ?: $invoice->customer?->mobile,
@@ -759,7 +759,7 @@ class InvoiceController extends Controller
                     $invoice->customer_name ?? '',
                     $invoice->customer_mobile ?? '',
                     $invoice->uuid,
-                    optional($invoice->created_at)->format('Y-m-d'),
+                    \App\Support\JalaliDate::date($invoice->display_document_date),
                     'invoice',
                     (int) $invoice->total,
                     '',
@@ -786,7 +786,7 @@ class InvoiceController extends Controller
                         $invoice->customer_name ?? '',
                         $invoice->customer_mobile ?? '',
                         $invoice->uuid,
-                        optional($invoice->created_at)->format('Y-m-d'),
+                        \App\Support\JalaliDate::date($invoice->display_document_date),
                         'payment',
                         (int) $payment->amount,
                         $payment->method,

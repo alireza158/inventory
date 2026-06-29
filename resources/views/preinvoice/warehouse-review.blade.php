@@ -76,7 +76,7 @@
             <div class="col-md-3">
                 <div class="text-muted small">تاریخ</div>
                 <strong>
-                    {{ $order->created_at ? Jalalian::fromDateTime($order->created_at)->format('Y/m/d H:i') : '—' }}
+                    {{ \App\Support\JalaliDate::dateTime($order->display_document_date) }}
                 </strong>
             </div>
 

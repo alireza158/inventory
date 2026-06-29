@@ -75,7 +75,7 @@ class PreinvoiceController extends Controller
                 'creator:id,name',
                 'warehouseReviewer:id,name',
                 'reviews.user:id,name',
-                'invoice:id,uuid,preinvoice_order_id,status,created_at',
+                'invoice:id,uuid,preinvoice_order_id,status,created_at,document_date',
             ])
             ->where('uuid', $uuid)
             ->firstOrFail();
@@ -99,7 +99,7 @@ class PreinvoiceController extends Controller
             'creator:id,name',
             'warehouseReviewer:id,name',
             'reviews.user:id,name',
-            'invoice:id,uuid,preinvoice_order_id,status,created_at',
+            'invoice:id,uuid,preinvoice_order_id,status,created_at,document_date',
         ]);
 
         $products = Product::query()
@@ -319,7 +319,7 @@ class PreinvoiceController extends Controller
         $status = (string) $request->query('status', '');
         $query = PreinvoiceOrder::query()
             ->where('created_by', auth()->id())
-            ->with(['invoice:id,uuid,preinvoice_order_id,status,created_at'])
+            ->with(['invoice:id,uuid,preinvoice_order_id,status,created_at,document_date'])
             ->withCount('items');
 
         if ($status !== '') {
@@ -344,7 +344,7 @@ class PreinvoiceController extends Controller
                 'creator:id,name',
                 'warehouseReviewer:id,name',
                 'reviews.user:id,name',
-                'invoice:id,uuid,preinvoice_order_id,status,created_at',
+                'invoice:id,uuid,preinvoice_order_id,status,created_at,document_date',
             ])
             ->where('uuid', $uuid)
             ->where('created_by', auth()->id())
@@ -1639,6 +1639,7 @@ class PreinvoiceController extends Controller
                 $invoice = Invoice::create([
                     'uuid' => $officialInvoiceUuid,
                     'preinvoice_order_id' => $order->id,
+                    'document_date' => $order->display_document_date,
 
                     'customer_id' => $order->customer_id ?? null,
                     'customer_name' => $order->customer_name,
