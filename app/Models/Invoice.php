@@ -14,6 +14,7 @@ class Invoice extends Model
     public const STATUS_SHIPPED = 'shipped';
     public const STATUS_NOT_SHIPPED = 'not_shipped';
     public const STATUS_PENDING_FINANCE_REAPPROVAL = 'pending_finance_reapproval';
+    public const STATUS_FINANCE_APPROVED = 'finance_approved';
 
     protected $fillable = [
         'uuid','customer_id','preinvoice_order_id',

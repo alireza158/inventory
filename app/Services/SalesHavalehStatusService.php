@@ -25,6 +25,7 @@ class SalesHavalehStatusService
             self::PACKING,
             self::SHIPPED,
             self::NOT_SHIPPED,
+            Invoice::STATUS_FINANCE_APPROVED,
         ];
     }
 
@@ -39,6 +40,7 @@ class SalesHavalehStatusService
             self::SHIPPED => 'ارسال شده',
             self::NOT_SHIPPED => 'کنسل شده',
             Invoice::STATUS_PENDING_FINANCE_REAPPROVAL => 'در انتظار تایید مالی مجدد',
+            Invoice::STATUS_FINANCE_APPROVED => 'تایید مالی شده',
         ];
     }
 
@@ -75,6 +77,10 @@ class SalesHavalehStatusService
 
         if ($current === $newStatus) {
             return;
+        }
+
+        if ($current === Invoice::STATUS_FINANCE_APPROVED && ! $this->isAdmin($user)) {
+            abort(422, 'فاکتور تایید مالی‌شده فقط توسط مدیر قابل تغییر وضعیت عملیاتی است.');
         }
 
         if ($current === self::NOT_SHIPPED) {
