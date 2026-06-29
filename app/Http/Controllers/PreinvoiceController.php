@@ -125,7 +125,7 @@ class PreinvoiceController extends Controller
         DB::transaction(function () use ($order, $data) {
             $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
             abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
-            $this->assertWarehouseCanOnlyReduceOrDelete($order, $data['items']);
+            $this->assertWarehouseCanOnlyEditExistingItems($order, $data['items']);
             $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id());
             $this->validateWarehouseChangeReasons($order, $data);
 
@@ -185,7 +185,7 @@ class PreinvoiceController extends Controller
         DB::transaction(function () use ($order, $data) {
             $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
             abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
-            $this->assertWarehouseCanOnlyReduceOrDelete($order, $data['items']);
+            $this->assertWarehouseCanOnlyEditExistingItems($order, $data['items']);
             $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id());
             $this->validateWarehouseChangeReasons($order, $data);
 
@@ -843,7 +843,7 @@ class PreinvoiceController extends Controller
         }
     }
 
-    private function assertWarehouseCanOnlyReduceOrDelete(PreinvoiceOrder $order, array $newItems): void
+    private function assertWarehouseCanOnlyEditExistingItems(PreinvoiceOrder $order, array $newItems): void
     {
         $oldMap = $this->itemQuantityMap($order->items->map(fn($item) => [
             'product_id' => (int) $item->product_id,
@@ -852,13 +852,9 @@ class PreinvoiceController extends Controller
         ])->all());
         $newMap = $this->itemQuantityMap($newItems);
 
-        foreach ($newMap as $key => $newQty) {
+        foreach (array_keys($newMap) as $key) {
             if (! array_key_exists($key, $oldMap)) {
                 abort(403, 'انبار مجاز به افزودن کالای جدید نیست.');
-            }
-
-            if ($newQty > (int) $oldMap[$key]) {
-                abort(422, 'انبار فقط مجاز به کاهش تعداد آیتم‌ها است.');
             }
         }
     }
@@ -1200,11 +1196,12 @@ class PreinvoiceController extends Controller
             ->whereNotNull('converted_at')
             ->lockForUpdate()
             ->get()
-            ->keyBy(fn (PreinvoiceDraftReservation $row) => ((int) $row->product_id) . ':' . ((int) $row->variant_id));
+            ->groupBy(fn (PreinvoiceDraftReservation $row) => ((int) $row->product_id) . ':' . ((int) $row->variant_id));
 
         foreach ($required as $key => $row) {
-            $reservation = $rows->get($key);
-            $currentQty = (int) ($reservation?->quantity ?? 0);
+            $reservationRows = $rows->get($key, collect());
+            $reservation = $reservationRows->first();
+            $currentQty = (int) $reservationRows->sum('quantity');
             $requiredQty = (int) $row['quantity'];
             $delta = $requiredQty - $currentQty;
 
@@ -1219,6 +1216,18 @@ class PreinvoiceController extends Controller
                 $reservation->expires_at = null;
                 $reservation->converted_at = $reservation->converted_at ?? now();
                 $reservation->save();
+
+                $duplicateIds = $reservationRows
+                    ->skip(1)
+                    ->pluck('id')
+                    ->filter()
+                    ->all();
+
+                if (! empty($duplicateIds)) {
+                    PreinvoiceDraftReservation::query()
+                        ->whereIn('id', $duplicateIds)
+                        ->delete();
+                }
             } else {
                 PreinvoiceDraftReservation::query()->create([
                     'token' => (string) Str::uuid(),
@@ -1233,15 +1242,19 @@ class PreinvoiceController extends Controller
             }
         }
 
-        foreach ($rows as $key => $reservation) {
+        foreach ($rows as $key => $reservationRows) {
             if (isset($required[$key])) {
                 continue;
             }
 
+            $releaseQuantity = (int) $reservationRows->sum('quantity');
+            $firstReservation = $reservationRows->first();
             if (! $stockAlreadyAdjusted) {
-                $this->releaseStockForItem((int) $reservation->product_id, (int) $reservation->variant_id, (int) $reservation->quantity);
+                $this->releaseStockForItem((int) $firstReservation->product_id, (int) $firstReservation->variant_id, $releaseQuantity);
             }
-            $reservation->delete();
+            PreinvoiceDraftReservation::query()
+                ->whereIn('id', $reservationRows->pluck('id')->filter()->all())
+                ->delete();
         }
     }
 
