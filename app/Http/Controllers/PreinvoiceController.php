@@ -90,7 +90,7 @@ class PreinvoiceController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
             if ($lockedOrder->status === PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE && $this->hasActiveFreeze($lockedOrder)) {
-                $this->syncPreinvoiceReservations($lockedOrder);
+                $this->syncPreinvoiceReservations($lockedOrder, true);
             }
         });
 
@@ -134,7 +134,7 @@ class PreinvoiceController extends Controller
             $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $this->replaceOrderItems($order, $data['items']);
             if ($stockLocked) {
-                $this->syncPreinvoiceReservations($order->fresh('items'));
+                $this->syncPreinvoiceReservationsAfterItemChange($order->fresh('items'), $oldItems);
             }
 
             $order->update([
@@ -194,7 +194,7 @@ class PreinvoiceController extends Controller
             $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $this->replaceOrderItems($order, $data['items']);
             if ($stockLocked) {
-                $this->syncPreinvoiceReservations($order->fresh('items'));
+                $this->syncPreinvoiceReservationsAfterItemChange($order->fresh('items'), $oldItems);
             }
 
             $order->refresh()->load('items');
@@ -394,7 +394,7 @@ class PreinvoiceController extends Controller
             $this->syncPreinvoiceReservations($order, true);
             $order->update([
                 'total_price' => $this->calculateOrderTotal($order),
-                'stock_frozen_until' => now(),
+                'stock_frozen_until' => null,
                 'stock_released_at' => null,
             ]);
             $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), null);
@@ -441,7 +441,7 @@ class PreinvoiceController extends Controller
 
         $validated = $this->validateDraftPayload($request, false, $order);
 
-        DB::transaction(function () use ($order, $validated) {
+        $itemsChanged = DB::transaction(function () use ($order, $validated) {
             $order = PreinvoiceOrder::query()
                 ->with(['items', 'invoice.items'])
                 ->whereKey($order->id)
@@ -456,12 +456,14 @@ class PreinvoiceController extends Controller
             $customer = $this->resolveCustomer($validated);
             $shippingId = (int) $validated['shipping_id'];
             $before = $this->snapshotItems($order);
+            $oldItemSignature = $this->itemChangeSignatureFromOrder($order);
             $oldItems = $order->items->map(fn($it) => ['product_id' => (int) $it->product_id, 'variant_id' => (int) $it->variant_id, 'quantity' => (int) $it->quantity])->all();
             $newItems = collect($validated['products'])->map(fn($p) => [
                 'product_id' => (int) $p['id'],
                 'variant_id' => (int) $p['variety_id'],
                 'quantity' => (int) $p['quantity'],
             ])->all();
+            $itemsActuallyChanged = $oldItemSignature !== $this->itemChangeSignatureFromDraftRows($validated['products']);
 
             $stockLocked = $this->hasActiveFreeze($order);
             if ($stockLocked || ! $order->invoice) {
@@ -486,59 +488,72 @@ class PreinvoiceController extends Controller
             $this->syncItems($order, $validated['products'], true);
 
             if ($stockLocked) {
-                $this->syncPreinvoiceReservations($order->fresh('items'));
+                $this->syncPreinvoiceReservationsAfterItemChange($order->fresh('items'), $oldItems);
             } elseif ($order->invoice) {
                 $this->moveConsumedInvoiceStockBackToReservation($oldItems, $newItems);
             }
 
             $order->refresh()->load(['items.product', 'items.variant', 'invoice.items']);
             $oldStatus = (string) $order->status;
-            $order->update([
-                'status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
-                'warehouse_review_note' => null,
-                'warehouse_reject_reason' => null,
-                'warehouse_reviewed_by' => null,
-                'warehouse_reviewed_at' => null,
+            $updatePayload = [
                 'total_price' => $this->calculateOrderTotal($order),
-                'stock_frozen_until' => now(),
+                'stock_frozen_until' => null,
                 'stock_released_at' => null,
-                'items_updated_at' => now(),
-                'items_updated_by' => auth()->id(),
-            ]);
+            ];
 
-            $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), $oldStatus);
-            $this->warehouseReviewAuditService->log($order->fresh(), \App\Models\WarehouseReviewLog::ACTION_RESUBMITTED_TO_WAREHOUSE, auth()->id(), $oldStatus, PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 'پیش‌فاکتور بعد از اصلاح دوباره به صف انبار ارسال شد.');
-            $this->warehousePendingRefreshService->refreshActiveWarehousePendingForDocument($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), 'preinvoice', auth()->id());
-
-            $this->syncExistingInvoiceFromOrderForReapproval($order->fresh(['items', 'invoice.items']));
-
-            $order->reviews()->create([
-                'user_id' => auth()->id(),
-                'action' => 'seller_items_changed_reapproval_required',
-                'reason' => 'اقلام سند توسط فروشنده/مدیر تغییر کرد و تاییدهای قبلی باطل شد.',
-                'before_items' => $before,
-                'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
-            ]);
-
-            ActivityLogger::log('seller_items_reapproval', $order->fresh(), 'اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.', [
-                'old_status' => $oldStatus,
-                'new_status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
-                'user_id' => auth()->id(),
-            ]);
-
-            if (!empty($order->created_by)) {
-                $this->notificationService->notifyRole(
-                    'warehouse',
-                    'preinvoice_items_changed_reapproval_required',
-                    'پیش‌فاکتور نیازمند بررسی مجدد انبار است',
-                    "اقلام پیش‌فاکتور مشتری {$order->customer_name} تغییر کرد و دوباره به صف انبار برگشت.",
-                    route('preinvoice.warehouse.review', $order->uuid),
-                    ['level' => 'warning', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "warehouse_reapproval_required:{$order->id}:" . now()->timestamp]
-                );
+            if ($itemsActuallyChanged) {
+                $updatePayload = array_merge($updatePayload, [
+                    'status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+                    'warehouse_review_note' => null,
+                    'warehouse_reject_reason' => null,
+                    'warehouse_reviewed_by' => null,
+                    'warehouse_reviewed_at' => null,
+                    'items_updated_at' => now(),
+                    'items_updated_by' => auth()->id(),
+                ]);
             }
+
+            $order->update($updatePayload);
+
+            if ($itemsActuallyChanged) {
+                $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), $oldStatus);
+                $this->warehouseReviewAuditService->log($order->fresh(), \App\Models\WarehouseReviewLog::ACTION_RESUBMITTED_TO_WAREHOUSE, auth()->id(), $oldStatus, PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 'پیش‌فاکتور بعد از اصلاح دوباره به صف انبار ارسال شد.');
+                $this->warehousePendingRefreshService->refreshActiveWarehousePendingForDocument($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), 'preinvoice', auth()->id());
+
+                $this->syncExistingInvoiceFromOrderForReapproval($order->fresh(['items', 'invoice.items']));
+
+                $order->reviews()->create([
+                    'user_id' => auth()->id(),
+                    'action' => 'seller_items_changed_reapproval_required',
+                    'reason' => 'اقلام سند توسط فروشنده/مدیر تغییر کرد و تاییدهای قبلی باطل شد.',
+                    'before_items' => $before,
+                    'after_items' => $this->snapshotItems($order->fresh('items.product', 'items.variant')),
+                ]);
+
+                ActivityLogger::log('seller_items_reapproval', $order->fresh(), 'اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.', [
+                    'old_status' => $oldStatus,
+                    'new_status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+                    'user_id' => auth()->id(),
+                ]);
+
+                if (!empty($order->created_by)) {
+                    $this->notificationService->notifyRole(
+                        'warehouse',
+                        'preinvoice_items_changed_reapproval_required',
+                        'پیش‌فاکتور نیازمند بررسی مجدد انبار است',
+                        "اقلام پیش‌فاکتور مشتری {$order->customer_name} تغییر کرد و دوباره به صف انبار برگشت.",
+                        route('preinvoice.warehouse.review', $order->uuid),
+                        ['level' => 'warning', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "warehouse_reapproval_required:{$order->id}:" . now()->timestamp]
+                    );
+                }
+            }
+
+            return $itemsActuallyChanged;
         });
 
-        return back()->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');
+        return back()->with('success', $itemsChanged
+            ? '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.'
+            : '✅ اطلاعات پیش‌فاکتور ذخیره شد؛ چون اقلام واقعی تغییر نکرده بود، تاییدهای قبلی باطل نشد.');
     }
 
     private function validateDraftPayload(Request $request, bool $checkCurrentStock = true, ?PreinvoiceOrder $editingOrder = null): array
@@ -771,22 +786,38 @@ class PreinvoiceController extends Controller
 
     private function replaceOrderItems(PreinvoiceOrder $order, array $items): void
     {
-        $order->items()->delete();
+        $existingByKey = $order->items()->get()->keyBy(fn ($item) => ((int) $item->product_id) . ':' . ((int) $item->variant_id));
+        $keepIds = [];
 
         foreach (array_values($items) as $index => $row) {
             $variant = ProductVariant::query()
                 ->whereKey((int) $row['variant_id'])
                 ->where('product_id', (int) $row['product_id'])
                 ->firstOrFail(['sell_price']);
-            $order->items()->create([
+            $attrs = [
                 'product_id' => (int) $row['product_id'],
                 'variant_id' => (int) $row['variant_id'],
                 'quantity' => (int) $row['quantity'],
-                'price' => (int) ($variant->sell_price ?? 0),
+                'price' => (int) ($row['price'] ?? $variant->sell_price ?? 0),
                 'sort_order' => $index + 1,
-            ]);
+            ];
+            $key = $attrs['product_id'] . ':' . $attrs['variant_id'];
+            $existing = $existingByKey->get($key);
+            if ($existing) {
+                $existing->fill($attrs);
+                if ($existing->isDirty()) {
+                    $existing->save();
+                }
+                $keepIds[] = (int) $existing->id;
+                continue;
+            }
+
+            $keepIds[] = (int) $order->items()->create($attrs)->id;
         }
+
+        $order->items()->whereNotIn('id', $keepIds)->delete();
     }
+
 
     private function snapshotItems(PreinvoiceOrder $order): array
     {
@@ -812,6 +843,39 @@ class PreinvoiceController extends Controller
 
         return SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price)['grand_total'];
     }
+
+    private function itemChangeSignatureFromOrder(PreinvoiceOrder $order): array
+    {
+        $order->loadMissing('items');
+
+        return $order->items
+            ->map(fn ($item) => [
+                'product_id' => (int) $item->product_id,
+                'variant_id' => (int) $item->variant_id,
+                'quantity' => (int) $item->quantity,
+                'price' => (int) $item->price,
+                'line_discount_amount' => (int) ($item->line_discount_amount ?? 0),
+            ])
+            ->sortBy(fn ($row) => $row['product_id'] . ':' . $row['variant_id'])
+            ->values()
+            ->all();
+    }
+
+    private function itemChangeSignatureFromDraftRows(array $rows): array
+    {
+        return collect($rows)
+            ->map(fn ($row) => [
+                'product_id' => (int) ($row['id'] ?? 0),
+                'variant_id' => (int) ($row['variety_id'] ?? 0),
+                'quantity' => (int) ($row['quantity'] ?? 0),
+                'price' => (int) ($row['price'] ?? 0),
+                'line_discount_amount' => (int) ($row['line_discount_amount'] ?? 0),
+            ])
+            ->sortBy(fn ($row) => $row['product_id'] . ':' . $row['variant_id'])
+            ->values()
+            ->all();
+    }
+
 
     private function assertOrderHasStock(PreinvoiceOrder $order): void
     {
@@ -1067,7 +1131,9 @@ class PreinvoiceController extends Controller
 
     private function syncItems(PreinvoiceOrder $order, array $products, bool $preserveExistingOrder = false): void
     {
-        $existingById = $preserveExistingOrder ? $order->items()->get()->keyBy('id') : collect();
+        $existingItems = $preserveExistingOrder ? $order->items()->get() : collect();
+        $existingById = $preserveExistingOrder ? $existingItems->keyBy('id') : collect();
+        $existingByKey = $preserveExistingOrder ? $existingItems->keyBy(fn ($item) => ((int) $item->product_id) . ':' . ((int) $item->variant_id)) : collect();
         $keepIds = [];
         $nextOrder = (int) $order->items()->max('sort_order');
         foreach (array_values($products) as $index => $p) {
@@ -1083,19 +1149,29 @@ class PreinvoiceController extends Controller
                 'line_discount_amount' => (int) ($p['line_discount_amount'] ?? 0),
             ];
             $itemId = (int) ($p['item_id'] ?? 0);
+            $item = null;
             if ($preserveExistingOrder && $itemId > 0 && $existingById->has($itemId)) {
                 $item = $existingById->get($itemId);
-                $item->update($attrs);
-                $keepIds[] = $item->id;
+            } elseif ($preserveExistingOrder) {
+                $item = $existingByKey->get($attrs['product_id'] . ':' . $attrs['variant_id']);
+            }
+
+            if ($item) {
+                $item->fill($attrs);
+                if ($item->isDirty()) {
+                    $item->save();
+                }
+                $keepIds[] = (int) $item->id;
             } else {
                 $attrs['sort_order'] = $preserveExistingOrder ? ++$nextOrder : ($index + 1);
-                $keepIds[] = $order->items()->create($attrs)->id;
+                $keepIds[] = (int) $order->items()->create($attrs)->id;
             }
         }
         if ($preserveExistingOrder) {
             $order->items()->whereNotIn('id', $keepIds)->delete();
         }
     }
+
 
 
     private function finalizeDraftReservations(PreinvoiceOrder $order, ?string $reservationToken, array $products): void
@@ -1168,6 +1244,20 @@ class PreinvoiceController extends Controller
             $row->expires_at = null;
             $row->save();
         }
+    }
+
+
+    private function syncPreinvoiceReservationsAfterItemChange(PreinvoiceOrder $order, array $oldItems): void
+    {
+        $order->loadMissing('items');
+        $newItems = $order->items->map(fn ($item) => [
+            'product_id' => (int) $item->product_id,
+            'variant_id' => (int) $item->variant_id,
+            'quantity' => (int) $item->quantity,
+        ])->all();
+
+        $this->applyFrozenStockDelta($oldItems, $newItems, true);
+        $this->syncPreinvoiceReservations($order, true);
     }
 
 
@@ -1411,7 +1501,10 @@ class PreinvoiceController extends Controller
 
     private function hasCentralStockMovedToReserve(PreinvoiceOrder $order): bool
     {
-        return ! is_null($order->stock_frozen_until);
+        return is_null($order->stock_released_at) && PreinvoiceDraftReservation::query()
+            ->where('preinvoice_order_id', $order->id)
+            ->whereNotNull('converted_at')
+            ->exists();
     }
 
     private function coverReservationShortfalls($requiredByVariant, bool $centralStockMovedToReserve): void
@@ -1587,7 +1680,7 @@ class PreinvoiceController extends Controller
             $isFinanceReapproval = $existingInvoice && (string) $existingInvoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL;
             $oldInvoiceStatus = $existingInvoice ? (string) $existingInvoice->status : null;
             $oldInvoiceTotal = $existingInvoice ? (int) $existingInvoice->total : null;
-            $shouldDeductOnFinalize = ! $existingInvoice;
+            $shouldDeductOnFinalize = false;
             $centralStockMovedToReserve = $this->hasCentralStockMovedToReserve($order);
 
             foreach ($order->items as $it) {
@@ -1761,7 +1854,7 @@ class PreinvoiceController extends Controller
                 'status' => PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE,
                 'total_price' => (int) $total,
                 'stock_frozen_until' => null,
-                'stock_released_at' => now(),
+                'stock_released_at' => null,
             ]);
 
             if (! $isFinanceReapproval) {

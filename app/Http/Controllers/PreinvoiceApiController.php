@@ -426,6 +426,7 @@ class PreinvoiceApiController extends Controller
     {
         DB::transaction(function () {
             $expiredRows = PreinvoiceDraftReservation::query()
+                ->whereNull('preinvoice_order_id')
                 ->whereNull('converted_at')
                 ->whereNotNull('expires_at')
                 ->where('expires_at', '<=', now())

@@ -17,6 +17,8 @@ class InventoryCorruptionAuditService
         PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING,
         PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
         PreinvoiceOrder::STATUS_FINANCE_REVIEWING,
+        PreinvoiceOrder::STATUS_RETURNED_TO_WAREHOUSE,
+        PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE,
     ];
 
     public function rows(?int $productId = null): Collection
@@ -111,21 +113,11 @@ class InventoryCorruptionAuditService
     {
         return DB::table('preinvoice_draft_reservations AS pdr')
             ->leftJoin('preinvoice_orders AS po', 'po.id', '=', 'pdr.preinvoice_order_id')
+            ->whereNull('pdr.preinvoice_order_id')
             ->whereNull('pdr.converted_at')
+            ->whereNotNull('pdr.expires_at')
+            ->where('pdr.expires_at', '<=', now())
             ->when($productId, fn ($query) => $query->where('pdr.product_id', $productId))
-            ->where(function ($query) {
-                $query->where('pdr.expires_at', '<=', now())
-                    ->orWhereNotNull('po.stock_released_at')
-                    ->orWhereIn('po.status', [
-                        PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE,
-                        PreinvoiceOrder::STATUS_CANCELLED_BY_WAREHOUSE,
-                        PreinvoiceOrder::STATUS_CANCELLED_BY_FINANCE,
-                    ])
-                    ->orWhere(function ($nested) {
-                        $nested->whereNotNull('po.id')
-                            ->whereNotIn('po.status', self::ACTIVE_PREINVOICE_STATUSES);
-                    });
-            })
             ->pluck('pdr.id');
     }
 
@@ -172,21 +164,13 @@ class InventoryCorruptionAuditService
 
     private function activeReservationQuantities(): array
     {
-        return DB::table('preinvoice_draft_reservations AS pdr')
-            ->select('pdr.variant_id', DB::raw('SUM(pdr.quantity) AS qty'))
-            ->leftJoin('preinvoice_orders AS po', 'po.id', '=', 'pdr.preinvoice_order_id')
-            ->whereNull('pdr.converted_at')
-            ->where(function ($query) {
-                $query->whereNull('pdr.expires_at')->orWhere('pdr.expires_at', '>', now());
-            })
-            ->where(function ($query) {
-                $query->whereNull('po.id')
-                    ->orWhere(function ($nested) {
-                        $nested->whereIn('po.status', self::ACTIVE_PREINVOICE_STATUSES)
-                            ->whereNull('po.stock_released_at');
-                    });
-            })
-            ->groupBy('pdr.variant_id')
+        return DB::table('preinvoice_order_items AS poi')
+            ->select('poi.variant_id', DB::raw('SUM(poi.quantity) AS qty'))
+            ->join('preinvoice_orders AS po', 'po.id', '=', 'poi.preinvoice_order_id')
+            ->whereNotNull('poi.variant_id')
+            ->whereIn('po.status', self::ACTIVE_PREINVOICE_STATUSES)
+            ->whereNull('po.stock_released_at')
+            ->groupBy('poi.variant_id')
             ->get()
             ->mapWithKeys(fn ($row) => [(int) $row->variant_id => (int) $row->qty])
             ->all();

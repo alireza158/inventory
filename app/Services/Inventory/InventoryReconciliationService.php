@@ -12,7 +12,11 @@ class InventoryReconciliationService
     public const VALID_INVOICE_STATUSES = ['pending_warehouse_approval', 'not_shipped', 'shipped'];
     public const ACTIVE_PREINVOICE_STATUSES = [
         PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
+        PreinvoiceOrder::STATUS_WAREHOUSE_REVIEWING,
         PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+        PreinvoiceOrder::STATUS_FINANCE_REVIEWING,
+        PreinvoiceOrder::STATUS_RETURNED_TO_WAREHOUSE,
+        PreinvoiceOrder::STATUS_CONVERTED_TO_INVOICE,
     ];
     public const BLOCKING_FLAGS = ['reservation_without_purchase', 'sold_more_than_purchased', 'suspicious_reservation'];
 
