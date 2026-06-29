@@ -13,6 +13,7 @@ use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
 use App\Models\StockMovement;
 use App\Support\Currency;
+use App\Support\SalesDocumentTotals;
 use App\Support\IranLocations;
 use App\Support\DocumentCodeGenerator;
 use App\Support\ActivityLogger;
@@ -807,12 +808,9 @@ class PreinvoiceController extends Controller
 
     private function calculateOrderTotal(PreinvoiceOrder $order): int
     {
-        $subtotal = (int) $order->items()
-            ->reorder()
-            ->selectRaw('COALESCE(SUM(quantity * price), 0) as total')
-            ->value('total');
+        $order->loadMissing('items');
 
-        return max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
+        return SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price)['grand_total'];
     }
 
     private function assertOrderHasStock(PreinvoiceOrder $order): void
@@ -906,8 +904,9 @@ class PreinvoiceController extends Controller
             return;
         }
 
-        $subtotal = (int) $order->items->sum(fn($it) => ((int) $it->quantity) * ((int) $it->price));
-        $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
+        $totals = SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price);
+        $subtotal = $totals['subtotal_before_discount'];
+        $total = $totals['grand_total'];
 
         $invoice->items()->delete();
         foreach ($order->items as $item) {
@@ -1585,9 +1584,9 @@ class PreinvoiceController extends Controller
                     $variant->save();
                 }
             }
-            $subtotal = (int) $order->items->sum(fn($it) => ((int) $it->price) * ((int) $it->quantity));
-
-            $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
+            $totals = SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price);
+            $subtotal = $totals['subtotal_before_discount'];
+            $total = $totals['grand_total'];
 
             $requiredByVariant = $order->items
                 ->groupBy('variant_id')

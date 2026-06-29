@@ -11,6 +11,7 @@ use App\Models\ProductVariant;
 use App\Models\StockMovement;
 use App\Support\DocumentCodeGenerator;
 use App\Support\ActivityLogger;
+use App\Support\SalesDocumentTotals;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 
@@ -123,8 +124,9 @@ class SalesHavalehService
             }
 
             $invoice->refresh()->load(['items', 'preinvoiceOrder']);
-            $subtotal = (int) $invoice->items->sum('line_total');
-            $newTotal = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+            $totals = SalesDocumentTotals::calculate($invoice->items, (int) $invoice->discount_amount, (int) $invoice->shipping_price);
+            $subtotal = $totals['subtotal_before_discount'];
+            $newTotal = $totals['grand_total'];
             $oldTotal = (int) $invoice->total;
 
             $invoice->update([
@@ -492,8 +494,9 @@ class SalesHavalehService
                 return $existing;
             }
 
-            $subtotal = (int) $order->items->sum(fn ($it) => ((int) $it->quantity * (int) $it->price));
-            $total = max($subtotal + (int) $order->shipping_price - (int) $order->discount_amount, 0);
+            $totals = SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price);
+            $subtotal = $totals['subtotal_before_discount'];
+            $total = $totals['grand_total'];
 
             $invoice = Invoice::query()->create([
                 'uuid' => $this->officialCodeForPreinvoiceConversion($order),

@@ -13,6 +13,7 @@ use App\Models\StockMovement;
 use App\Models\Warehouse;
 use App\Models\WarehouseTransfer;
 use App\Services\WarehouseStockService;
+use App\Support\SalesDocumentTotals;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -150,8 +151,10 @@ class VoucherController extends Controller
                 ]);
             }
 
-            $subtotal = (int) $invoice->items()->reorder()->sum('line_total');
-            $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+            $invoice->loadMissing('items');
+            $totals = SalesDocumentTotals::calculate($invoice->items, (int) $invoice->discount_amount, (int) $invoice->shipping_price);
+            $subtotal = $totals['subtotal_before_discount'];
+            $total = $totals['grand_total'];
             $invoice->update([
                 'subtotal' => $subtotal,
                 'total' => $total,
@@ -761,8 +764,10 @@ class VoucherController extends Controller
                 ]);
             }
 
-            $subtotal = (int) $invoice->items()->reorder()->sum('line_total');
-            $total = max($subtotal + (int) $invoice->shipping_price - (int) $invoice->discount_amount, 0);
+            $invoice->loadMissing('items');
+            $totals = SalesDocumentTotals::calculate($invoice->items, (int) $invoice->discount_amount, (int) $invoice->shipping_price);
+            $subtotal = $totals['subtotal_before_discount'];
+            $total = $totals['grand_total'];
 
             $invoice->update([
                 'subtotal' => $subtotal,
