@@ -394,7 +394,7 @@ class PreinvoiceController extends Controller
             $this->syncPreinvoiceReservations($order, true);
             $order->update([
                 'total_price' => $this->calculateOrderTotal($order),
-                'stock_frozen_until' => now(),
+                'stock_frozen_until' => null,
                 'stock_released_at' => null,
             ]);
             $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), null);
@@ -500,7 +500,7 @@ class PreinvoiceController extends Controller
                 'warehouse_reviewed_by' => null,
                 'warehouse_reviewed_at' => null,
                 'total_price' => $this->calculateOrderTotal($order),
-                'stock_frozen_until' => now(),
+                'stock_frozen_until' => null,
                 'stock_released_at' => null,
                 'items_updated_at' => now(),
                 'items_updated_by' => auth()->id(),
@@ -1411,7 +1411,10 @@ class PreinvoiceController extends Controller
 
     private function hasCentralStockMovedToReserve(PreinvoiceOrder $order): bool
     {
-        return ! is_null($order->stock_frozen_until);
+        return is_null($order->stock_released_at) && PreinvoiceDraftReservation::query()
+            ->where('preinvoice_order_id', $order->id)
+            ->whereNotNull('converted_at')
+            ->exists();
     }
 
     private function coverReservationShortfalls($requiredByVariant, bool $centralStockMovedToReserve): void
