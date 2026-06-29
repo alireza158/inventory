@@ -4,6 +4,8 @@
 @php
   use Morilog\Jalali\Jalalian;
 
+  $totals = \App\Support\SalesDocumentTotals::calculate($invoice->items, (int) $invoice->discount_amount, (int) $invoice->shipping_price);
+
   $methodFa = fn($m) => match($m){
     'cash' => 'نقدی',
     'cheque' => 'چک',
@@ -151,7 +153,7 @@
             </thead>
             <tbody>
               @foreach($invoice->items as $it)
-                @php $line = (int)($it->line_total ?? ($it->price * $it->quantity)); @endphp
+                @php $line = \App\Support\SalesDocumentTotals::lineTotal($it); @endphp
                 <tr>
                   <td class="fw-semibold">{{ $productTitle($it) }}</td>
                   <td>{{ $variantTitle($it) }}</td>
@@ -166,10 +168,10 @@
 
         <div class="p-3 p-md-4 border-top">
           <div class="row g-2">
-            <div class="col-6"><span class="text-muted">جمع جزء:</span> <b>{{ $rial($invoice->subtotal) }}</b></div>
-            <div class="col-6"><span class="text-muted">هزینه ارسال:</span> <b>{{ $rial($invoice->shipping_price) }}</b></div>
-            <div class="col-6"><span class="text-muted">تخفیف:</span> <b>{{ $rial($invoice->discount_amount) }}</b></div>
-            <div class="col-6 fs-5"><span class="text-muted">مبلغ کل:</span> <b>{{ $rial($invoice->total) }}</b></div>
+            <div class="col-6"><span class="text-muted">جمع جزء:</span> <b>{{ $rial($totals['subtotal_before_discount']) }}</b></div>
+            <div class="col-6"><span class="text-muted">هزینه ارسال:</span> <b>{{ $rial($totals['shipping']) }}</b></div>
+            <div class="col-6"><span class="text-muted">تخفیف:</span> <b>{{ $rial($totals['total_discount']) }}</b></div>
+            <div class="col-6 fs-5"><span class="text-muted">مبلغ کل:</span> <b>{{ $rial($totals['grand_total']) }}</b></div>
           </div>
         </div>
       </div>
@@ -221,7 +223,7 @@
             $cashPaidAmount = (int) $invoice->payments->where('method', 'cash')->sum('amount');
             $chequePaidAmount = (int) $invoice->payments->where('method', 'cheque')->sum('amount');
             $paidAmount = $cashPaidAmount + $chequePaidAmount;
-            $remainingAmount = max((int) $invoice->total - $paidAmount, 0);
+            $remainingAmount = max((int) $totals['grand_total'] - $paidAmount, 0);
             $paymentState = $remainingAmount <= 0 ? 'تسویه شده' : ($paidAmount > 0 ? 'پرداخت ناقص' : 'پرداخت نشده');
             $paymentStateClass = $remainingAmount <= 0 ? 'bg-success' : ($paidAmount > 0 ? 'bg-warning text-dark' : 'bg-danger');
           @endphp

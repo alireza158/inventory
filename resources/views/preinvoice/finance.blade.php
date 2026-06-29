@@ -3,10 +3,11 @@
 @php
   use Morilog\Jalali\Jalalian;
 
-  $subtotal = $order->items->sum(fn ($it) => ((int) $it->price) * ((int) $it->quantity));
-  $shipping = (int) $order->shipping_price;
-  $discount = (int) $order->discount_amount;
-  $grandTotal = max($subtotal + $shipping - $discount, 0);
+  $totals = \App\Support\SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price);
+  $subtotal = $totals['subtotal_before_discount'];
+  $shipping = $totals['shipping'];
+  $discount = $totals['total_discount'];
+  $grandTotal = $totals['grand_total'];
   $rial = fn ($value) => \App\Support\Currency::formatRial($value);
 @endphp
 
