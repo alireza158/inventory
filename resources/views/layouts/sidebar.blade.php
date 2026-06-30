@@ -11,7 +11,7 @@
 
     $salesActive = $isRoute('preinvoice.create', 'preinvoice.my.*', 'customers.*', 'persons.*');
 
-    $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'finance.cheques.*');
+    $financeActive = $isRoute('preinvoice.draft.*', 'account-statements.*', 'invoices.*', 'finance.cheques.*', 'finance.reports.*');
 
     $configActive = $isRoute('shipping-methods.*', 'users.*', 'admin.permissions.*', 'admin.roles.*', 'activity-logs.*', 'inventory-webhooks.*');
 
@@ -337,6 +337,9 @@
                     @endcanPermission
                     @canPermission('invoices.view')
                     <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
+                    @endcanPermission
+                    @canPermission('invoices.view')
+                    <a class="sidebar-sublink {{ $is('finance.reports.*') }}" href="{{ route('finance.reports.index') }}">گزارشات مالی</a>
                     @endcanPermission
                     @canPermission('cheques.view')
                     <a class="sidebar-sublink {{ $is('finance.cheques.*') }}" href="{{ route('finance.cheques.registered') }}">چک‌های ثبت‌شده</a>
