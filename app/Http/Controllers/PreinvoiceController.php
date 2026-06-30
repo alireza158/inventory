@@ -712,15 +712,27 @@ class PreinvoiceController extends Controller
 
     private function validateWarehouseReviewPayload(Request $request, bool $forApprove = false, ?PreinvoiceOrder $order = null): array
     {
+        $items = $this->normalizeWarehouseReviewItems($request->input('items', []), $order, $request->input('removed_items', []));
+
+        Log::debug('warehouse approval validation debug', [
+            'order_id' => $order->id ?? null,
+            'uuid' => $order->uuid ?? null,
+            'raw_items_keys' => is_array($request->input('items', [])) ? array_keys($request->input('items', [])) : [],
+            'raw_item_70' => data_get($request->input('items', []), '70'),
+            'normalized_items' => $items,
+        ]);
+
         $request->merge([
-            'items' => $this->normalizeWarehouseReviewItems($request->input('items', []), $order, $request->input('removed_items', [])),
+            'items' => $items,
         ]);
 
         $validated = $request->validate([
             'warehouse_review_note' => $forApprove ? 'required|string|max:2000' : 'nullable|string|max:2000',
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|integer|exists:products,id,is_sellable,1',
-            'items.*.variant_id' => ['required', 'integer', Rule::exists('product_variants', 'id')->where(fn($q) => $q->where('is_active', true))],
+            'items.*.id' => 'nullable|integer',
+            'items.*.item_id' => 'nullable|integer',
+            'items.*.product_id' => 'required|integer',
+            'items.*.variant_id' => 'required|integer',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'nullable|integer|min:0',
             'items.*.change_reason' => 'nullable|string|in:' . implode(',', array_keys(WarehouseReviewAuditService::REASONS)),
@@ -737,13 +749,33 @@ class PreinvoiceController extends Controller
         ]);
 
         foreach (($validated['items'] ?? []) as $index => $row) {
+            $itemId = (int) ($row['item_id'] ?? $row['id'] ?? 0);
+            $existing = $order && $itemId > 0
+                ? $order->items->firstWhere('id', $itemId)
+                : null;
+
+            if ($existing) {
+                continue;
+            }
+
+            $productExists = Product::query()
+                ->whereKey((int) $row['product_id'])
+                ->where('is_sellable', true)
+                ->exists();
+
+            if (! $productExists) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.product_id" => 'کالای انتخابی معتبر نیست.',
+                ]);
+            }
+
             $isValidVariant = ProductVariant::query()
                 ->whereKey((int) $row['variant_id'])
                 ->where('product_id', (int) $row['product_id'])
                 ->where('is_active', true)
                 ->exists();
 
-            if (!$isValidVariant) {
+            if (! $isValidVariant) {
                 throw ValidationException::withMessages([
                     "items.{$index}.variant_id" => 'تنوع انتخابی برای کالا معتبر نیست.',
                 ]);
@@ -810,8 +842,8 @@ class PreinvoiceController extends Controller
             if ($existing) {
                 $row['id'] = (int) $existing->id;
                 $row['item_id'] = (int) $existing->id;
-                $row['product_id'] = filled($row['product_id'] ?? null) ? (int) $row['product_id'] : (int) $existing->product_id;
-                $row['variant_id'] = filled($row['variant_id'] ?? null) ? (int) $row['variant_id'] : (int) $existing->variant_id;
+                $row['product_id'] = (int) $existing->product_id;
+                $row['variant_id'] = (int) $existing->variant_id;
                 $row['quantity'] = filled($row['quantity'] ?? null) ? (int) $row['quantity'] : (int) $existing->quantity;
                 $row['price'] = filled($row['price'] ?? null) ? (int) $row['price'] : (int) $existing->price;
                 $seenItemIds[(int) $existing->id] = true;
