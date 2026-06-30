@@ -10,6 +10,7 @@ use App\Http\Controllers\CustomerApiController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\FinanceReportController;
 use App\Http\Controllers\InventoryWebhookController;
 use App\Http\Controllers\InvoiceNoteController;
 use App\Http\Controllers\InvoicePaymentController;
@@ -136,6 +137,14 @@ Route::put('/vouchers/sales/{uuid}', [InvoiceController::class, 'salesVoucherUpd
 Route::post('/vouchers/sales/{uuid}/status', [InvoiceController::class, 'updateStatus'])->name('vouchers.sales.status');
 Route::get('/vouchers/sales/{uuid}/print', [InvoiceController::class, 'print'])->name('vouchers.sales.print');
 Route::get('/finance/registered-cheques', [ChequeController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant')->name('finance.cheques.registered');
+Route::middleware('role:admin|Admin|finance|Accountant|Manager')->prefix('finance/reports')->name('finance.reports.')->group(function () {
+    Route::get('/', [FinanceReportController::class, 'index'])->name('index');
+    Route::get('/sales-visitors', [FinanceReportController::class, 'salesVisitors'])->name('sales-visitors');
+    Route::post('/sales-visitors/commission-batches', [FinanceReportController::class, 'storeSalesVisitorsCommissionBatch'])->name('sales-visitors.commission-batches.store');
+    Route::get('/sales-visitors/commission-batches/{batch}', [FinanceReportController::class, 'showSalesVisitorsCommissionBatch'])->name('sales-visitors.commission-batches.show');
+    Route::get('/sales-visitors/commission-batches/{batch}/print', [FinanceReportController::class, 'printSalesVisitorsCommissionBatch'])->name('sales-visitors.commission-batches.print');
+    Route::get('/sales-visitors/commission-batches/{batch}/export', [FinanceReportController::class, 'exportSalesVisitorsCommissionBatch'])->name('sales-visitors.commission-batches.export');
+});
 
 Route::get('/vouchers/section/{type}', [VoucherController::class, 'sectionIndex'])->name('vouchers.section.index');
 Route::get('/vouchers/section/{type}/create', [VoucherController::class, 'sectionCreate'])->name('vouchers.section.create');
