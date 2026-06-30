@@ -26,11 +26,6 @@ class FinanceReportController extends Controller
         'void',
     ];
 
-    private const COMMISSIONABLE_STATUSES = [
-        Invoice::STATUS_SHIPPED,
-        Invoice::STATUS_FINANCE_APPROVED,
-    ];
-
     public function index()
     {
         $reports = [
@@ -93,7 +88,7 @@ class FinanceReportController extends Controller
 
         $visitors = $this->visitors();
         $statusLabels = $this->statusLabels();
-        $statusOptions = ['commissionable' => 'فقط فاکتورهای قابل محاسبه پورسانت'] + $statusLabels + ['valid' => 'همه فاکتورهای معتبر', 'all' => 'همه وضعیت‌ها'];
+        $statusOptions = ['valid' => 'همه فاکتورهای معتبر'] + $statusLabels + ['all' => 'همه وضعیت‌ها'];
 
         return view('finance.reports.sales-visitors', compact('filters', 'filterErrors', 'details', 'summary', 'summaryTotals', 'visitors', 'statusLabels', 'statusOptions', 'approvedInvoiceIds'));
     }
@@ -106,8 +101,14 @@ class FinanceReportController extends Controller
             'to_date' => ['nullable', 'date'],
             'invoice_ids' => ['required', 'array', 'min:1'],
             'invoice_ids.*' => ['integer', 'exists:invoices,id'],
+            'status' => ['nullable', 'string'],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        $allowedStatusFilters = array_merge(['valid', 'all'], array_keys($this->statusLabels()));
+        if (! in_array((string) ($data['status'] ?? 'valid'), $allowedStatusFilters, true)) {
+            $data['status'] = 'valid';
+        }
 
         $dateFrom = $this->parseDate((string) ($data['from_date'] ?? ''));
         $dateTo = $this->parseDate((string) ($data['to_date'] ?? ''));
@@ -120,7 +121,7 @@ class FinanceReportController extends Controller
             'from_date' => $dateFrom?->toDateString() ?? '',
             'to_date' => $dateTo?->toDateString() ?? '',
             'visitor_id' => (string) $data['visitor_id'],
-            'status' => 'commissionable',
+            'status' => (string) ($data['status'] ?? 'valid'),
         ];
 
         $invoices = $this->baseSalesVisitorsQuery($filters, $dateFrom, $dateTo)
@@ -130,7 +131,7 @@ class FinanceReportController extends Controller
             ->get();
 
         if ($invoices->count() !== $invoiceIds->count()) {
-            throw ValidationException::withMessages(['invoice_ids' => 'برخی فاکتورهای انتخاب‌شده معتبر، نهایی یا متعلق به این ویزیتور/بازه نیستند.']);
+            throw ValidationException::withMessages(['invoice_ids' => 'برخی فاکتورهای انتخاب‌شده در لیست گزارش این ویزیتور/بازه/فیلتر وضعیت وجود ندارند.']);
         }
 
         $alreadyApproved = $this->activeApprovedInvoiceIds($invoiceIds->all());
@@ -222,8 +223,7 @@ class FinanceReportController extends Controller
             ->when($dateTo, fn (Builder $query) => $query->whereDate('document_date', '<=', $dateTo->toDateString()))
             ->when($filters['visitor_id'] !== '', fn (Builder $query) => $query->whereHas('preinvoiceOrder', fn (Builder $orderQuery) => $orderQuery->where('created_by', (int) $filters['visitor_id'])))
             ->when($filters['status'] === 'valid', fn (Builder $query) => $query->whereNotIn('status', self::INVALID_STATUSES))
-            ->when($filters['status'] === 'commissionable', fn (Builder $query) => $query->whereIn('status', self::COMMISSIONABLE_STATUSES))
-            ->when(! in_array($filters['status'], ['', 'valid', 'all', 'commissionable'], true), fn (Builder $query) => $query->where('status', $filters['status']));
+            ->when(! in_array($filters['status'], ['', 'valid', 'all'], true), fn (Builder $query) => $query->where('status', $filters['status']));
     }
 
     private function exportSalesVisitors($invoices, bool $excelAlias = false): StreamedResponse
@@ -261,7 +261,7 @@ class FinanceReportController extends Controller
             'from_date' => $this->normalizeDigits(trim((string) $request->query('from_date', ''))),
             'to_date' => $this->normalizeDigits(trim((string) $request->query('to_date', ''))),
             'visitor_id' => trim((string) $request->query('visitor_id', '')),
-            'status' => trim((string) $request->query('status', 'commissionable')) ?: 'commissionable',
+            'status' => trim((string) $request->query('status', 'valid')) ?: 'valid',
         ];
     }
 
