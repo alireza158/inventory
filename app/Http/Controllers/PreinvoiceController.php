@@ -695,6 +695,10 @@ class PreinvoiceController extends Controller
 
     private function validateWarehouseReviewPayload(Request $request, bool $forApprove = false): array
     {
+        $request->merge([
+            'items' => $this->normalizeWarehouseReviewItems($request->input('items', [])),
+        ]);
+
         $validated = $request->validate([
             'warehouse_review_note' => $forApprove ? 'required|string|max:2000' : 'nullable|string|max:2000',
             'items' => 'required|array|min:1',
@@ -730,6 +734,33 @@ class PreinvoiceController extends Controller
         }
 
         return $validated;
+    }
+
+    private function normalizeWarehouseReviewItems(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        return array_values(array_filter($items, function ($row): bool {
+            if (! is_array($row)) {
+                return false;
+            }
+
+            foreach (['marked_deleted', 'deleted', '_delete', 'remove'] as $flag) {
+                if (filter_var($row[$flag] ?? false, FILTER_VALIDATE_BOOL)) {
+                    return false;
+                }
+            }
+
+            foreach (['product_id', 'variant_id', 'quantity', 'change_reason', 'change_note'] as $field) {
+                if (trim((string) ($row[$field] ?? '')) !== '') {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
     }
 
     private function validateWarehouseChangeReasons(PreinvoiceOrder $order, array $data): void
@@ -1573,6 +1604,20 @@ class PreinvoiceController extends Controller
         return $code;
     }
 
+    private function safeLegacyConflictInvoiceUuid(PreinvoiceOrder $order): string
+    {
+        $base = (string) $order->uuid . '-P' . (int) $order->id;
+        $candidate = $base;
+        $suffix = 2;
+
+        while (Invoice::query()->where('uuid', $candidate)->exists()) {
+            $candidate = $base . '-' . $suffix;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
     private function canHandleFinanceActions(): bool
     {
         $user = auth()->user();
@@ -1663,14 +1708,16 @@ class PreinvoiceController extends Controller
             $officialInvoiceUuid = $this->officialCodeForPreinvoiceConversion($order);
             $existingInvoice = Invoice::query()
                 ->where('preinvoice_order_id', $order->id)
-                ->orWhere('uuid', $officialInvoiceUuid)
+                ->lockForUpdate()
+                ->first();
+            $legacyConflictInvoice = Invoice::query()
+                ->where('uuid', $officialInvoiceUuid)
+                ->where('preinvoice_order_id', '!=', $order->id)
                 ->lockForUpdate()
                 ->first();
 
-            if ($existingInvoice && (int) $existingInvoice->preinvoice_order_id !== (int) $order->id) {
-                throw ValidationException::withMessages([
-                    'invoice' => "شماره فاکتور {$officialInvoiceUuid} قبلاً برای پیش‌فاکتور دیگری ثبت شده است. لطفاً با مدیر سیستم تماس بگیرید.",
-                ]);
+            if (! $existingInvoice && $legacyConflictInvoice) {
+                $officialInvoiceUuid = $this->safeLegacyConflictInvoiceUuid($order);
             }
 
             if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
@@ -1759,6 +1806,17 @@ class PreinvoiceController extends Controller
                     'subtotal' => (int) $subtotal,
                     'total' => (int) $total,
                     'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+                ]);
+            }
+
+            if ($legacyConflictInvoice && $invoice->wasRecentlyCreated) {
+                ActivityLogger::log('legacy_invoice_number_conflict_resolved', $invoice->fresh(), 'به دلیل تداخل شماره فاکتور قدیمی، شماره امن جدید برای فاکتور تولید شد.', [
+                    'preinvoice_order_id' => $order->id,
+                    'preinvoice_uuid' => $order->uuid,
+                    'generated_invoice_uuid' => $invoice->uuid,
+                    'conflicting_invoice_id' => $legacyConflictInvoice->id,
+                    'conflicting_invoice_uuid' => $legacyConflictInvoice->uuid,
+                    'conflicting_preinvoice_order_id' => $legacyConflictInvoice->preinvoice_order_id,
                 ]);
             }
 
