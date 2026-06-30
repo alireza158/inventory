@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FinanceCommissionBatch;
+use App\Models\FinanceCommissionBatchItem;
 use App\Models\Invoice;
 use App\Models\User;
 use App\Support\JalaliDate;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Morilog\Jalali\Jalalian;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -21,6 +25,26 @@ class FinanceReportController extends Controller
         'rejected',
         'void',
     ];
+
+    private const COMMISSIONABLE_STATUSES = [
+        Invoice::STATUS_SHIPPED,
+        Invoice::STATUS_FINANCE_APPROVED,
+    ];
+
+    public function index()
+    {
+        $reports = [
+            [
+                'title' => 'گزارش فروش ویزیتورها',
+                'description' => 'انتخاب و تایید فاکتورهای قابل محاسبه برای پورسانت ویزیتورها',
+                'route' => route('finance.reports.sales-visitors'),
+                'icon' => '📊',
+                'active' => true,
+            ],
+        ];
+
+        return view('finance.reports.index', compact('reports'));
+    }
 
     public function salesVisitors(Request $request)
     {
@@ -41,7 +65,10 @@ class FinanceReportController extends Controller
             ->paginate(50)
             ->withQueryString();
 
-        $summary = (clone $baseQuery)->get()
+        $approvedInvoiceIds = $this->activeApprovedInvoiceIds($details->getCollection()->pluck('id')->all());
+
+        $summaryRows = (clone $baseQuery)->get();
+        $summary = $summaryRows
             ->groupBy(fn (Invoice $invoice) => (string) ($invoice->preinvoiceOrder?->created_by ?: 0))
             ->map(function ($rows) {
                 $first = $rows->first();
@@ -64,19 +91,127 @@ class FinanceReportController extends Controller
             'total' => (int) $summary->sum('total'),
         ];
 
-        $visitors = User::query()
-            ->whereIn('id', function ($query) {
-                $query->select('created_by')
-                    ->from('preinvoice_orders')
-                    ->whereNotNull('created_by');
-            })
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
+        $visitors = $this->visitors();
         $statusLabels = $this->statusLabels();
-        $statusOptions = ['valid' => 'فقط فاکتورهای معتبر/نهایی', 'all' => 'همه وضعیت‌ها'] + $statusLabels;
+        $statusOptions = ['commissionable' => 'فقط فاکتورهای قابل محاسبه پورسانت'] + $statusLabels + ['valid' => 'همه فاکتورهای معتبر', 'all' => 'همه وضعیت‌ها'];
 
-        return view('finance.reports.sales-visitors', compact('filters', 'filterErrors', 'details', 'summary', 'summaryTotals', 'visitors', 'statusLabels', 'statusOptions'));
+        return view('finance.reports.sales-visitors', compact('filters', 'filterErrors', 'details', 'summary', 'summaryTotals', 'visitors', 'statusLabels', 'statusOptions', 'approvedInvoiceIds'));
+    }
+
+    public function storeSalesVisitorsCommissionBatch(Request $request)
+    {
+        $data = $request->validate([
+            'visitor_id' => ['required', 'integer', 'exists:users,id'],
+            'from_date' => ['nullable', 'date'],
+            'to_date' => ['nullable', 'date'],
+            'invoice_ids' => ['required', 'array', 'min:1'],
+            'invoice_ids.*' => ['integer', 'exists:invoices,id'],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $dateFrom = $this->parseDate((string) ($data['from_date'] ?? ''));
+        $dateTo = $this->parseDate((string) ($data['to_date'] ?? ''));
+        if ($dateFrom && $dateTo && $dateFrom->gt($dateTo)) {
+            throw ValidationException::withMessages(['from_date' => 'تاریخ شروع نباید بعد از تاریخ پایان باشد.']);
+        }
+
+        $invoiceIds = collect($data['invoice_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+        $filters = [
+            'from_date' => $dateFrom?->toDateString() ?? '',
+            'to_date' => $dateTo?->toDateString() ?? '',
+            'visitor_id' => (string) $data['visitor_id'],
+            'status' => 'commissionable',
+        ];
+
+        $invoices = $this->baseSalesVisitorsQuery($filters, $dateFrom, $dateTo)
+            ->whereIn('id', $invoiceIds)
+            ->orderBy('document_date')
+            ->orderBy('id')
+            ->get();
+
+        if ($invoices->count() !== $invoiceIds->count()) {
+            throw ValidationException::withMessages(['invoice_ids' => 'برخی فاکتورهای انتخاب‌شده معتبر، نهایی یا متعلق به این ویزیتور/بازه نیستند.']);
+        }
+
+        $alreadyApproved = $this->activeApprovedInvoiceIds($invoiceIds->all());
+        if (! empty($alreadyApproved)) {
+            throw ValidationException::withMessages(['invoice_ids' => 'برخی فاکتورهای انتخاب‌شده قبلاً برای پورسانت تأیید شده‌اند.']);
+        }
+
+        $batch = DB::transaction(function () use ($data, $dateFrom, $dateTo, $invoices) {
+            $batch = FinanceCommissionBatch::query()->create([
+                'visitor_id' => (int) $data['visitor_id'],
+                'from_date' => $dateFrom?->toDateString(),
+                'to_date' => $dateTo?->toDateString(),
+                'invoice_count' => $invoices->count(),
+                'total_amount' => (int) $invoices->sum(fn (Invoice $invoice) => (int) $invoice->total),
+                'approved_by' => auth()->id(),
+                'approved_at' => now(),
+                'status' => FinanceCommissionBatch::STATUS_ACTIVE,
+                'note' => $data['note'] ?? null,
+            ]);
+
+            foreach ($invoices as $invoice) {
+                FinanceCommissionBatchItem::query()->create([
+                    'batch_id' => $batch->id,
+                    'invoice_id' => $invoice->id,
+                    'invoice_uuid' => $invoice->uuid,
+                    'invoice_date' => $invoice->display_document_date,
+                    'customer_name' => $invoice->customer_name,
+                    'customer_mobile' => $invoice->customer_mobile,
+                    'invoice_total' => (int) $invoice->total,
+                    'invoice_status' => $invoice->status,
+                ]);
+            }
+
+            return $batch;
+        });
+
+        return redirect()->route('finance.reports.sales-visitors.commission-batches.show', $batch)->with('success', 'فاکتورهای انتخاب‌شده برای پورسانت تأیید شدند.');
+    }
+
+    public function showSalesVisitorsCommissionBatch(FinanceCommissionBatch $batch)
+    {
+        $batch->load(['visitor:id,name', 'approver:id,name', 'items']);
+
+        return view('finance.reports.commission-batch-show', compact('batch'));
+    }
+
+    public function printSalesVisitorsCommissionBatch(FinanceCommissionBatch $batch)
+    {
+        $batch->load(['visitor:id,name', 'approver:id,name', 'items']);
+
+        return view('finance.reports.commission-batch-show', ['batch' => $batch, 'printMode' => true]);
+    }
+
+    public function exportSalesVisitorsCommissionBatch(FinanceCommissionBatch $batch, Request $request): StreamedResponse
+    {
+        $batch->load(['visitor:id,name', 'approver:id,name', 'items']);
+        $excelAlias = $request->query('format') === 'excel';
+        $filename = 'commission-batch-' . $batch->id . '-' . now()->format('Ymd-His') . ($excelAlias ? '.xls' : '.csv');
+
+        return response()->streamDownload(function () use ($batch) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['visitor', $batch->visitor?->name, 'from_date', JalaliDate::date($batch->from_date), 'to_date', JalaliDate::date($batch->to_date), 'approved_by', $batch->approver?->name, 'approved_at', JalaliDate::dateTime($batch->approved_at)]);
+            fputcsv($handle, []);
+            fputcsv($handle, ['invoice_number', 'invoice_date', 'customer_name', 'customer_mobile', 'invoice_total', 'invoice_status']);
+
+            foreach ($batch->items as $item) {
+                fputcsv($handle, [
+                    $item->invoice_uuid,
+                    JalaliDate::date($item->invoice_date),
+                    $item->customer_name,
+                    $item->customer_mobile,
+                    (int) $item->invoice_total,
+                    $this->statusLabels()[$item->invoice_status] ?? $item->invoice_status,
+                ]);
+            }
+
+            fputcsv($handle, []);
+            fputcsv($handle, ['invoice_count', $batch->invoice_count, 'total_amount', $batch->total_amount]);
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     private function baseSalesVisitorsQuery(array $filters, ?Carbon $dateFrom, ?Carbon $dateTo): Builder
@@ -87,7 +222,8 @@ class FinanceReportController extends Controller
             ->when($dateTo, fn (Builder $query) => $query->whereDate('document_date', '<=', $dateTo->toDateString()))
             ->when($filters['visitor_id'] !== '', fn (Builder $query) => $query->whereHas('preinvoiceOrder', fn (Builder $orderQuery) => $orderQuery->where('created_by', (int) $filters['visitor_id'])))
             ->when($filters['status'] === 'valid', fn (Builder $query) => $query->whereNotIn('status', self::INVALID_STATUSES))
-            ->when(! in_array($filters['status'], ['', 'valid', 'all'], true), fn (Builder $query) => $query->where('status', $filters['status']));
+            ->when($filters['status'] === 'commissionable', fn (Builder $query) => $query->whereIn('status', self::COMMISSIONABLE_STATUSES))
+            ->when(! in_array($filters['status'], ['', 'valid', 'all', 'commissionable'], true), fn (Builder $query) => $query->where('status', $filters['status']));
     }
 
     private function exportSalesVisitors($invoices, bool $excelAlias = false): StreamedResponse
@@ -97,7 +233,8 @@ class FinanceReportController extends Controller
         return response()->streamDownload(function () use ($invoices) {
             $handle = fopen('php://output', 'w');
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['invoice_number', 'invoice_date', 'customer_name', 'customer_mobile', 'visitor', 'subtotal', 'discount_amount', 'total', 'status']);
+            fputcsv($handle, ['invoice_number', 'invoice_date', 'customer_name', 'customer_mobile', 'visitor', 'subtotal', 'discount_amount', 'total', 'status', 'commission_approval_status']);
+            $approvedIds = $this->activeApprovedInvoiceIds($invoices->pluck('id')->all());
 
             foreach ($invoices as $invoice) {
                 fputcsv($handle, [
@@ -110,6 +247,7 @@ class FinanceReportController extends Controller
                     (int) $invoice->discount_amount,
                     (int) $invoice->total,
                     $this->statusLabels()[$invoice->status] ?? $invoice->status,
+                    in_array($invoice->id, $approvedIds, true) ? 'قبلاً تأیید شده' : 'تأیید نشده',
                 ]);
             }
 
@@ -123,7 +261,7 @@ class FinanceReportController extends Controller
             'from_date' => $this->normalizeDigits(trim((string) $request->query('from_date', ''))),
             'to_date' => $this->normalizeDigits(trim((string) $request->query('to_date', ''))),
             'visitor_id' => trim((string) $request->query('visitor_id', '')),
-            'status' => trim((string) $request->query('status', 'valid')) ?: 'valid',
+            'status' => trim((string) $request->query('status', 'commissionable')) ?: 'commissionable',
         ];
     }
 
@@ -182,6 +320,32 @@ class FinanceReportController extends Controller
             '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
             '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
         ]));
+    }
+
+    private function activeApprovedInvoiceIds(array $invoiceIds): array
+    {
+        if (empty($invoiceIds)) {
+            return [];
+        }
+
+        return FinanceCommissionBatchItem::query()
+            ->whereIn('invoice_id', $invoiceIds)
+            ->whereHas('batch', fn (Builder $query) => $query->where('status', FinanceCommissionBatch::STATUS_ACTIVE))
+            ->pluck('invoice_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    private function visitors()
+    {
+        return User::query()
+            ->whereIn('id', function ($query) {
+                $query->select('created_by')
+                    ->from('preinvoice_orders')
+                    ->whereNotNull('created_by');
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 
     private function statusLabels(): array

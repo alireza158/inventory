@@ -339,8 +339,7 @@
                     <a class="sidebar-sublink {{ $is('invoices.*') }}" href="{{ route('invoices.index') }}">فاکتورها</a>
                     @endcanPermission
                     @canPermission('invoices.view')
-                    <div class="sidebar-sublink text-muted small fw-bold mt-2">گزارشات مالی</div>
-                    <a class="sidebar-sublink {{ $is('finance.reports.sales-visitors') }}" href="{{ route('finance.reports.sales-visitors') }}">گزارش فروش ویزیتورها</a>
+                    <a class="sidebar-sublink {{ $is('finance.reports.*') }}" href="{{ route('finance.reports.index') }}">گزارشات مالی</a>
                     @endcanPermission
                     @canPermission('cheques.view')
                     <a class="sidebar-sublink {{ $is('finance.cheques.*') }}" href="{{ route('finance.cheques.registered') }}">چک‌های ثبت‌شده</a>
