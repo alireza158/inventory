@@ -128,25 +128,35 @@ class Product extends Model
         $query->where(function (Builder $productQuery) use ($search, $tokens, $isCodeLike) {
             static::orWhereProductCodeMatches($productQuery, $search, $isCodeLike);
 
-            if ($isCodeLike || count($tokens) === 1) {
-                $patterns = static::buildProductSearchPatterns($search);
+            $patterns = static::buildProductSearchPatterns($search);
 
-                foreach (static::productSearchableColumns() as $column) {
-                    static::orWhereProductSearchColumnLikeAny($productQuery, 'products.' . $column, $patterns);
-                }
-
-                $productQuery->orWhereHas('category', function (Builder $categoryQuery) use ($patterns) {
-                    static::orWhereProductSearchColumnLikeAny($categoryQuery, 'categories.name', $patterns);
-                });
-
-                return;
+            foreach (static::productSearchableColumns() as $column) {
+                static::orWhereNormalizedLikeAny($productQuery, 'products.' . $column, $patterns);
             }
 
-            static::orWhereNormalizedLike($productQuery, 'products.name', $search);
-            static::orWhereAllTokensInColumn($productQuery, 'products.name', $tokens);
+            $productQuery->orWhereHas('category', function (Builder $categoryQuery) use ($patterns) {
+                static::orWhereNormalizedLikeAny($categoryQuery, 'categories.name', $patterns);
+            });
 
-            if (static::hasProductColumnFromQualifiedName('products.description')) {
-                static::orWhereNormalizedLike($productQuery, 'products.description', $search);
+            $productQuery->orWhereHas('variants', function (Builder $variantQuery) use ($patterns) {
+                foreach (static::variantSearchableColumns() as $column) {
+                    static::orWhereNormalizedLikeAny($variantQuery, 'product_variants.' . $column, $patterns);
+                }
+            });
+
+            if (count($tokens) > 1) {
+                static::orWhereAllTokensInColumn($productQuery, 'products.name', $tokens);
+                $productQuery->orWhereHas('variants', function (Builder $variantQuery) use ($tokens) {
+                    $variantQuery->where(function (Builder $tokenQuery) use ($tokens) {
+                        foreach ($tokens as $token) {
+                            $tokenQuery->where(function (Builder $columnQuery) use ($token) {
+                                foreach (static::variantSearchableColumns() as $column) {
+                                    static::orWhereNormalizedLike($columnQuery, 'product_variants.' . $column, $token);
+                                }
+                            });
+                        }
+                    });
+                });
             }
         });
 
@@ -205,6 +215,20 @@ class Product extends Model
         $scoreSql .= " + CASE WHEN {$categoryName} LIKE ? THEN 35 ELSE 0 END";
         $bindings[] = '%' . static::escapeProductSearchLike($searchLower) . '%';
 
+        $variantExactCodeScore = static::variantExistsSql(static::variantExactCodeConditionSql());
+        $scoreSql .= " + CASE WHEN {$variantExactCodeScore} THEN " . ($isCodeLike ? 980 : 230) . " ELSE 0 END";
+        $bindings = array_merge($bindings, static::variantExactCodeBindings($searchLower));
+
+        $variantScore = static::variantExistsSql(static::variantContainsConditionSql());
+        $scoreSql .= " + CASE WHEN {$variantScore} THEN 330 ELSE 0 END";
+        $bindings = array_merge($bindings, static::variantContainsBindings($searchLower));
+
+        if (count($tokens) > 1) {
+            $variantAllTokensSql = static::variantExistsSql(static::variantAllTokensConditionSql($tokens));
+            $scoreSql .= " + CASE WHEN {$variantAllTokensSql} THEN 880 ELSE 0 END";
+            $bindings = array_merge($bindings, static::variantAllTokensBindings($tokens));
+        }
+
         if (static::hasProductColumnFromQualifiedName('products.description')) {
             $description = static::normalizedSqlExpression('products.description');
             $scoreSql .= " + CASE WHEN {$description} LIKE ? THEN 20 ELSE 0 END";
@@ -246,13 +270,32 @@ class Product extends Model
             }
         });
 
-        return static::applyProductSearchScore($query, $search, $tokens);
+        return $query;
     }
 
     private static function orWhereNormalizedLike(Builder $query, string $column, string $search)
     {
         $expression = static::normalizedSqlExpression($column);
-        $query->orWhereRaw("{$expression} LIKE ?", ['%' . static::escapeProductSearchLike(mb_strtolower($search)) . '%']);
+        $searchLower = mb_strtolower(static::normalizeProductSearchTerm($search));
+        $compactSearch = str_replace(' ', '', $searchLower);
+
+        $query->orWhereRaw("{$expression} LIKE ?", ['%' . static::escapeProductSearchLike($searchLower) . '%']);
+
+        if ($compactSearch !== $searchLower) {
+            $query->orWhereRaw("REPLACE({$expression}, ' ', '') LIKE ?", ['%' . static::escapeProductSearchLike($compactSearch) . '%']);
+        }
+    }
+
+    private static function orWhereNormalizedLikeAny(Builder $query, string $column, array $patterns)
+    {
+        $expression = static::normalizedSqlExpression($column);
+
+        $query->orWhere(function (Builder $columnQuery) use ($expression, $patterns) {
+            foreach ($patterns as $pattern) {
+                $columnQuery->orWhereRaw("{$expression} LIKE ?", [$pattern]);
+                $columnQuery->orWhereRaw("REPLACE({$expression}, ' ', '') LIKE ?", [str_replace(' ', '', $pattern)]);
+            }
+        });
     }
 
     private static function orWhereAllTokensInColumn(Builder $query, string $column, array $tokens)
@@ -284,7 +327,7 @@ class Product extends Model
 
     private static function buildProductSearchPatterns(string $term): array
     {
-        $normalized = static::normalizeProductSearchTerm($term);
+        $normalized = mb_strtolower(static::normalizeProductSearchTerm($term));
 
         if ($normalized === '') {
             return [];
@@ -324,6 +367,58 @@ class Product extends Model
     private static function hasProductColumnFromQualifiedName(string $column): bool
     {
         return str_starts_with($column, 'products.') && Schema::hasColumn('products', substr($column, 9));
+    }
+
+    private static function variantSearchableColumns(): array
+    {
+        return ['variant_name', 'variant_code', 'variety_name', 'variety_code', 'unique_key'];
+    }
+
+    private static function variantExactCodeConditionSql(): string
+    {
+        return collect(['variant_code', 'variety_code', 'unique_key'])
+            ->map(fn (string $column) => static::normalizedSqlExpression('product_variants.' . $column) . ' = ?')
+            ->implode(' OR ');
+    }
+
+    private static function variantExactCodeBindings(string $searchLower): array
+    {
+        return array_fill(0, 3, $searchLower);
+    }
+
+    private static function variantContainsConditionSql(): string
+    {
+        return collect(static::variantSearchableColumns())
+            ->map(fn (string $column) => static::normalizedSqlExpression('product_variants.' . $column) . ' LIKE ?')
+            ->implode(' OR ');
+    }
+
+    private static function variantContainsBindings(string $searchLower): array
+    {
+        return array_fill(0, count(static::variantSearchableColumns()), '%' . static::escapeProductSearchLike($searchLower) . '%');
+    }
+
+    private static function variantAllTokensConditionSql(array $tokens): string
+    {
+        return collect($tokens)->map(function () {
+            return '(' . static::variantContainsConditionSql() . ')';
+        })->implode(' AND ');
+    }
+
+    private static function variantAllTokensBindings(array $tokens): array
+    {
+        $bindings = [];
+
+        foreach ($tokens as $token) {
+            array_push($bindings, ...static::variantContainsBindings(mb_strtolower($token)));
+        }
+
+        return $bindings;
+    }
+
+    private static function variantExistsSql(string $conditionSql): string
+    {
+        return "EXISTS (SELECT 1 FROM product_variants WHERE product_variants.product_id = products.id AND ({$conditionSql}))";
     }
 
     private static function productSearchableColumns(): array
