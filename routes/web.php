@@ -140,10 +140,6 @@ Route::get('/finance/registered-cheques', [ChequeController::class, 'index'])->m
 Route::middleware('role:admin|Admin|finance|Accountant|Manager')->prefix('finance/reports')->name('finance.reports.')->group(function () {
     Route::get('/', [FinanceReportController::class, 'index'])->name('index');
     Route::get('/sales-visitors', [FinanceReportController::class, 'salesVisitors'])->name('sales-visitors');
-    Route::post('/sales-visitors/commission-batches', [FinanceReportController::class, 'storeSalesVisitorsCommissionBatch'])->name('sales-visitors.commission-batches.store');
-    Route::get('/sales-visitors/commission-batches/{batch}', [FinanceReportController::class, 'showSalesVisitorsCommissionBatch'])->name('sales-visitors.commission-batches.show');
-    Route::get('/sales-visitors/commission-batches/{batch}/print', [FinanceReportController::class, 'printSalesVisitorsCommissionBatch'])->name('sales-visitors.commission-batches.print');
-    Route::get('/sales-visitors/commission-batches/{batch}/export', [FinanceReportController::class, 'exportSalesVisitorsCommissionBatch'])->name('sales-visitors.commission-batches.export');
 });
 
 Route::get('/vouchers/section/{type}', [VoucherController::class, 'sectionIndex'])->name('vouchers.section.index');

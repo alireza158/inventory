@@ -27,14 +27,14 @@
   .money-cell{white-space:nowrap; font-variant-numeric:tabular-nums; text-align:left; direction:ltr;}
   .code-cell{direction:ltr; unicode-bidi:plaintext; display:inline-block;}
   .selection-bar{border:1px solid #dbeafe; background:#eff6ff; border-radius:16px; padding:12px;}
-  @media print{.no-report-print,.pagination{display:none!important}.report-card,.report-head{box-shadow:none!important;border:1px solid #ddd!important}body{background:#fff!important}}
+  @media print{.no-report-print,.pagination,.print-hide-unselected{display:none!important}.report-card,.report-head{box-shadow:none!important;border:1px solid #ddd!important}body{background:#fff!important}}
 </style>
 
 <div class="finance-report-page">
   <div class="report-head mb-3 d-flex justify-content-between align-items-start flex-wrap gap-3">
     <div>
       <div class="h4 fw-black mb-1">گزارش فروش ویزیتورها</div>
-      <div class="text-muted small">ابزار انتخاب و تایید فاکتورهای قابل محاسبه برای پورسانت؛ مبنا: invoices.document_date و invoices.total</div>
+      <div class="text-muted small">ابزار گزارش و انتخاب موقت فاکتورهای ویزیتورها؛ مبنا: invoices.document_date و invoices.total</div>
     </div>
     <div class="d-flex gap-2 flex-wrap no-report-print">
       <a class="btn btn-outline-secondary" href="{{ route('finance.reports.index') }}">بازگشت به گزارشات مالی</a>
@@ -74,28 +74,23 @@
     <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>نام ویزیتور</th><th>تعداد فاکتورها</th><th class="text-end">قبل از تخفیف</th><th class="text-end">تخفیف</th><th class="text-end">مبلغ نهایی</th></tr></thead><tbody>@forelse($summary as $row)<tr><td>{{ $row['visitor_name'] }}</td><td>{{ number_format($row['invoice_count']) }}</td><td class="money-cell">{{ $rial($row['subtotal']) }}</td><td class="money-cell">{{ $rial($row['discount_amount']) }}</td><td class="money-cell fw-bold">{{ $rial($row['total']) }}</td></tr>@empty<tr><td colspan="5" class="text-center text-muted py-4">داده‌ای برای نمایش وجود ندارد.</td></tr>@endforelse</tbody></table></div>
   </div>
 
-  <form method="POST" action="{{ route('finance.reports.sales-visitors.commission-batches.store') }}" class="card report-card no-report-print" id="commissionBatchForm">
-    @csrf
-    <input type="hidden" name="visitor_id" value="{{ $filters['visitor_id'] ?? '' }}">
-    <input type="hidden" name="from_date" value="{{ $filters['from_date'] ?? '' }}">
-    <input type="hidden" name="to_date" value="{{ $filters['to_date'] ?? '' }}">
-    <input type="hidden" name="status" value="{{ $filters['status'] ?? 'valid' }}">
+  <div class="card report-card" id="selectionReportCard">
     <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <div class="fw-bold">جزئیات فاکتورها برای تأیید پورسانت</div>
-      <div class="small text-muted">وضعیت فاکتور فقط برای اطلاع/فیلتر است و مانع انتخاب پورسانت نمی‌شود.</div>
+      <div class="fw-bold">جزئیات فاکتورها برای انتخاب موقت</div>
+      <div class="small text-muted">انتخاب‌ها فقط در همین صفحه و برای مشاهده جمع/چاپ موقت هستند و چیزی ذخیره نمی‌شود.</div>
     </div>
-    <div class="card-body border-bottom">
+    <div class="card-body border-bottom no-report-print">
       <div class="selection-bar d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div><span class="fw-bold">انتخاب‌شده:</span> <span id="selectedCount">0</span> فاکتور | <span class="fw-bold">جمع:</span> <span id="selectedTotal">0</span></div>
+        <div><span class="fw-bold">انتخاب‌شده:</span> <span id="selectedCount">0</span> فاکتور | <span class="fw-bold">جمع انتخاب‌شده:</span> <span id="selectedTotal">0</span></div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
-          <input class="form-control form-control-sm" style="min-width:260px" name="note" placeholder="یادداشت اختیاری برای batch">
-          <button class="btn btn-success" id="approveSelectedBtn" disabled>تأیید فاکتورهای انتخاب‌شده</button>
+          <button type="button" class="btn btn-outline-dark" id="printSelectedBtn" disabled>چاپ انتخاب‌شده‌ها</button>
+          <button type="button" class="btn btn-outline-secondary" id="clearSelectionBtn" disabled>پاک کردن انتخاب</button>
         </div>
       </div>
     </div>
-    <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th><input type="checkbox" id="selectAllInvoices"></th><th>شماره فاکتور</th><th>تاریخ</th><th>نام مشتری</th><th>موبایل</th><th>ویزیتور/ثبت‌کننده</th><th class="text-end">مبلغ فاکتور</th><th class="text-end">تخفیف</th><th class="text-end">مبلغ نهایی</th><th>وضعیت</th><th>وضعیت پورسانت</th></tr></thead><tbody>@forelse($details as $invoice)@php $alreadyApproved = in_array((int) $invoice->id, $approvedInvoiceIds, true); $canSelect = !$alreadyApproved; @endphp<tr><td><input type="checkbox" class="invoice-check" name="invoice_ids[]" value="{{ $invoice->id }}" data-total="{{ (int) $invoice->total }}" @disabled(!$canSelect)></td><td><a class="code-cell" href="{{ route('invoices.show', $invoice->uuid) }}">{{ $invoice->uuid }}</a></td><td>{{ $jalali($invoice->display_document_date) }}</td><td>{{ $invoice->customer_name ?: '—' }}</td><td>{{ $invoice->customer_mobile ?: '—' }}</td><td>{{ $invoice->preinvoiceOrder?->creator?->name ?: 'نامشخص' }}</td><td class="money-cell">{{ $rial($invoice->subtotal) }}</td><td class="money-cell">{{ $rial($invoice->discount_amount) }}</td><td class="money-cell fw-bold">{{ $rial($invoice->total) }}</td><td>{{ $statusLabels[$invoice->status] ?? ($invoice->status ?: '—') }}</td><td>@if($alreadyApproved)<span class="badge text-bg-secondary">قبلاً تأیید شده</span>@else<span class="badge text-bg-success">قابل انتخاب</span>@endif</td></tr>@empty<tr><td colspan="11" class="text-center text-muted py-4">فاکتوری یافت نشد.</td></tr>@endforelse</tbody></table></div>
-    <div class="card-footer bg-white">{{ $details->links() }}</div>
-  </form>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th class="no-report-print"><input type="checkbox" id="selectAllInvoices"></th><th>شماره فاکتور</th><th>تاریخ</th><th>نام مشتری</th><th>موبایل</th><th>ویزیتور/ثبت‌کننده</th><th class="text-end">مبلغ فاکتور</th><th class="text-end">تخفیف</th><th class="text-end">مبلغ نهایی</th><th>وضعیت فاکتور</th></tr></thead><tbody>@forelse($details as $invoice)<tr class="invoice-row"><td class="no-report-print"><input type="checkbox" class="invoice-check" value="{{ $invoice->id }}" data-total="{{ (int) $invoice->total }}"></td><td><a class="code-cell" href="{{ route('invoices.show', $invoice->uuid) }}">{{ $invoice->uuid }}</a></td><td>{{ $jalali($invoice->display_document_date) }}</td><td>{{ $invoice->customer_name ?: '—' }}</td><td>{{ $invoice->customer_mobile ?: '—' }}</td><td>{{ $invoice->preinvoiceOrder?->creator?->name ?: 'نامشخص' }}</td><td class="money-cell">{{ $rial($invoice->subtotal) }}</td><td class="money-cell">{{ $rial($invoice->discount_amount) }}</td><td class="money-cell fw-bold">{{ $rial($invoice->total) }}</td><td>{{ $statusLabels[$invoice->status] ?? ($invoice->status ?: '—') }}</td></tr>@empty<tr><td colspan="10" class="text-center text-muted py-4">فاکتوری یافت نشد.</td></tr>@endforelse</tbody></table></div>
+    <div class="card-footer bg-white no-report-print">{{ $details->links() }}</div>
+  </div>
 </div>
 @endsection
 
@@ -114,19 +109,32 @@ document.addEventListener('DOMContentLoaded', function(){
   const selectAll = document.getElementById('selectAllInvoices');
   const selectedCount = document.getElementById('selectedCount');
   const selectedTotal = document.getElementById('selectedTotal');
-  const approveBtn = document.getElementById('approveSelectedBtn');
+  const printSelectedBtn = document.getElementById('printSelectedBtn');
+  const clearSelectionBtn = document.getElementById('clearSelectionBtn');
   function money(v){return Number(v || 0).toLocaleString('fa-IR') + ' ریال';}
   function refreshSelection(){
-    const selected = checks.filter(c => c.checked && !c.disabled);
+    const selected = checks.filter(c => c.checked);
     const total = selected.reduce((sum, c) => sum + Number(c.dataset.total || 0), 0);
     selectedCount.textContent = selected.length.toLocaleString('fa-IR');
     selectedTotal.textContent = money(total);
-    approveBtn.disabled = selected.length === 0;
-    if(selectAll){ const enabled = checks.filter(c => !c.disabled); selectAll.checked = enabled.length > 0 && enabled.every(c => c.checked); }
+    if(printSelectedBtn) printSelectedBtn.disabled = selected.length === 0;
+    if(clearSelectionBtn) clearSelectionBtn.disabled = selected.length === 0;
+    if(selectAll){ selectAll.checked = checks.length > 0 && checks.every(c => c.checked); }
   }
   checks.forEach(c => c.addEventListener('change', refreshSelection));
-  selectAll?.addEventListener('change', function(){ checks.filter(c => !c.disabled).forEach(c => c.checked = selectAll.checked); refreshSelection(); });
-  document.getElementById('commissionBatchForm')?.addEventListener('submit', function(e){ if(!checks.some(c => c.checked && !c.disabled)){ e.preventDefault(); } });
+  selectAll?.addEventListener('change', function(){ checks.forEach(c => c.checked = selectAll.checked); refreshSelection(); });
+  clearSelectionBtn?.addEventListener('click', function(){ checks.forEach(c => c.checked = false); refreshSelection(); });
+  printSelectedBtn?.addEventListener('click', function(){
+    const rows = Array.from(document.querySelectorAll('.invoice-row'));
+    const hasSelection = checks.some(c => c.checked);
+    if(!hasSelection) return;
+    rows.forEach(row => {
+      const check = row.querySelector('.invoice-check');
+      if(check && !check.checked) row.classList.add('print-hide-unselected');
+    });
+    window.print();
+    setTimeout(function(){ rows.forEach(row => row.classList.remove('print-hide-unselected')); }, 250);
+  });
   refreshSelection();
 });
 </script>
