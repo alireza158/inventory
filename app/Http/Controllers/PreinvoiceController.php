@@ -27,6 +27,7 @@ use App\Services\PaymentRegistrationService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -120,7 +121,8 @@ class PreinvoiceController extends Controller
         $order = PreinvoiceOrder::query()->with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
 
-        $data = $this->validateWarehouseReviewPayload($request);
+        $this->logWarehouseReviewRequestItems($order, $request);
+        $data = $this->validateWarehouseReviewPayload($request, false, $order);
 
         DB::transaction(function () use ($order, $data) {
             $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
@@ -180,7 +182,8 @@ class PreinvoiceController extends Controller
         $order = PreinvoiceOrder::query()->with('items')->where('uuid', $uuid)->firstOrFail();
         abort_if($order->status !== PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE, 403);
 
-        $data = $this->validateWarehouseReviewPayload($request, true);
+        $this->logWarehouseReviewRequestItems($order, $request);
+        $data = $this->validateWarehouseReviewPayload($request, true, $order);
 
         DB::transaction(function () use ($order, $data) {
             $order = PreinvoiceOrder::query()->with('items')->whereKey($order->id)->lockForUpdate()->firstOrFail();
@@ -693,10 +696,24 @@ class PreinvoiceController extends Controller
         }
     }
 
-    private function validateWarehouseReviewPayload(Request $request, bool $forApprove = false): array
+    private function logWarehouseReviewRequestItems(PreinvoiceOrder $order, Request $request): void
+    {
+        $rawItems = $request->input('items', []);
+
+        Log::debug('warehouse approval request items', [
+            'order_id' => $order->id ?? null,
+            'uuid' => $order->uuid ?? null,
+            'items_keys' => is_array($rawItems) ? array_keys($rawItems) : [],
+            'item_70' => data_get($rawItems, '70'),
+            'item_166' => data_get($rawItems, '166'),
+            'items_count' => is_array($rawItems) ? count($rawItems) : 0,
+        ]);
+    }
+
+    private function validateWarehouseReviewPayload(Request $request, bool $forApprove = false, ?PreinvoiceOrder $order = null): array
     {
         $request->merge([
-            'items' => $this->normalizeWarehouseReviewItems($request->input('items', [])),
+            'items' => $this->normalizeWarehouseReviewItems($request->input('items', []), $order, $request->input('removed_items', [])),
         ]);
 
         $validated = $request->validate([
@@ -736,31 +753,94 @@ class PreinvoiceController extends Controller
         return $validated;
     }
 
-    private function normalizeWarehouseReviewItems(mixed $items): array
+    private function normalizeWarehouseReviewItems(mixed $items, ?PreinvoiceOrder $order = null, mixed $removedItems = []): array
     {
         if (! is_array($items)) {
             return [];
         }
 
-        return array_values(array_filter($items, function ($row): bool {
+        $existingItems = $order
+            ? $order->items->keyBy(fn ($item) => (int) $item->id)
+            : collect();
+        $existingByProductVariant = $order
+            ? $order->items->keyBy(fn ($item) => ((int) $item->product_id) . ':' . ((int) $item->variant_id))
+            : collect();
+        $removedKeys = collect(is_array($removedItems) ? $removedItems : [])
+            ->filter(fn ($row) => is_array($row))
+            ->map(fn ($row) => ((int) ($row['product_id'] ?? 0)) . ':' . ((int) ($row['variant_id'] ?? 0)))
+            ->filter(fn ($key) => $key !== '0:0')
+            ->flip();
+        $normalized = [];
+        $seenItemIds = [];
+
+        foreach ($items as $key => $row) {
             if (! is_array($row)) {
-                return false;
+                continue;
             }
 
             foreach (['marked_deleted', 'deleted', '_delete', 'remove'] as $flag) {
                 if (filter_var($row[$flag] ?? false, FILTER_VALIDATE_BOOL)) {
-                    return false;
+                    continue 2;
                 }
             }
 
-            foreach (['product_id', 'variant_id', 'quantity', 'change_reason', 'change_note'] as $field) {
+            $hasAnyValue = false;
+            foreach (['id', 'item_id', 'product_id', 'variant_id', 'quantity', 'price'] as $field) {
                 if (trim((string) ($row[$field] ?? '')) !== '') {
-                    return true;
+                    $hasAnyValue = true;
+                    break;
                 }
             }
 
-            return false;
-        }));
+            if (! $hasAnyValue) {
+                continue;
+            }
+
+            $itemId = (int) ($row['item_id'] ?? $row['id'] ?? (is_numeric($key) ? $key : 0));
+            $existing = $itemId > 0 ? $existingItems->get($itemId) : null;
+
+            if (! $existing && $order && ! empty($row['product_id']) && ! empty($row['variant_id'])) {
+                $existing = $existingByProductVariant->get(((int) $row['product_id']) . ':' . ((int) $row['variant_id']));
+            }
+
+            if ($order && ! $existing) {
+                continue;
+            }
+
+            if ($existing) {
+                $row['id'] = (int) $existing->id;
+                $row['item_id'] = (int) $existing->id;
+                $row['product_id'] = filled($row['product_id'] ?? null) ? (int) $row['product_id'] : (int) $existing->product_id;
+                $row['variant_id'] = filled($row['variant_id'] ?? null) ? (int) $row['variant_id'] : (int) $existing->variant_id;
+                $row['quantity'] = filled($row['quantity'] ?? null) ? (int) $row['quantity'] : (int) $existing->quantity;
+                $row['price'] = filled($row['price'] ?? null) ? (int) $row['price'] : (int) $existing->price;
+                $seenItemIds[(int) $existing->id] = true;
+            }
+
+            $normalized[] = $row;
+        }
+
+        if ($order) {
+            foreach ($order->items as $existing) {
+                $itemId = (int) $existing->id;
+                $productVariantKey = ((int) $existing->product_id) . ':' . ((int) $existing->variant_id);
+
+                if (isset($seenItemIds[$itemId]) || isset($removedKeys[$productVariantKey])) {
+                    continue;
+                }
+
+                $normalized[] = [
+                    'id' => $itemId,
+                    'item_id' => $itemId,
+                    'product_id' => (int) $existing->product_id,
+                    'variant_id' => (int) $existing->variant_id,
+                    'quantity' => (int) $existing->quantity,
+                    'price' => (int) $existing->price,
+                ];
+            }
+        }
+
+        return array_values($normalized);
     }
 
     private function validateWarehouseChangeReasons(PreinvoiceOrder $order, array $data): void
