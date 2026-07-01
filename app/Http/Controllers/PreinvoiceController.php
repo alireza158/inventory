@@ -60,6 +60,7 @@ class PreinvoiceController extends Controller
             ->where('status', PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE)
             ->with(['creator:id,name'])
             ->withCount('items')
+            ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(20);
 
@@ -294,6 +295,7 @@ class PreinvoiceController extends Controller
         $orders = PreinvoiceOrder::query()
             ->where('status', PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE)
             ->with(['creator:id,name'])
+            ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(20);
 
