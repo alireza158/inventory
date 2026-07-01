@@ -505,6 +505,7 @@ class InvoiceController extends Controller
 
         $updatedInvoice = $this->salesHavalehService->changeStatus($invoice, $data['status'], $data['note'] ?? null, auth()->id());
         $this->notifySellerForInvoiceStatus($updatedInvoice, $data['status'], $data['note'] ?? null);
+        $this->notifyDepartmentsForInvoiceStatus($updatedInvoice, $data['status'], $data['note'] ?? null);
 
         if ((string) $updatedInvoice->status === Invoice::STATUS_SHIPPED) {
             return redirect()->route('vouchers.sales.queue')
@@ -535,6 +536,25 @@ class InvoiceController extends Controller
         );
     }
 
+    private function notifyDepartmentsForInvoiceStatus(Invoice $invoice, string $status, ?string $note = null): void
+    {
+        $labels = $this->statusService->labels();
+        $statusLabel = $labels[$status] ?? $status;
+        $message = "فاکتور شماره {$invoice->uuid} برای مشتری {$invoice->customer_name} به وضعیت «{$statusLabel}» تغییر کرد." . ($note ? " توضیح: {$note}" : '');
+
+        if ($status === Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL) {
+            $this->notificationService->notifyRoles(['warehouse', 'Warehouse', 'StorageManager'], 'invoice_pending_warehouse_approval', 'فاکتور نیازمند تایید انبار است', $message, route('vouchers.sales.edit', $invoice->uuid), ['level' => 'warning', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => "warehouse_invoice_status:{$invoice->id}:{$status}"]);
+        }
+
+        if ($status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL) {
+            $this->notificationService->notifyRoles(['finance', 'Accountant'], 'invoice_pending_finance_approval', 'فاکتور نیازمند تایید مالی است', $message, route('invoices.show', $invoice->uuid), ['level' => 'warning', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => "finance_invoice_status:{$invoice->id}:{$status}"]);
+        }
+
+        if ($status === Invoice::STATUS_SHIPPED) {
+            $this->notificationService->notifyRoles(['finance', 'Accountant', 'manager', 'Manager'], 'invoice_shipped', 'فاکتور ارسال شد', $message, route('invoices.show', $invoice->uuid), ['level' => 'success', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => "departments_invoice_status:{$invoice->id}:{$status}"]);
+        }
+    }
+
     public function cancel(string $uuid, Request $request)
     {
         $invoice = Invoice::where('uuid', $uuid)->firstOrFail();
@@ -543,6 +563,7 @@ class InvoiceController extends Controller
         ]);
         $updatedInvoice = $this->salesHavalehService->cancelAndRestore($invoice, $data['note'] ?? null, auth()->id());
         $this->notifySellerForInvoiceStatus($updatedInvoice, SalesHavalehStatusService::NOT_SHIPPED, $data['note'] ?? null);
+        $this->notificationService->notifyRoles(['finance', 'Accountant', 'warehouse', 'Warehouse', 'StorageManager', 'manager', 'Manager'], 'invoice_cancelled', 'فاکتور کنسل شد', "فاکتور شماره {$updatedInvoice->uuid} کنسل شد و اثر مالی/موجودی اصلاح شد." . (!empty($data['note']) ? ' توضیح: ' . $data['note'] : ''), route('invoices.show', $updatedInvoice->uuid), ['level' => 'danger', 'notifiable_type' => Invoice::class, 'notifiable_id' => $updatedInvoice->id, 'unique_key' => "departments_invoice_cancelled:{$updatedInvoice->id}"]);
 
         if ((string) $invoice->status === SalesHavalehStatusService::NOT_SHIPPED) {
             return back()->with('success', 'این فاکتور قبلاً کنسل شده و عملیات برگشت موجودی/مالی دوباره انجام نشد.');

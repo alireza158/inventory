@@ -166,14 +166,18 @@
 
     <div class="app-topbar__actions d-flex align-items-center gap-2">
         <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary position-relative" data-bs-toggle="dropdown" id="notifBell">
+            <button class="btn btn-sm btn-outline-secondary position-relative" data-bs-toggle="dropdown" id="notifBell" title="اعلان‌ها">
                 🔔
                 <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
             </button>
             <div class="dropdown-menu dropdown-menu-end p-2 app-notif-menu" style="min-width: min(320px, calc(100vw - 1.5rem))">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <strong>اعلان‌ها</strong>
-                    <button class="btn btn-sm btn-link p-0" id="notifReadAllBtn">خواندن همه</button>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-link p-0" id="notifBrowserBtn" type="button">اعلان مرورگر</button>
+                        <button class="btn btn-sm btn-link p-0" id="notifMuteBtn" type="button">بی‌صدا</button>
+                        <button class="btn btn-sm btn-link p-0" id="notifReadAllBtn" type="button">خواندن همه</button>
+                    </div>
                 </div>
                 <div id="notifList" class="small text-muted">در حال بارگذاری...</div>
                 <div class="mt-2 text-center">
@@ -255,30 +259,125 @@
     });
   });
 
-  async function loadNotifications(){
+  const notifState = {
+    pollMs: 30000,
+    lastId: Number(localStorage.getItem('ariaNotifLastId') || 0),
+    soundEnabled: localStorage.getItem('ariaNotifMuted') !== '1',
+    interacted: false,
+  };
+
+  function updateNotifMuteButton(){
+    const btn = document.getElementById('notifMuteBtn');
+    if (btn) btn.textContent = notifState.soundEnabled ? 'بی‌صدا' : 'با صدا';
+  }
+
+  function unlockNotifAudio(){
+    notifState.interacted = true;
+  }
+
+  function playNotificationSound(){
+    playFallbackBeep();
+  }
+
+  function playFallbackBeep(){
+    if (!notifState.soundEnabled || !notifState.interacted || !window.AudioContext && !window.webkitAudioContext) return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.24);
+  }
+
+  function showBrowserNotification(notification){
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const browserNotification = new Notification(notification.title || 'اعلان جدید', {
+      body: notification.message || '',
+      icon: '{{ asset('logo.png') }}',
+      tag: `aria-notif-${notification.id}`,
+      dir: 'rtl',
+    });
+    browserNotification.onclick = function(){
+      window.focus();
+      window.location.href = `/notifications/${notification.id}/open`;
+    };
+  }
+
+  function renderNotificationList(list){
+    const wrap = document.getElementById('notifList');
+    if (!wrap) return;
+    if (!list.length) { wrap.innerHTML = '<div class="text-muted">اعلانی وجود ندارد.</div>'; return; }
+    wrap.innerHTML = list.map(n => `<a class="d-block text-decoration-none p-2 mb-1 rounded border ${n.read_at ? 'bg-light' : 'bg-info bg-opacity-10 fw-bold'}" href="/notifications/${n.id}/open">
+      <div class="d-flex justify-content-between gap-2"><span class="text-dark">${escapeHtml(n.title || '')}</span><span class="badge bg-${levelClass(n.level)}">${escapeHtml(n.level || 'info')}</span></div>
+      <div class="text-muted small">${escapeHtml(n.message || '')}</div>
+    </a>`).join('');
+  }
+
+  function levelClass(level){
+    if (level === 'danger') return 'danger';
+    if (level === 'warning') return 'warning text-dark';
+    if (level === 'success') return 'success';
+    return 'info text-dark';
+  }
+
+  function escapeHtml(value){
+    const div = document.createElement('div');
+    div.textContent = value;
+    return div.innerHTML;
+  }
+
+  async function loadNotifications(checkNew = false){
+    const latestUrl = new URL('{{ route('notifications.latest') }}', window.location.origin);
+    if (checkNew && notifState.lastId > 0) latestUrl.searchParams.set('after_id', notifState.lastId);
+
     const [cRes,lRes] = await Promise.all([
-      fetch('{{ route('notifications.unread-count') }}'),
-      fetch('{{ route('notifications.latest') }}')
+      fetch('{{ route('notifications.unread-count') }}', {headers:{'Accept':'application/json'}}),
+      fetch(latestUrl, {headers:{'Accept':'application/json'}})
     ]);
     const count = (await cRes.json()).count || 0;
     const badge = document.getElementById('notifBadge');
     badge.textContent = count;
     badge.classList.toggle('d-none', count <= 0);
 
-    const list = await lRes.json();
-    const wrap = document.getElementById('notifList');
-    if (!list.length) { wrap.innerHTML = '<div class=\"text-muted\">اعلانی وجود ندارد.</div>'; return; }
-    wrap.innerHTML = list.map(n => `<a class="d-block text-decoration-none p-2 mb-1 rounded ${n.read_at ? 'bg-light' : 'bg-info bg-opacity-10'}" href="/notifications/${n.id}/open">
-      <div class="fw-bold text-dark">${n.title}</div>
-      <div class="text-muted small">${n.message ?? ''}</div>
-    </a>`).join('');
+    const payload = await lRes.json();
+    const list = Array.isArray(payload) ? payload : (payload.items || []);
+    if (!checkNew) renderNotificationList(list);
+
+    const latestId = Number(payload.latest_id || (list[0] ? list[0].id : 0));
+    const newUnreadItems = checkNew ? list.filter(n => !n.read_at && Number(n.id) > notifState.lastId) : [];
+    if (newUnreadItems.length) {
+      playNotificationSound();
+      newUnreadItems.slice().reverse().forEach(showBrowserNotification);
+      renderNotificationList((await (await fetch('{{ route('notifications.latest') }}')).json()).items || []);
+    }
+    if (latestId > notifState.lastId) {
+      notifState.lastId = latestId;
+      localStorage.setItem('ariaNotifLastId', String(latestId));
+    }
   }
+  document.addEventListener('click', unlockNotifAudio, {once:true});
+  document.addEventListener('keydown', unlockNotifAudio, {once:true});
   document.addEventListener('DOMContentLoaded', function(){
-    loadNotifications();
-    setInterval(loadNotifications, 45000);
+    updateNotifMuteButton();
+    loadNotifications(false);
+    setInterval(() => loadNotifications(true), notifState.pollMs);
     document.getElementById('notifReadAllBtn')?.addEventListener('click', async function(){
-      await fetch('{{ route('notifications.read-all') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}'}});
-      loadNotifications();
+      await fetch('{{ route('notifications.read-all') }}', {method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'}});
+      loadNotifications(false);
+    });
+    document.getElementById('notifMuteBtn')?.addEventListener('click', function(){
+      notifState.soundEnabled = !notifState.soundEnabled;
+      localStorage.setItem('ariaNotifMuted', notifState.soundEnabled ? '0' : '1');
+      updateNotifMuteButton();
+    });
+    document.getElementById('notifBrowserBtn')?.addEventListener('click', function(){
+      if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
     });
   });
 
