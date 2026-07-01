@@ -217,55 +217,28 @@
 
         <div id="chequeFields" class="d-none">
           <div class="row g-2">
-            <div class="col-md-4">
-              <label class="form-label">شماره چک</label>
-              <input type="text" id="chequeNumberInput" class="form-control">
-            </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label">مبلغ چک</label>
-              <input type="text" inputmode="numeric" id="chequeAmountInput" class="form-control money">
+              <input type="text" inputmode="numeric" id="chequeAmountInput" class="form-control money" placeholder="مثلاً 5,000,000">
             </div>
-            <div class="col-md-4">
-              <label class="form-label">وضعیت صیادی چک</label>
-              <select id="chequeStatusInput" class="form-select">
-                <option value="registered">ثبت‌شده</option>
-                <option value="unregistered">ثبت‌نشده</option>
-              </select>
+            <div class="col-md-6">
+              <label class="form-label">شماره سریال چک</label>
+              <input type="text" id="chequeNumberInput" class="form-control" placeholder="شماره سریال چک">
             </div>
-            <div class="col-md-4">
-              <label class="form-label">تاریخ سررسید</label>
-              <input type="text" id="chequeDueDateInput" class="form-control" data-jdp data-jdp-only-date autocomplete="off" dir="ltr" placeholder="1405/01/20">
+            <div class="col-md-6">
+              <label class="form-label">بانک</label>
+              <input type="text" id="chequeBankNameInput" class="form-control" placeholder="مثال: ملی">
             </div>
-            <div class="col-md-4">
-              <label class="form-label">تاریخ دریافت چک</label>
+            <div class="col-md-6">
+              <label class="form-label">تاریخ ثبت چک</label>
               <input type="text" id="chequeReceivedAtInput" class="form-control" data-jdp data-jdp-only-date autocomplete="off" dir="ltr" placeholder="1405/01/10">
             </div>
-            <div class="col-md-4">
-              <label class="form-label">نام مشتری</label>
-              <input type="text" id="chequeCustomerNameInput" class="form-control" value="{{ $order->customer_name ?: '' }}" readonly>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">شناسه / کد مشتری</label>
-              <input type="text" id="chequeCustomerCodeInput" class="form-control" value="{{ $order->customer_id ?: '' }}" readonly>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">نام بانک</label>
-              <input type="text" id="chequeBankNameInput" class="form-control">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">نام شعبه</label>
-              <input type="text" id="chequeBranchNameInput" class="form-control">
+            <div class="col-md-6">
+              <label class="form-label">تاریخ سررسید چک</label>
+              <input type="text" id="chequeDueDateInput" class="form-control" data-jdp data-jdp-only-date autocomplete="off" dir="ltr" placeholder="1405/01/20">
             </div>
             <div class="col-md-6">
-              <label class="form-label">شماره حساب / شبا (اختیاری)</label>
-              <input type="text" id="chequeAccountNumberInput" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">صاحب حساب / صادرکننده چک (اختیاری)</label>
-              <input type="text" id="chequeAccountHolderInput" class="form-control">
-            </div>
-            <div class="col-12">
-              <label class="form-label">توضیحات (اختیاری)</label>
+              <label class="form-label">توضیحات اختیاری</label>
               <textarea id="chequeNoteInput" class="form-control" rows="2"></textarea>
             </div>
           </div>
@@ -284,8 +257,6 @@
   (function () {
     const finalizeForm = document.getElementById('finalizePreinvoiceForm');
     const finalizeBtn = document.getElementById('finalizePreinvoiceBtn');
-    const defaultChequeCustomerName = @json($order->customer_name ?? '');
-    const defaultChequeCustomerCode = @json(!empty($order->customer_id) ? (string) $order->customer_id : '');
     const rowsWrap = document.getElementById('paymentRows');
     const addBtn = document.getElementById('addPaymentRow');
     const guide = document.getElementById('paymentGuide');
@@ -361,11 +332,11 @@
       guide.classList.add('d-none');
       let cashTotal = 0, chequeTotal = 0;
       rowsWrap.innerHTML = payments.map((payment, idx) => {
-        const amount = Number(payment.amount || payment.cheque_amount || 0);
+        const amount = Number(payment.amount || 0);
         if (payment.method === 'cash') cashTotal += amount; else chequeTotal += amount;
         const title = payment.method === 'cash'
           ? `نقدی | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} ریال`
-          : `چک | شماره: ${payment.cheque_number} | مبلغ: ${Number(payment.cheque_amount || 0).toLocaleString('en-US')} ریال`;
+          : `چک | شماره: ${payment.cheque_number} | بانک: ${payment.bank_name || '—'} | مبلغ: ${Number(payment.amount || 0).toLocaleString('en-US')} ریال`;
 
         const hiddenInputs = Object.entries(payment).map(([key, val]) => buildHiddenInput(`payments[${idx}][${key}]`, val)).join('');
 
@@ -418,22 +389,15 @@
         method: 'cheque',
         amount: normalizeAmount(document.getElementById('chequeAmountInput').value),
         paid_at: normalizeDate(document.getElementById('chequeReceivedAtInput').value),
-        note: (document.getElementById('chequeNoteInput').value || '').trim(),
+        received_at: normalizeDate(document.getElementById('chequeReceivedAtInput').value),
+        due_date: normalizeDate(document.getElementById('chequeDueDateInput').value),
         cheque_number: (document.getElementById('chequeNumberInput').value || '').trim(),
-        cheque_amount: normalizeAmount(document.getElementById('chequeAmountInput').value),
-        cheque_due_date: normalizeDate(document.getElementById('chequeDueDateInput').value),
-        cheque_received_at: normalizeDate(document.getElementById('chequeReceivedAtInput').value),
-        cheque_customer_name: (document.getElementById('chequeCustomerNameInput').value || '').trim(),
-        cheque_customer_code: (document.getElementById('chequeCustomerCodeInput').value || '').trim(),
-        cheque_bank_name: (document.getElementById('chequeBankNameInput').value || '').trim(),
-        cheque_branch_name: (document.getElementById('chequeBranchNameInput').value || '').trim(),
-        cheque_account_number: (document.getElementById('chequeAccountNumberInput').value || '').trim(),
-        cheque_account_holder: (document.getElementById('chequeAccountHolderInput').value || '').trim(),
-        cheque_status: document.getElementById('chequeStatusInput').value || 'pending',
+        bank_name: (document.getElementById('chequeBankNameInput').value || '').trim(),
+        note: (document.getElementById('chequeNoteInput').value || '').trim(),
       };
 
-      if (!payload.amount || !payload.paid_at) {
-        return { error: 'برای ثبت چک، مبلغ و تاریخ دریافت چک الزامی است.' };
+      if (!payload.amount || !payload.received_at || !payload.due_date || !payload.cheque_number || !payload.bank_name) {
+        return { error: 'برای ثبت چک، مبلغ، شماره سریال، بانک، تاریخ ثبت و تاریخ سررسید الزامی است.' };
       }
 
       return payload;
@@ -441,9 +405,6 @@
 
     function clearModalFields() {
       paymentModalEl.querySelectorAll('input, textarea').forEach((el) => el.value = '');
-      document.getElementById('chequeStatusInput').value = 'unregistered';
-      document.getElementById('chequeCustomerNameInput').value = defaultChequeCustomerName;
-      document.getElementById('chequeCustomerCodeInput').value = defaultChequeCustomerCode;
       paymentModalError.classList.add('d-none');
       paymentModalError.textContent = '';
       paymentTypeInput.value = 'cash';

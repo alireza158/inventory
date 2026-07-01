@@ -1959,18 +1959,27 @@ class PreinvoiceController extends Controller
             'payments.*.paid_at' => 'required_with:payments|date',
             'payments.*.note' => 'nullable|string|max:2000',
             'payments.*.bank_name' => 'nullable|string|max:255',
-            'payments.*.cheque_bank_name' => 'nullable|string|max:255',
-            'payments.*.cheque_branch_name' => 'nullable|string|max:255',
             'payments.*.cheque_number' => 'nullable|string|max:255',
-            'payments.*.cheque_amount' => 'nullable|integer|min:1',
-            'payments.*.cheque_due_date' => 'nullable|date',
-            'payments.*.cheque_received_at' => 'nullable|date',
-            'payments.*.cheque_customer_name' => 'nullable|string|max:255',
-            'payments.*.cheque_customer_code' => 'nullable|string|max:255',
-            'payments.*.cheque_account_number' => 'nullable|string|max:255',
-            'payments.*.cheque_account_holder' => 'nullable|string|max:255',
-            'payments.*.cheque_status' => 'nullable|in:pending,cleared,bounced,registered,unregistered',
+            'payments.*.received_at' => 'nullable|date',
+            'payments.*.due_date' => 'nullable|date',
         ]);
+
+        foreach (($validated['payments'] ?? []) as $index => $paymentRow) {
+            if (($paymentRow['method'] ?? null) !== 'cheque') {
+                continue;
+            }
+
+            $missing = [];
+            foreach (['amount', 'cheque_number', 'bank_name', 'received_at', 'due_date'] as $field) {
+                if (blank($paymentRow[$field] ?? null)) {
+                    $missing["payments.{$index}.{$field}"] = 'این فیلد برای پرداخت چکی الزامی است.';
+                }
+            }
+
+            if (! empty($missing)) {
+                throw ValidationException::withMessages($missing);
+            }
+        }
 
         $invoice = DB::transaction(function () use ($order, $validated, $reapprovableInvoiceStatuses) {
             $lockedOrder = PreinvoiceOrder::query()
@@ -2186,9 +2195,6 @@ class PreinvoiceController extends Controller
 
             foreach (($validated['payments'] ?? []) as $paymentRow) {
                 $payload = $paymentRow;
-                if (($payload['method'] ?? null) === 'cheque') {
-                    $payload['cheque_amount'] = (int) ($payload['amount'] ?? 0);
-                }
 
                 $this->paymentService->registerForInvoice(
                     $invoice,
