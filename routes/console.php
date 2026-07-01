@@ -160,6 +160,77 @@ Artisan::command('inventory:set-central-stock {quantity=500 : Quantity to set fo
     return 1;
 })->purpose('Disabled legacy bulk stock overwrite command');
 
+
+Artisan::command('preinvoice:release-expired-draft-reservations', function () {
+    $releasedRows = 0;
+    $releasedQuantity = 0;
+
+    DB::transaction(function () use (&$releasedRows, &$releasedQuantity) {
+        $rows = DB::table('preinvoice_draft_reservations')
+            ->whereNull('preinvoice_order_id')
+            ->whereNull('converted_at')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now())
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($rows->groupBy('variant_id') as $variantId => $variantRows) {
+            $variant = ProductVariant::query()->whereKey((int) $variantId)->lockForUpdate()->first();
+            $quantity = (int) $variantRows->sum('quantity');
+            if ($variant && $quantity > 0) {
+                $variant->reserved = max(0, (int) $variant->reserved - $quantity);
+                $variant->save();
+            }
+
+            $byProduct = $variantRows->groupBy('product_id');
+            foreach ($byProduct as $productId => $productRows) {
+                $productQuantity = (int) $productRows->sum('quantity');
+                $product = Product::query()->whereKey((int) $productId)->lockForUpdate()->first();
+                if ($product && $productQuantity > 0) {
+                    $product->reserved = max(0, (int) $product->reserved - $productQuantity);
+                    $product->save();
+                }
+
+                if ($productQuantity > 0) {
+                    \App\Services\WarehouseStockService::change(
+                        \App\Services\WarehouseStockService::centralWarehouseId(),
+                        (int) $productId,
+                        $productQuantity,
+                        (int) $variantId
+                    );
+                }
+            }
+
+            $releasedQuantity += $quantity;
+        }
+
+        $ids = $rows->pluck('id')->all();
+        if (! empty($ids)) {
+            DB::table('preinvoice_draft_reservations')->whereIn('id', $ids)->delete();
+        }
+
+        $releasedRows = count($ids);
+    });
+
+    \App\Models\ActivityLog::query()->create([
+        'user_id' => null,
+        'action' => 'preinvoice_expired_draft_reservations_released',
+        'subject_type' => null,
+        'subject_id' => null,
+        'description' => 'رزروهای موقت منقضی‌شده پیش‌فاکتور آزاد شد.',
+        'properties' => [
+            'command' => 'preinvoice:release-expired-draft-reservations',
+            'released_rows' => $releasedRows,
+            'released_quantity' => $releasedQuantity,
+        ],
+        'occurred_at' => now(),
+    ]);
+
+    $this->info("Released {$releasedRows} expired draft reservation row(s), total quantity {$releasedQuantity}.");
+    return 0;
+})->purpose('Release expired temporary preinvoice draft reservations');
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
@@ -178,6 +249,7 @@ Schedule::call(function () {
 })->everyMinute();
 
 Schedule::command('ariya:import-orders')->everyFiveMinutes();
+Schedule::command('preinvoice:release-expired-draft-reservations')->everyFiveMinutes();
 
 Artisan::command('products:audit-variants {product : Product id/code/sku/short_barcode/barcode}', function (string $product) {
     $service = app(\App\Services\ProductVariantStructureService::class);
