@@ -489,7 +489,7 @@ class PreinvoiceController extends Controller
                 'total_price' => 0,
             ]);
 
-            $validated['products'] = $this->validateAndHydrateDraftItemsForSale($validated['products'], $validated['reservation_token'] ?? null);
+            $validated['products'] = $this->validateAndHydrateDraftItemsForSale($validated['products'], $validated['reservation_token'] ?? null, $order);
             $this->syncItems($order, $validated['products'], true);
 
             if ($stockLocked) {
@@ -651,13 +651,13 @@ class PreinvoiceController extends Controller
         }
 
         if ($checkCurrentStock) {
-            $this->validateDraftItemsBusinessRules($validated['products'] ?? [], $validated['reservation_token'] ?? null);
+            $this->validateDraftItemsBusinessRules($validated['products'] ?? [], $validated['reservation_token'] ?? null, $editingOrder);
         }
 
         return $validated;
     }
 
-    private function validateDraftItemsBusinessRules(array $products, ?string $reservationToken = null): void
+    private function validateDraftItemsBusinessRules(array $products, ?string $reservationToken = null, ?PreinvoiceOrder $existingOrder = null): void
     {
         $variantIds = collect($products)->pluck('variety_id')->map(fn($id) => (int) $id)->filter()->values();
         if ($variantIds->isEmpty()) {
@@ -694,15 +694,17 @@ class PreinvoiceController extends Controller
         }
 
         $draftReservations = $this->activeDraftReservationQuantities($reservationToken);
-        $freeStockByVariant = $variants->mapWithKeys(fn (ProductVariant $variant, int|string $id) => [
-            (int) $id => max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0)),
+        $existingDocumentQuantities = $this->existingPreinvoiceItemQuantities($existingOrder);
+        $centralAvailableByVariant = $variants->mapWithKeys(fn (ProductVariant $variant, int|string $id) => [
+            (int) $id => $this->centralAvailableQty($variant),
         ])->all();
         Log::debug('PREINVOICE_STORE_STOCK_CHECK', [
             'user_id' => auth()->id(),
             'draft_token' => $reservationToken,
             'requested_by_variant' => $qtyByVariant,
             'draft_reserved_by_variant' => $draftReservations,
-            'free_stock_by_variant' => $freeStockByVariant,
+            'existing_document_qty_by_variant' => $existingDocumentQuantities,
+            'central_available_by_variant' => $centralAvailableByVariant,
         ]);
 
         foreach ($qtyByVariant as $variantId => $requiredQty) {
@@ -714,20 +716,21 @@ class PreinvoiceController extends Controller
                 ]);
             }
 
-            $reservedForThisDraft = (int) ($draftReservations[(int) $variantId] ?? 0);
-            $freeStock = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0));
-            $availableQty = $freeStock + $reservedForThisDraft;
+            $draftReservedQty = (int) ($draftReservations[(int) $variantId] ?? 0);
+            $existingQty = (int) ($existingDocumentQuantities[(int) $variantId] ?? 0);
+            $centralAvailable = $this->centralAvailableQty($variant);
+            $availableQty = $centralAvailable + $draftReservedQty + $existingQty;
 
             if ($requiredQty > $availableQty) {
                 $name = $this->variantSaleLabel($variant);
                 throw ValidationException::withMessages([
-                    'products' => "موجودی آزاد کالای {$name} کافی نیست. تعداد رزرو شده برای این پیش‌فاکتور: {$reservedForThisDraft}، موجودی آزاد فعلی: {$freeStock}، تعداد درخواستی: {$requiredQty}.",
+                    'products' => "موجودی قابل فروش کالای {$name} کافی نیست. تعداد قبلی همین سند: {$existingQty}، رزرو موقت همین فرم: {$draftReservedQty}، موجودی آزاد مرکزی: {$centralAvailable}، تعداد درخواستی: {$requiredQty}.",
                 ]);
             }
         }
     }
 
-    private function validateAndHydrateDraftItemsForSale(array $products, ?string $reservationToken = null): array
+    private function validateAndHydrateDraftItemsForSale(array $products, ?string $reservationToken = null, ?PreinvoiceOrder $existingOrder = null): array
     {
         $variantIds = collect($products)->pluck('variety_id')->map(fn ($id) => (int) $id)->filter()->unique()->values();
         $variants = ProductVariant::query()
@@ -737,8 +740,35 @@ class PreinvoiceController extends Controller
             ->get()
             ->keyBy('id');
         $draftReservations = $this->activeDraftReservationQuantities($reservationToken);
+        $existingDocumentQuantities = $this->existingPreinvoiceItemQuantities($existingOrder);
+        $requestedByVariant = collect($products)
+            ->groupBy(fn (array $row) => (int) ($row['variety_id'] ?? 0))
+            ->map(fn ($rows) => (int) collect($rows)->sum(fn (array $row) => (int) ($row['quantity'] ?? 0)))
+            ->all();
+        $variantStock = $variants->mapWithKeys(fn (ProductVariant $variant, int|string $id) => [
+            (int) $id => (int) ($variant->stock ?? 0),
+        ])->all();
+        $variantReserved = $variants->mapWithKeys(fn (ProductVariant $variant, int|string $id) => [
+            (int) $id => (int) ($variant->reserved ?? 0),
+        ])->all();
+        $availableForThisSubmit = $variants->mapWithKeys(fn (ProductVariant $variant, int|string $id) => [
+            (int) $id => $this->centralAvailableQty($variant)
+                + (int) ($draftReservations[(int) $id] ?? 0)
+                + (int) ($existingDocumentQuantities[(int) $id] ?? 0),
+        ])->all();
 
-        return collect($products)->map(function (array $row, int $index) use ($variants, $draftReservations) {
+        Log::debug('PREINVOICE_FINAL_STOCK_CHECK', [
+            'user_id' => auth()->id(),
+            'reservation_token' => $reservationToken,
+            'requested_by_variant' => $requestedByVariant,
+            'draft_reserved_by_variant' => $draftReservations,
+            'existing_document_qty_by_variant' => $existingDocumentQuantities,
+            'variant_stock' => $variantStock,
+            'variant_reserved' => $variantReserved,
+            'available_for_this_submit' => $availableForThisSubmit,
+        ]);
+
+        return collect($products)->map(function (array $row, int $index) use ($variants, $draftReservations, $existingDocumentQuantities) {
             $productId = (int) ($row['id'] ?? 0);
             $variantId = (int) ($row['variety_id'] ?? 0);
             $quantity = (int) ($row['quantity'] ?? 0);
@@ -757,12 +787,13 @@ class PreinvoiceController extends Controller
                 ]);
             }
 
-            $reservedForThisDraft = (int) ($draftReservations[$variantId] ?? 0);
-            $freeStock = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0));
-            $availableQty = $freeStock + $reservedForThisDraft;
+            $draftReservedQty = (int) ($draftReservations[$variantId] ?? 0);
+            $existingQty = (int) ($existingDocumentQuantities[$variantId] ?? 0);
+            $centralAvailable = $this->centralAvailableQty($variant);
+            $availableQty = $centralAvailable + $draftReservedQty + $existingQty;
             if ($quantity > $availableQty) {
                 throw ValidationException::withMessages([
-                    "products.{$index}.quantity" => "موجودی آزاد کالای {$name} کافی نیست. تعداد رزرو شده برای این پیش‌فاکتور: {$reservedForThisDraft}، موجودی آزاد فعلی: {$freeStock}، تعداد درخواستی: {$quantity}.",
+                    "products.{$index}.quantity" => "موجودی قابل فروش کالای {$name} کافی نیست. تعداد قبلی همین سند: {$existingQty}، رزرو موقت همین فرم: {$draftReservedQty}، موجودی آزاد مرکزی: {$centralAvailable}، تعداد درخواستی: {$quantity}.",
                 ]);
             }
 
@@ -770,6 +801,26 @@ class PreinvoiceController extends Controller
 
             return $row;
         })->all();
+    }
+
+    private function existingPreinvoiceItemQuantities(?PreinvoiceOrder $order): array
+    {
+        if (! $order) {
+            return [];
+        }
+
+        return $order->items()
+            ->selectRaw('variant_id, SUM(quantity) as qty')
+            ->whereNotNull('variant_id')
+            ->groupBy('variant_id')
+            ->pluck('qty', 'variant_id')
+            ->map(fn ($qty) => (int) $qty)
+            ->all();
+    }
+
+    private function centralAvailableQty(ProductVariant $variant): int
+    {
+        return max(0, (int) ($variant->stock ?? 0));
     }
 
     private function variantSaleLabel(ProductVariant $variant): string
@@ -1617,10 +1668,11 @@ class PreinvoiceController extends Controller
             ]);
         }
 
-        $available = max(0, (int) $variant->stock - (int) $variant->reserved);
+        $available = $this->centralAvailableQty($variant);
         if ($available < $quantity) {
+            $name = $this->variantSaleLabel($variant);
             throw ValidationException::withMessages([
-                'products' => 'موجودی آزاد کالای ' . $this->variantSaleLabel($variant) . " کافی نیست. موجودی آزاد: {$available} عدد.",
+                'products' => "موجودی آزاد مرکزی کالای {$name} کافی نیست. موجودی آزاد مرکزی: {$available} عدد.",
             ]);
         }
 
