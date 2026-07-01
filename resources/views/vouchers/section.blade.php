@@ -307,6 +307,9 @@
 
                 <div class="d-flex gap-2 flex-wrap">
                     <a class="btn btn-outline-secondary" href="{{ route('vouchers.index') }}">بازگشت</a>
+                    @if($isCustomerReturn)
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#salesReturnExportModal">خروجی اکسل</button>
+                    @endif
                     <a class="btn btn-primary" href="{{ route('vouchers.section.create', $type) }}">+ ثبت جدید</a>
                 </div>
             </div>
@@ -314,68 +317,70 @@
     </div>
 
     @if($voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN)
-        <div class="card mb-3">
-            <div class="card-body">
-                <form method="GET" class="row g-2 align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label">مشتری</label>
-                        <select name="customer_id" class="form-select form-select-sm">
-                            <option value="">همه مشتری‌ها</option>
-                            @foreach($customers as $customer)
-                                @php
-                                    $customerTitle = trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? '')) ?: ('مشتری #' . $customer->id);
-                                @endphp
-                                <option value="{{ $customer->id }}" @selected((int) $requestCustomerId === (int) $customer->id)>
-                                    {{ $customerTitle }} | {{ $customer->mobile }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">علت برگشت</label>
-                        <select name="return_reason" class="form-select form-select-sm">
-                            <option value="">همه علت‌ها</option>
-                            @foreach($returnReasons as $reasonKey => $reasonTitle)
-                                <option value="{{ $reasonKey }}" @selected($returnReason === $reasonKey)>{{ $reasonTitle }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">کالا</label>
-                        <select name="product_id" class="form-select form-select-sm">
-                            <option value="">همه کالاها</option>
-                            @foreach($filterProducts as $product)
-                                <option value="{{ $product->id }}" @selected((int) $productId === (int) $product->id)>
-                                    {{ $product->name }}{{ $product->code ? ' | '.$product->code : '' }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">تنوع کالا</label>
-                        <select name="variant_id" class="form-select form-select-sm">
-                            <option value="">همه تنوع‌ها</option>
-                            @foreach($filterVariants as $variant)
-                                <option value="{{ $variant->id }}" @selected((int) $variantId === (int) $variant->id)>
-                                    {{ $variant->product?->name }} / {{ $variant->variant_name ?: $variant->variant_code }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">از تاریخ</label>
-                        <input type="date" name="date_from" value="{{ $dateFrom }}" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">تا تاریخ</label>
-                        <input type="date" name="date_to" value="{{ $dateTo }}" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-4 d-flex gap-2">
-                        <button class="btn btn-sm btn-primary w-100">فیلتر</button>
-                        <a href="{{ route('vouchers.section.index', $type) }}" class="btn btn-sm btn-outline-secondary w-100">حذف فیلتر</a>
-                        <a href="{{ route('vouchers.section.return-from-sale.export', request()->query()) }}" class="btn btn-sm btn-success w-100">خروجی Excel</a>
-                    </div>
-                </form>
+        <div class="modal fade" id="salesReturnExportModal" tabindex="-1" aria-labelledby="salesReturnExportModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="GET" action="{{ route('vouchers.section.return-from-sale.export') }}" id="salesReturnExportForm">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="salesReturnExportModalLabel">خروجی اکسل برگشت از فروش</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="exportCustomerId">مشتری</label>
+                                    <select name="customer_id" id="exportCustomerId" class="form-select" data-placeholder="جستجوی نام، موبایل یا کد مشتری"></select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="exportReturnReason">علت برگشت</label>
+                                    <select name="return_reason" id="exportReturnReason" class="form-select">
+                                        <option value="">همه علت‌ها</option>
+                                        @foreach($returnReasons as $reasonKey => $reasonTitle)
+                                            <option value="{{ $reasonKey }}">{{ $reasonTitle }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="exportDateFrom">تاریخ شروع</label>
+                                    <input type="date" name="date_from" id="exportDateFrom" class="form-control">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="exportDateTo">تاریخ پایان</label>
+                                    <input type="date" name="date_to" id="exportDateTo" class="form-control">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="exportCategoryId">دسته‌بندی</label>
+                                    <select name="category_id" id="exportCategoryId" class="form-select">
+                                        <option value="">همه دسته‌بندی‌ها</option>
+                                        @foreach($categories as $category)
+                                            <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="exportSubcategoryId">زیر‌دسته‌بندی</label>
+                                    <select name="subcategory_id" id="exportSubcategoryId" class="form-select" disabled>
+                                        <option value="">ابتدا دسته‌بندی را انتخاب کنید</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="exportProductId">کالا</label>
+                                    <select name="product_id" id="exportProductId" class="form-select" disabled data-placeholder="ابتدا زیر‌دسته‌بندی و سپس کالا را جستجو کنید"></select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="exportVariantId">تنوع کالا</label>
+                                    <select name="variant_id" id="exportVariantId" class="form-select" disabled>
+                                        <option value="">ابتدا کالا را انتخاب کنید</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">انصراف</button>
+                            <button type="submit" class="btn btn-success">دریافت خروجی اکسل</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     @endif
@@ -490,4 +495,93 @@
         {{ $vouchers->links() }}
     </div>
 </div>
+
+@push('scripts')
+@if($voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN)
+<script>
+(function () {
+    const hasSelect2 = window.jQuery && jQuery.fn && jQuery.fn.select2;
+    const modal = document.getElementById('salesReturnExportModal');
+    if (!modal) return;
+
+    const $customer = jQuery('#exportCustomerId');
+    const $product = jQuery('#exportProductId');
+    const subcategory = document.getElementById('exportSubcategoryId');
+    const category = document.getElementById('exportCategoryId');
+    const variant = document.getElementById('exportVariantId');
+
+    function resetSelect(select, placeholder, disabled = true) {
+        select.innerHTML = `<option value="">${placeholder}</option>`;
+        select.disabled = disabled;
+    }
+
+    function resetProduct() {
+        if (hasSelect2 && $product.data('select2')) {
+            $product.val(null).trigger('change');
+        }
+        $product.empty().prop('disabled', true);
+        resetSelect(variant, 'ابتدا کالا را انتخاب کنید', true);
+    }
+
+    if (hasSelect2) {
+        $customer.select2({
+            dropdownParent: jQuery(modal),
+            width: '100%',
+            allowClear: true,
+            minimumInputLength: 2,
+            placeholder: $customer.data('placeholder'),
+            ajax: {
+                url: '{{ route('vouchers.section.return-from-sale.ajax.customers') }}',
+                dataType: 'json',
+                delay: 300,
+                data: params => ({ q: params.term || '' }),
+                processResults: data => ({ results: data.results || [] })
+            }
+        });
+
+        $product.select2({
+            dropdownParent: jQuery(modal),
+            width: '100%',
+            allowClear: true,
+            minimumInputLength: 2,
+            placeholder: $product.data('placeholder'),
+            ajax: {
+                url: '{{ route('vouchers.section.return-from-sale.ajax.products') }}',
+                dataType: 'json',
+                delay: 300,
+                data: params => ({ q: params.term || '', subcategory_id: subcategory.value || '' }),
+                processResults: data => ({ results: data.results || [] })
+            }
+        });
+    }
+
+    category.addEventListener('change', async function () {
+        resetSelect(subcategory, this.value ? 'در حال دریافت...' : 'ابتدا دسته‌بندی را انتخاب کنید', true);
+        resetProduct();
+        if (!this.value) return;
+        const response = await fetch(`{{ route('vouchers.section.return-from-sale.ajax.subcategories') }}?category_id=${encodeURIComponent(this.value)}`, { headers: { 'Accept': 'application/json' } });
+        const rows = await response.json();
+        resetSelect(subcategory, 'همه زیر‌دسته‌بندی‌ها', false);
+        rows.forEach(row => subcategory.add(new Option(row.name, row.id)));
+    });
+
+    subcategory.addEventListener('change', function () {
+        resetProduct();
+        if (this.value) $product.prop('disabled', false);
+    });
+
+    $product.on('change', async function () {
+        resetSelect(variant, this.value ? 'در حال دریافت...' : 'ابتدا کالا را انتخاب کنید', true);
+        if (!this.value) return;
+        const url = `{{ url('/vouchers/section/return-from-sale/ajax/products') }}/${encodeURIComponent(this.value)}/variants`;
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        const rows = await response.json();
+        resetSelect(variant, 'همه تنوع‌ها', false);
+        rows.forEach(row => variant.add(new Option(row.text, row.id)));
+    });
+})();
+</script>
+@endif
+@endpush
+
 @endsection

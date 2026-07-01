@@ -176,17 +176,13 @@ class VoucherController extends Controller
         $productId = request()->integer('product_id');
         $variantId = request()->integer('variant_id');
         $returnReasons = WarehouseTransfer::returnReasonOptions();
-        $customers = collect();
-        $filterProducts = collect();
-        $filterVariants = collect();
+        $categories = collect();
 
         if ($voucherType === WarehouseTransfer::TYPE_CUSTOMER_RETURN) {
-            $customers = Customer::query()
-                ->orderBy('first_name')
-                ->orderBy('last_name')
-                ->get(['id', 'first_name', 'last_name', 'mobile']);
-            $filterProducts = Product::query()->orderBy('name')->get(['id', 'name', 'code']);
-            $filterVariants = ProductVariant::query()->with('product:id,name')->orderBy('variant_name')->get(['id', 'product_id', 'variant_name', 'variant_code']);
+            $categories = Category::query()
+                ->whereNull('parent_id')
+                ->orderBy('name')
+                ->get(['id', 'name']);
         }
 
         $vouchers = WarehouseTransfer::query()
@@ -245,16 +241,14 @@ class VoucherController extends Controller
             'salesInvoices',
             'type',
             'voucherType',
-            'customers',
+            'categories',
             'requestCustomerId',
             'dateFrom',
             'dateTo',
             'returnReason',
             'returnReasons',
             'productId',
-            'variantId',
-            'filterProducts',
-            'filterVariants'
+            'variantId'
         ));
     }
 
@@ -264,6 +258,9 @@ class VoucherController extends Controller
             'product_id' => $request->integer('product_id'),
             'variant_id' => $request->integer('variant_id'),
             'customer_id' => $request->integer('customer_id'),
+            'return_reason' => trim((string) $request->query('return_reason', '')),
+            'category_id' => $request->integer('category_id'),
+            'subcategory_id' => $request->integer('subcategory_id'),
             'date_from' => trim((string) $request->query('date_from', '')),
             'date_to' => trim((string) $request->query('date_to', '')),
         ];
@@ -271,6 +268,88 @@ class VoucherController extends Controller
         $filename = 'sales-returns-' . now()->format('Ymd-His') . '.xlsx';
 
         return Excel::download(new SalesReturnsExport($filters), $filename);
+    }
+
+
+    public function salesReturnsSearchCustomers(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        $customers = Customer::query()
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($subQuery) use ($q) {
+                    $subQuery->where('first_name', 'like', "%{$q}%")
+                        ->orWhere('last_name', 'like', "%{$q}%")
+                        ->orWhere('mobile', 'like', "%{$q}%")
+                        ->orWhere('crm_customer_id', 'like', "%{$q}%");
+                });
+            }, fn ($query) => $query->whereRaw('1 = 0'))
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->limit(20)
+            ->get(['id', 'first_name', 'last_name', 'mobile', 'crm_customer_id']);
+
+        return response()->json([
+            'results' => $customers->map(function (Customer $customer) {
+                $name = trim(($customer->first_name ?? '') . ' ' . ($customer->last_name ?? '')) ?: ('مشتری #' . $customer->id);
+                $meta = collect([$customer->crm_customer_id, $customer->mobile])->filter()->implode(' | ');
+
+                return [
+                    'id' => (int) $customer->id,
+                    'text' => $meta !== '' ? ($name . ' - ' . $meta) : $name,
+                ];
+            })->values(),
+        ]);
+    }
+
+    public function salesReturnsSubcategories(Request $request)
+    {
+        $parentId = (int) $request->query('category_id');
+
+        return response()->json(Category::query()
+            ->where('parent_id', $parentId)
+            ->orderBy('name')
+            ->get(['id', 'name']));
+    }
+
+    public function salesReturnsSearchProducts(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $subcategoryId = (int) $request->query('subcategory_id');
+
+        $products = Product::query()
+            ->where('category_id', $subcategoryId > 0 ? $subcategoryId : -1)
+            ->when($q !== '', fn ($query) => $query->search($q))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name', 'sku', 'code']);
+
+        return response()->json([
+            'results' => $products->map(fn (Product $product) => [
+                'id' => (int) $product->id,
+                'text' => trim($product->name . (($product->code ?: $product->sku) ? ' - ' . ($product->code ?: $product->sku) : '')),
+            ])->values(),
+        ]);
+    }
+
+    public function salesReturnsProductVariants(Product $product)
+    {
+        $variants = $product->variants()
+            ->active()
+            ->with(['modelList:id,model_name', 'color:id,name'])
+            ->orderBy('variant_name')
+            ->get(['id', 'product_id', 'variant_name', 'variant_code', 'model_list_id', 'color_id', 'variety_name']);
+
+        return response()->json($variants->map(fn (ProductVariant $variant) => [
+            'id' => (int) $variant->id,
+            'text' => collect([
+                $variant->variant_name,
+                $variant->modelList?->model_name,
+                $variant->color?->name,
+                $variant->variety_name,
+                $variant->variant_code,
+            ])->filter()->unique()->implode(' / ') ?: ('تنوع #' . $variant->id),
+        ])->values());
     }
 
     public function sectionCreate(string $type)
