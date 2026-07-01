@@ -27,7 +27,9 @@
   .sales-page-head{background:linear-gradient(135deg,#fff,#f8fafc); padding:20px;}
   .sales-page-title{font-weight:950; letter-spacing:-.02em;}
   .action-toolbar .btn{border-radius:12px; font-weight:800; padding:.55rem .8rem;}
-  .btn-excel{background:#16a34a; border-color:#16a34a; color:#fff; box-shadow:0 8px 18px rgba(22,163,74,.22);}
+  .btn-pdf{background:#dc2626; border-color:#dc2626; color:#fff; box-shadow:0 8px 18px rgba(220,38,38,.22);}
+  .btn-pdf:hover{background:#b91c1c; border-color:#b91c1c; color:#fff;}
+  .btn-excel{background:#16a34a; border-color:#16a34a; color:#fff; box-shadow:0 8px 18px rgba(22,163,74,.18);}
   .btn-excel:hover{background:#15803d; border-color:#15803d; color:#fff;}
   .sales-filter-card .card-body{padding:16px;}
   .sales-filter-card .form-label{font-size:.78rem; color:#64748b; font-weight:800; margin-bottom:.35rem;}
@@ -58,6 +60,7 @@
     <div class="action-toolbar d-flex gap-2 flex-wrap align-items-center justify-content-end no-report-print">
       <a class="btn btn-outline-primary" href="{{ route('vouchers.index', ['voucher_type' => 'sale']) }}">حواله فروش کالا</a>
       @if($canRegisterPayments ?? false)
+        <a class="btn btn-pdf" href="{{ request()->fullUrlWithQuery(['export' => 'pdf']) }}">خروجی PDF</a>
         <a class="btn btn-excel" href="{{ request()->fullUrlWithQuery(['export' => 'excel']) }}">خروجی Excel</a>
         <a class="btn btn-outline-success" href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}">خروجی CSV</a>
       @endif
