@@ -134,6 +134,11 @@
     </div>
 
     <div class="d-flex align-items-center gap-2 flex-wrap">
+        @canPermission('account_statements.adjust')
+            <button type="button" class="btn btn-outline-warning" id="openAdjustmentModalBtn">
+                اصلاح دستی مانده
+            </button>
+        @endcanPermission
         <button type="button" class="btn btn-success" id="openPaymentModalBtn">
             ➕ افزودن پرداخت
         </button>
@@ -142,6 +147,10 @@
         </a>
     </div>
 </div>
+
+@if (session('success'))
+    <div class="alert alert-success">{{ session('success') }}</div>
+@endif
 
 @if ($errors->any())
     <div class="alert alert-danger">
@@ -184,9 +193,16 @@
             <div class="fw-bold">ثبت پرداخت جدید</div>
             <div class="text-muted small">برای این مشتری پرداخت نقدی یا چکی ثبت کن</div>
         </div>
-        <button type="button" class="btn btn-success" id="openPaymentModalBtnSecondary">
-            افزودن پرداخت
-        </button>
+        <div class="d-flex gap-2 flex-wrap">
+            @canPermission('account_statements.adjust')
+                <button type="button" class="btn btn-outline-warning" id="openAdjustmentModalBtnSecondary">
+                    اصلاح دستی مانده
+                </button>
+            @endcanPermission
+            <button type="button" class="btn btn-success" id="openPaymentModalBtnSecondary">
+                افزودن پرداخت
+            </button>
+        </div>
     </div>
 </div>
 
@@ -271,6 +287,60 @@
 
     <div class="card-footer bg-white">{{ $ledgers->links() }}</div>
 </div>
+
+
+@canPermission('account_statements.adjust')
+<div class="payment-modal-backdrop" id="adjustmentModalBackdrop"></div>
+
+<div class="payment-modal" id="adjustmentModal" aria-hidden="true">
+    <div class="payment-modal-dialog" style="max-width: 620px;">
+        <div class="payment-modal-header">
+            <div>
+                <h5 class="payment-modal-title">اصلاح دستی مانده</h5>
+                <div class="payment-modal-subtitle">ثبت ردیف اصلاح دستی در گردش حساب {{ $customer->display_name ?: 'این مشتری' }}</div>
+            </div>
+
+            <button type="button" class="payment-modal-close" id="closeAdjustmentModalBtn" aria-label="بستن">
+                ×
+            </button>
+        </div>
+
+        <div class="payment-modal-body">
+            <form method="POST" action="{{ route('account-statements.adjustment.store', $customer->id) }}" id="accountStatementAdjustmentForm">
+                @csrf
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">نوع اصلاح</label>
+                        <select name="adjustment_type" class="form-select @error('adjustment_type', 'manualAdjustment') is-invalid @enderror" required>
+                            <option value="debit" @selected(old('adjustment_type') === 'debit')>بدهکار</option>
+                            <option value="credit" @selected(old('adjustment_type') === 'credit')>بستانکار</option>
+                        </select>
+                        @error('adjustment_type', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">مبلغ</label>
+                        <input type="number" min="1" step="1" class="form-control @error('amount', 'manualAdjustment') is-invalid @enderror" name="amount" value="{{ old('amount') }}" required>
+                        @error('amount', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">توضیحات اختیاری</label>
+                        <textarea name="note" class="form-control @error('note', 'manualAdjustment') is-invalid @enderror" rows="3" maxlength="1000" placeholder="اختیاری">{{ old('note') }}</textarea>
+                        @error('note', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-12 d-flex justify-content-end gap-2 flex-wrap">
+                        <button type="button" class="btn btn-outline-secondary" id="cancelAdjustmentModalBtn">انصراف</button>
+                        <button type="submit" class="btn btn-warning">ثبت اصلاح دستی</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endcanPermission
 
 <div class="payment-modal-backdrop" id="paymentModalBackdrop"></div>
 
@@ -395,6 +465,50 @@
 </div>
 
 <script>
+
+    (function () {
+        const body = document.body;
+        const modal = document.getElementById('adjustmentModal');
+        const backdrop = document.getElementById('adjustmentModalBackdrop');
+        const openButtons = [
+            document.getElementById('openAdjustmentModalBtn'),
+            document.getElementById('openAdjustmentModalBtnSecondary')
+        ].filter(Boolean);
+        const closeButton = document.getElementById('closeAdjustmentModalBtn');
+        const cancelButton = document.getElementById('cancelAdjustmentModalBtn');
+
+        if (!modal || !backdrop) return;
+
+        function openModal() {
+            modal.classList.add('is-open');
+            backdrop.classList.add('is-open');
+            modal.setAttribute('aria-hidden', 'false');
+            body.classList.add('overflow-hidden');
+        }
+
+        function closeModal() {
+            modal.classList.remove('is-open');
+            backdrop.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            body.classList.remove('overflow-hidden');
+        }
+
+        openButtons.forEach((btn) => btn.addEventListener('click', openModal));
+        closeButton && closeButton.addEventListener('click', closeModal);
+        cancelButton && cancelButton.addEventListener('click', closeModal);
+        backdrop.addEventListener('click', closeModal);
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && modal.classList.contains('is-open')) {
+                closeModal();
+            }
+        });
+
+        @if ($errors->manualAdjustment->any())
+            openModal();
+        @endif
+    })();
+
     (function () {
         const body = document.body;
         const modal = document.getElementById('paymentModal');
@@ -452,7 +566,7 @@
             toggleMethodFields();
         }
 
-        @if ($errors->any())
+        @if ($errors->any() && ! $errors->manualAdjustment->any())
             openModal();
         @endif
     })();

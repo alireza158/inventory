@@ -176,6 +176,7 @@ class PermissionCatalog
                 'cheques.create' => 'ثبت چک',
                 'account_statements.view' => 'مشاهده گردش حساب',
                 'account_statements.payments.create' => 'ثبت پرداخت در گردش حساب',
+                'account_statements.adjust' => 'اصلاح دستی گردش حساب اشخاص',
             ],
             'مشتریان' => [
                 'customers.view' => 'مشاهده مشتریان',
@@ -420,7 +421,7 @@ class PermissionCatalog
             'archive.preinvoices.show' => 'preinvoices.print', 'archive.invoices.show' => 'invoices.print',
             'invoices.index' => 'invoices.view', 'invoices.print' => 'invoices.print', 'invoices.edit' => 'invoices.edit', 'invoices.update' => 'invoices.edit', 'invoices.show' => 'invoices.show', 'invoices.status' => 'invoices.change_status', 'invoices.cancel' => 'invoices.cancel', 'invoices.payments.store' => 'payments.create', 'invoices.notes.store' => 'notes.create', 'cheques.store' => 'cheques.create',
             'finance.cheques.registered' => 'cheques.view', 'finance.cheques.index' => 'cheques.view',
-            'payments.view' => 'payments.view', 'account-statements.index' => 'account_statements.view', 'account-statements.payments.store' => 'account_statements.payments.create', 'account-statements.documents.invoices.show' => 'account_statements.view', 'account-statements.documents.returns.show' => 'account_statements.view', 'account-statements.documents.payments.show' => 'account_statements.view', 'account-statements.show' => 'account_statements.view',
+            'payments.view' => 'payments.view', 'account-statements.index' => 'account_statements.view', 'account-statements.payments.store' => 'account_statements.payments.create', 'account-statements.adjustment.store' => 'account_statements.adjust', 'account-statements.documents.invoices.show' => 'account_statements.view', 'account-statements.documents.returns.show' => 'account_statements.view', 'account-statements.documents.payments.show' => 'account_statements.view', 'account-statements.show' => 'account_statements.view',
             'activity-logs.index' => 'logs.view',
             'users.index' => 'users.view', 'users.sync' => 'users.sync',
             'admin.permissions.index' => 'permissions.view', 'admin.permissions.update' => 'permissions.sync',
