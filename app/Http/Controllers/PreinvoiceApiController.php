@@ -36,7 +36,7 @@ class PreinvoiceApiController extends Controller
                 $variantQuery->active()
                     ->where('sell_price', '>', 0)
                     ->where(function ($stockQuery) use ($reservedVariantIds) {
-                        $stockQuery->whereRaw('COALESCE(stock, 0) - COALESCE(reserved, 0) > 0');
+                        $stockQuery->whereRaw('COALESCE(stock, 0) > 0');
                         if (! empty($reservedVariantIds)) {
                             $stockQuery->orWhereIn('id', $reservedVariantIds);
                         }
@@ -144,7 +144,7 @@ class PreinvoiceApiController extends Controller
                         $stockQuery->where(function ($availableQuery) {
                             $availableQuery
                                 ->where('sell_price', '>', 0)
-                                ->whereRaw('COALESCE(stock, 0) - COALESCE(reserved, 0) > 0');
+                                ->whereRaw('COALESCE(stock, 0) > 0');
                         });
                         if (! empty($reservedVariantIds)) {
                             $stockQuery->orWhereIn('id', $reservedVariantIds);
@@ -167,7 +167,7 @@ class PreinvoiceApiController extends Controller
                         $stockQuery->where(function ($availableQuery) {
                             $availableQuery
                                 ->where('sell_price', '>', 0)
-                                ->whereRaw('COALESCE(stock, 0) - COALESCE(reserved, 0) > 0');
+                                ->whereRaw('COALESCE(stock, 0) > 0');
                         });
                         if (! empty($reservedVariantIds)) {
                             $stockQuery->orWhereIn('id', $reservedVariantIds);
@@ -203,34 +203,40 @@ class PreinvoiceApiController extends Controller
             'price' => (int) ($product->price ?? 0),
             'quantity' => $centralStock,
 
-            'varieties' => $product->variants->map(fn ($v) => [
-                'id' => $v->id,
-                'price' => (int) ($v->sell_price ?? 0),
-                'quantity' => max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0)),
-                'reserved' => (int) ($v->reserved ?? 0),
-                'free_stock' => max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0)),
-                'sellable_stock' => max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)),
-                'can_add_to_preinvoice' => (int) ($v->sell_price ?? 0) > 0
-                    && max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)) > 0,
-                'sale_warning' => (int) ($v->sell_price ?? 0) <= 0
-                    ? 'قیمت فروش ثبت نشده'
-                    : (max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)) <= 0 ? 'موجودی آزاد ندارد' : null),
-                'is_current_preinvoice_item' => in_array((int) $v->id, $currentPreinvoiceItemVariantIds, true),
-                'is_active' => (bool) ($v->is_active ?? false),
-                'variant_name' => (string) ($v->variant_name ?? ''),
-                'variety_name' => (string) ($v->variety_name ?? ''),
-                'variety_code' => (string) ($v->variety_code ?? ''),
-                'model_list_name' => (string) ($v->modelList?->model_name ?? ''),
+            'varieties' => $product->variants->map(function (ProductVariant $v) use ($reservedByVariant, $currentPreinvoiceItemVariantIds) {
+                $centralAvailable = $this->centralAvailableQty($v);
+                $reservedForThisToken = (int) ($reservedByVariant[(int) $v->id] ?? 0);
+                $sellableStock = $centralAvailable + $reservedForThisToken;
 
-                // ✅ بارکد 11 رقمی تنوع (برای اسکن/نمایش آینده)
-                'barcode' => $v->variant_code,
+                return [
+                    'id' => $v->id,
+                    'price' => (int) ($v->sell_price ?? 0),
+                    'quantity' => $centralAvailable,
+                    'reserved' => (int) ($v->reserved ?? 0),
+                    'free_stock' => $centralAvailable,
+                    'central_available' => $centralAvailable,
+                    'sellable_stock' => $sellableStock,
+                    'can_add_to_preinvoice' => (int) ($v->sell_price ?? 0) > 0 && $sellableStock > 0,
+                    'sale_warning' => (int) ($v->sell_price ?? 0) <= 0
+                        ? 'قیمت فروش ثبت نشده'
+                        : ($sellableStock <= 0 ? 'موجودی آزاد ندارد' : null),
+                    'is_current_preinvoice_item' => in_array((int) $v->id, $currentPreinvoiceItemVariantIds, true),
+                    'is_active' => (bool) ($v->is_active ?? false),
+                    'variant_name' => (string) ($v->variant_name ?? ''),
+                    'variety_name' => (string) ($v->variety_name ?? ''),
+                    'variety_code' => (string) ($v->variety_code ?? ''),
+                    'model_list_name' => (string) ($v->modelList?->model_name ?? ''),
 
-                // سازگار با JS قبلی
-                'attributes' => [
-                    ['pivot' => ['value' => $v->variant_name]],
-                ],
-                'unique_attributes_key' => (string) $v->variant_name,
-            ])->values(),
+                    // ✅ بارکد 11 رقمی تنوع (برای اسکن/نمایش آینده)
+                    'barcode' => $v->variant_code,
+
+                    // سازگار با JS قبلی
+                    'attributes' => [
+                        ['pivot' => ['value' => $v->variant_name]],
+                    ],
+                    'unique_attributes_key' => (string) $v->variant_name,
+                ];
+            })->values(),
         ];
 
         return response()->json(['data' => ['product' => $payload]]);
@@ -296,6 +302,12 @@ class PreinvoiceApiController extends Controller
     private function syncReservationRows(string $token, int $userId, array $items): array
     {
         $desired = $this->normalizeReservationItems($items);
+
+        Log::debug('PREINVOICE_RESERVATION_SYNC', [
+            'user_id' => $userId,
+            'token' => $token,
+            'desired' => $desired,
+        ]);
 
         return DB::transaction(function () use ($token, $userId, $desired) {
             $this->releaseExpiredDraftReservations();
@@ -438,11 +450,11 @@ class PreinvoiceApiController extends Controller
             ]);
         }
 
-        $available = max(0, (int) $variant->stock - (int) $variant->reserved);
+        $available = $this->centralAvailableQty($variant);
 
         if ($delta > $available) {
             throw ValidationException::withMessages([
-                'items' => "موجودی آزاد تنوع انتخابی کافی نیست. موجودی آزاد: {$available} عدد.",
+                'items' => "موجودی آزاد مرکزی تنوع انتخابی کافی نیست. موجودی آزاد مرکزی: {$available} عدد.",
             ]);
         }
 
@@ -478,6 +490,11 @@ class PreinvoiceApiController extends Controller
         }
 
         WarehouseStockService::change(WarehouseStockService::centralWarehouseId(), $productId, $delta, $variantId);
+    }
+
+    private function centralAvailableQty(ProductVariant $variant): int
+    {
+        return max(0, (int) ($variant->stock ?? 0));
     }
 
     private function releaseExpiredDraftReservations(): void
