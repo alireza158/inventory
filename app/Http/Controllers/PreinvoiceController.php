@@ -1895,7 +1895,7 @@ class PreinvoiceController extends Controller
                     'discount_amount' => (int) $order->discount_amount,
                     'subtotal' => (int) $subtotal,
                     'total' => (int) $total,
-                    'status' => $isFinanceReapproval ? Invoice::STATUS_FINANCE_APPROVED : Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+                    'status' => Invoice::STATUS_COLLECTING,
                     'status_changed_at' => now(),
                     'status_changed_by' => auth()->id(),
                 ]);
@@ -1917,7 +1917,9 @@ class PreinvoiceController extends Controller
                     'discount_amount' => (int) $order->discount_amount,
                     'subtotal' => (int) $subtotal,
                     'total' => (int) $total,
-                    'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+                    'status' => Invoice::STATUS_COLLECTING,
+                    'status_changed_at' => now(),
+                    'status_changed_by' => auth()->id(),
                 ]);
             }
 
@@ -1996,11 +1998,11 @@ class PreinvoiceController extends Controller
                 );
             }
 
-            ActivityLogger::log($isFinanceReapproval ? 'finance_reapproved' : 'finance_approved', $invoice->fresh(), $isFinanceReapproval ? 'فاکتور ویرایش‌شده توسط انبار مجدداً تایید مالی شد و بدون ورود مجدد به صف انبار نهایی شد.' : 'پیش‌فاکتور توسط مالی تایید و به فاکتور تبدیل شد.', [
+            ActivityLogger::log($isFinanceReapproval ? 'finance_reapproved' : 'finance_approved', $invoice->fresh(), $isFinanceReapproval ? 'فاکتور ویرایش‌شده توسط انبار مجدداً تایید مالی شد و به صف جمع‌آوری برگشت.' : 'پیش‌فاکتور توسط مالی تایید و به فاکتور/حواله در حال جمع‌آوری تبدیل شد.', [
                 'preinvoice_order_id' => $order->id,
                 'invoice_uuid' => $invoice->uuid,
                 'old_status' => $oldInvoiceStatus,
-                'new_status' => (string) $invoice->status,
+                'new_status' => Invoice::STATUS_COLLECTING,
                 'old_total' => $oldInvoiceTotal,
                 'new_total' => (int) $invoice->total,
                 'total_changed' => $oldInvoiceTotal !== null && $oldInvoiceTotal !== (int) $invoice->total,
@@ -2030,9 +2032,9 @@ class PreinvoiceController extends Controller
             if (! $isFinanceReapproval) {
                 $this->notificationService->notifyRole(
                     'warehouse',
-                    'invoice_ready_for_sales_voucher',
-                    'فاکتور جدید آماده حواله فروش است',
-                    "فاکتور شماره {$invoice->uuid} برای مشتری {$invoice->customer_name} صادر شد و آماده جمع‌آوری/چاپ حواله فروش است.",
+                    'invoice_ready_for_collection',
+                    'فاکتور جدید آماده جمع‌آوری است',
+                    "فاکتور شماره {$invoice->uuid} برای مشتری {$invoice->customer_name} تایید مالی شد و وارد بخش در حال جمع‌آوری شد.",
                     route('vouchers.sales.print', $invoice->uuid),
                     ['level' => 'success', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => "warehouse_invoice_ready:{$invoice->id}"]
                 );
@@ -2052,9 +2054,9 @@ class PreinvoiceController extends Controller
         });
 
         return redirect()->route('invoices.show', $invoice->uuid)
-            ->with('success', (string) $invoice->status === Invoice::STATUS_FINANCE_APPROVED
-                ? '✅ تایید مالی مجدد انجام شد و همان فاکتور بدون ورود به صف انبار نهایی شد.'
-                : '✅ تایید مالی انجام شد و پیش‌فاکتور به فاکتور/حواله انبار تبدیل شد.');
+            ->with('success', $invoice->wasRecentlyCreated
+                ? '✅ تایید مالی انجام شد و فاکتور وارد بخش در حال جمع‌آوری شد.'
+                : '✅ تایید مالی مجدد انجام شد و فاکتور به بخش در حال جمع‌آوری برگشت.');
     }
 
     public function financeCancel(string $uuid, Request $request)
