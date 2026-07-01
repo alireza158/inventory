@@ -4,6 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Legacy bridge/profile for asset documents.
+ * Manual management routes are disabled; records are preserved for asset_documents.personnel_id compatibility.
+ */
 class AssetPersonnel extends Model
 {
     protected $table = 'asset_personnel';

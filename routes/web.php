@@ -32,7 +32,6 @@ use App\Http\Controllers\StocktakeController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\ShippingMethodController;
 use App\Http\Controllers\SalesHavalehController;
-use App\Http\Controllers\AssetPersonnelController;
 use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AssetTrusteeController;
 use App\Http\Controllers\ArchiveController;
@@ -180,13 +179,11 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     Route::prefix('warehouse/asset-trustee')->name('asset.')->group(function () {
         Route::get('/', [AssetTrusteeController::class, 'hub'])->name('hub');
 
-        Route::get('/personnel', [AssetPersonnelController::class, 'index'])->name('personnel.index');
-        Route::get('/personnel/create', [AssetPersonnelController::class, 'create'])->name('personnel.create');
-        Route::post('/personnel', [AssetPersonnelController::class, 'store'])->name('personnel.store');
-        Route::get('/personnel/{personnel}', [AssetPersonnelController::class, 'show'])->name('personnel.show');
-        Route::get('/personnel/{personnel}/edit', [AssetPersonnelController::class, 'edit'])->name('personnel.edit');
-        Route::put('/personnel/{personnel}', [AssetPersonnelController::class, 'update'])->name('personnel.update');
-        Route::patch('/personnel/{personnel}/toggle-status', [AssetPersonnelController::class, 'toggleStatus'])->name('personnel.toggle-status');
+        // Manual asset-personnel management is disabled; asset documents now select active users and keep asset_personnel as a legacy bridge.
+        Route::get('/personnel', fn () => redirect()
+            ->route('asset.documents.index')
+            ->with('info', 'مدیریت دستی پرسنل اموال غیرفعال شده است. از این پس پرسنل از کاربران سیستم انتخاب می‌شود.'))
+            ->name('personnel.index');
 
         Route::get('/documents', [AssetDocumentController::class, 'index'])->name('documents.index');
         Route::get('/documents/create', [AssetDocumentController::class, 'create'])->name('documents.create');
