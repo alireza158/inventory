@@ -146,6 +146,7 @@ Route::get('/vouchers/section/{type}', [VoucherController::class, 'sectionIndex'
 Route::get('/vouchers/section/{type}/create', [VoucherController::class, 'sectionCreate'])->name('vouchers.section.create');
 Route::get('/vouchers/section/return-from-sale/export', [VoucherController::class, 'salesReturnsExport'])->name('vouchers.section.return-from-sale.export');
 Route::get('/vouchers/section/return-from-sale/ajax/customers', [VoucherController::class, 'salesReturnsSearchCustomers'])->name('vouchers.section.return-from-sale.ajax.customers');
+Route::get('/vouchers/section/return-from-sale/ajax/categories', [VoucherController::class, 'salesReturnsCategories'])->name('vouchers.section.return-from-sale.ajax.categories');
 Route::get('/vouchers/section/return-from-sale/ajax/subcategories', [VoucherController::class, 'salesReturnsSubcategories'])->name('vouchers.section.return-from-sale.ajax.subcategories');
 Route::get('/vouchers/section/return-from-sale/ajax/products', [VoucherController::class, 'salesReturnsSearchProducts'])->name('vouchers.section.return-from-sale.ajax.products');
 Route::get('/vouchers/section/return-from-sale/ajax/products/{product}/variants', [VoucherController::class, 'salesReturnsProductVariants'])->name('vouchers.section.return-from-sale.ajax.product-variants');
