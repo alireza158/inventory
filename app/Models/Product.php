@@ -123,42 +123,16 @@ class Product extends Model
         }
 
         $tokens = preg_split('/\s+/u', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $isCodeLike = static::isProductSearchCodeLike($search);
 
-        $query->where(function (Builder $productQuery) use ($search, $tokens, $isCodeLike) {
-            static::orWhereProductCodeMatches($productQuery, $search, $isCodeLike);
+        if ($tokens === []) {
+            return $query->whereRaw('0 = 1');
+        }
 
-            $patterns = static::buildProductSearchPatterns($search);
-
-            foreach (static::productSearchableColumns() as $column) {
-                static::orWhereNormalizedLikeAny($productQuery, 'products.' . $column, $patterns);
-            }
-
-            $productQuery->orWhereHas('category', function (Builder $categoryQuery) use ($patterns) {
-                static::orWhereNormalizedLikeAny($categoryQuery, 'categories.name', $patterns);
+        foreach ($tokens as $token) {
+            $query->where(function (Builder $tokenQuery) use ($token) {
+                static::orWhereProductSearchTokenMatches($tokenQuery, $token);
             });
-
-            $productQuery->orWhereHas('variants', function (Builder $variantQuery) use ($patterns) {
-                foreach (static::variantSearchableColumns() as $column) {
-                    static::orWhereNormalizedLikeAny($variantQuery, 'product_variants.' . $column, $patterns);
-                }
-            });
-
-            if (count($tokens) > 1) {
-                static::orWhereAllTokensInColumn($productQuery, 'products.name', $tokens);
-                $productQuery->orWhereHas('variants', function (Builder $variantQuery) use ($tokens) {
-                    $variantQuery->where(function (Builder $tokenQuery) use ($tokens) {
-                        foreach ($tokens as $token) {
-                            $tokenQuery->where(function (Builder $columnQuery) use ($token) {
-                                foreach (static::variantSearchableColumns() as $column) {
-                                    static::orWhereNormalizedLike($columnQuery, 'product_variants.' . $column, $token);
-                                }
-                            });
-                        }
-                    });
-                });
-            }
-        });
+        }
 
         return static::applyProductSearchScore($query, $search, $tokens);
     }
@@ -183,13 +157,13 @@ class Product extends Model
             $bindings[] = $searchLower;
         }
 
-        $scoreSql .= " + CASE WHEN {$name} = ? THEN 800 ELSE 0 END";
+        $scoreSql .= " + CASE WHEN {$name} = ? THEN 1600 ELSE 0 END";
         $bindings[] = $searchLower;
-        $scoreSql .= " + CASE WHEN {$name} LIKE ? THEN 650 ELSE 0 END";
+        $scoreSql .= " + CASE WHEN {$name} LIKE ? THEN 1300 ELSE 0 END";
         $bindings[] = static::escapeProductSearchLike($searchLower) . '%';
-        $scoreSql .= " + CASE WHEN {$name} LIKE ? THEN 360 ELSE 0 END";
+        $scoreSql .= " + CASE WHEN {$name} LIKE ? THEN 1000 ELSE 0 END";
         $bindings[] = '%' . static::escapeProductSearchLike($searchLower) . '%';
-        $scoreSql .= " + CASE WHEN REPLACE({$name}, ' ', '') LIKE ? THEN 220 ELSE 0 END";
+        $scoreSql .= " + CASE WHEN REPLACE({$name}, ' ', '') LIKE ? THEN 950 ELSE 0 END";
         $bindings[] = '%' . static::escapeProductSearchLike($compactSearch) . '%';
 
         if (count($tokens) > 1) {
@@ -200,7 +174,7 @@ class Product extends Model
                 $bindings[] = '%' . static::escapeProductSearchLike(mb_strtolower($token)) . '%';
             }
 
-            $scoreSql .= ' + CASE WHEN ' . implode(' AND ', $allTokensConditions) . ' THEN 900 ELSE 0 END';
+            $scoreSql .= ' + CASE WHEN ' . implode(' AND ', $allTokensConditions) . ' THEN 260 ELSE 0 END';
         }
 
         foreach ($tokens as $token) {
@@ -223,9 +197,13 @@ class Product extends Model
         $scoreSql .= " + CASE WHEN {$variantScore} THEN 330 ELSE 0 END";
         $bindings = array_merge($bindings, static::variantContainsBindings($searchLower));
 
+        $variantNameScore = static::variantExistsSql(static::variantNameContainsConditionSql());
+        $scoreSql .= " + CASE WHEN {$variantNameScore} THEN 820 ELSE 0 END";
+        $bindings[] = '%' . static::escapeProductSearchLike($searchLower) . '%';
+
         if (count($tokens) > 1) {
             $variantAllTokensSql = static::variantExistsSql(static::variantAllTokensConditionSql($tokens));
-            $scoreSql .= " + CASE WHEN {$variantAllTokensSql} THEN 880 ELSE 0 END";
+            $scoreSql .= " + CASE WHEN {$variantAllTokensSql} THEN 240 ELSE 0 END";
             $bindings = array_merge($bindings, static::variantAllTokensBindings($tokens));
         }
 
@@ -267,6 +245,28 @@ class Product extends Model
                 $expression = static::normalizedSqlExpression($column);
                 $codeQuery->orWhereRaw("{$expression} = ?", [$searchLower]);
                 $codeQuery->orWhereRaw("{$expression} LIKE ?", ['%' . static::escapeProductSearchLike($searchLower) . '%']);
+            }
+        });
+
+        return $query;
+    }
+
+    private static function orWhereProductSearchTokenMatches(Builder $query, string $token): Builder
+    {
+        $pattern = '%' . static::escapeProductSearchLike(mb_strtolower(static::normalizeProductSearchTerm($token))) . '%';
+        $patterns = static::productSearchPersianArabicVariants($pattern);
+
+        foreach (static::productSearchableColumns() as $column) {
+            static::orWhereNormalizedLikeAny($query, 'products.' . $column, $patterns);
+        }
+
+        $query->orWhereHas('category', function (Builder $categoryQuery) use ($patterns) {
+            static::orWhereNormalizedLikeAny($categoryQuery, 'categories.name', $patterns);
+        });
+
+        $query->orWhereHas('variants', function (Builder $variantQuery) use ($patterns) {
+            foreach (static::variantSearchableColumns() as $column) {
+                static::orWhereNormalizedLikeAny($variantQuery, 'product_variants.' . $column, $patterns);
             }
         });
 
@@ -398,6 +398,11 @@ class Product extends Model
         return array_fill(0, count(static::variantSearchableColumns()), '%' . static::escapeProductSearchLike($searchLower) . '%');
     }
 
+    private static function variantNameContainsConditionSql(): string
+    {
+        return static::normalizedSqlExpression('product_variants.variant_name') . ' LIKE ?';
+    }
+
     private static function variantAllTokensConditionSql(array $tokens): string
     {
         return collect($tokens)->map(function () {
@@ -429,7 +434,7 @@ class Product extends Model
             return $columns;
         }
 
-        return $columns = collect(['name', 'code', 'sku', 'barcode', 'short_barcode', 'description'])
+        return $columns = collect(['name', 'code', 'sku', 'barcode', 'short_barcode'])
             ->filter(fn (string $column) => Schema::hasColumn('products', $column))
             ->values()
             ->all();

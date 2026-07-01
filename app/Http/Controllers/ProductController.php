@@ -33,14 +33,14 @@ class ProductController extends Controller
                 'warehouseStocks.warehouse',
             ]);
 
-        $search = $request->input('q', $request->input('search'));
-        $categoryId = $request->input('category_id', $request->input('category'));
+        $search = trim((string) $request->query('q', $request->query('search', '')));
+        $categoryId = $request->query('category_id', $request->query('category'));
         $stockStatus = $request->input('stock_status');
         $sellableStatus = $request->input('sellable_status', $request->input('sale_status'));
         $minPrice = $request->input('min_price', $request->input('price_min'));
         $maxPrice = $request->input('max_price', $request->input('price_max'));
 
-        if (filled($search)) {
+        if ($search !== '') {
             $query->search($search);
         }
 
@@ -82,7 +82,7 @@ class ProductController extends Controller
         $sortColumn = $allowedSorts[$sort] ?? 'id';
 
         $products = $query
-            ->when(! filled($search), fn ($productQuery) => $productQuery->orderBy($sortColumn, $dir))
+            ->when($search === '', fn ($productQuery) => $productQuery->orderBy($sortColumn, $dir))
             ->orderByDesc('products.id')
             ->paginate(20)
             ->withQueryString();
