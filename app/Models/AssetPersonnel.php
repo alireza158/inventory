@@ -9,6 +9,8 @@ class AssetPersonnel extends Model
     protected $table = 'asset_personnel';
 
     protected $fillable = [
+        'user_id',
+        'user_name_snapshot',
         'full_name',
         'personnel_code',
         'national_code',
@@ -26,5 +28,10 @@ class AssetPersonnel extends Model
     public function documents()
     {
         return $this->hasMany(AssetDocument::class, 'personnel_id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

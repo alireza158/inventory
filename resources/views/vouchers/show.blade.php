@@ -42,7 +42,7 @@
       <div class="col-md-4"><strong>انبار مقصد:</strong> {{ $voucher->toWarehouse?->name ?? '—' }}</div>
       <div class="col-md-4"><strong>ثبت‌کننده:</strong> {{ $voucher->user?->name ?? '—' }}</div>
       <div class="col-md-6"><strong>فاکتور مرجع:</strong> {{ $voucher->relatedInvoice?->uuid ?? '—' }}</div>
-      <div class="col-md-6"><strong>تحویل‌گیرنده/ذی‌نفع:</strong> {{ $voucher->beneficiary_name ?? '—' }}</div>
+      <div class="col-md-6"><strong>تحویل‌گیرنده/ذی‌نفع:</strong> {{ $voucher->receiverDisplayName() }}</div>
       <div class="col-12"><strong>توضیحات:</strong> {{ $voucher->note ?: '—' }}</div>
     </div>
   </div>
