@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Invoice;
@@ -9,6 +10,7 @@ use App\Models\InvoicePayment;
 use App\Models\WarehouseTransfer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AccountStatementController extends Controller
 {
@@ -170,6 +172,56 @@ class AccountStatementController extends Controller
             'netBalance',
             'customerInvoices'
         ));
+    }
+
+
+    public function storeManualAdjustment(Request $request, Customer $customer)
+    {
+        $data = $request->validateWithBag('manualAdjustment', [
+            'adjustment_type' => ['required', 'in:debit,credit'],
+            'amount' => ['required', 'integer', 'min:1'],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $user = $request->user();
+        $userName = $user?->name ?: 'کاربر نامشخص';
+        $userNote = trim((string) ($data['note'] ?? ''));
+        $ledgerNote = $userNote === ''
+            ? 'اصلاح دستی گردش حساب توسط مالی'
+            : 'اصلاح دستی گردش حساب - ' . $userNote;
+
+        DB::transaction(function () use ($customer, $data, $ledgerNote, $user, $userName, $userNote): void {
+            $ledger = CustomerLedger::create([
+                'customer_id' => $customer->id,
+                'type' => $data['adjustment_type'],
+                'amount' => (int) $data['amount'],
+                'reference_type' => null,
+                'reference_id' => null,
+                'note' => $ledgerNote,
+            ]);
+
+            if (Schema::hasTable('activity_logs')) {
+                ActivityLog::create([
+                    'user_id' => $user?->id,
+                    'action' => 'account_statement_adjust',
+                    'subject_type' => CustomerLedger::class,
+                    'subject_id' => $ledger->id,
+                    'description' => 'اصلاح دستی گردش حساب مشتری توسط ' . $userName,
+                    'properties' => [
+                        'customer_id' => $customer->id,
+                        'amount' => (int) $data['amount'],
+                        'adjustment_type' => $data['adjustment_type'],
+                        'user_id' => $user?->id,
+                        'note' => $userNote === '' ? null : $userNote,
+                    ],
+                    'occurred_at' => now(),
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('account-statements.show', $customer)
+            ->with('success', 'اصلاح دستی گردش حساب با موفقیت ثبت شد.');
     }
 
     public function showInvoice(string $uuid)
