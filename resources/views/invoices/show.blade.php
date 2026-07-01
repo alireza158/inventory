@@ -15,7 +15,7 @@
   $statusFa = fn($s) => match($s){
     'pending_warehouse_approval' => 'در انتظار تایید انبار',
     'collecting' => 'در حال جمع‌آوری',
-    'checking_discrepancy' => 'چک کردن بار',
+    'checking_discrepancy' => 'در حال بررسی',
     'packing' => 'بسته‌بندی بار',
     'shipped' => 'ارسال شد',
     'not_shipped' => 'کنسل شده',
@@ -187,11 +187,9 @@
           <form method="POST" action="{{ route('invoices.status', $invoice->uuid) }}" class="d-flex gap-2">
             @csrf
             <select name="status" class="form-select" @disabled($invoice->status==='not_shipped')>
-              <option value="pending_warehouse_approval" @selected($invoice->status==='pending_warehouse_approval')>در انتظار تایید انبار</option>
+              <option value="checking_discrepancy" @selected($invoice->status==='checking_discrepancy')>در حال بررسی</option>
               <option value="collecting" @selected($invoice->status==='collecting')>در حال جمع‌آوری</option>
-              <option value="checking_discrepancy" @selected($invoice->status==='checking_discrepancy')>چک کردن بار</option>
-              <option value="packing" @selected($invoice->status==='packing')>بسته‌بندی بار</option>
-              <option value="shipped" @selected($invoice->status==='shipped')>ارسال شد</option>
+              <option value="shipped" @selected($invoice->status==='shipped')>ارسال شده</option>
             </select>
             <button class="btn btn-primary" @disabled($invoice->status==='not_shipped')>ثبت</button>
           </form>

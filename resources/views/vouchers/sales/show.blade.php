@@ -42,14 +42,14 @@
       <div class="col-md-5">
         <label class="form-label">تغییر وضعیت حواله</label>
         <select name="status" class="form-select">
-          @foreach($statusLabels as $key => $label)
+          @foreach(['checking_discrepancy'=>'در حال بررسی','collecting'=>'در حال جمع‌آوری','shipped'=>'ارسال شده'] as $key => $label)
             <option value="{{ $key }}" @selected($invoice->status===$key)>{{ $label }}</option>
           @endforeach
         </select>
       </div>
       <div class="col-md-5">
         <label class="form-label">یادداشت</label>
-        <input name="note" class="form-control" placeholder="برای ارسال‌شده الزامی است">
+        <input name="note" class="form-control" placeholder="اختیاری">
       </div>
       <div class="col-md-2">
         <button class="btn btn-primary w-100">ثبت وضعیت</button>

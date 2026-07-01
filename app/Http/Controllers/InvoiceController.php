@@ -32,7 +32,7 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         $allowedPaymentStatuses = ['paid', 'partial', 'unpaid'];
-        $allowedStatuses = $this->statusService->all();
+        $allowedStatuses = $this->statusService->manualStatuses();
 
         $filters = [
             'date_from' => trim((string) $request->query('date_from', $request->query('date', ''))),
@@ -124,7 +124,7 @@ class InvoiceController extends Controller
         $q = trim((string) $request->query('q', ''));
         $status = trim((string) $request->query('status', ''));
 
-        $allowedStatuses = $this->statusService->all();
+        $allowedStatuses = $this->statusService->manualStatuses();
 
         $invoices = Invoice::query()
             ->with(['items.product', 'items.variant', 'preinvoiceOrder:id,created_by'])
@@ -217,12 +217,10 @@ class InvoiceController extends Controller
     private function queueStatuses(): array
     {
         return [
-            SalesHavalehStatusService::PENDING_WAREHOUSE_APPROVAL,
             SalesHavalehStatusService::COLLECTING,
             SalesHavalehStatusService::CHECKING_DISCREPANCY,
             SalesHavalehStatusService::FINAL_CHECK,
             SalesHavalehStatusService::PACKING,
-            SalesHavalehStatusService::NOT_SHIPPED,
         ];
     }
 
@@ -477,15 +475,8 @@ class InvoiceController extends Controller
         $invoice = Invoice::where('uuid', $uuid)->firstOrFail();
 
         $data = $request->validate([
-            'status' => ['required', 'string', Rule::in($this->statusService->all())],
-            'note' => [
-                Rule::requiredIf($request->input('status') === Invoice::STATUS_SHIPPED),
-                'nullable',
-                'string',
-                'max:1000',
-            ],
-        ], [
-            'note.required' => 'برای ثبت وضعیت ارسال‌شده، وارد کردن یادداشت نهایی الزامی است.',
+            'status' => ['required', 'string', Rule::in($this->statusService->manualStatuses())],
+            'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $updatedInvoice = $this->salesHavalehService->changeStatus($invoice, $data['status'], $data['note'] ?? null, auth()->id());
@@ -505,9 +496,13 @@ class InvoiceController extends Controller
         $data = $request->validate([
             'note' => 'nullable|string|max:1000',
         ]);
-        $this->salesHavalehService->cancelAndRestore($invoice, $data['note'] ?? null, auth()->id());
+        $updatedInvoice = $this->salesHavalehService->cancelAndRestore($invoice, $data['note'] ?? null, auth()->id());
 
-        return back()->with('success', '✅ فاکتور کنسل شد و موجودی به انبار برگشت.');
+        if ((string) $invoice->status === SalesHavalehStatusService::NOT_SHIPPED) {
+            return back()->with('success', 'این فاکتور قبلاً کنسل شده و عملیات برگشت موجودی/مالی دوباره انجام نشد.');
+        }
+
+        return back()->with('success', '✅ فاکتور کنسل شد، موجودی به انبار برگشت و اثر مالی اصلاح شد.');
     }
 
     public function undoCancel(string $uuid, Request $request)

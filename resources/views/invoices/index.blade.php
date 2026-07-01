@@ -80,7 +80,7 @@
         <div class="col-12"><button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#moreInvoiceFilters">فیلترهای بیشتر</button></div>
         <div class="collapse col-12 {{ (($filters['status']??'')||($filters['seller']??'')||($filters['only_remaining']??'')||($filters['only_paid']??'')||($filters['has_cheque']??'')||($filters['min_amount']??'')||($filters['max_amount']??'')) ? 'show' : '' }}" id="moreInvoiceFilters">
           <div class="row g-3">
-            <div class="col-sm-6 col-xl-2"><label class="form-label">وضعیت عملیاتی</label><select class="form-select" name="status"><option value="">همه</option>@foreach($statusLabels as $key=>$label)<option value="{{ $key }}" @selected(($filters['status'] ?? '')===$key)>{{ $label }}</option>@endforeach</select></div>
+            <div class="col-sm-6 col-xl-2"><label class="form-label">وضعیت عملیاتی</label><select class="form-select" name="status"><option value="">همه</option>@foreach(['checking_discrepancy'=>'در حال بررسی','collecting'=>'در حال جمع‌آوری','shipped'=>'ارسال شده'] as $key=>$label)<option value="{{ $key }}" @selected(($filters['status'] ?? '')===$key)>{{ $label }}</option>@endforeach</select></div>
             <div class="col-sm-6 col-xl-2"><label class="form-label">ثبت‌کننده / فروشنده</label><input class="form-control" name="seller" value="{{ $filters['seller'] ?? '' }}"></div>
             <div class="col-sm-6 col-xl-2"><label class="form-label">حداقل مبلغ</label><input class="form-control" name="min_amount" value="{{ $filters['min_amount'] ?? '' }}"></div>
             <div class="col-sm-6 col-xl-2"><label class="form-label">حداکثر مبلغ</label><input class="form-control" name="max_amount" value="{{ $filters['max_amount'] ?? '' }}"></div>

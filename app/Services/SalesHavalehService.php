@@ -418,7 +418,7 @@ class SalesHavalehService
         );
     }
 
-    private function adjustSaleItemStock(Invoice $invoice, InvoiceItem $item, int $quantityDelta, string $movementReason, string $message, ?string $reason, ?string $note): void
+    private function adjustSaleItemStock(Invoice $invoice, InvoiceItem $item, int $quantityDelta, string $movementReason, string $message, ?string $reason, ?string $note, ?string $transactionType = null): void
     {
         if ($quantityDelta === 0) {
             return;
@@ -439,7 +439,7 @@ class SalesHavalehService
             $noteText,
             [
                 'reason' => $movementReason,
-                'transaction_type' => StockMovement::TRANSACTION_SALES_HAVALEH_ADJUSTMENT,
+                'transaction_type' => $transactionType ?: StockMovement::TRANSACTION_SALES_HAVALEH_ADJUSTMENT,
                 'reference_type' => Invoice::class,
                 'reference_id' => $invoice->id,
             ]
@@ -513,6 +513,9 @@ class SalesHavalehService
                 'discount_amount' => (int) $order->discount_amount,
                 'subtotal' => $subtotal,
                 'total' => $total,
+                'status' => SalesHavalehStatusService::COLLECTING,
+                'status_changed_at' => now(),
+                'status_changed_by' => $userId,
             ]);
 
             foreach ($order->items as $item) {
@@ -539,9 +542,6 @@ class SalesHavalehService
     {
         return DB::transaction(function () use ($invoice, $newStatus, $note, $userId) {
             $user = auth()->user();
-            if ($newStatus === SalesHavalehStatusService::SHIPPED && trim((string) $note) === '') {
-                abort(422, 'برای ثبت وضعیت ارسال‌شده، وارد کردن یادداشت نهایی الزامی است.');
-            }
 
             $invoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
             $oldStatus = (string) $invoice->status;
@@ -576,9 +576,13 @@ class SalesHavalehService
                 return $invoice;
             }
 
-            foreach ($invoice->items as $item) {
-                $this->adjustSaleItemStock($invoice, $item, (int) $item->quantity, StockMovement::REASON_RETURN, 'برگشت موجودی بابت کنسلی حواله فروش', null, $note);
+            if (! $this->hasCancellationStockReturn($invoice)) {
+                foreach ($invoice->items as $item) {
+                    $this->adjustSaleItemStock($invoice, $item, (int) $item->quantity, StockMovement::REASON_RETURN, 'برگشت موجودی بابت کنسلی حواله فروش', null, $note, StockMovement::TRANSACTION_SALES_HAVALEH_ADJUSTMENT . '_cancel');
+                }
             }
+
+            $this->ledgerService->voidInvoiceDebit($invoice, $note);
 
             $invoice->update([
                 'status' => SalesHavalehStatusService::NOT_SHIPPED,
@@ -624,6 +628,16 @@ class SalesHavalehService
         });
     }
 
+
+    private function hasCancellationStockReturn(Invoice $invoice): bool
+    {
+        return StockMovement::query()
+            ->where('reference_type', Invoice::class)
+            ->where('reference_id', (int) $invoice->id)
+            ->where('transaction_type', StockMovement::TRANSACTION_SALES_HAVALEH_ADJUSTMENT . '_cancel')
+            ->exists();
+    }
+
     public function undoCancelAndReserve(Invoice $invoice, ?string $note = null, ?int $userId = null): Invoice
     {
         return DB::transaction(function () use ($invoice, $note, $userId) {
@@ -637,9 +651,12 @@ class SalesHavalehService
             }
 
             $invoice->update([
+                'status' => SalesHavalehStatusService::COLLECTING,
+                'status_changed_at' => now(),
+                'status_changed_by' => $userId,
             ]);
 
-            $this->historyService->log($invoice, 'cancel_reverted', 'status', SalesHavalehStatusService::NOT_SHIPPED, SalesHavalehStatusService::PENDING_WAREHOUSE_APPROVAL, $note ?: 'لغو کنسلی فاکتور توسط مالی', $userId);
+            $this->historyService->log($invoice, 'cancel_reverted', 'status', SalesHavalehStatusService::NOT_SHIPPED, SalesHavalehStatusService::COLLECTING, $note ?: 'لغو کنسلی فاکتور توسط مالی', $userId);
             $this->restoreLinkedPreinvoiceAfterCancelUndo($invoice, $note, $userId);
 
             return $invoice->fresh();
