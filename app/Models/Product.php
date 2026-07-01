@@ -123,6 +123,11 @@ class Product extends Model
         }
 
         $tokens = preg_split('/\s+/u', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if ($tokens === []) {
+            return $query->whereRaw('0 = 1');
+        }
+
         foreach ($tokens as $token) {
             $query->where(function (Builder $tokenQuery) use ($token) {
                 static::orWhereProductSearchTokenMatches($tokenQuery, $token);

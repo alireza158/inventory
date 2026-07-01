@@ -5,12 +5,111 @@ namespace Tests\Feature;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ProductSearchTest extends TestCase
 {
     use RefreshDatabase;
+
+    private function actingAsProductsViewer(): User
+    {
+        $role = Role::findOrCreate('products-viewer', 'web');
+        $permission = Permission::findOrCreate('products.view', 'web');
+        $role->givePermissionTo($permission);
+
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        $this->actingAs($user);
+
+        return $user;
+    }
+
+    public function test_products_index_query_search_with_unmatched_text_returns_no_products(): void
+    {
+        $this->actingAsProductsViewer();
+
+        $category = Category::create(['name' => 'لوازم جانبی']);
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'کاور کیفی مگنتی سامسونگ',
+            'sku' => 'HTTP-SKU-001',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
+        $response = $this->get('/products?q=zzzzzzzzzzzz');
+
+        $response->assertOk();
+        $response->assertDontSee('کاور کیفی مگنتی سامسونگ');
+        $response->assertSee('۰ کالا');
+    }
+
+    public function test_products_index_keeps_search_strict_with_category_filter_and_pagination_links(): void
+    {
+        $this->actingAsProductsViewer();
+
+        $samsung = Category::create(['name' => 'سامسونگ']);
+        $apple = Category::create(['name' => 'آیفون']);
+
+        $matching = Product::create([
+            'category_id' => $samsung->id,
+            'name' => 'کاور کیفی مگنتی سامسونگ',
+            'sku' => 'HTTP-SKU-101',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
+        Product::create([
+            'category_id' => $samsung->id,
+            'name' => 'کابل سامسونگ',
+            'sku' => 'HTTP-SKU-102',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
+        Product::create([
+            'category_id' => $apple->id,
+            'name' => 'کاور کیفی مگنتی آیفون',
+            'sku' => 'HTTP-SKU-103',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
+        for ($i = 1; $i <= 21; $i++) {
+            Product::create([
+                'category_id' => $samsung->id,
+                'name' => "کیفی مگنتی سامسونگ صفحه {$i}",
+                'sku' => "HTTP-SKU-PAGE-{$i}",
+                'stock' => 5,
+                'price' => 1000,
+            ]);
+        }
+
+        $response = $this->get('/products?q=' . urlencode('کیفی مگنتی سامسون') . '&category_id=' . $samsung->id);
+
+        $response->assertOk();
+        $response->assertSee($matching->name);
+        $response->assertDontSee('کابل سامسونگ');
+        $response->assertDontSee('کاور کیفی مگنتی آیفون');
+        $response->assertSee('q=%DA%A9%DB%8C%D9%81%DB%8C%20%D9%85%DA%AF%D9%86%D8%AA%DB%8C%20%D8%B3%D8%A7%D9%85%D8%B3%D9%88%D9%86', false);
+        $response->assertSee('category_id=' . $samsung->id, false);
+    }
+
+    public function test_products_index_form_submits_one_canonical_q_field(): void
+    {
+        $this->actingAsProductsViewer();
+
+        $response = $this->get('/products?q=' . urlencode('سامسونگ'));
+
+        $response->assertOk();
+        $this->assertSame(1, substr_count($response->getContent(), 'name="q"'));
+        $response->assertSee('id="productSearchQuery"', false);
+    }
 
     public function test_multi_word_product_search_requires_every_token_across_searchable_fields(): void
     {
