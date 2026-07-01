@@ -24,11 +24,14 @@ class SalesReturnsExport implements FromQuery, ShouldAutoSize, WithEvents, WithH
         return WarehouseTransferItem::query()
             ->select('warehouse_transfer_items.*')
             ->join('warehouse_transfers', 'warehouse_transfers.id', '=', 'warehouse_transfer_items.warehouse_transfer_id')
-            ->with(['transfer.customer', 'transfer.user', 'product.category', 'variant.modelList', 'variant.color'])
+            ->with(['transfer.customer', 'transfer.user', 'product.category.parent', 'variant.modelList', 'variant.color'])
             ->where('warehouse_transfers.voucher_type', WarehouseTransfer::TYPE_CUSTOMER_RETURN)
             ->when(($this->filters['product_id'] ?? 0) > 0, fn ($q) => $q->where('warehouse_transfer_items.product_id', (int) $this->filters['product_id']))
             ->when(($this->filters['variant_id'] ?? 0) > 0, fn ($q) => $q->where('warehouse_transfer_items.product_variant_id', (int) $this->filters['variant_id']))
             ->when(($this->filters['customer_id'] ?? 0) > 0, fn ($q) => $q->where('warehouse_transfers.customer_id', (int) $this->filters['customer_id']))
+            ->when(($this->filters['return_reason'] ?? '') !== '' && isset(WarehouseTransfer::returnReasonOptions()[$this->filters['return_reason']]), fn ($q) => $q->where('warehouse_transfers.return_reason', $this->filters['return_reason']))
+            ->when(($this->filters['subcategory_id'] ?? 0) > 0, fn ($q) => $q->whereHas('product', fn ($productQuery) => $productQuery->where('category_id', (int) $this->filters['subcategory_id'])))
+            ->when(($this->filters['category_id'] ?? 0) > 0 && ($this->filters['subcategory_id'] ?? 0) <= 0, fn ($q) => $q->whereHas('product', fn ($productQuery) => $productQuery->whereIn('category_id', \App\Models\Category::selfAndDescendantIds((int) $this->filters['category_id']))))
             ->when(($this->filters['date_from'] ?? '') !== '', fn ($q) => $q->whereDate('warehouse_transfers.transferred_at', '>=', $this->filters['date_from']))
             ->when(($this->filters['date_to'] ?? '') !== '', fn ($q) => $q->whereDate('warehouse_transfers.transferred_at', '<=', $this->filters['date_to']))
             ->orderBy('warehouse_transfers.transferred_at')
@@ -39,8 +42,8 @@ class SalesReturnsExport implements FromQuery, ShouldAutoSize, WithEvents, WithH
     public function headings(): array
     {
         return [
-            'شماره سند برگشت از فروش', 'تاریخ سند', 'نام مشتری', 'کد کالا', 'نام کالا', 'دسته‌بندی کالا',
-            'تنوع کالا / Variant', 'تعداد برگشتی', 'علت برگشت', 'توضیحات', 'کاربر ثبت‌کننده', 'تاریخ ثبت', 'تاریخ ویرایش',
+            'شماره سند برگشت از فروش', 'تاریخ سند', 'نام مشتری', 'کد مشتری', 'کد کالا', 'نام کالا', 'دسته‌بندی کالا',
+            'زیر‌دسته‌بندی کالا', 'تنوع کالا / Variant', 'تعداد برگشتی', 'علت برگشت', 'توضیحات', 'کاربر ثبت‌کننده', 'تاریخ ثبت', 'تاریخ ویرایش',
         ];
     }
 
@@ -55,13 +58,19 @@ class SalesReturnsExport implements FromQuery, ShouldAutoSize, WithEvents, WithH
             $item->variant?->variant_code ?: $item->variant_code,
         ]);
 
+        $category = $item->product?->category;
+        $rootCategory = $category?->parent ?: $category;
+        $subcategory = $category?->parent ? $category : null;
+
         return [
             $transfer?->reference ?: ('TR-' . $transfer?->id),
             $transfer?->transferred_at?->format('Y/m/d H:i'),
             $customerName !== '' ? $customerName : ($transfer?->beneficiary_name ?: '—'),
+            $transfer?->customer?->crm_customer_id ?: $transfer?->customer?->mobile,
             $item->product?->code ?: $item->product?->sku,
             $item->product?->name,
-            $item->product?->category?->name,
+            $rootCategory?->name,
+            $subcategory?->name ?: '—',
             implode(' / ', array_unique($variantParts)) ?: '—',
             (int) $item->quantity,
             WarehouseTransfer::returnReasonOptions()[$transfer?->return_reason] ?? '—',
@@ -81,7 +90,7 @@ class SalesReturnsExport implements FromQuery, ShouldAutoSize, WithEvents, WithH
                 $sheet->getStyle($sheet->calculateWorksheetDimension())->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_RIGHT)
                     ->setVertical(Alignment::VERTICAL_CENTER);
-                $sheet->getStyle('A1:M1')->getFont()->setBold(true);
+                $sheet->getStyle('A1:O1')->getFont()->setBold(true);
                 $sheet->setAutoFilter($sheet->calculateWorksheetDimension());
                 $sheet->freezePane('A2');
             },
