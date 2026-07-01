@@ -24,17 +24,27 @@
 <style>
   .sales-wide-page{max-width:100%; overflow-x:hidden;}
   .sales-page-head,.sales-card{border:0; border-radius:18px; box-shadow:0 10px 28px rgba(15,23,42,.06);}
-  .sales-page-head{background:linear-gradient(135deg,#fff,#f8fafc); padding:18px;}
-  .sales-filter-card .form-label{font-size:.8rem; color:#64748b; font-weight:800;}
-  .summary-card{border:1px solid #eef2f7; border-radius:16px; padding:14px; background:#fff; height:100%;}
+  .sales-page-head{background:linear-gradient(135deg,#fff,#f8fafc); padding:20px;}
+  .sales-page-title{font-weight:950; letter-spacing:-.02em;}
+  .action-toolbar .btn{border-radius:12px; font-weight:800; padding:.55rem .8rem;}
+  .btn-pdf{background:#dc2626; border-color:#dc2626; color:#fff; box-shadow:0 8px 18px rgba(220,38,38,.22);}
+  .btn-pdf:hover{background:#b91c1c; border-color:#b91c1c; color:#fff;}
+  .btn-excel{background:#16a34a; border-color:#16a34a; color:#fff; box-shadow:0 8px 18px rgba(22,163,74,.18);}
+  .btn-excel:hover{background:#15803d; border-color:#15803d; color:#fff;}
+  .sales-filter-card .card-body{padding:16px;}
+  .sales-filter-card .form-label{font-size:.78rem; color:#64748b; font-weight:800; margin-bottom:.35rem;}
+  .sales-filter-card .form-control,.sales-filter-card .form-select{border-radius:12px;}
+  .summary-card{border:1px solid #eef2f7; border-radius:16px; padding:14px; background:#fff; height:100%; box-shadow:0 6px 18px rgba(15,23,42,.035);}
   .summary-card .label{font-size:.78rem; color:#64748b; font-weight:800;}
   .summary-card .value{font-size:1rem; font-weight:950; margin-top:6px;}
   .sales-table{table-layout:fixed; width:100%;}
-  .sales-table th{font-size:.76rem; color:#64748b; white-space:nowrap;}
+  .sales-table th{font-size:.76rem; color:#64748b; white-space:nowrap; font-weight:900;}
   .sales-table td{font-size:.84rem; vertical-align:middle; padding:.55rem .45rem;}
   .code-cell{direction:ltr; unicode-bidi:plaintext; display:inline-block; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .invoice-number-pill{background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:999px; padding:.2rem .45rem; font-weight:950;}
   .customer-cell{max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block;}
-  .money-cell{white-space:nowrap; font-variant-numeric:tabular-nums; text-align:left; direction:ltr;}
+  .money-cell{white-space:nowrap; font-variant-numeric:tabular-nums; text-align:left; direction:ltr; font-weight:800;}
+  .status-badge{min-width:82px; border-radius:999px; padding:.42em .65em;}
   .invoice-mobile-card{border:1px solid #e5e7eb; border-radius:16px; padding:14px; background:#fff; box-shadow:0 6px 18px rgba(15,23,42,.04);}
   .payment-modal .modal-dialog{max-width:920px;}
   .quick-ranges .btn{font-size:.76rem; padding:.25rem .55rem;}
@@ -44,13 +54,14 @@
 <div class="sales-wide-page">
   <div class="sales-page-head mb-3 d-flex justify-content-between align-items-start flex-wrap gap-3">
     <div>
-      <div class="h4 fw-black mb-1">فاکتورهای فروش</div>
+      <div class="h4 sales-page-title mb-1">فاکتورهای فروش</div>
       <div class="text-muted small">گزارش، پیگیری و مدیریت مالی فاکتورهای فروش</div>
     </div>
-    <div class="d-flex gap-2 flex-wrap align-items-center justify-content-end no-report-print">
-      <a class="btn btn-outline-secondary" href="{{ route('vouchers.index', ['voucher_type' => 'sale']) }}">حواله فروش کالا</a>
+    <div class="action-toolbar d-flex gap-2 flex-wrap align-items-center justify-content-end no-report-print">
+      <a class="btn btn-outline-primary" href="{{ route('vouchers.index', ['voucher_type' => 'sale']) }}">حواله فروش کالا</a>
       @if($canRegisterPayments ?? false)
-        <a class="btn btn-outline-success" href="{{ request()->fullUrlWithQuery(['export' => 'excel']) }}">خروجی Excel</a>
+        <a class="btn btn-pdf" href="{{ request()->fullUrlWithQuery(['export' => 'pdf']) }}">خروجی PDF</a>
+        <a class="btn btn-excel" href="{{ request()->fullUrlWithQuery(['export' => 'excel']) }}">خروجی Excel</a>
         <a class="btn btn-outline-success" href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}">خروجی CSV</a>
       @endif
       <button type="button" class="btn btn-outline-dark" onclick="window.print()">چاپ گزارش</button>
@@ -80,7 +91,7 @@
         <div class="col-12"><button class="btn btn-link p-0" type="button" data-bs-toggle="collapse" data-bs-target="#moreInvoiceFilters">فیلترهای بیشتر</button></div>
         <div class="collapse col-12 {{ (($filters['status']??'')||($filters['seller']??'')||($filters['only_remaining']??'')||($filters['only_paid']??'')||($filters['has_cheque']??'')||($filters['min_amount']??'')||($filters['max_amount']??'')) ? 'show' : '' }}" id="moreInvoiceFilters">
           <div class="row g-3">
-            <div class="col-sm-6 col-xl-2"><label class="form-label">وضعیت عملیاتی</label><select class="form-select" name="status"><option value="">همه</option>@foreach(['checking_discrepancy'=>'در حال بررسی','collecting'=>'در حال جمع‌آوری','shipped'=>'ارسال شده'] as $key=>$label)<option value="{{ $key }}" @selected(($filters['status'] ?? '')===$key)>{{ $label }}</option>@endforeach</select></div>
+            <div class="col-sm-6 col-xl-2"><label class="form-label">وضعیت عملیاتی</label><select class="form-select" name="status"><option value="">همه</option>@foreach($allowedStatuses as $key)<option value="{{ $key }}" @selected(($filters['status'] ?? '')===$key)>{{ $statusFa($key) }}</option>@endforeach</select></div>
             <div class="col-sm-6 col-xl-2"><label class="form-label">ثبت‌کننده / فروشنده</label><input class="form-control" name="seller" value="{{ $filters['seller'] ?? '' }}"></div>
             <div class="col-sm-6 col-xl-2"><label class="form-label">حداقل مبلغ</label><input class="form-control" name="min_amount" value="{{ $filters['min_amount'] ?? '' }}"></div>
             <div class="col-sm-6 col-xl-2"><label class="form-label">حداکثر مبلغ</label><input class="form-control" name="max_amount" value="{{ $filters['max_amount'] ?? '' }}"></div>
@@ -113,11 +124,11 @@
           @forelse($invoices as $inv)
             @php $paid=(int)($inv->paid_total??0); $remaining=max((int)$inv->total-$paid,0); $customerCode=$inv->customer?->crm_customer_id ?: $inv->customer_id; $customerName=$inv->customer_name ?: $inv->customer?->display_name ?: '—'; @endphp
             <tr>
-              <td><span class="code-cell fw-bold" title="{{ $inv->uuid }}">{{ Str::limit($inv->uuid, 10, '…') }}</span></td>
+              <td><span class="code-cell invoice-number-pill" title="{{ $inv->uuid }}">{{ Str::limit($inv->uuid, 10, '…') }}</span></td>
               <td class="text-nowrap">{{ \App\Support\JalaliDate::date($inv->display_document_date) }}</td>
               <td><span class="customer-cell" title="{{ $customerName }}">{{ $customerName }}</span></td><td>{{ $customerCode ?: '—' }}</td><td>{{ $inv->customer_mobile ?: $inv->customer?->mobile ?: '—' }}</td>
               <td class="money-cell">{{ $rial($inv->total) }}</td><td class="money-cell text-success">{{ $rial($paid) }}</td><td class="money-cell fw-bold {{ $remaining>0?'text-danger':'text-success' }}">{{ $rial($remaining) }}</td>
-              <td><span class="badge {{ $payClass($paid,$inv->total) }}">{{ $payLabel($paid,$inv->total) }}</span></td><td><span class="badge {{ $statusBadge($inv->status) }}">{{ $statusFa($inv->status) }}</span></td><td><span class="customer-cell">{{ $inv->preinvoiceOrder?->creator?->name ?? '—' }}</span></td>
+              <td><span class="badge status-badge {{ $payClass($paid,$inv->total) }}">{{ $payLabel($paid,$inv->total) }}</span></td><td><span class="badge status-badge {{ $statusBadge($inv->status) }}">{{ $statusFa($inv->status) }}</span></td><td><span class="customer-cell">{{ $inv->preinvoiceOrder?->creator?->name ?? '—' }}</span></td>
               <td>
                 <div class="dropdown">
                   <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">عملیات</button>
@@ -158,8 +169,8 @@
           <span class="code-cell">{{ Str::limit($inv->uuid, 12, '…') }}</span>
         </div>
         <div class="d-flex flex-wrap gap-2 mb-2">
-          <span class="badge {{ $statusBadge($inv->status) }}">{{ $statusFa($inv->status) }}</span>
-          <span class="badge {{ $payClass($paid, $inv->total) }}">{{ $payLabel($paid, $inv->total) }}</span>
+          <span class="badge status-badge {{ $statusBadge($inv->status) }}">{{ $statusFa($inv->status) }}</span>
+          <span class="badge status-badge {{ $payClass($paid, $inv->total) }}">{{ $payLabel($paid, $inv->total) }}</span>
         </div>
         <div class="small text-muted d-flex justify-content-between"><span>مبلغ</span><strong>{{ $rial($inv->total) }}</strong></div>
         <div class="small text-muted d-flex justify-content-between"><span>پرداخت‌شده</span><strong>{{ $rial($paid) }}</strong></div>
