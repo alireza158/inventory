@@ -261,70 +261,42 @@
                 </div>
 
                 <div class="col-md-8">
-                  <label class="form-label">مبلغ پرداخت</label>
+                  <label class="form-label">مبلغ پرداخت / مبلغ چک</label>
                   <input id="amount_view" type="text" inputmode="numeric" class="form-control" placeholder="مبلغ (ریال)" autocomplete="off" required>
                   <input name="amount" id="amount" type="hidden">
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-4 cash-fields">
                   <label class="form-label">تاریخ پرداخت</label>
-                  <input id="paid_at_jalali" type="text" class="form-control" placeholder="تاریخ شمسی" required>
+                  <input id="paid_at_jalali" type="text" class="form-control" placeholder="تاریخ شمسی">
                   <input name="paid_at" id="paid_at" type="hidden">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-4 cash-fields">
                   <label class="form-label">اسم بانک (فقط نقدی)</label>
                   <input name="bank_name" class="form-control" placeholder="مثال: ملی">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-4 cash-fields">
                   <label class="form-label">رسید پرداخت</label>
                   <input name="receipt_image" type="file" class="form-control" accept="image/*">
                 </div>
 
                 <div class="col-12 cheque-fields d-none">
                   <div class="row g-2">
-                    <div class="col-md-4">
-                      <label class="form-label">شماره چک</label>
+                    <div class="col-md-6">
+                      <label class="form-label">شماره سریال چک</label>
                       <input name="cheque_number" class="form-control" placeholder="شماره سریال چک">
                     </div>
-                    <div class="col-md-4">
-                      <label class="form-label">نام بانک (اختیاری)</label>
-                      <input name="cheque_bank_name" class="form-control" placeholder="مثال: ملی">
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label">نام شعبه (اختیاری)</label>
-                      <input name="cheque_branch_name" class="form-control">
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label">تاریخ سررسید</label>
-                      <input name="cheque_due_date" type="date" class="form-control">
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label">تاریخ دریافت چک</label>
-                      <input name="cheque_received_at" type="date" class="form-control">
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label">نام مشتری</label>
-                      <input name="cheque_customer_name" class="form-control" value="{{ $invoice->customer_name }}" readonly>
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label">کد/شناسه مشتری</label>
-                      <input name="cheque_customer_code" class="form-control" value="{{ $invoice->customer_id ?: '' }}" readonly>
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label">شماره حساب/شبا</label>
-                      <input name="cheque_account_number" class="form-control">
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label">صاحب حساب / صادرکننده چک (اختیاری)</label>
-                      <input name="cheque_account_holder" class="form-control">
+                    <div class="col-md-6">
+                      <label class="form-label">تاریخ ثبت چک</label>
+                      <input name="received_at" type="date" class="form-control">
                     </div>
                     <div class="col-md-6">
-                      <label class="form-label">تصویر چک</label>
-                      <input name="cheque_image" type="file" class="form-control" accept="image/*">
+                      <label class="form-label">تاریخ سررسید چک</label>
+                      <input name="due_date" type="date" class="form-control">
                     </div>
                     <div class="col-md-6">
-                      <label class="form-label">وضعیت صیادی چک</label>
-                      <select name="cheque_status" class="form-select">
+                      <label class="form-label">وضعیت چک</label>
+                      <select name="status" class="form-select">
                         <option value="registered">ثبت‌شده</option>
                         <option value="unregistered">ثبت‌نشده</option>
                       </select>
@@ -332,7 +304,7 @@
                   </div>
                 </div>
 
-                <div class="col-12">
+                <div class="col-12 cash-fields">
                   <label class="form-label">یادداشت</label>
                   <textarea name="note" class="form-control" rows="2" placeholder="اختیاری"></textarea>
                 </div>
@@ -359,7 +331,7 @@
           @forelse($invoice->payments as $p)
             @php
               $chequeStatusFa = match($p->cheque?->status){
-                'pending' => 'ثبت‌نشده',
+                'pending' => 'در انتظار / نامشخص',
                 'unregistered' => 'ثبت‌نشده',
                 'registered' => 'ثبت‌شده',
                 'cleared' => 'وصول شده',
@@ -385,10 +357,11 @@
 
               @if($p->method === 'cheque' && $p->cheque)
                 <div class="small text-muted mt-1">
-                  شماره چک: {{ $p->cheque->cheque_number ?: '—' }} |
-                  بانک: {{ $p->cheque->bank_name ?: '—' }} |
-                  تاریخ چک: {{ $jalali($p->cheque->due_date) }} |
-                  وضعیت: {{ $chequeStatusFa }}
+                  مبلغ چک: {{ $rial($p->cheque->amount ?: $p->amount) }} |
+                  شماره سریال چک: {{ $p->cheque->cheque_number ?: '—' }} |
+                  تاریخ ثبت چک: {{ $jalali($p->cheque->received_at) }} |
+                  تاریخ سررسید چک: {{ $jalali($p->cheque->due_date) }} |
+                  وضعیت چک: {{ $chequeStatusFa }}
                 </div>
               @endif
 
@@ -562,10 +535,12 @@
     if (!formWrap) return;
 
     const chequeBlocks = formWrap.querySelectorAll('.cheque-fields');
+    const cashBlocks = formWrap.querySelectorAll('.cash-fields');
 
     function setChequeVisibility() {
       const isCheque = methodSelect && methodSelect.value === 'cheque';
       chequeBlocks.forEach((el) => el.classList.toggle('d-none', !isCheque));
+      cashBlocks.forEach((el) => el.classList.toggle('d-none', isCheque));
     }
 
     toggleBtn?.addEventListener('click', function () {
