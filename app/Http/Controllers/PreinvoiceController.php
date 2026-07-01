@@ -1933,9 +1933,23 @@ class PreinvoiceController extends Controller
         abort_unless($this->canHandleFinanceActions(), 403);
 
         $order = PreinvoiceOrder::with(['items', 'invoice'])->where('uuid', $uuid)->firstOrFail();
-        abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
-        if ($order->invoice && (string) $order->invoice->status !== Invoice::STATUS_PENDING_FINANCE_REAPPROVAL) {
-            return redirect()->route('invoices.show', $order->invoice->uuid)->with('success', 'این پیش‌فاکتور قبلاً به فاکتور تبدیل شده است.');
+        if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
+            if ($order->invoice) {
+                return redirect()->route('invoices.show', $order->invoice->uuid)
+                    ->with('success', 'این سند قبلاً تایید مالی شده و تغییر جدیدی برای تایید ندارد.');
+            }
+
+            abort(403);
+        }
+
+        $reapprovableInvoiceStatuses = [
+            Invoice::STATUS_PENDING_FINANCE_REAPPROVAL,
+            Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
+        ];
+
+        if ($order->invoice && ! in_array((string) $order->invoice->status, $reapprovableInvoiceStatuses, true)) {
+            return redirect()->route('invoices.show', $order->invoice->uuid)
+                ->with('success', 'این سند قبلاً تایید مالی شده و تغییر جدیدی برای تایید ندارد.');
         }
 
         $validated = $request->validate([
@@ -1958,7 +1972,7 @@ class PreinvoiceController extends Controller
             'payments.*.cheque_status' => 'nullable|in:pending,cleared,bounced,registered,unregistered',
         ]);
 
-        $invoice = DB::transaction(function () use ($order, $validated) {
+        $invoice = DB::transaction(function () use ($order, $validated, $reapprovableInvoiceStatuses) {
             $lockedOrder = PreinvoiceOrder::query()
                 ->whereKey($order->id)
                 ->lockForUpdate()
@@ -1966,10 +1980,18 @@ class PreinvoiceController extends Controller
                 ->firstOrFail();
             $order = $lockedOrder;
             $officialInvoiceUuid = $this->officialCodeForPreinvoiceConversion($order);
-            $existingInvoice = Invoice::query()
+            $existingInvoices = Invoice::query()
                 ->where('preinvoice_order_id', $order->id)
                 ->lockForUpdate()
-                ->first();
+                ->get();
+
+            if ($existingInvoices->count() > 1) {
+                throw ValidationException::withMessages([
+                    'preinvoice' => 'برای این پیش‌فاکتور بیش از یک فاکتور ثبت شده است و نیاز به بررسی دستی دارد.',
+                ]);
+            }
+
+            $existingInvoice = $existingInvoices->first();
             $legacyConflictInvoice = Invoice::query()
                 ->where('uuid', $officialInvoiceUuid)
                 ->where('preinvoice_order_id', '!=', $order->id)
@@ -1982,6 +2004,12 @@ class PreinvoiceController extends Controller
 
             if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
                 abort(403);
+            }
+
+            if ($existingInvoice && ! in_array((string) $existingInvoice->status, $reapprovableInvoiceStatuses, true)) {
+                throw ValidationException::withMessages([
+                    'preinvoice' => 'این سند قبلاً تایید مالی شده و تغییر جدیدی برای تایید ندارد.',
+                ]);
             }
 
             $isFinanceReapproval = $existingInvoice && (string) $existingInvoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL;
