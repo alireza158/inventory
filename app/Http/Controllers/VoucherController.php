@@ -302,6 +302,14 @@ class VoucherController extends Controller
         ]);
     }
 
+    public function salesReturnsCategories()
+    {
+        return response()->json(Category::query()
+            ->whereNull('parent_id')
+            ->orderBy('name')
+            ->get(['id', 'name']));
+    }
+
     public function salesReturnsSubcategories(Request $request)
     {
         $parentId = (int) $request->query('category_id');
