@@ -11,8 +11,8 @@ use App\Models\User;
 use App\Models\WarehouseTransferItem;
 use App\Services\InventoryReservationReleaseService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\Rule;
 
 class WarehouseReservationController extends Controller
@@ -28,7 +28,7 @@ class WarehouseReservationController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['q', 'user_id', 'customer_id', 'type', 'document_status', 'older_than_20', 'releasable_only', 'date_from', 'date_to']);
-        $rows = collect()
+        $allRows = collect()
             ->merge($this->draftRows($filters))
             ->merge($this->preinvoiceRows($filters))
             ->merge($this->invoiceRows($filters))
@@ -38,12 +38,14 @@ class WarehouseReservationController extends Controller
             ->values();
 
         $stats = [
-            'total_active' => $rows->count(),
-            'draft_active' => $rows->where('type', 'draft')->count(),
-            'draft_over_20h' => $rows->where('type', 'draft')->where('age_hours', '>', 20)->count(),
-            'preinvoice_active' => $rows->where('type', 'preinvoice')->count(),
-            'suspicious_releasable' => $rows->where('releasable', true)->where('age_hours', '>', 20)->count(),
+            'total_active' => $allRows->count(),
+            'draft_active' => $allRows->where('type', 'draft')->count(),
+            'draft_over_20h' => $allRows->where('type', 'draft')->where('age_hours', '>', 20)->count(),
+            'preinvoice_active' => $allRows->where('type', 'preinvoice')->count(),
+            'suspicious_releasable' => $allRows->where('releasable', true)->where('age_hours', '>', 20)->count(),
         ];
+
+        $rows = $this->paginateRows($allRows, $request);
 
         return view('warehouse-reservations.index', [
             'rows' => $rows,
@@ -68,9 +70,24 @@ class WarehouseReservationController extends Controller
 
         $service->releaseDraftReservation($reservation, $request->user(), $data['release_reason'], $data['release_note'] ?? null);
 
-        return back()->with('success', 'رزرو موقت با موفقیت آزاد شد.');
+        return back()->with('success', 'رزرو با موفقیت آزاد شد و به موجودی قابل فروش برگشت.');
     }
 
+
+
+    private function paginateRows(Collection $rows, Request $request): LengthAwarePaginator
+    {
+        $perPage = 20;
+        $page = max(1, (int) $request->query('page', 1));
+
+        return (new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url()]
+        ))->appends($request->query());
+    }
 
     private function passesFilters(array $row, array $filters): bool
     {
