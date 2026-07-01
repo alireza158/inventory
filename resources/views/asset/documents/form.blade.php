@@ -21,7 +21,7 @@ $items = old('items', $isEdit ? $document->items->map(fn($item)=>[
   <div class="card-body">
     <div class="row g-3 mb-3">
       <div class="col-md-4"><label class="form-label">تاریخ سند</label><input type="date" name="document_date" class="form-control" required value="{{ old('document_date', optional($document->document_date)->toDateString() ?: now()->toDateString()) }}"></div>
-      <div class="col-md-8"><label class="form-label">پرسنل</label><select name="personnel_id" class="form-select" required><option value="">انتخاب...</option>@foreach($personnel as $p)<option value="{{ $p->id }}" @selected(old('personnel_id', $document->personnel_id)==$p->id)>{{ $p->full_name }} ({{ $p->personnel_code }})</option>@endforeach</select></div>
+      <div class="col-md-8"><label class="form-label">پرسنل / تحویل‌گیرنده اموال</label><input type="text" class="form-control form-control-sm mb-1 user-select-filter" data-target="trusteeUserSelect" placeholder="جستجو بر اساس نام، تلفن، ایمیل یا کد پرسنلی"><select id="trusteeUserSelect" name="trustee_user_id" class="form-select" required><option value="">انتخاب پرسنل...</option>@foreach($trusteeUsers as $user)<option value="{{ $user->id }}" data-search="{{ trim($user->name.' '.$user->phone.' '.$user->email.' '.$user->personnel_code) }}" @selected((string) old('trustee_user_id', $document->trustee_user_id) === (string) $user->id)>{{ $user->name }}{{ $user->phone ? ' - '.$user->phone : '' }}</option>@endforeach</select></div>
       <div class="col-12"><label class="form-label">توضیحات کلی (اختیاری)</label><textarea name="description" class="form-control" rows="2">{{ old('description', $document->description) }}</textarea></div>
       <div class="col-12">
         <label class="form-label">نامه / فرم امضاشده (اختیاری)</label>
@@ -57,6 +57,7 @@ $items = old('items', $isEdit ? $document->items->map(fn($item)=>[
 </form>
 
 <script>
+document.querySelectorAll('.user-select-filter').forEach(input=>input.addEventListener('input',()=>{const select=document.getElementById(input.dataset.target);const term=input.value.trim().toLowerCase();[...select.options].forEach((option,index)=>{if(index===0)return;option.hidden=term!=='' && !String(option.dataset.search||option.textContent).toLowerCase().includes(term);});}));
 const itemsWrap = document.getElementById('itemsWrap');
 const initialItems = @json($items);
 

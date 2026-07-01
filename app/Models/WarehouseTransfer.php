@@ -65,6 +65,8 @@ class WarehouseTransfer extends Model
         'external_invoice_number',
         'customer_id',
         'beneficiary_name',
+        'receiver_user_id',
+        'receiver_name_snapshot',
         'return_reason',
         'user_id',
         'transferred_at',
@@ -94,6 +96,20 @@ class WarehouseTransfer extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function receiverUser()
+    {
+        return $this->belongsTo(User::class, 'receiver_user_id');
+    }
+
+    public function receiverDisplayName(): string
+    {
+        return $this->receiver_name_snapshot
+            ?: ($this->receiverUser?->name
+                ?: ($this->beneficiary_name
+                    ?: ($this->toWarehouse?->personnel_name
+                        ?: ($this->toWarehouse?->name ?: '—'))));
     }
 
     public function relatedInvoice()
