@@ -25,6 +25,21 @@
         <div class="col-md-6 text-md-end"><b>وضعیت:</b> {{ $statusLabels[$invoice->status] ?? $invoice->status }}</div>
       </div>
 
+      <div class="row g-2 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">نام مشتری</label>
+          <input type="text" class="form-control" value="{{ $invoice->customer_name ?: $invoice->customer?->display_name }}" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">موبایل مشتری</label>
+          <input type="text" class="form-control" value="{{ $invoice->customer_mobile ?: $invoice->customer?->mobile }}" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">کد مشتری</label>
+          <input type="text" class="form-control" value="{{ $invoice->customer?->crm_customer_id ?: $invoice->customer_id }}" readonly>
+        </div>
+      </div>
+
       <div class="table-responsive">
         <table class="table align-middle">
           <thead><tr><th>محصول</th><th>مدل</th><th>تعداد</th><th>قیمت</th><th>تخفیف ردیفی</th><th>جمع ردیف</th><th>حذف</th></tr></thead>

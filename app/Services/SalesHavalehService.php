@@ -235,9 +235,6 @@ class SalesHavalehService
             $invoice->refresh()->load(['items', 'preinvoiceOrder.items']);
             $totals = SalesDocumentTotals::calculate($invoice->items, (int) ($header['discount_amount'] ?? $invoice->discount_amount), (int) ($header['shipping_price'] ?? $invoice->shipping_price));
             $invoice->update([
-                'customer_name' => $header['customer_name'],
-                'customer_mobile' => $header['customer_mobile'],
-                'customer_address' => $header['customer_address'] ?? '',
                 'discount_amount' => (int) ($header['discount_amount'] ?? 0),
                 'shipping_price' => (int) ($header['shipping_price'] ?? 0),
                 'subtotal' => (int) $totals['subtotal_before_discount'],
