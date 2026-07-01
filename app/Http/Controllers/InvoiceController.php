@@ -364,7 +364,7 @@ class InvoiceController extends Controller
     public function edit(string $uuid)
     {
         $invoice = Invoice::query()
-            ->with(['items.product', 'items.variant'])
+            ->with(['items.product', 'items.variant', 'customer'])
             ->where('uuid', $uuid)
             ->firstOrFail();
 
@@ -394,9 +394,6 @@ class InvoiceController extends Controller
         ]);
 
         $data = $request->validate([
-            'customer_name' => 'required|string|max:255',
-            'customer_mobile' => 'required|string|max:50',
-            'customer_address' => 'nullable|string|max:2000',
             'discount_amount' => 'nullable|integer|min:0',
             'shipping_price' => 'nullable|integer|min:0',
             'items' => 'required|array|min:1',
