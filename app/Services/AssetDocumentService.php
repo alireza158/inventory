@@ -70,7 +70,7 @@ class AssetDocumentService
             abort(422, 'فقط سند پیش‌نویس قابل ویرایش است.');
         }
 
-        $normalizedItems = $this->validationService->normalizeAndValidateItems($items);
+        $normalizedItems = $this->validationService->normalizeAndValidateItems($items, $document->id);
 
         return DB::transaction(function () use ($document, $header, $normalizedItems, $userId) {
             $old = $document->toArray();

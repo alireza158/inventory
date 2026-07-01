@@ -59,12 +59,101 @@ $items = old('items', $isEdit ? $document->items->map(fn($item)=>[
 <script>
 document.querySelectorAll('.user-select-filter').forEach(input=>input.addEventListener('input',()=>{const select=document.getElementById(input.dataset.target);const term=input.value.trim().toLowerCase();[...select.options].forEach((option,index)=>{if(index===0)return;option.hidden=term!=='' && !String(option.dataset.search||option.textContent).toLowerCase().includes(term);});}));
 const itemsWrap = document.getElementById('itemsWrap');
+const assetDocumentForm = document.getElementById('assetDocumentForm');
+const submitBtn = assetDocumentForm.querySelector('button[type="submit"], button:not([type])');
 const initialItems = @json($items);
+const serverErrors = @json($errors->getMessages());
+
+function normalizeDigits(value){
+  return String(value || '').replace(/[۰-۹٠-٩]/g, ch => ({'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9','٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'}[ch] || ch));
+}
 
 function parseCodes(text){
-  const normalized = (text || '').trim().replace(/[\s,]+/g, ',');
+  const normalized = normalizeDigits(text).trim().replace(/[\s,،]+/g, ',');
   if(!normalized) return [];
   return normalized.split(',').map(x=>x.trim()).filter(Boolean);
+}
+
+function firstDuplicate(values){
+  const seen = new Set();
+  for (const value of values) {
+    if (seen.has(value)) return value;
+    seen.add(value);
+  }
+  return null;
+}
+
+function setRowError(row, message, tone = 'danger'){
+  const codes = row.querySelector('.codes');
+  const help = row.querySelector('.codes-help');
+  codes.classList.toggle('is-invalid', Boolean(message) && tone !== 'success');
+  help.textContent = message || help.dataset.defaultText || '';
+  help.className = message ? `text-${tone} small codes-help` : 'text-success small codes-help';
+}
+
+function validateRow(row, crossRowCounts = null){
+  const qty = row.querySelector('.qty');
+  const codes = row.querySelector('.codes');
+  const help = row.querySelector('.codes-help');
+  const needed = parseInt(qty.value || '0', 10);
+  const parsed = parseCodes(codes.value);
+  const validFourDigit = parsed.filter(code => /^\d{4}$/.test(code));
+  help.dataset.defaultText = `${validFourDigit.length} کد وارد شده از ${needed} کد مورد نیاز`;
+
+  const invalidCode = parsed.find(code => !/^\d{4}$/.test(code));
+  if (invalidCode) {
+    setRowError(row, 'همه کدهای اموال باید دقیقاً ۴ رقم باشند.');
+    return false;
+  }
+
+  const duplicate = firstDuplicate(parsed);
+  if (duplicate) {
+    setRowError(row, `کد تکراری: ${duplicate}`);
+    return false;
+  }
+
+  if (crossRowCounts) {
+    const crossDuplicate = parsed.find(code => crossRowCounts.get(code) > 1);
+    if (crossDuplicate) {
+      setRowError(row, `کد اموال ${crossDuplicate} در چند ردیف این سند تکرار شده است.`);
+      return false;
+    }
+  }
+
+  if (validFourDigit.length < needed) {
+    setRowError(row, 'تعداد کدهای واردشده کمتر از تعداد کالا است.', 'warning');
+    return false;
+  }
+
+  if (validFourDigit.length > needed) {
+    setRowError(row, 'تعداد کدهای واردشده بیشتر از تعداد کالا است.');
+    return false;
+  }
+
+  setRowError(row, help.dataset.defaultText, 'success');
+  return true;
+}
+
+function validateAllRows(){
+  const rows = [...itemsWrap.children];
+  const counts = new Map();
+  rows.forEach(row => parseCodes(row.querySelector('.codes')?.value || '').forEach(code => counts.set(code, (counts.get(code) || 0) + 1)));
+  const valid = rows.map(row => validateRow(row, counts)).every(Boolean);
+  if (submitBtn) submitBtn.disabled = !valid;
+  return valid;
+}
+
+function applyServerErrors(){
+  let hasServerCodeError = false;
+  [...itemsWrap.children].forEach((row, index) => {
+    const key = `items.${index}.asset_codes_input`;
+    if (serverErrors[key]?.length) {
+      setRowError(row, serverErrors[key][0]);
+      hasServerCodeError = true;
+    }
+  });
+  if (hasServerCodeError && submitBtn) submitBtn.disabled = true;
+  return hasServerCodeError;
 }
 
 function createRow(item = {item_name:'',quantity:1,asset_codes_input:'',description:''}) {
@@ -82,33 +171,29 @@ function createRow(item = {item_name:'',quantity:1,asset_codes_input:'',descript
 
   const qty = row.querySelector('.qty');
   const codes = row.querySelector('.codes');
-  const help = row.querySelector('.codes-help');
 
-  function refreshHelp(){
-    const needed = parseInt(qty.value || '0', 10);
-    const entered = parseCodes(codes.value).length;
-    help.textContent = `${entered} کد وارد شده از ${needed} کد مورد نیاز`;
-    help.className = entered === needed ? 'text-success small codes-help' : 'text-warning small codes-help';
-  }
-
-  qty.addEventListener('input', refreshHelp);
-  codes.addEventListener('input', refreshHelp);
+  qty.addEventListener('input', validateAllRows);
+  codes.addEventListener('input', () => {
+    codes.value = normalizeDigits(codes.value);
+    validateAllRows();
+  });
   row.querySelector('.qty-plus').addEventListener('click', () => {
     qty.value = Math.max(1, (parseInt(qty.value || '1', 10) || 1) + 1);
-    refreshHelp();
+    validateAllRows();
   });
   row.querySelector('.qty-minus').addEventListener('click', () => {
     qty.value = Math.max(1, (parseInt(qty.value || '1', 10) || 1) - 1);
-    refreshHelp();
+    validateAllRows();
   });
   row.querySelector('.remove-row').addEventListener('click', () => {
     row.remove();
     reindexRows();
+    validateAllRows();
   });
-  refreshHelp();
 
   itemsWrap.appendChild(row);
   reindexRows();
+  validateAllRows();
 }
 
 document.getElementById('addItemBtn').addEventListener('click', ()=> createRow());
@@ -124,8 +209,15 @@ function reindexRows(){
   });
 }
 
-document.getElementById('assetDocumentForm').addEventListener('submit', function () {
+assetDocumentForm.addEventListener('submit', function (event) {
   reindexRows();
+  if (!validateAllRows()) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
 });
+
+validateAllRows();
+applyServerErrors();
 </script>
 @endsection
