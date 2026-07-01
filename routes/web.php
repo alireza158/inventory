@@ -312,6 +312,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
         Route::post('/customers', [CustomerApiController::class, 'store'])->name('api.customers.store');
         Route::get('/customers/{customer}', [CustomerApiController::class, 'show'])->name('api.customers.show');
     });
+    Route::post('/preinvoice/draft-reservations/release', [PreinvoiceApiController::class, 'releaseDraftReservation'])->name('preinvoice.draft-reservations.release');
 
     // Customers
     Route::get('/customers', [CustomerController::class, 'index'])->middleware('permission:customers.manage')->name('customers.index');

@@ -1111,7 +1111,8 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         <input type="hidden" name="customer_name" id="customer_name" value="{{ old('customer_name', $order->customer_name ?? '') }}">
         <input type="hidden" name="customer_mobile" id="customer_mobile" value="{{ old('customer_mobile', $order->customer_mobile ?? '') }}">
         <input type="hidden" name="payment_status" value="pending">
-        <input type="hidden" name="reservation_token" id="reservation_token" value="{{ old('reservation_token') }}">
+        <input type="hidden" name="reservation_token" id="reservation_token" value="{{ old('reservation_token', old('draft_token')) }}">
+        <input type="hidden" name="draft_token" id="draft_token" value="{{ old('draft_token', old('reservation_token')) }}">
         <input type="hidden" name="discount_breakdown" id="discount_breakdown" value="">
 
         <div class="soft-card compact-card mb-3">
@@ -1408,6 +1409,8 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         localStorage.setItem(RESERVATION_TOKEN_KEY, token);
         const input = document.getElementById('reservation_token');
         if (input) input.value = token;
+        const draftInput = document.getElementById('draft_token');
+        if (draftInput) draftInput.value = token;
         return token;
     }
 
@@ -1468,7 +1471,28 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         localStorage.removeItem(RESERVATION_TOKEN_KEY);
         const input = document.getElementById('reservation_token');
         if (input) input.value = '';
+        const draftInput = document.getElementById('draft_token');
+        if (draftInput) draftInput.value = '';
         productCache.clear();
+    }
+
+    function releaseDraftReservationBeacon() {
+        if (IS_EDIT || isSubmittingProgrammatically) return;
+        const token = normalize(document.getElementById('reservation_token')?.value) || normalize(localStorage.getItem(RESERVATION_TOKEN_KEY));
+        if (!token || !API.reservationsRelease) return;
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const body = JSON.stringify({ reservation_token: token, _token: csrf });
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon(API.reservationsRelease, new Blob([body], { type: 'application/json' }));
+        } else {
+            fetch(API.reservationsRelease, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body,
+                keepalive: true
+            }).catch(() => {});
+        }
+        localStorage.removeItem(RESERVATION_TOKEN_KEY);
     }
 
     function toEnglishDigits(str) {
@@ -1875,6 +1899,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         window.addEventListener('beforeunload', function() {
             saveLocalDraftNow();
         });
+        window.addEventListener('pagehide', releaseDraftReservationBeacon);
     }
 
     async function getProductDetails(productId, fresh = false) {
@@ -1901,7 +1926,10 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     }
 
     async function searchProducts(query) {
-        const res = await fetch(API.products + '?q=' + encodeURIComponent(query), {
+        const params = new URLSearchParams({ q: query });
+        const token = ensureReservationToken();
+        if (token) params.set('reservation_token', token);
+        const res = await fetch(API.products + '?' + params.toString(), {
             headers: {
                 'Accept': 'application/json'
             }
@@ -2715,13 +2743,14 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     errors.push(`${group.product.title}: تنوع ${item.variant_id} پیدا نشد.`);
                     continue;
                 }
-                const stock = variantStock(v);
-                const requested = Number(item.quantity || 0);
-                if (requested > stock) errors.push(`${group.product.title} / ${buildVariantTitle(v)}: موجودی ${stock} عدد، درخواست ${requested} عدد.`);
+                const price = variantPrice(v, product);
+                if (Number(price || 0) <= 0) {
+                    errors.push(`${group.product.title} / ${buildVariantTitle(v)}: قیمت فروش ثبت نشده است.`);
+                }
             }
         }
         if (errors.length) {
-            alert('موجودی تغییر کرده:\n\n' + errors.slice(0, 8).join('\n'));
+            alert('امکان ثبت پیش‌فاکتور وجود ندارد:\n\n' + errors.slice(0, 8).join('\n'));
             return false;
         }
         return true;
