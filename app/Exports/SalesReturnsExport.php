@@ -12,6 +12,7 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use App\Support\JalaliDate;
 
 class SalesReturnsExport implements FromQuery, ShouldAutoSize, WithEvents, WithHeadings, WithMapping
 {
@@ -64,7 +65,7 @@ class SalesReturnsExport implements FromQuery, ShouldAutoSize, WithEvents, WithH
 
         return [
             $transfer?->reference ?: ('TR-' . $transfer?->id),
-            $transfer?->transferred_at?->format('Y/m/d H:i'),
+            JalaliDate::dateTime($transfer?->transferred_at),
             $customerName !== '' ? $customerName : ($transfer?->beneficiary_name ?: '—'),
             $transfer?->customer?->crm_customer_id ?: $transfer?->customer?->mobile,
             $item->product?->code ?: $item->product?->sku,
@@ -76,8 +77,8 @@ class SalesReturnsExport implements FromQuery, ShouldAutoSize, WithEvents, WithH
             WarehouseTransfer::returnReasonOptions()[$transfer?->return_reason] ?? '—',
             $transfer?->note,
             $transfer?->user?->name,
-            $transfer?->created_at?->format('Y/m/d H:i'),
-            $transfer?->updated_at && !$transfer->updated_at->equalTo($transfer->created_at) ? $transfer->updated_at->format('Y/m/d H:i') : '',
+            JalaliDate::dateTime($transfer?->created_at),
+            $transfer?->updated_at && !$transfer->updated_at->equalTo($transfer->created_at) ? JalaliDate::dateTime($transfer->updated_at) : '',
         ];
     }
 

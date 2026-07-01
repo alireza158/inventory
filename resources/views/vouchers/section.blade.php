@@ -10,6 +10,7 @@
     ];
 
     $toRial = fn($rial) => \App\Support\Currency::formatRial($rial);
+    $jalaliDateTime = fn($date) => \App\Support\JalaliDate::dateTime($date);
 
     $isCustomerReturn = $voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN;
 
@@ -41,15 +42,24 @@
         return $parts->isNotEmpty() ? $parts->implode(' / ') : '—';
     };
 
-    $returnedItemsSummary = function ($voucher) use ($variantLabel): string {
-        $items = $voucher->items->map(function ($item) use ($variantLabel) {
+    $returnItemRows = function ($voucher) use ($variantLabel) {
+        return $voucher->items->map(function ($item) use ($variantLabel) {
             $product = $item->product?->name ?? ('#' . $item->product_id);
             $variant = $variantLabel($item);
             $code = $item->variant?->variant_code ?: ($item->variant_code ?: null);
-            $quantity = number_format((int) $item->quantity);
 
-            return trim($product . ' / ' . $variant . ($code ? ' (' . $code . ')' : '') . ' × ' . $quantity);
-        })->filter()->values();
+            return [
+                'product' => $product,
+                'variant' => $variant,
+                'code' => $code,
+                'quantity' => (int) $item->quantity,
+                'summary' => trim($product . ' / ' . $variant . ($code ? ' (' . $code . ')' : '') . ' × ' . number_format((int) $item->quantity)),
+            ];
+        })->filter(fn ($row) => filled($row['summary']))->values();
+    };
+
+    $returnedItemsSummary = function ($voucher) use ($returnItemRows): string {
+        $items = $returnItemRows($voucher)->pluck('summary')->filter()->values();
 
         return $items->isNotEmpty() ? $items->implode('، ') : '—';
     };
@@ -234,6 +244,55 @@
         color:var(--muted);
     }
 
+
+    .return-table-wrap{
+        overflow-x:visible;
+    }
+
+    .return-table{
+        table-layout:fixed;
+        width:100%;
+        direction:rtl;
+    }
+
+    .return-table th,
+    .return-table td{
+        padding:.72rem .65rem;
+        text-align:right;
+        white-space:normal;
+        overflow-wrap:anywhere;
+        word-break:normal;
+    }
+
+    .return-table thead th{
+        color:var(--muted);
+        font-size:12px;
+        font-weight:900;
+        background:#fbfcfe;
+        border-bottom:1px solid var(--brd);
+    }
+
+    .return-table tbody td{
+        font-size:13px;
+        line-height:1.65;
+    }
+
+    .return-col-row{width:52px}.return-col-ref{width:118px}.return-col-date{width:132px}.return-col-customer{width:150px}.return-col-items{width:24%}.return-col-qty{width:74px}.return-col-reason{width:118px}.return-col-status{width:104px}.return-col-user{width:118px}.return-col-actions{width:116px}
+
+    .cell-muted{color:var(--muted);font-size:12px}.cell-strong{font-weight:900;color:var(--text)}
+    .return-items-cell{max-width:100%}
+    .return-item-line{display:block;min-width:0;margin-bottom:4px}
+    .return-item-line:last-child{margin-bottom:0}
+    .return-item-name{display:block;font-weight:800;color:var(--text);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+    .return-item-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:2px;color:var(--muted);font-size:11px}
+    .mini-badge{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--brd);border-radius:999px;background:#f8fafc;padding:2px 7px;font-size:11px;font-weight:700;line-height:1.6}
+    .more-items{display:inline-flex;margin-top:4px;color:#1d4ed8;background:#eff6ff;border:1px solid #dbeafe;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:800}
+    .return-actions{display:flex;flex-direction:column;gap:6px;align-items:stretch}.return-actions .btn{width:100%;font-size:12px;font-weight:800;padding:.32rem .5rem}
+
+    @media (max-width: 1199.98px){
+        .return-table-wrap{overflow-x:auto}.return-table{min-width:980px}
+    }
+
     .mobile-cards{
         display:none;
     }
@@ -386,57 +445,86 @@
     @endif
 
     @if($voucherType === \App\Models\WarehouseTransfer::TYPE_CUSTOMER_RETURN)
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table table-striped mb-0">
+        <div class="card table-card">
+            <div class="section-head">
+                <div>
+                    <h2 class="section-title">جدول خلاصه برگشت از فروش</h2>
+                    <p class="section-sub">ستون‌های طولانی مثل کالاها و توضیحات خلاصه شده‌اند؛ جزئیات کامل در صفحه ویرایش/نمایش حواله باقی می‌ماند.</p>
+                </div>
+            </div>
+            <div class="return-table-wrap">
+                <table class="table table-hover align-middle mb-0 return-table">
+                    <colgroup>
+                        <col class="return-col-row"><col class="return-col-ref"><col class="return-col-date"><col class="return-col-customer"><col class="return-col-items"><col class="return-col-qty"><col class="return-col-reason"><col class="return-col-status"><col class="return-col-user"><col class="return-col-actions">
+                    </colgroup>
                     <thead>
                     <tr>
-                        <th>#</th>
-                        <th>شماره</th>
-                        <th>تاریخ</th>
-                        <th>مبدا</th>
-                        <th>مقصد</th>
-                        <th>کاربر</th>
-                        <th>نام و نام خانوادگی برگشت‌دهنده</th>
-                        <th>موبایل برگشت‌دهنده</th>
-                        <th>کالا / نوع دقیق برگشتی</th>
-                        <th>مبلغ برگشتی مشتری</th>
-                        <th>نوع برگشت</th>
-                        <th>فاکتور مرجع</th>
-                        <th>شماره سازه‌حساب</th>
+                        <th>ردیف</th>
+                        <th>شماره حواله</th>
+                        <th>تاریخ شمسی</th>
+                        <th>مشتری</th>
+                        <th>کالا / تنوع</th>
+                        <th>تعداد</th>
                         <th>علت برگشت</th>
-                        <th></th>
+                        <th>وضعیت</th>
+                        <th>ثبت‌کننده</th>
+                        <th>عملیات</th>
                     </tr>
                     </thead>
                     <tbody>
                     @forelse($vouchers as $voucher)
+                        @php
+                            $itemRows = $returnItemRows($voucher);
+                            $visibleItems = $itemRows->take(2);
+                            $hiddenItemsCount = max($itemRows->count() - $visibleItems->count(), 0);
+                            $itemSummary = $returnedItemsSummary($voucher);
+                            $totalQuantity = (int) $voucher->items->sum('quantity');
+                        @endphp
                         <tr>
-                            <td>{{ $voucher->id }}</td>
-                            <td>{{ $voucher->reference ?: ('TR-'.$voucher->id) }}</td>
-                            <td>{{ $voucher->transferred_at?->format('Y/m/d H:i') }}</td>
-                            <td>{{ $voucher->fromWarehouse?->name ?: '—' }}</td>
-                            <td>{{ $voucher->toWarehouse?->name ?: '—' }}</td>
-                            <td>{{ $voucher->user?->name ?: '—' }}</td>
-                            <td>{{ $returnerName($voucher) }}</td>
-                            <td>{{ $voucher->customer?->mobile ?: '—' }}</td>
-                            <td class="small" style="min-width: 260px;">{{ $returnedItemsSummary($voucher) }}</td>
-                            <td>{{ $toRial($voucher->total_amount) }}</td>
-                            <td>{{ \App\Models\WarehouseTransfer::returnSourceLabel($voucher->return_type ?? null) }}</td>
-                            <td>{{ $voucher->relatedInvoice?->uuid ?: '—' }}</td>
-                            <td>{{ $voucher->external_invoice_number ?: '—' }}</td>
-                            <td>{{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}</td>
+                            <td class="cell-muted">{{ $vouchers->firstItem() ? $vouchers->firstItem() + $loop->index : $loop->iteration }}</td>
+                            <td><span class="code-pill">{{ $voucher->reference ?: ('TR-'.$voucher->id) }}</span></td>
+                            <td class="cell-strong" dir="ltr">{{ $jalaliDateTime($voucher->transferred_at) }}</td>
                             <td>
-                                <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.edit', $voucher) }}">ویرایش</a>
-                                <form method="POST" action="{{ route('vouchers.destroy', $voucher) }}" class="d-inline" onsubmit="return confirm('از حذف برگشت از فروش مطمئن هستید؟')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
-                                </form>
+                                <div class="customer-box">
+                                    <div class="name">{{ $returnerName($voucher) }}</div>
+                                    <div class="meta">{{ $voucher->customer?->mobile ?: '—' }}</div>
+                                </div>
+                            </td>
+                            <td class="return-items-cell" title="{{ $itemSummary }}">
+                                @forelse($visibleItems as $itemRow)
+                                    <span class="return-item-line">
+                                        <span class="return-item-name">{{ $itemRow['product'] }}</span>
+                                        <span class="return-item-meta">
+                                            @if($itemRow['variant'] !== '—')<span class="mini-badge">{{ $itemRow['variant'] }}</span>@endif
+                                            @if($itemRow['code'])<span class="mini-badge" dir="ltr">{{ $itemRow['code'] }}</span>@endif
+                                            <span>× {{ number_format($itemRow['quantity']) }}</span>
+                                        </span>
+                                    </span>
+                                @empty
+                                    <span class="cell-muted">—</span>
+                                @endforelse
+                                @if($hiddenItemsCount > 0)
+                                    <span class="more-items" title="{{ $itemSummary }}">+ {{ number_format($hiddenItemsCount) }} قلم دیگر</span>
+                                @endif
+                            </td>
+                            <td class="cell-strong">{{ number_format($totalQuantity) }}</td>
+                            <td><span class="reason-pill">{{ \App\Models\WarehouseTransfer::returnReasonOptions()[$voucher->return_reason] ?? '—' }}</span></td>
+                            <td>{{ \App\Models\WarehouseTransfer::returnSourceLabel($voucher->return_type ?? null) }}</td>
+                            <td>{{ $voucher->user?->name ?: '—' }}</td>
+                            <td>
+                                <div class="return-actions">
+                                    <a class="btn btn-sm btn-outline-primary" href="{{ route('vouchers.edit', $voucher) }}">ویرایش</a>
+                                    <form method="POST" action="{{ route('vouchers.destroy', $voucher) }}" onsubmit="return confirm('از حذف برگشت از فروش مطمئن هستید؟')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="15" class="text-center py-4 text-muted">موردی ثبت نشده است.</td>
+                            <td colspan="10" class="text-center py-4 text-muted">موردی ثبت نشده است.</td>
                         </tr>
                     @endforelse
                     </tbody>
@@ -463,7 +551,7 @@
                         <tr>
                             <td>{{ $voucher->id }}</td>
                             <td>{{ $voucher->reference ?: ('TR-'.$voucher->id) }}</td>
-                            <td>{{ $voucher->transferred_at?->format('Y/m/d H:i') }}</td>
+                            <td>{{ $jalaliDateTime($voucher->transferred_at) }}</td>
                             <td>{{ $voucher->fromWarehouse?->name ?: '—' }}</td>
                             <td>{{ $voucher->toWarehouse?->name ?: '—' }}</td>
                             <td>{{ $voucher->user?->name ?: '—' }}</td>
