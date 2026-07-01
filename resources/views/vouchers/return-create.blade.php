@@ -177,7 +177,7 @@
 
 <div class="container py-3">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">ثبت برگشت از فروش</h4>
+        <h4 class="mb-0">{{ isset($voucher) ? 'ویرایش برگشت از فروش' : 'ثبت برگشت از فروش' }}</h4>
         <a class="btn btn-outline-secondary" href="{{ route('vouchers.section.index', 'return-from-sale') }}">بازگشت</a>
     </div>
 
@@ -203,29 +203,32 @@
         </div>
 
         <div class="p-3">
-            <form method="POST" action="{{ route('vouchers.section.store', 'return-from-sale') }}" id="returnForm">
+            <form method="POST" action="{{ isset($voucher) ? route('vouchers.update', $voucher) : route('vouchers.section.store', 'return-from-sale') }}" id="returnForm">
                 @csrf
+                @isset($voucher)
+                    @method('PUT')
+                @endisset
 
-                <input type="hidden" name="related_invoice_uuid" id="relatedInvoiceUuid" value="{{ old('related_invoice_uuid') }}">
+                <input type="hidden" name="related_invoice_uuid" id="relatedInvoiceUuid" value="{{ old('related_invoice_uuid', $voucher->relatedInvoice->uuid ?? '') }}">
 
                 <div class="row g-3 mb-1">
                     <div class="col-lg-4">
                         <label class="form-label">نوع برگشت از فروش</label>
                         <select name="return_type" id="returnTypeSelect" class="form-select" required>
-                            <option value="internal_invoice" @selected(old('return_type', 'internal_invoice') === 'internal_invoice')>بر اساس فاکتور داخلی</option>
-                            <option value="external_manual" @selected(old('return_type') === 'external_manual')>بدون فاکتور داخلی / فاکتور سازه‌حساب</option>
+                            <option value="internal_invoice" @selected(old('return_type', $voucher->return_type ?? 'internal_invoice') === 'internal_invoice')>بر اساس فاکتور داخلی</option>
+                            <option value="external_manual" @selected(old('return_type', $voucher->return_type ?? null) === 'external_manual')>بدون فاکتور داخلی / فاکتور سازه‌حساب</option>
                         </select>
                     </div>
                     <div class="col-lg-4 d-none" id="externalInvoiceWrap">
                         <label class="form-label">شماره فاکتور سازه‌حساب</label>
-                        <input name="external_invoice_number" id="externalInvoiceNumber" class="form-control" value="{{ old('external_invoice_number') }}" maxlength="100">
+                        <input name="external_invoice_number" id="externalInvoiceNumber" class="form-control" value="{{ old('external_invoice_number', $voucher->external_invoice_number ?? '') }}" maxlength="100">
                         <div class="form-text">برای مرجوعی‌هایی که فاکتورشان در نرم‌افزار قبلی ثبت شده است.</div>
                     </div>
                     <div class="col-lg-4">
                         <label class="form-label">انبار مقصد</label>
                         <select class="form-select" name="to_warehouse_id" id="warehouseSelect" required>
                             @foreach($warehouses as $warehouse)
-                                <option value="{{ $warehouse->id }}" @selected((int) old('to_warehouse_id', $returnsWarehouse->id) === (int) $warehouse->id)>
+                                <option value="{{ $warehouse->id }}" @selected((int) old('to_warehouse_id', $voucher->to_warehouse_id ?? $returnsWarehouse->id) === (int) $warehouse->id)>
                                     {{ $warehouse->name }}
                                 </option>
                             @endforeach
@@ -257,7 +260,7 @@
                                     data-search="{{ $customerSearch }}"
                                     data-name="{{ $customerTitle }}"
                                     data-phone="{{ $customerPhone }}"
-                                    @selected(old('customer_id') == $customer->id)
+                                    @selected(old('customer_id', $voucher->customer_id ?? null) == $customer->id)
                                 >
                                     {{ $customerTitle }}@if($customerPhone) | {{ $customerPhone }}@endif
                                 </option>
@@ -279,7 +282,7 @@
                         <select name="return_reason" id="returnReasonSelect" class="form-select" required>
                             <option value="">انتخاب علت...</option>
                             @foreach($returnReasons as $reasonKey => $reasonTitle)
-                                <option value="{{ $reasonKey }}" @selected(old('return_reason') === $reasonKey)>
+                                <option value="{{ $reasonKey }}" @selected(old('return_reason', $voucher->return_reason ?? null) === $reasonKey)>
                                     {{ $reasonTitle }}
                                 </option>
                             @endforeach
@@ -383,7 +386,7 @@
                                     <table class="table table-striped line-table" id="manualItemsTable">
                                         <thead>
                                             <tr>
-                                                <th>کالا / تعریف سریع</th><th>تنوع</th><th>کد / بارکد</th><th>تعداد</th><th>مبلغ فروش واحد</th><th>مبلغ کل</th><th></th>
+                                                <th>دسته‌بندی</th><th>کالا / تعریف سریع</th><th>تنوع</th><th>کد / بارکد</th><th>تعداد</th><th>مبلغ فروش واحد</th><th>مبلغ کل</th><th></th>
                                             </tr>
                                         </thead>
                                         <tbody></tbody>
@@ -396,20 +399,22 @@
                     </div>
 
 
+                    @unless(isset($voucher))
                     <div class="col-md-6">
                         <label class="form-label">شماره حواله / ارجاع اختیاری</label>
-                        <input name="reference" class="form-control" value="{{ old('reference') }}" maxlength="100">
+                        <input name="reference" class="form-control" value="{{ old('reference', $voucher->reference ?? '') }}" maxlength="100">
                     </div>
+                    @endunless
 
                     <div class="col-md-6">
                         <label class="form-label">توضیحات اختیاری</label>
-                        <input name="note" class="form-control" value="{{ old('note') }}" maxlength="255">
+                        <input name="note" class="form-control" value="{{ old('note', $voucher->note ?? '') }}" maxlength="255">
                     </div>
 
                     <div class="col-12">
                         <div class="sticky-submit">
                             <button type="submit" class="btn btn-success w-100" id="submitBtn">
-                                ثبت برگشت از فروش
+                                {{ isset($voucher) ? 'ذخیره ویرایش برگشت از فروش' : 'ثبت برگشت از فروش' }}
                             </button>
                         </div>
                     </div>
@@ -458,6 +463,7 @@
             'name' => (string) ($product->name ?? ''),
             'code' => (string) ($product->code ?? $product->sku ?? $product->barcode ?? $product->short_barcode ?? ''),
             'barcode' => (string) ($product->barcode ?? $product->short_barcode ?? ''),
+            'category_id' => (int) ($product->category_id ?? 0),
             'sale_price' => (int) ($product->price ?? $product->sale_retail ?? $product->sale_wholesale ?? 0),
             'price' => (int) ($product->price ?? $product->sale_retail ?? $product->sale_wholesale ?? 0),
             'variants' => $variants->map(function ($variant) {
@@ -530,8 +536,22 @@ document.addEventListener('DOMContentLoaded', function () {
         invoiceProductsBase: @json(url('/vouchers/invoice')),
     };
 
-    const oldRelatedInvoiceUuid = @json(old('related_invoice_uuid'));
-    const oldItems = @json(old('items', []));
+    const oldRelatedInvoiceUuid = @json(old('related_invoice_uuid', $voucher->relatedInvoice->uuid ?? ''));
+    const oldItems = @json(old('items', isset($voucher) ? $voucher->items->map(fn ($item) => [
+        'invoice_item_id' => $item->invoice_item_id,
+        'product_id' => $item->product_id,
+        'variant_id' => $item->product_variant_id,
+        'quantity' => $item->quantity,
+        'unit_price' => $item->unit_price,
+        'category_id' => $item->product?->category_id,
+    ])->values()->all() : []));
+    const editingVoucherId = @json($voucher->id ?? null);
+    const existingInvoice = @json(isset($voucher) && $voucher->relatedInvoice ? [
+        'uuid' => $voucher->relatedInvoice->uuid,
+        'invoice_date' => optional($voucher->relatedInvoice->created_at)->format('Y-m-d H:i'),
+        'created_at' => optional($voucher->relatedInvoice->created_at)->format('Y-m-d H:i'),
+        'total' => (int) ($voucher->relatedInvoice->total ?? 0),
+    ] : null);
     const products = @json($manualReturnProducts);
     const categories = @json($categories->map(fn ($category) => ['id' => (int) $category->id, 'name' => (string) $category->name, 'code' => (string) ($category->code ?? '')])->values());
 
@@ -925,7 +945,8 @@ document.addEventListener('DOMContentLoaded', function () {
         showItemsWarning('در حال بارگذاری کالاهای خریداری‌شده فاکتور...');
 
         try {
-            const url = endpoints.invoiceProductsBase + '/' + encodeURIComponent(uuid) + '/products';
+            let url = endpoints.invoiceProductsBase + '/' + encodeURIComponent(uuid) + '/products';
+            if (editingVoucherId) url += '?exclude_voucher_id=' + encodeURIComponent(editingVoucherId);
             const response = await fetch(url, {
                 headers: { 'Accept': 'application/json' }
             });
@@ -1018,8 +1039,9 @@ document.addEventListener('DOMContentLoaded', function () {
         return selectSearchText(data.element, data.text).includes(term) ? data : null;
     }
 
-    function productOptions(selected) {
-        return '<option value="">انتخاب کالا...</option><option value="__new__">➕ تعریف کالای جدید</option>' + products.map(function (p) {
+    function productOptions(selected, categoryId = '') {
+        const filteredProducts = categoryId ? products.filter(function (p) { return String(p.category_id || '') === String(categoryId); }) : products;
+        return '<option value="">انتخاب کالا...</option><option value="__new__">➕ تعریف کالای جدید</option>' + filteredProducts.map(function (p) {
             const variantsSearch = (p.variants || []).map(function (v) {
                 return [v.name || '', v.code || '', v.barcode || ''].join(' ');
             }).join(' ');
@@ -1161,7 +1183,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const unitPrice = Number(rowData.unit_price || 0);
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><select name="items[${index}][product_id]" class="form-select manual-product" required>${productOptions(rowData.product_id)}</select>${newProductFields(index, rowData)}</td>
+            <td><select class="form-select manual-category">${categoryOptions(rowData.category_id)}</select></td>
+            <td><select name="items[${index}][product_id]" class="form-select manual-product" required>${productOptions(rowData.product_id, rowData.category_id)}</select>${newProductFields(index, rowData)}</td>
             <td><select name="items[${index}][variant_id]" class="form-select manual-variant" required>${variantOptions(rowData.product_id, rowData.variant_id)}</select></td>
             <td><span class="mono manual-code">—</span></td>
             <td><input name="items[${index}][quantity]" type="number" min="1" class="form-control manual-qty" value="${escapeHtml(rowData.quantity || 1)}" required></td>
@@ -1174,6 +1197,7 @@ document.addEventListener('DOMContentLoaded', function () {
         `;
         manualTbody.appendChild(tr);
 
+        const categorySelect = tr.querySelector('.manual-category');
         const productSelect = tr.querySelector('.manual-product');
         const variantSelect = tr.querySelector('.manual-variant');
         const priceDisplayInput = tr.querySelector('.manual-price-display');
@@ -1197,6 +1221,14 @@ document.addEventListener('DOMContentLoaded', function () {
             recalcManualTotals();
         }
 
+        function onCategoryChanged() {
+            destroySelect2(productSelect);
+            productSelect.innerHTML = productOptions('', categorySelect.value);
+            initManualSelect(productSelect);
+            fillVariantSelect(tr, '');
+            refreshVariantMeta(true);
+        }
+
         function onProductChanged() {
             if (productSelect.value !== '__new__') fillVariantSelect(tr, productSelect.value);
             refreshVariantMeta(true);
@@ -1207,9 +1239,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (window.jQuery && jQuery.fn) {
+            jQuery(categorySelect).on('change', onCategoryChanged);
             jQuery(productSelect).on('change', onProductChanged);
             jQuery(variantSelect).on('change', onVariantChanged);
         } else {
+            categorySelect.addEventListener('change', onCategoryChanged);
             productSelect.addEventListener('change', onProductChanged);
             variantSelect.addEventListener('change', onVariantChanged);
         }
@@ -1400,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (oldRelatedInvoiceUuid && !isManualReturn()) {
-        applySelectedInvoice({
+        applySelectedInvoice(existingInvoice || {
             uuid: oldRelatedInvoiceUuid,
             invoice_date: '—',
             created_at: '—',
