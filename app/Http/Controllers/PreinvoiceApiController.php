@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\PreinvoiceDraftReservation;
 use App\Models\PreinvoiceOrder;
 use App\Models\Product;
@@ -12,6 +13,7 @@ use App\Services\WarehouseStockService;
 use App\Support\IranLocations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -262,6 +264,19 @@ class PreinvoiceApiController extends Controller
 
         $payload = $this->syncReservationRows((string) $data['reservation_token'], (int) auth()->id(), []);
 
+        ActivityLog::query()->create([
+            'user_id' => auth()->id(),
+            'action' => 'preinvoice_draft_reservations_released',
+            'subject_type' => null,
+            'subject_id' => null,
+            'description' => 'رزروهای موقت پیش‌فاکتور آزاد شد.',
+            'properties' => [
+                'token' => (string) $data['reservation_token'],
+                'released_by_endpoint' => true,
+            ],
+            'occurred_at' => now(),
+        ]);
+
         return response()->json([
             'ok' => true,
             'data' => $payload,
@@ -279,6 +294,7 @@ class PreinvoiceApiController extends Controller
                 ->where('token', $token)
                 ->where('user_id', $userId)
                 ->whereNull('converted_at')
+                ->whereNull('preinvoice_order_id')
                 ->lockForUpdate()
                 ->get();
 
@@ -308,6 +324,15 @@ class PreinvoiceApiController extends Controller
                         ]);
                     }
                 }
+
+                Log::debug('PREINVOICE_DRAFT_RESERVE', [
+                    'user_id' => $userId,
+                    'token' => $token,
+                    'variant_id' => $variantId,
+                    'quantity' => $newQty,
+                    'old_quantity' => $oldQty,
+                    'delta' => $newQty - $oldQty,
+                ]);
 
                 $delta = $newQty - $oldQty;
                 if ($delta > 0) {
@@ -381,6 +406,7 @@ class PreinvoiceApiController extends Controller
             ->where('token', $token)
             ->where('user_id', auth()->id())
             ->whereNull('converted_at')
+            ->whereNull('preinvoice_order_id')
             ->where(function ($query) {
                 $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })

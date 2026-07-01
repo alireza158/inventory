@@ -568,6 +568,7 @@ class PreinvoiceController extends Controller
 
         $validated = $request->validate([
             'reservation_token' => 'nullable|uuid',
+            'draft_token' => 'nullable|uuid',
             'customer_id' => 'nullable|integer|exists:customers,id',
             'customer_name' => 'required|string|max:255',
             'customer_mobile' => 'required|string|max:20',
@@ -597,6 +598,14 @@ class PreinvoiceController extends Controller
             'products.required' => 'حداقل یک محصول باید ثبت شود.',
             'products.min' => 'حداقل یک محصول باید ثبت شود.',
         ]);
+
+        $validated['reservation_token'] = $validated['reservation_token'] ?? ($validated['draft_token'] ?? null);
+
+        if ($checkCurrentStock && empty($validated['reservation_token'])) {
+            throw ValidationException::withMessages([
+                'reservation_token' => 'توکن رزرو پیش‌فاکتور معتبر نیست. لطفاً صفحه را دوباره باز کنید.',
+            ]);
+        }
 
         $provinceId = !empty($validated['province_id']) ? (int) $validated['province_id'] : null;
         $cityId = !empty($validated['city_id']) ? (int) $validated['city_id'] : null;
@@ -685,6 +694,16 @@ class PreinvoiceController extends Controller
         }
 
         $draftReservations = $this->activeDraftReservationQuantities($reservationToken);
+        $freeStockByVariant = $variants->mapWithKeys(fn (ProductVariant $variant, int|string $id) => [
+            (int) $id => max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0)),
+        ])->all();
+        Log::debug('PREINVOICE_STORE_STOCK_CHECK', [
+            'user_id' => auth()->id(),
+            'draft_token' => $reservationToken,
+            'requested_by_variant' => $qtyByVariant,
+            'draft_reserved_by_variant' => $draftReservations,
+            'free_stock_by_variant' => $freeStockByVariant,
+        ]);
 
         foreach ($qtyByVariant as $variantId => $requiredQty) {
             $variant = $variants->get((int) $variantId);
@@ -695,13 +714,14 @@ class PreinvoiceController extends Controller
                 ]);
             }
 
+            $reservedForThisDraft = (int) ($draftReservations[(int) $variantId] ?? 0);
             $freeStock = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0));
-            $availableQty = $freeStock + (int) ($draftReservations[(int) $variantId] ?? 0);
+            $availableQty = $freeStock + $reservedForThisDraft;
 
             if ($requiredQty > $availableQty) {
                 $name = $this->variantSaleLabel($variant);
                 throw ValidationException::withMessages([
-                    'products' => "موجودی آزاد کالای {$name} کافی نیست. موجودی آزاد: {$availableQty} عدد.",
+                    'products' => "موجودی آزاد کالای {$name} کافی نیست. تعداد رزرو شده برای این پیش‌فاکتور: {$reservedForThisDraft}، موجودی آزاد فعلی: {$freeStock}، تعداد درخواستی: {$requiredQty}.",
                 ]);
             }
         }
@@ -737,11 +757,12 @@ class PreinvoiceController extends Controller
                 ]);
             }
 
-            $freeStock = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0))
-                + (int) ($draftReservations[$variantId] ?? 0);
-            if ($quantity > $freeStock) {
+            $reservedForThisDraft = (int) ($draftReservations[$variantId] ?? 0);
+            $freeStock = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0));
+            $availableQty = $freeStock + $reservedForThisDraft;
+            if ($quantity > $availableQty) {
                 throw ValidationException::withMessages([
-                    "products.{$index}.quantity" => "موجودی آزاد کالای {$name} کافی نیست. موجودی آزاد: {$freeStock} عدد.",
+                    "products.{$index}.quantity" => "موجودی آزاد کالای {$name} کافی نیست. تعداد رزرو شده برای این پیش‌فاکتور: {$reservedForThisDraft}، موجودی آزاد فعلی: {$freeStock}، تعداد درخواستی: {$quantity}.",
                 ]);
             }
 
@@ -1412,6 +1433,7 @@ class PreinvoiceController extends Controller
                 ->where('token', $reservationToken)
                 ->where('user_id', auth()->id())
                 ->whereNull('converted_at')
+                ->whereNull('preinvoice_order_id')
                 ->where(function ($query) {
                     $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 })
@@ -1568,6 +1590,7 @@ class PreinvoiceController extends Controller
             ->where('token', $reservationToken)
             ->where('user_id', auth()->id())
             ->whereNull('converted_at')
+            ->whereNull('preinvoice_order_id')
             ->where(function ($query) {
                 $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
