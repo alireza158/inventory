@@ -392,6 +392,7 @@ class PreinvoiceController extends Controller
                 'stock_released_at' => null,
             ]);
 
+            $validated['products'] = $this->validateAndHydrateDraftItemsForSale($validated['products'], $validated['reservation_token'] ?? null);
             $this->syncItems($order, $validated['products']);
             $this->finalizeDraftReservations($order, $validated['reservation_token'] ?? null, $validated['products']);
             $this->syncPreinvoiceReservations($order, true);
@@ -488,6 +489,7 @@ class PreinvoiceController extends Controller
                 'total_price' => 0,
             ]);
 
+            $validated['products'] = $this->validateAndHydrateDraftItemsForSale($validated['products'], $validated['reservation_token'] ?? null);
             $this->syncItems($order, $validated['products'], true);
 
             if ($stockLocked) {
@@ -686,14 +688,79 @@ class PreinvoiceController extends Controller
 
         foreach ($qtyByVariant as $variantId => $requiredQty) {
             $variant = $variants->get((int) $variantId);
-            $availableQty = max(0, $this->centralInventoryService->availableForVariant((int) $variantId) + (int) ($draftReservations[(int) $variantId] ?? 0));
+            if ((int) ($variant->sell_price ?? 0) <= 0) {
+                $name = $this->variantSaleLabel($variant);
+                throw ValidationException::withMessages([
+                    'products' => "قیمت فروش برای کالای {$name} ثبت نشده است و امکان افزودن به پیش‌فاکتور وجود ندارد.",
+                ]);
+            }
+
+            $freeStock = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0));
+            $availableQty = $freeStock + (int) ($draftReservations[(int) $variantId] ?? 0);
 
             if ($requiredQty > $availableQty) {
+                $name = $this->variantSaleLabel($variant);
                 throw ValidationException::withMessages([
-                    'products' => "موجودی تنوع انتخابی کافی نیست. موجودی قابل فروش: {$availableQty} | درخواست: {$requiredQty}",
+                    'products' => "موجودی آزاد کالای {$name} کافی نیست. موجودی آزاد: {$availableQty} عدد.",
                 ]);
             }
         }
+    }
+
+    private function validateAndHydrateDraftItemsForSale(array $products, ?string $reservationToken = null): array
+    {
+        $variantIds = collect($products)->pluck('variety_id')->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        $variants = ProductVariant::query()
+            ->with('product:id,name,is_sellable')
+            ->whereIn('id', $variantIds)
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+        $draftReservations = $this->activeDraftReservationQuantities($reservationToken);
+
+        return collect($products)->map(function (array $row, int $index) use ($variants, $draftReservations) {
+            $productId = (int) ($row['id'] ?? 0);
+            $variantId = (int) ($row['variety_id'] ?? 0);
+            $quantity = (int) ($row['quantity'] ?? 0);
+            $variant = $variants->get($variantId);
+
+            if (! $variant || (int) $variant->product_id !== $productId || ! (bool) $variant->is_active) {
+                throw ValidationException::withMessages([
+                    "products.{$index}.variety_id" => 'تنوع انتخابی برای این کالا نامعتبر یا غیرفعال است.',
+                ]);
+            }
+
+            $name = $this->variantSaleLabel($variant);
+            if ((int) ($variant->sell_price ?? 0) <= 0) {
+                throw ValidationException::withMessages([
+                    "products.{$index}.price" => "قیمت فروش برای کالای {$name} ثبت نشده است و امکان افزودن به پیش‌فاکتور وجود ندارد.",
+                ]);
+            }
+
+            $freeStock = max(0, (int) ($variant->stock ?? 0) - (int) ($variant->reserved ?? 0))
+                + (int) ($draftReservations[$variantId] ?? 0);
+            if ($quantity > $freeStock) {
+                throw ValidationException::withMessages([
+                    "products.{$index}.quantity" => "موجودی آزاد کالای {$name} کافی نیست. موجودی آزاد: {$freeStock} عدد.",
+                ]);
+            }
+
+            $row['price'] = (int) $variant->sell_price;
+
+            return $row;
+        })->all();
+    }
+
+    private function variantSaleLabel(ProductVariant $variant): string
+    {
+        $variant->loadMissing('product:id,name');
+        $parts = array_filter([
+            (string) ($variant->product?->name ?? ''),
+            (string) ($variant->variant_name ?? ''),
+            (string) ($variant->variety_name ?? ''),
+        ]);
+
+        return $parts ? implode(' - ', $parts) : 'انتخابی';
     }
 
     private function logWarehouseReviewRequestItems(PreinvoiceOrder $order, Request $request): void
@@ -1288,7 +1355,7 @@ class PreinvoiceController extends Controller
                 'product_id' => (int) $p['id'],
                 'variant_id' => (int) $p['variety_id'],
                 'quantity' => (int) $p['quantity'],
-                'price' => (int) ($p['price'] ?? $variant->sell_price ?? 0),
+                'price' => (int) ($variant->sell_price ?? 0),
                 'line_discount_amount' => (int) ($p['line_discount_amount'] ?? 0),
             ];
             $itemId = (int) ($p['item_id'] ?? 0);
@@ -1521,10 +1588,16 @@ class PreinvoiceController extends Controller
             ->lockForUpdate()
             ->firstOrFail();
 
-        $available = max(0, (int) $variant->stock);
+        if ((int) ($variant->sell_price ?? 0) <= 0) {
+            throw ValidationException::withMessages([
+                'products' => 'قیمت فروش برای کالای ' . $this->variantSaleLabel($variant) . ' ثبت نشده است و امکان افزودن به پیش‌فاکتور وجود ندارد.',
+            ]);
+        }
+
+        $available = max(0, (int) $variant->stock - (int) $variant->reserved);
         if ($available < $quantity) {
             throw ValidationException::withMessages([
-                'products' => "موجودی آزاد این کالا کافی نیست. موجودی: {$available} | درخواست: {$quantity}",
+                'products' => 'موجودی آزاد کالای ' . $this->variantSaleLabel($variant) . " کافی نیست. موجودی آزاد: {$available} عدد.",
             ]);
         }
 

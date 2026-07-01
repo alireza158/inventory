@@ -27,7 +27,9 @@ class PreinvoiceApiController extends Controller
         $products = Product::query()
             ->select(['id', 'name', 'sku', 'short_barcode', 'code', 'price'])
             ->where('is_sellable', true)
-            ->whereHas('variants', fn ($q) => $q->active()->where('stock', '>', 0))
+            ->whereHas('variants', fn ($q) => $q->active()
+                ->where('sell_price', '>', 0)
+                ->whereRaw('COALESCE(stock, 0) - COALESCE(reserved, 0) > 0'))
             ->when($q !== '', function ($query) use ($q, $qDigits) {
 
                 // ✅ اگر عدد وارد شد و طولش <= 4 یعنی PPPP
@@ -127,7 +129,11 @@ class PreinvoiceApiController extends Controller
             ->where(function ($outerQuery) use ($reservedVariantIds, $currentPreinvoiceItemVariantIds) {
                 $outerQuery->where(function ($query) use ($reservedVariantIds) {
                     $query->active()->where(function ($stockQuery) use ($reservedVariantIds) {
-                        $stockQuery->where('stock', '>', 0);
+                        $stockQuery->where(function ($availableQuery) {
+                            $availableQuery
+                                ->where('sell_price', '>', 0)
+                                ->whereRaw('COALESCE(stock, 0) - COALESCE(reserved, 0) > 0');
+                        });
                         if (! empty($reservedVariantIds)) {
                             $stockQuery->orWhereIn('id', $reservedVariantIds);
                         }
@@ -146,7 +152,11 @@ class PreinvoiceApiController extends Controller
             ->where(function ($outerQuery) use ($reservedVariantIds, $currentPreinvoiceItemVariantIds) {
                 $outerQuery->where(function ($query) use ($reservedVariantIds) {
                     $query->active()->where(function ($stockQuery) use ($reservedVariantIds) {
-                        $stockQuery->where('stock', '>', 0);
+                        $stockQuery->where(function ($availableQuery) {
+                            $availableQuery
+                                ->where('sell_price', '>', 0)
+                                ->whereRaw('COALESCE(stock, 0) - COALESCE(reserved, 0) > 0');
+                        });
                         if (! empty($reservedVariantIds)) {
                             $stockQuery->orWhereIn('id', $reservedVariantIds);
                         }
@@ -184,9 +194,15 @@ class PreinvoiceApiController extends Controller
             'varieties' => $product->variants->map(fn ($v) => [
                 'id' => $v->id,
                 'price' => (int) ($v->sell_price ?? 0),
-                'quantity' => (int) ($v->stock ?? 0),
+                'quantity' => max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0)),
                 'reserved' => (int) ($v->reserved ?? 0),
-                'sellable_stock' => max(0, (int) ($v->stock ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)),
+                'free_stock' => max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0)),
+                'sellable_stock' => max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)),
+                'can_add_to_preinvoice' => (int) ($v->sell_price ?? 0) > 0
+                    && max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)) > 0,
+                'sale_warning' => (int) ($v->sell_price ?? 0) <= 0
+                    ? 'قیمت فروش ثبت نشده'
+                    : (max(0, (int) ($v->stock ?? 0) - (int) ($v->reserved ?? 0) + (int) ($reservedByVariant[(int) $v->id] ?? 0)) <= 0 ? 'موجودی آزاد ندارد' : null),
                 'is_current_preinvoice_item' => in_array((int) $v->id, $currentPreinvoiceItemVariantIds, true),
                 'is_active' => (bool) ($v->is_active ?? false),
                 'variant_name' => (string) ($v->variant_name ?? ''),
@@ -380,11 +396,17 @@ class PreinvoiceApiController extends Controller
         }
 
         $variant = ProductVariant::query()->whereKey($variantId)->lockForUpdate()->firstOrFail();
-        $available = max(0, (int) $variant->stock);
+        if ((int) ($variant->sell_price ?? 0) <= 0) {
+            throw ValidationException::withMessages([
+                'items' => 'قیمت فروش برای تنوع انتخابی ثبت نشده است و امکان افزودن به پیش‌فاکتور وجود ندارد.',
+            ]);
+        }
+
+        $available = max(0, (int) $variant->stock - (int) $variant->reserved);
 
         if ($delta > $available) {
             throw ValidationException::withMessages([
-                'items' => "موجودی قابل فریز برای تنوع انتخابی کافی نیست. موجودی انبار مرکزی: {$available} | درخواست جدید: {$delta}",
+                'items' => "موجودی آزاد تنوع انتخابی کافی نیست. موجودی آزاد: {$available} عدد.",
             ]);
         }
 
