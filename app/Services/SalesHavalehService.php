@@ -9,6 +9,7 @@ use App\Models\PreinvoiceOrder;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
+use App\Models\WarehouseStock;
 use App\Support\DocumentCodeGenerator;
 use App\Support\ActivityLogger;
 use App\Support\SalesDocumentTotals;
@@ -58,6 +59,8 @@ class SalesHavalehService
                     'change_reason' => 'برای حذف، اضافه یا ویرایش اقلام حواله فروش، انتخاب دلیل الزامی است.',
                 ]);
             }
+
+            $this->validateRequestedStockAvailability($invoice, $items);
 
             $requestedIds = collect($items)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
 
@@ -387,6 +390,83 @@ class SalesHavalehService
         }
 
         return false;
+    }
+
+
+    private function validateRequestedStockAvailability(Invoice $invoice, array $items): void
+    {
+        $currentItems = $invoice->items;
+        $itemsById = $currentItems->keyBy('id');
+
+        $oldTotals = $currentItems
+            ->filter(fn (InvoiceItem $item) => (int) $item->variant_id > 0)
+            ->groupBy(fn (InvoiceItem $item) => (int) $item->variant_id)
+            ->map(fn ($rows) => (int) $rows->sum('quantity'));
+
+        $newTotals = collect($items)->reduce(function (array $carry, array $row) use ($itemsById) {
+            $quantity = max(0, (int) ($row['quantity'] ?? 0));
+            if ($quantity <= 0) {
+                return $carry;
+            }
+
+            $itemId = (int) ($row['id'] ?? 0);
+            $existingItem = $itemId > 0 ? $itemsById->get($itemId) : null;
+            $variantId = (int) ($row['variant_id'] ?? ($existingItem?->variant_id ?? 0));
+
+            if ($variantId > 0) {
+                $carry[$variantId] = ($carry[$variantId] ?? 0) + $quantity;
+            }
+
+            return $carry;
+        }, []);
+
+        $variantIds = collect(array_keys($newTotals))
+            ->merge($oldTotals->keys())
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($variantIds->isEmpty()) {
+            return;
+        }
+
+        $variants = ProductVariant::query()
+            ->with('product')
+            ->whereIn('id', $variantIds)
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        $centralId = WarehouseStockService::centralWarehouseId();
+        $warehouseStocks = WarehouseStock::query()
+            ->where('warehouse_id', $centralId)
+            ->whereIn('product_variant_id', $variantIds)
+            ->lockForUpdate()
+            ->pluck('quantity', 'product_variant_id');
+
+        foreach ($variantIds as $variantId) {
+            $oldTotal = (int) ($oldTotals[$variantId] ?? 0);
+            $newTotal = (int) ($newTotals[$variantId] ?? 0);
+            $delta = $newTotal - $oldTotal;
+
+            if ($delta <= 0) {
+                continue;
+            }
+
+            $freeStock = max(0, (int) ($warehouseStocks[$variantId] ?? 0));
+            if ($delta <= $freeStock) {
+                continue;
+            }
+
+            $variant = $variants->get($variantId);
+            $label = trim(($variant?->product?->name ?: ('#' . $variantId)) . ($variant?->variant_name ? (' / ' . $variant->variant_name) : ''));
+            $maxAllowed = $oldTotal + $freeStock;
+
+            throw ValidationException::withMessages([
+                'items' => "موجودی آزاد کالای {$label} کافی نیست. موجودی آزاد: {$freeStock} عدد، حداکثر قابل ثبت برای این حواله: {$maxAllowed} عدد.",
+            ]);
+        }
     }
 
     private function addInvoiceItem(Invoice $invoice, array $row, ?string $reason, ?string $note, ?int $userId): void

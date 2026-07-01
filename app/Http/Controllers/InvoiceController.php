@@ -274,8 +274,9 @@ class InvoiceController extends Controller
 
         $statusLabels = $this->statusService->labels();
         $canEditItems = $this->statusService->isEditable($invoice, auth()->user());
+        $stockLimits = $this->salesVoucherStockLimits($invoice);
 
-        return view('vouchers.sales.edit', compact('invoice', 'statusLabels', 'canEditItems'));
+        return view('vouchers.sales.edit', compact('invoice', 'statusLabels', 'canEditItems', 'stockLimits'));
     }
 
     public function salesVoucherUpdate(string $uuid, Request $request)
@@ -353,7 +354,44 @@ class InvoiceController extends Controller
             'variant_code' => (string) ($variant->variant_code ?? ''),
             'sell_price' => (int) ($variant->sell_price ?? 0),
             'available_stock' => max(0, (int) ($stocks[$variant->id] ?? 0)),
+            'max_allowed' => max(0, (int) ($stocks[$variant->id] ?? 0)),
         ])->values());
+    }
+
+
+    private function salesVoucherStockLimits(Invoice $invoice): array
+    {
+        $variantIds = $invoice->items
+            ->pluck('variant_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($variantIds->isEmpty()) {
+            return [];
+        }
+
+        $centralId = WarehouseStockService::centralWarehouseId();
+        $stocks = WarehouseStock::query()
+            ->where('warehouse_id', $centralId)
+            ->whereIn('product_variant_id', $variantIds)
+            ->pluck('quantity', 'product_variant_id');
+
+        $oldTotals = $invoice->items
+            ->groupBy(fn ($item) => (int) $item->variant_id)
+            ->map(fn ($items) => (int) $items->sum('quantity'));
+
+        return $variantIds->mapWithKeys(function (int $variantId) use ($stocks, $oldTotals) {
+            $freeStock = max(0, (int) ($stocks[$variantId] ?? 0));
+            $currentTotal = (int) ($oldTotals[$variantId] ?? 0);
+
+            return [$variantId => [
+                'free_stock' => $freeStock,
+                'current_total' => $currentTotal,
+                'max_allowed' => $currentTotal + $freeStock,
+            ]];
+        })->all();
     }
 
     private function normalizeIntegerInput($value): int
