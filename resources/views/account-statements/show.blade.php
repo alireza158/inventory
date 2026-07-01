@@ -134,6 +134,11 @@
     </div>
 
     <div class="d-flex align-items-center gap-2 flex-wrap">
+        @canPermission('account_statements.adjust')
+            <button type="button" class="btn btn-outline-warning" id="openAdjustmentModalBtn">
+                تنظیم دستی مانده
+            </button>
+        @endcanPermission
         <button type="button" class="btn btn-success" id="openPaymentModalBtn">
             ➕ افزودن پرداخت
         </button>
@@ -142,6 +147,10 @@
         </a>
     </div>
 </div>
+
+@if (session('success'))
+    <div class="alert alert-success">{{ session('success') }}</div>
+@endif
 
 @if ($errors->any())
     <div class="alert alert-danger">
@@ -184,9 +193,16 @@
             <div class="fw-bold">ثبت پرداخت جدید</div>
             <div class="text-muted small">برای این مشتری پرداخت نقدی یا چکی ثبت کن</div>
         </div>
-        <button type="button" class="btn btn-success" id="openPaymentModalBtnSecondary">
-            افزودن پرداخت
-        </button>
+        <div class="d-flex gap-2 flex-wrap">
+            @canPermission('account_statements.adjust')
+                <button type="button" class="btn btn-outline-warning" id="openAdjustmentModalBtnSecondary">
+                    تنظیم دستی مانده
+                </button>
+            @endcanPermission
+            <button type="button" class="btn btn-success" id="openPaymentModalBtnSecondary">
+                افزودن پرداخت
+            </button>
+        </div>
     </div>
 </div>
 
@@ -271,6 +287,68 @@
 
     <div class="card-footer bg-white">{{ $ledgers->links() }}</div>
 </div>
+
+
+@canPermission('account_statements.adjust')
+<div class="payment-modal-backdrop" id="adjustmentModalBackdrop"></div>
+
+<div class="payment-modal" id="adjustmentModal" aria-hidden="true">
+    <div class="payment-modal-dialog" style="max-width: 620px;">
+        <div class="payment-modal-header">
+            <div>
+                <h5 class="payment-modal-title">تنظیم دستی مانده</h5>
+                <div class="payment-modal-subtitle">تنظیم مانده نهایی گردش حساب {{ $customer->display_name ?: 'این مشتری' }}</div>
+            </div>
+
+            <button type="button" class="payment-modal-close" id="closeAdjustmentModalBtn" aria-label="بستن">
+                ×
+            </button>
+        </div>
+
+        <div class="payment-modal-body">
+            <form method="POST" action="{{ route('account-statements.adjustment.store', $customer->id) }}" id="accountStatementAdjustmentForm">
+                @csrf
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">نوع مانده نهایی</label>
+                        <select name="balance_type" id="manualAdjustmentBalanceType" class="form-select @error('balance_type', 'manualAdjustment') is-invalid @enderror" required>
+                            <option value="debit" @selected(old('balance_type') === 'debit')>بدهکار</option>
+                            <option value="credit" @selected(old('balance_type') === 'credit')>بستانکار</option>
+                        </select>
+                        @error('balance_type', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">مبلغ مانده نهایی</label>
+                        <input type="text" inputmode="numeric" dir="ltr" class="form-control text-start @error('amount', 'manualAdjustment') is-invalid @enderror" id="manualAdjustmentAmount" name="amount" value="{{ old('amount') }}" required autocomplete="off">
+                        @error('amount', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-12">
+                        <div class="alert alert-info small mb-0">عدد واردشده به مانده فعلی اضافه نمی‌شود؛ مانده حساب شخص دقیقاً روی همین مبلغ تنظیم می‌شود.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small" id="manualAdjustmentPreview">بعد از ثبت، مانده نهایی این شخص: —</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">توضیحات اختیاری</label>
+                        <textarea name="note" class="form-control @error('note', 'manualAdjustment') is-invalid @enderror" rows="3" maxlength="1000" placeholder="اختیاری">{{ old('note') }}</textarea>
+                        @error('note', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-12 d-flex justify-content-end gap-2 flex-wrap">
+                        <button type="button" class="btn btn-outline-secondary" id="cancelAdjustmentModalBtn">انصراف</button>
+                        <button type="submit" class="btn btn-warning">ثبت اصلاح دستی</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endcanPermission
 
 <div class="payment-modal-backdrop" id="paymentModalBackdrop"></div>
 
@@ -395,6 +473,99 @@
 </div>
 
 <script>
+
+    (function () {
+        const body = document.body;
+        const modal = document.getElementById('adjustmentModal');
+        const backdrop = document.getElementById('adjustmentModalBackdrop');
+        const openButtons = [
+            document.getElementById('openAdjustmentModalBtn'),
+            document.getElementById('openAdjustmentModalBtnSecondary')
+        ].filter(Boolean);
+        const closeButton = document.getElementById('closeAdjustmentModalBtn');
+        const cancelButton = document.getElementById('cancelAdjustmentModalBtn');
+        const amountInput = document.getElementById('manualAdjustmentAmount');
+        const balanceTypeSelect = document.getElementById('manualAdjustmentBalanceType');
+        const preview = document.getElementById('manualAdjustmentPreview');
+        const form = document.getElementById('accountStatementAdjustmentForm');
+
+        if (!modal || !backdrop) return;
+
+        function normalizeDigits(value) {
+            const map = {
+                '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+                '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+                '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+            };
+
+            return String(value || '').replace(/[۰-۹٠-٩]/g, (char) => map[char] || char);
+        }
+
+        function rawAmount() {
+            return normalizeDigits(amountInput ? amountInput.value : '').replace(/[^0-9]/g, '');
+        }
+
+        function formatAmount(value) {
+            const raw = normalizeDigits(value).replace(/[^0-9]/g, '');
+            return raw === '' ? '' : raw.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        function updatePreview() {
+            if (!preview || !balanceTypeSelect) return;
+
+            const raw = rawAmount();
+            const label = balanceTypeSelect.value === 'credit' ? 'بستانکار' : 'بدهکار';
+
+            preview.textContent = raw === ''
+                ? 'بعد از ثبت، مانده نهایی این شخص: —'
+                : `بعد از ثبت، مانده نهایی این شخص: ${label} ${formatAmount(raw)} ریال خواهد شد.`;
+        }
+
+        function openModal() {
+            modal.classList.add('is-open');
+            backdrop.classList.add('is-open');
+            modal.setAttribute('aria-hidden', 'false');
+            body.classList.add('overflow-hidden');
+        }
+
+        function closeModal() {
+            modal.classList.remove('is-open');
+            backdrop.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            body.classList.remove('overflow-hidden');
+        }
+
+        if (amountInput) {
+            amountInput.value = formatAmount(amountInput.value);
+            amountInput.addEventListener('input', function () {
+                amountInput.value = formatAmount(amountInput.value);
+                updatePreview();
+            });
+        }
+
+        balanceTypeSelect && balanceTypeSelect.addEventListener('change', updatePreview);
+        form && form.addEventListener('submit', function () {
+            if (amountInput) amountInput.value = rawAmount();
+        });
+        updatePreview();
+
+        openButtons.forEach((btn) => btn.addEventListener('click', openModal));
+        closeButton && closeButton.addEventListener('click', closeModal);
+        cancelButton && cancelButton.addEventListener('click', closeModal);
+        backdrop.addEventListener('click', closeModal);
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && modal.classList.contains('is-open')) {
+                closeModal();
+            }
+        });
+
+        @if ($errors->manualAdjustment->any())
+            openModal();
+        @endif
+    })();
+
     (function () {
         const body = document.body;
         const modal = document.getElementById('paymentModal');
@@ -452,7 +623,7 @@
             toggleMethodFields();
         }
 
-        @if ($errors->any())
+        @if ($errors->any() && ! $errors->manualAdjustment->any())
             openModal();
         @endif
     })();

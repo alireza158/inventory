@@ -342,6 +342,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     // Account statements (گردش حساب اشخاص)
     Route::get('/account-statements', [AccountStatementController::class, 'index'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.index');
     Route::post('/account-statements/{customer}/payments', [InvoicePaymentController::class, 'storeForCustomer'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.payments.store');
+    Route::post('/account-statements/{customer}/adjustment', [AccountStatementController::class, 'storeManualAdjustment'])->middleware('permission:account_statements.adjust')->name('account-statements.adjustment.store');
     Route::get('/account-statements/documents/invoices/{uuid}', [AccountStatementController::class, 'showInvoice'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.invoices.show');
     Route::get('/account-statements/documents/returns/{voucher}', [AccountStatementController::class, 'showReturnFromSale'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.returns.show');
     Route::get('/account-statements/documents/payments/{payment}', [AccountStatementController::class, 'showPayment'])->middleware('role:admin|Admin|finance|Accountant')->name('account-statements.documents.payments.show');
