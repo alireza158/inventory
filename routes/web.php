@@ -40,6 +40,7 @@ use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WarehouseMapController;
 use App\Http\Controllers\WarehouseReviewController;
+use App\Http\Controllers\WarehouseReservationController;
 use App\Http\Controllers\Admin\UserPermissionController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\BugInvestigatorController;
@@ -275,6 +276,11 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
     // Preinvoice pages
     Route::get('/preinvoice/create', [PreinvoiceController::class, 'create'])->name('preinvoice.create');
     Route::post('/preinvoice/draft', [PreinvoiceController::class, 'saveDraft'])->name('preinvoice.draft.save');
+
+    Route::prefix('warehouse/reservations')->name('warehouse.reservations.')->group(function () {
+        Route::get('/', [WarehouseReservationController::class, 'index'])->middleware('permission:warehouse.reservations.view')->name('index');
+        Route::post('/draft/{reservation}/release', [WarehouseReservationController::class, 'releaseDraftReservation'])->middleware('permission:warehouse.reservations.release')->name('draft.release');
+    });
 
     Route::prefix('warehouse/reviews')->name('warehouse.reviews.')->middleware('permission:preinvoices.warehouse.reviews.view')->group(function () {
         Route::get('/', [WarehouseReviewController::class, 'index'])->name('index');
