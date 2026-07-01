@@ -410,7 +410,7 @@
                                 <div class="col-md-6">
                                     <label class="form-label" for="exportCategoryId">دسته‌بندی</label>
                                     <select name="category_id" id="exportCategoryId" class="form-select">
-                                        <option value="">همه دسته‌بندی‌ها</option>
+                                        <option value="">انتخاب دسته‌بندی</option>
                                         @foreach($categories as $category)
                                             <option value="{{ $category->id }}">{{ $category->name }}</option>
                                         @endforeach
@@ -603,6 +603,32 @@
         select.disabled = disabled;
     }
 
+    async function loadJson(url) {
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) {
+            console.error('Sales return export ajax failed', { url, status: response.status });
+            throw new Error(`Ajax request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.debug('Sales return export ajax response', { url, data });
+        return data;
+    }
+
+    async function loadCategories() {
+        resetSelect(category, 'در حال دریافت دسته‌بندی‌ها...', true);
+        resetSelect(subcategory, 'ابتدا دسته‌بندی را انتخاب کنید', true);
+        resetProduct();
+        try {
+            const rows = await loadJson(`{{ route('vouchers.section.return-from-sale.ajax.categories') }}`);
+            resetSelect(category, 'انتخاب دسته‌بندی', false);
+            rows.forEach(row => category.add(new Option(row.name, row.id)));
+        } catch (error) {
+            console.error('Unable to load main categories for sales return export', error);
+            resetSelect(category, 'خطا در دریافت دسته‌بندی‌ها', true);
+        }
+    }
+
     function resetProduct() {
         if (hasSelect2 && $product.data('select2')) {
             $product.val(null).trigger('change');
@@ -647,10 +673,14 @@
         resetSelect(subcategory, this.value ? 'در حال دریافت...' : 'ابتدا دسته‌بندی را انتخاب کنید', true);
         resetProduct();
         if (!this.value) return;
-        const response = await fetch(`{{ route('vouchers.section.return-from-sale.ajax.subcategories') }}?category_id=${encodeURIComponent(this.value)}`, { headers: { 'Accept': 'application/json' } });
-        const rows = await response.json();
-        resetSelect(subcategory, 'همه زیر‌دسته‌بندی‌ها', false);
-        rows.forEach(row => subcategory.add(new Option(row.name, row.id)));
+        try {
+            const rows = await loadJson(`{{ route('vouchers.section.return-from-sale.ajax.subcategories') }}?category_id=${encodeURIComponent(this.value)}`);
+            resetSelect(subcategory, rows.length ? 'انتخاب زیر‌دسته‌بندی' : 'زیر‌دسته‌بندی ندارد', !rows.length);
+            rows.forEach(row => subcategory.add(new Option(row.name, row.id)));
+        } catch (error) {
+            console.error('Unable to load subcategories for sales return export', error);
+            resetSelect(subcategory, 'خطا در دریافت زیر‌دسته‌بندی‌ها', true);
+        }
     });
 
     subcategory.addEventListener('change', function () {
@@ -662,11 +692,17 @@
         resetSelect(variant, this.value ? 'در حال دریافت...' : 'ابتدا کالا را انتخاب کنید', true);
         if (!this.value) return;
         const url = `{{ url('/vouchers/section/return-from-sale/ajax/products') }}/${encodeURIComponent(this.value)}/variants`;
-        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-        const rows = await response.json();
-        resetSelect(variant, 'همه تنوع‌ها', false);
-        rows.forEach(row => variant.add(new Option(row.text, row.id)));
+        try {
+            const rows = await loadJson(url);
+            resetSelect(variant, rows.length ? 'همه تنوع‌ها' : 'تنوعی برای این کالا ثبت نشده است', !rows.length);
+            rows.forEach(row => variant.add(new Option(row.text, row.id)));
+        } catch (error) {
+            console.error('Unable to load variants for sales return export', error);
+            resetSelect(variant, 'خطا در دریافت تنوع‌ها', true);
+        }
     });
+
+    modal.addEventListener('show.bs.modal', loadCategories);
 })();
 </script>
 @endif
