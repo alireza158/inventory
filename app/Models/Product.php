@@ -248,9 +248,8 @@ class Product extends Model
 
     private static function orWhereProductSearchTokenMatches(Builder $query, string $token): Builder
     {
-        static::orWhereProductCodeMatches($query, $token, static::isProductSearchCodeLike($token));
-
-        $patterns = static::buildProductSearchPatterns($token);
+        $pattern = '%' . static::escapeProductSearchLike(mb_strtolower(static::normalizeProductSearchTerm($token))) . '%';
+        $patterns = static::productSearchPersianArabicVariants($pattern);
 
         foreach (static::productSearchableColumns() as $column) {
             static::orWhereNormalizedLikeAny($query, 'products.' . $column, $patterns);

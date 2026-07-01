@@ -40,9 +40,25 @@ class ProductSearchTest extends TestCase
             'price' => 1000,
         ]);
 
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'کابل سامسونگ',
+            'sku' => 'SKU-003-A',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'شارژر سامسونگ',
+            'sku' => 'SKU-003-B',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
         $bothAcrossVariant = Product::create([
             'category_id' => $category->id,
-            'name' => 'قاب گوشی',
+            'name' => 'قاب سامسونگ',
             'sku' => 'SKU-004',
             'stock' => 5,
             'price' => 1000,
@@ -56,7 +72,7 @@ class ProductSearchTest extends TestCase
             'stock' => 5,
         ]);
 
-        $results = Product::query()->search('کیفی مگنتی')->pluck('id')->all();
+        $results = Product::query()->search('کیفی مگنتی سامسون')->pluck('id')->all();
 
         $this->assertContains($bothInName->id, $results);
         $this->assertContains($bothAcrossVariant->id, $results);
@@ -91,6 +107,37 @@ class ProductSearchTest extends TestCase
             ->all();
 
         $this->assertSame([$samsungCase->id], $results);
+    }
+
+    public function test_multi_word_product_search_requires_all_tokens_for_iphone_query(): void
+    {
+        $category = Category::create(['name' => 'لوازم جانبی']);
+
+        $iphoneCase = Product::create([
+            'category_id' => $category->id,
+            'name' => 'کیفی مگنتی آیفون ۱۵',
+            'sku' => 'SKU-150',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'کیفی مگنتی سامسونگ',
+            'sku' => 'SKU-151',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'کابل آیفون',
+            'sku' => 'SKU-152',
+            'stock' => 5,
+            'price' => 1000,
+        ]);
+
+        $this->assertSame([$iphoneCase->id], Product::query()->search('کیفی مگنتی آیفون')->pluck('id')->all());
     }
 
     public function test_single_word_and_code_search_still_match_related_products(): void
