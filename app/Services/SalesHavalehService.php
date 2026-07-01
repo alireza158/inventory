@@ -153,6 +153,138 @@ class SalesHavalehService
 
 
 
+    public function updateInvoiceByFinance(
+        Invoice $invoice,
+        array $header,
+        array $items,
+        int $userId,
+        string $editReason
+    ): Invoice {
+        $editReason = trim($editReason);
+
+        return DB::transaction(function () use ($invoice, $header, $items, $userId, $editReason) {
+            if ($editReason === '') {
+                throw ValidationException::withMessages(['edit_reason' => 'ثبت یادداشت ویرایش فاکتور برای مالی الزامی است.']);
+            }
+
+            $invoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+            $lockedItems = $invoice->items()->with(['product', 'variant'])->lockForUpdate()->get();
+            $invoice->setRelation('items', $lockedItems);
+            $itemsById = $lockedItems->keyBy('id');
+            $oldTotal = (int) $invoice->total;
+
+            $requestedIds = collect($items)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
+            foreach ($lockedItems as $item) {
+                if (! in_array((int) $item->id, $requestedIds, true)) {
+                    $this->adjustSaleItemStock($invoice, $item, (int) $item->quantity, StockMovement::REASON_RETURN, 'برگشت موجودی بابت حذف ردیف توسط مالی', 'finance_correction', $editReason);
+                    $this->historyService->log($invoice, 'finance_item_removed', 'items', (string) $item->id, null, $this->itemChangeDescription('ردیف ' . $this->itemLabel($item) . ' توسط مالی حذف شد و موجودی آن برگشت.', 'finance_correction', $editReason), $userId);
+                    $item->delete();
+                }
+            }
+
+            foreach (array_values($items) as $index => $row) {
+                $itemId = (int) ($row['id'] ?? 0);
+                if ($itemId <= 0) {
+                    $this->addInvoiceItem($invoice, array_merge($row, ['sort_order' => $index + 1]), 'finance_correction', $editReason, $userId);
+                    continue;
+                }
+
+                $item = $itemsById->get($itemId);
+                if (! $item) {
+                    continue;
+                }
+
+                $newQty = (int) ($row['quantity'] ?? 0);
+                $newPrice = (int) ($row['price'] ?? 0);
+                $newDiscount = max(0, (int) ($row['line_discount_amount'] ?? 0));
+                $newVariantId = (int) ($row['variant_id'] ?? $item->variant_id);
+                $newProductId = (int) ($row['product_id'] ?? $item->product_id);
+
+                if ($newQty <= 0) {
+                    $this->adjustSaleItemStock($invoice, $item, (int) $item->quantity, StockMovement::REASON_RETURN, 'برگشت موجودی بابت حذف ردیف توسط مالی', 'finance_correction', $editReason);
+                    $item->delete();
+                    continue;
+                }
+
+                if ($newVariantId !== (int) $item->variant_id || $newProductId !== (int) $item->product_id) {
+                    $variant = ProductVariant::query()->with('product')->whereKey($newVariantId)->where('product_id', $newProductId)->lockForUpdate()->firstOrFail();
+                    $this->centralInventoryService->assertVariantAvailable($newVariantId, $newQty);
+                    $this->adjustSaleItemStock($invoice, $item, (int) $item->quantity, StockMovement::REASON_RETURN, 'برگشت موجودی کالای قبلی بابت تغییر تنوع توسط مالی', 'finance_correction', $editReason);
+                    $item->forceFill(['product_id' => (int) $variant->product_id, 'variant_id' => $newVariantId]);
+                    $this->adjustSaleItemStock($invoice, $item, -$newQty, StockMovement::REASON_SALE, 'کسر موجودی کالای جدید بابت تغییر تنوع توسط مالی', 'finance_correction', $editReason);
+                } else {
+                    $delta = $newQty - (int) $item->quantity;
+                    if ($delta > 0) {
+                        $this->centralInventoryService->assertVariantAvailable((int) $item->variant_id, $delta);
+                        $this->adjustSaleItemStock($invoice, $item, -$delta, StockMovement::REASON_SALE, 'کسر موجودی بابت افزایش تعداد توسط مالی', 'finance_correction', $editReason);
+                    } elseif ($delta < 0) {
+                        $this->adjustSaleItemStock($invoice, $item, abs($delta), StockMovement::REASON_RETURN, 'برگشت موجودی بابت کاهش تعداد توسط مالی', 'finance_correction', $editReason);
+                    }
+                }
+
+                $lineDiscount = min($newDiscount, $newQty * $newPrice);
+                $item->update([
+                    'quantity' => $newQty,
+                    'price' => $newPrice,
+                    'line_discount_amount' => $lineDiscount,
+                    'line_total' => max(($newQty * $newPrice) - $lineDiscount, 0),
+                    'sort_order' => $index + 1,
+                ]);
+            }
+
+            $invoice->refresh()->load(['items', 'preinvoiceOrder.items']);
+            $totals = SalesDocumentTotals::calculate($invoice->items, (int) ($header['discount_amount'] ?? $invoice->discount_amount), (int) ($header['shipping_price'] ?? $invoice->shipping_price));
+            $invoice->update([
+                'customer_name' => $header['customer_name'],
+                'customer_mobile' => $header['customer_mobile'],
+                'customer_address' => $header['customer_address'] ?? '',
+                'discount_amount' => (int) ($header['discount_amount'] ?? 0),
+                'shipping_price' => (int) ($header['shipping_price'] ?? 0),
+                'subtotal' => (int) $totals['subtotal_before_discount'],
+                'total' => (int) $totals['grand_total'],
+                'items_updated_at' => now(),
+                'items_updated_by' => $userId,
+            ]);
+
+            $this->ledgerService->syncInvoiceDebit($invoice->fresh());
+            $this->syncLinkedPreinvoiceValues($invoice->fresh(['items', 'preinvoiceOrder.items']), $userId);
+            $this->historyService->log($invoice->fresh(), 'finance_invoice_edited', 'total', (string) $oldTotal, (string) $invoice->fresh()->total, 'ویرایش کامل فاکتور توسط مالی: ' . $editReason, $userId);
+            ActivityLogger::log('finance_invoice_edited', $invoice->fresh(), 'فاکتور توسط مالی ویرایش شد.', ['reason' => $editReason, 'old_total' => $oldTotal, 'new_total' => (int) $invoice->fresh()->total]);
+
+            return $invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder']);
+        });
+    }
+
+    private function syncLinkedPreinvoiceValues(Invoice $invoice, int $userId): void
+    {
+        $order = $invoice->preinvoiceOrder()->lockForUpdate()->first();
+        if (! $order) return;
+        $order->items()->delete();
+        foreach ($invoice->items as $item) {
+            $order->items()->create([
+                'product_id' => (int) $item->product_id,
+                'variant_id' => (int) $item->variant_id,
+                'quantity' => (int) $item->quantity,
+                'price' => (int) $item->price,
+                'line_total' => (int) $item->line_total,
+                'sort_order' => (int) ($item->sort_order ?: 0),
+                'line_discount_amount' => (int) ($item->line_discount_amount ?? 0),
+            ]);
+        }
+        $order->update([
+            'customer_name' => $invoice->customer_name,
+            'customer_mobile' => $invoice->customer_mobile,
+            'customer_address' => $invoice->customer_address,
+            'discount_amount' => (int) $invoice->discount_amount,
+            'shipping_price' => (int) $invoice->shipping_price,
+            'total_price' => (int) $invoice->total,
+            'items_updated_at' => now(),
+            'items_updated_by' => $userId,
+        ]);
+    }
+
+
+
 
     public function updateItems(
         Invoice $invoice,
@@ -237,6 +369,8 @@ class SalesHavalehService
             $itemId = (int) ($row['id'] ?? 0);
             $newQty = (int) ($row['quantity'] ?? 0);
             $newPrice = (int) ($row['price'] ?? 0);
+            $newDiscount = (int) ($row['line_discount_amount'] ?? 0);
+            $newVariantId = (int) ($row['variant_id'] ?? 0);
 
             if ($itemId <= 0) {
                 if ($newQty > 0 && (int) ($row['variant_id'] ?? 0) > 0) {
@@ -250,7 +384,7 @@ class SalesHavalehService
                 continue;
             }
 
-            if ($newQty !== (int) $item->quantity || $newPrice !== (int) $item->price) {
+            if ($newQty !== (int) $item->quantity || $newPrice !== (int) $item->price || $newDiscount !== (int) ($item->line_discount_amount ?? 0) || ($newVariantId > 0 && $newVariantId !== (int) $item->variant_id)) {
                 return true;
             }
         }
@@ -324,7 +458,8 @@ class SalesHavalehService
             'quantity' => $quantity,
             'price' => $price,
             'line_total' => max(($quantity * $price) - (int) ($row['line_discount_amount'] ?? 0), 0),
-            'sort_order' => $nextSortOrder,
+            'sort_order' => (int) ($row['sort_order'] ?? $nextSortOrder),
+            'line_discount_amount' => min((int) ($row['line_discount_amount'] ?? 0), $quantity * $price),
         ]);
 
         $this->adjustSaleItemStock($invoice, $item, -$quantity, StockMovement::REASON_SALE, 'کسر موجودی بابت افزودن آیتم جدید به حواله فروش', $reason, $note);

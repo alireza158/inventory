@@ -12,6 +12,7 @@ use App\Services\SalesDocumentAccessService;
 use App\Services\SalesPrintDocumentService;
 use App\Services\WarehousePendingRefreshService;
 use App\Services\WarehouseStockService;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Morilog\Jalali\Jalalian;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ class InvoiceController extends Controller
         private readonly SalesHavalehService $salesHavalehService,
         private readonly SalesDocumentAccessService $accessService,
         private readonly WarehousePendingRefreshService $warehousePendingRefreshService,
+        private readonly NotificationService $notificationService,
     ) {}
 
     public function index(Request $request)
@@ -365,65 +367,87 @@ class InvoiceController extends Controller
             ->where('uuid', $uuid)
             ->firstOrFail();
 
-        if (! $this->accessService->canSellerEditInvoiceItems($invoice, auth()->user())) {
-            return redirect()->back()->with('error', 'این فاکتور قابل ویرایش توسط اپراتور نیست و ویرایش آن باید توسط واحد مالی انجام شود.');
-        }
+        abort_unless($this->canHandleFinanceActions(), 403);
 
-        return view('invoices.edit', compact('invoice'));
+        $statusLabels = $this->statusService->labels();
+
+        return view('invoices.edit', compact('invoice', 'statusLabels'));
     }
 
     public function update(string $uuid, Request $request)
     {
+        abort_unless($this->canHandleFinanceActions(), 403);
+
         $invoice = Invoice::query()->with(['items', 'preinvoiceOrder:id,created_by'])->where('uuid', $uuid)->firstOrFail();
-        if (! $this->accessService->canSellerEditInvoiceItems($invoice, auth()->user())) {
-            return redirect()->back()->with('error', 'این فاکتور قابل ویرایش توسط اپراتور نیست و ویرایش آن باید توسط واحد مالی انجام شود.');
-        }
+
+        $normalizedItems = collect($request->input('items', []))->map(function (array $row) {
+            $row['quantity'] = $this->normalizeIntegerInput($row['quantity'] ?? 0);
+            $row['price'] = $this->normalizeIntegerInput($row['price'] ?? 0);
+            $row['line_discount_amount'] = $this->normalizeIntegerInput($row['line_discount_amount'] ?? 0);
+            return $row;
+        })->values()->all();
+        $request->merge([
+            'items' => $normalizedItems,
+            'discount_amount' => $this->normalizeIntegerInput($request->input('discount_amount', 0)),
+            'shipping_price' => $this->normalizeIntegerInput($request->input('shipping_price', 0)),
+        ]);
 
         $data = $request->validate([
             'customer_name' => 'required|string|max:255',
             'customer_mobile' => 'required|string|max:50',
             'customer_address' => 'nullable|string|max:2000',
+            'discount_amount' => 'nullable|integer|min:0',
+            'shipping_price' => 'nullable|integer|min:0',
             'items' => 'required|array|min:1',
-            'items.*.id' => 'required|exists:invoice_items,id',
+            'items.*.id' => 'nullable|exists:invoice_items,id',
+            'items.*.product_id' => 'required_without:items.*.id|nullable|exists:products,id',
+            'items.*.variant_id' => 'required_without:items.*.id|nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:0',
             'items.*.price' => 'required|integer|min:0',
+            'items.*.line_discount_amount' => 'nullable|integer|min:0',
             'edit_reason' => 'required|string|max:2000',
+        ], [
+            'edit_reason.required' => 'ثبت یادداشت ویرایش فاکتور برای مالی الزامی است.',
         ]);
 
-        DB::transaction(function () use ($invoice, $data) {
-            $invoice = Invoice::query()->with(['items', 'preinvoiceOrder'])->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
-            if (! $this->accessService->canSellerEditInvoiceItems($invoice, auth()->user())) {
-                abort(403, 'این فاکتور قابل ویرایش توسط اپراتور نیست و ویرایش آن باید توسط واحد مالی انجام شود.');
-            }
-            $beforeAudit = [
-                'invoice' => $invoice->only(['customer_name', 'customer_mobile', 'customer_address', 'subtotal', 'discount_amount', 'total', 'status']),
-                'items' => $invoice->items->map->only(['id', 'product_id', 'variant_id', 'quantity', 'price', 'line_total'])->values()->all(),
-            ];
+        $beforeAudit = [
+            'invoice' => $invoice->only(['customer_name', 'customer_mobile', 'customer_address', 'subtotal', 'discount_amount', 'shipping_price', 'total', 'status']),
+            'items' => $invoice->items->map->only(['id', 'product_id', 'variant_id', 'quantity', 'price', 'line_discount_amount', 'line_total'])->values()->all(),
+        ];
 
-            $invoice->update([
-                'customer_name' => $data['customer_name'],
-                'customer_mobile' => $data['customer_mobile'],
-                'customer_address' => $data['customer_address'] ?? '',
-            ]);
+        $fresh = $this->salesHavalehService->updateInvoiceByFinance(
+            $invoice,
+            $data,
+            $data['items'],
+            (int) auth()->id(),
+            $data['edit_reason']
+        );
 
-            $this->salesHavalehService->updateItems($invoice, $data['items'], (int) auth()->id(), $data['edit_reason'], $data['edit_reason']);
-            $fresh = $invoice->fresh(['items.product', 'items.variant', 'preinvoiceOrder.items']);
-            DB::table('invoice_edit_audits')->insert([
-                'invoice_id' => $invoice->id,
-                'user_id' => auth()->id(),
-                'reason' => $data['edit_reason'],
-                'changes_before' => json_encode($beforeAudit, JSON_UNESCAPED_UNICODE),
-                'changes_after' => json_encode([
-                    'invoice' => $fresh->only(['customer_name', 'customer_mobile', 'customer_address', 'subtotal', 'discount_amount', 'total', 'status']),
-                    'items' => $fresh->items->map->only(['id', 'product_id', 'variant_id', 'quantity', 'price', 'line_total'])->values()->all(),
-                ], JSON_UNESCAPED_UNICODE),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $this->warehousePendingRefreshService->refreshActiveWarehousePendingForDocument($fresh, 'invoice', auth()->id());
-        });
+        DB::table('invoice_edit_audits')->insert([
+            'invoice_id' => $invoice->id,
+            'user_id' => auth()->id(),
+            'reason' => $data['edit_reason'],
+            'changes_before' => json_encode($beforeAudit, JSON_UNESCAPED_UNICODE),
+            'changes_after' => json_encode([
+                'invoice' => $fresh->only(['customer_name', 'customer_mobile', 'customer_address', 'subtotal', 'discount_amount', 'shipping_price', 'total', 'status']),
+                'items' => $fresh->items->map->only(['id', 'product_id', 'variant_id', 'quantity', 'price', 'line_discount_amount', 'line_total'])->values()->all(),
+            ], JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
-        return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ اقلام سند تغییر کرد و برای بررسی مجدد به انبار و مالی ارسال شد.');
+        if (!empty($fresh->preinvoiceOrder?->created_by)) {
+            $this->notificationService->notifyUser(
+                (int) $fresh->preinvoiceOrder->created_by,
+                'invoice_finance_edited',
+                'فاکتور شما توسط مالی ویرایش شد',
+                "فاکتور شماره {$fresh->uuid} برای مشتری {$fresh->customer_name} توسط مالی ویرایش شد.",
+                route('invoices.show', $fresh->uuid),
+                ['level' => 'warning', 'notifiable_type' => Invoice::class, 'notifiable_id' => $fresh->id, 'unique_key' => "seller_invoice_finance_edited:{$fresh->id}:" . md5($data['edit_reason'] . '|' . $fresh->updated_at)]
+            );
+        }
+
+        return redirect()->route('invoices.show', $invoice->uuid)->with('success', '✅ فاکتور با یادداشت مالی ذخیره شد؛ موجودی و گردش حساب مشتری بروزرسانی شد.');
     }
 
     public function print(string $uuid, Request $request, SalesPrintDocumentService $printService)
@@ -480,6 +504,7 @@ class InvoiceController extends Controller
         ]);
 
         $updatedInvoice = $this->salesHavalehService->changeStatus($invoice, $data['status'], $data['note'] ?? null, auth()->id());
+        $this->notifySellerForInvoiceStatus($updatedInvoice, $data['status'], $data['note'] ?? null);
 
         if ((string) $updatedInvoice->status === Invoice::STATUS_SHIPPED) {
             return redirect()->route('vouchers.sales.queue')
@@ -490,6 +515,26 @@ class InvoiceController extends Controller
             ->with('success', '✅ وضعیت حواله بروزرسانی شد.');
     }
 
+    private function notifySellerForInvoiceStatus(Invoice $invoice, string $status, ?string $note = null): void
+    {
+        $invoice->loadMissing('preinvoiceOrder:id,created_by,uuid,customer_name');
+        $sellerId = (int) ($invoice->preinvoiceOrder?->created_by ?? 0);
+        if ($sellerId <= 0) {
+            return;
+        }
+
+        $labels = $this->statusService->labels();
+        $statusLabel = $labels[$status] ?? $status;
+        $this->notificationService->notifyUser(
+            $sellerId,
+            'invoice_status_changed',
+            'وضعیت فاکتور شما تغییر کرد',
+            "فاکتور شماره {$invoice->uuid} برای مشتری {$invoice->customer_name} به وضعیت «{$statusLabel}» تغییر کرد." . ($note ? " توضیح: {$note}" : ''),
+            route('invoices.show', $invoice->uuid),
+            ['level' => in_array($status, [Invoice::STATUS_NOT_SHIPPED, SalesHavalehStatusService::NOT_SHIPPED], true) ? 'danger' : 'info', 'notifiable_type' => Invoice::class, 'notifiable_id' => $invoice->id, 'unique_key' => "seller_invoice_status:{$invoice->id}:{$status}:{$sellerId}"]
+        );
+    }
+
     public function cancel(string $uuid, Request $request)
     {
         $invoice = Invoice::where('uuid', $uuid)->firstOrFail();
@@ -497,6 +542,7 @@ class InvoiceController extends Controller
             'note' => 'nullable|string|max:1000',
         ]);
         $updatedInvoice = $this->salesHavalehService->cancelAndRestore($invoice, $data['note'] ?? null, auth()->id());
+        $this->notifySellerForInvoiceStatus($updatedInvoice, SalesHavalehStatusService::NOT_SHIPPED, $data['note'] ?? null);
 
         if ((string) $invoice->status === SalesHavalehStatusService::NOT_SHIPPED) {
             return back()->with('success', 'این فاکتور قبلاً کنسل شده و عملیات برگشت موجودی/مالی دوباره انجام نشد.');
