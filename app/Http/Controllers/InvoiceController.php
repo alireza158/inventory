@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class InvoiceController extends Controller
@@ -93,7 +94,7 @@ class InvoiceController extends Controller
 
         if ($request->input('export') === 'csv' || $request->input('export') === 'excel' || $request->input('export') === 'daily_csv') {
             abort_unless($this->canHandleFinanceActions(), 403);
-            return $this->exportInvoiceAccountingCsv((clone $baseQuery)->with(['customer:id,crm_customer_id,first_name,last_name,mobile', 'preinvoiceOrder.creator:id,name'])->orderByDesc('id')->get(), $filters, $request->input('export') === 'excel');
+            return $this->exportInvoiceReport((clone $baseQuery)->with(['customer:id,crm_customer_id,first_name,last_name,mobile', 'preinvoiceOrder.creator:id,name'])->orderByDesc('id')->get(), $request->input('export'));
         }
 
         $summary = $this->invoiceReportSummary(clone $baseQuery);
@@ -737,35 +738,66 @@ class InvoiceController extends Controller
         ]));
     }
 
-    private function exportInvoiceAccountingCsv($invoices, array $filters, bool $excelAlias = false): StreamedResponse
+    private function exportInvoiceReport(Collection $invoices, string $exportType)
     {
-        $filename = 'invoice-accounting-report-' . now()->format('Ymd-His') . ($excelAlias ? '.xls' : '.csv');
+        $filename = 'invoices-report-' . now()->format('Y-m-d');
 
+        if ($exportType === 'excel' && class_exists(\Maatwebsite\Excel\Facades\Excel::class)) {
+            $export = new class($this->invoiceReportExportRows($invoices)) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings {
+                public function __construct(private readonly Collection $rows) {}
+
+                public function collection(): Collection
+                {
+                    return $this->rows;
+                }
+
+                public function headings(): array
+                {
+                    return [
+                        'شماره فاکتور',
+                        'ثبت‌کننده فاکتور',
+                        'مشتری',
+                        'مبلغ فاکتور',
+                        'وضعیت فاکتور',
+                    ];
+                }
+            };
+
+            return \Maatwebsite\Excel\Facades\Excel::download($export, $filename . '.xlsx');
+        }
+
+        return $this->exportInvoiceReportCsv($invoices, $filename . '.csv');
+    }
+
+    private function invoiceReportExportRows(Collection $invoices): Collection
+    {
+        $statusLabels = $this->statusService->labels();
+
+        return $invoices->map(fn (Invoice $invoice) => [
+            $invoice->uuid,
+            $invoice->preinvoiceOrder?->creator?->name ?: '—',
+            $invoice->customer_name ?: $invoice->customer?->display_name ?: '—',
+            (int) $invoice->total,
+            $statusLabels[$invoice->status] ?? ($invoice->status ?: '—'),
+        ]);
+    }
+
+    private function exportInvoiceReportCsv(Collection $invoices, string $filename): StreamedResponse
+    {
         return response()->streamDownload(function () use ($invoices) {
             $handle = fopen('php://output', 'w');
             fwrite($handle, "\xEF\xBB\xBF");
 
             fputcsv($handle, [
-                'invoice_number', 'invoice_date', 'customer_name', 'customer_code', 'customer_mobile',
-                'invoice_total', 'paid_amount', 'remaining_amount', 'payment_status', 'invoice_status', 'seller',
+                'شماره فاکتور',
+                'ثبت‌کننده فاکتور',
+                'مشتری',
+                'مبلغ فاکتور',
+                'وضعیت فاکتور',
             ]);
 
-            foreach ($invoices as $invoice) {
-                $paid = (int) ($invoice->paid_total ?? 0);
-                $remaining = max((int) $invoice->total - $paid, 0);
-                fputcsv($handle, [
-                    $invoice->uuid,
-                    \App\Support\JalaliDate::date($invoice->display_document_date),
-                    $invoice->customer_name ?: $invoice->customer?->display_name,
-                    $invoice->customer?->crm_customer_id ?: $invoice->customer_id,
-                    $invoice->customer_mobile ?: $invoice->customer?->mobile,
-                    (int) $invoice->total,
-                    $paid,
-                    $remaining,
-                    $this->paymentStatusLabel($paid, (int) $invoice->total),
-                    $this->statusService->labels()[$invoice->status] ?? ($invoice->status ?: ''),
-                    $invoice->preinvoiceOrder?->creator?->name ?? '',
-                ]);
+            foreach ($this->invoiceReportExportRows($invoices) as $row) {
+                fputcsv($handle, $row);
             }
 
             fclose($handle);
