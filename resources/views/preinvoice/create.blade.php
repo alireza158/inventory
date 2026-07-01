@@ -1471,6 +1471,25 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         productCache.clear();
     }
 
+    function releaseDraftReservationBeacon() {
+        if (IS_EDIT || isSubmittingProgrammatically) return;
+        const token = normalize(document.getElementById('reservation_token')?.value) || normalize(localStorage.getItem(RESERVATION_TOKEN_KEY));
+        if (!token || !API.reservationsRelease) return;
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const body = JSON.stringify({ reservation_token: token, _token: csrf });
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon(API.reservationsRelease, new Blob([body], { type: 'application/json' }));
+        } else {
+            fetch(API.reservationsRelease, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body,
+                keepalive: true
+            }).catch(() => {});
+        }
+        localStorage.removeItem(RESERVATION_TOKEN_KEY);
+    }
+
     function toEnglishDigits(str) {
         return String(str || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     }
@@ -1875,6 +1894,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         window.addEventListener('beforeunload', function() {
             saveLocalDraftNow();
         });
+        window.addEventListener('pagehide', releaseDraftReservationBeacon);
     }
 
     async function getProductDetails(productId, fresh = false) {
