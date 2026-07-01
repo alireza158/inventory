@@ -26,4 +26,13 @@ class CustomerLedgerService
             ]
         );
     }
+
+    public function voidInvoiceDebit(Invoice $invoice, ?string $note = null): void
+    {
+        CustomerLedger::query()
+            ->where('reference_type', Invoice::class)
+            ->where('reference_id', (int) $invoice->id)
+            ->where('type', 'debit')
+            ->delete();
+    }
 }

@@ -17,15 +17,22 @@ class SalesHavalehStatusService
 
     public function all(): array
     {
-        return [
+        return array_values(array_unique(array_merge($this->manualStatuses(), [
             self::PENDING_WAREHOUSE_APPROVAL,
-            self::COLLECTING,
-            self::CHECKING_DISCREPANCY,
             self::FINAL_CHECK,
             self::PACKING,
-            self::SHIPPED,
             self::NOT_SHIPPED,
+            Invoice::STATUS_PENDING_FINANCE_REAPPROVAL,
             Invoice::STATUS_FINANCE_APPROVED,
+        ])));
+    }
+
+    public function manualStatuses(): array
+    {
+        return [
+            self::CHECKING_DISCREPANCY,
+            self::COLLECTING,
+            self::SHIPPED,
         ];
     }
 
@@ -34,7 +41,7 @@ class SalesHavalehStatusService
         return [
             self::PENDING_WAREHOUSE_APPROVAL => 'در انتظار تایید انبار',
             self::COLLECTING => 'در حال جمع‌آوری',
-            self::CHECKING_DISCREPANCY => 'در حال مغایرت و بررسی',
+            self::CHECKING_DISCREPANCY => 'در حال بررسی',
             self::FINAL_CHECK => 'در حال چک نهایی',
             self::PACKING => 'در حال بسته‌بندی',
             self::SHIPPED => 'ارسال شده',
@@ -47,10 +54,8 @@ class SalesHavalehStatusService
     public function editableStatusesForRegularUsers(): array
     {
         return [
-            self::PENDING_WAREHOUSE_APPROVAL,
             self::COLLECTING,
             self::CHECKING_DISCREPANCY,
-            self::FINAL_CHECK,
         ];
     }
 
@@ -69,8 +74,8 @@ class SalesHavalehStatusService
 
     public function assertValidTransition(Invoice $invoice, string $newStatus, ?User $user): void
     {
-        if (!in_array($newStatus, $this->all(), true)) {
-            abort(422, 'وضعیت انتخاب‌شده معتبر نیست.');
+        if (!in_array($newStatus, $this->manualStatuses(), true)) {
+            abort(422, 'فقط وضعیت‌های عملیاتی دستی قابل انتخاب هستند.');
         }
 
         $current = (string) $invoice->status;
@@ -92,11 +97,11 @@ class SalesHavalehStatusService
         }
 
         $allowedNext = [
-            self::PENDING_WAREHOUSE_APPROVAL => [self::COLLECTING, self::CHECKING_DISCREPANCY, self::NOT_SHIPPED],
-            self::COLLECTING => [self::FINAL_CHECK, self::CHECKING_DISCREPANCY, self::NOT_SHIPPED],
-            self::CHECKING_DISCREPANCY => [self::COLLECTING, self::FINAL_CHECK, self::NOT_SHIPPED],
-            self::FINAL_CHECK => [self::PACKING, self::CHECKING_DISCREPANCY, self::NOT_SHIPPED],
-            self::PACKING => [self::SHIPPED, self::CHECKING_DISCREPANCY, self::NOT_SHIPPED],
+            self::PENDING_WAREHOUSE_APPROVAL => [self::COLLECTING, self::CHECKING_DISCREPANCY],
+            self::COLLECTING => [self::CHECKING_DISCREPANCY, self::SHIPPED],
+            self::CHECKING_DISCREPANCY => [self::COLLECTING, self::SHIPPED],
+            self::FINAL_CHECK => [self::COLLECTING, self::CHECKING_DISCREPANCY, self::SHIPPED],
+            self::PACKING => [self::COLLECTING, self::CHECKING_DISCREPANCY, self::SHIPPED],
             self::SHIPPED => [],
             self::NOT_SHIPPED => [],
         ];

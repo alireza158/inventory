@@ -27,14 +27,14 @@
       <div class="col-md-5">
         <label class="form-label">وضعیت جدید</label>
         <select name="status" class="form-select">
-          @foreach($statusLabels as $key => $label)
+          @foreach(['checking_discrepancy'=>'در حال بررسی','collecting'=>'در حال جمع‌آوری','shipped'=>'ارسال شده'] as $key => $label)
             <option value="{{ $key }}" @selected($invoice->status===$key)>{{ $label }}</option>
           @endforeach
         </select>
       </div>
       <div class="col-md-5">
         <label class="form-label">یادداشت</label>
-        <textarea name="note" id="status-note" class="form-control" rows="2" placeholder="برای ارسال‌شده الزامی است"></textarea>
+        <textarea name="note" id="status-note" class="form-control" rows="2" placeholder="اختیاری"></textarea>
       </div>
       <div class="col-md-2">
         <button class="btn btn-primary w-100">ثبت تغییر وضعیت</button>
@@ -193,18 +193,5 @@ document.getElementById('add-modal-item')?.addEventListener('click', () => {
   tr.innerHTML = `<td>${product.selectedOptions[0].text}<input type="hidden" name="items[${i}][product_id]" value="${product.value}"></td><td>${variant.selectedOptions[0].text}<input type="hidden" name="items[${i}][variant_id]" value="${variant.value}" class="js-item-field" data-original=""></td><td><input type="number" min="1" name="items[${i}][quantity]" value="${qty.value}" data-original="0" class="form-control js-item-field"></td><td><input type="text" inputmode="numeric" value="${formatMoney(price.value)}" data-raw-target="item-price-${i}" class="form-control js-money"><input id="item-price-${i}" type="hidden" name="items[${i}][price]" value="${rawNumber(price.value) || 0}" data-original="0" class="js-item-field"></td><td><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove(); syncChangeReasonRequired();">حذف</button></td>`;
   tbody.appendChild(tr); bindMoneyInputs(tr); syncChangeReasonRequired(); modal?.hide();
 });
-</script>
-
-<script>
-(() => {
-  const statusSelect = document.querySelector('#sales-status-form select[name="status"]');
-  const note = document.querySelector('#status-note');
-  const syncRequired = () => {
-    if (!statusSelect || !note) return;
-    note.required = statusSelect.value === 'shipped';
-  };
-  statusSelect?.addEventListener('change', syncRequired);
-  syncRequired();
-})();
 </script>
 @endsection
