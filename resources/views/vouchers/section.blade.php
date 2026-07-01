@@ -340,6 +340,28 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="col-md-3">
+                        <label class="form-label">کالا</label>
+                        <select name="product_id" class="form-select form-select-sm">
+                            <option value="">همه کالاها</option>
+                            @foreach($filterProducts as $product)
+                                <option value="{{ $product->id }}" @selected((int) $productId === (int) $product->id)>
+                                    {{ $product->name }}{{ $product->code ? ' | '.$product->code : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">تنوع کالا</label>
+                        <select name="variant_id" class="form-select form-select-sm">
+                            <option value="">همه تنوع‌ها</option>
+                            @foreach($filterVariants as $variant)
+                                <option value="{{ $variant->id }}" @selected((int) $variantId === (int) $variant->id)>
+                                    {{ $variant->product?->name }} / {{ $variant->variant_name ?: $variant->variant_code }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="col-md-2">
                         <label class="form-label">از تاریخ</label>
                         <input type="date" name="date_from" value="{{ $dateFrom }}" class="form-control form-control-sm">
@@ -348,9 +370,10 @@
                         <label class="form-label">تا تاریخ</label>
                         <input type="date" name="date_to" value="{{ $dateTo }}" class="form-control form-control-sm">
                     </div>
-                    <div class="col-md-2 d-flex gap-2">
+                    <div class="col-md-4 d-flex gap-2">
                         <button class="btn btn-sm btn-primary w-100">فیلتر</button>
                         <a href="{{ route('vouchers.section.index', $type) }}" class="btn btn-sm btn-outline-secondary w-100">حذف فیلتر</a>
+                        <a href="{{ route('vouchers.section.return-from-sale.export', request()->query()) }}" class="btn btn-sm btn-success w-100">خروجی Excel</a>
                     </div>
                 </form>
             </div>

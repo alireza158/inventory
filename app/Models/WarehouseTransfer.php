@@ -18,6 +18,7 @@ class WarehouseTransfer extends Model
     public const RETURN_REASON_WARRANTY = 'warranty';
     public const RETURN_REASON_PACKAGING_DAMAGE = 'packaging_damage';
     public const RETURN_REASON_TRANSIT_DAMAGE = 'transit_damage';
+    public const RETURN_REASON_GOODS_HEALTHY = 'goods_healthy';
 
     public static function typeOptions(): array
     {
@@ -50,6 +51,7 @@ class WarehouseTransfer extends Model
             self::RETURN_REASON_WARRANTY => 'برگشت به دلیل گارانتی (خرابی کالا)',
             self::RETURN_REASON_PACKAGING_DAMAGE => 'آسیب‌دیدگی به‌دلیل پکینگ/کارتن',
             self::RETURN_REASON_TRANSIT_DAMAGE => 'شکستگی در مسیر ارسال',
+            self::RETURN_REASON_GOODS_HEALTHY => 'سالم بودن کالا',
         ];
     }
 
