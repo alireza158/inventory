@@ -23,7 +23,7 @@ class InventoryReservationReleaseService
 
             if ($lockedReservation->preinvoice_order_id !== null || $lockedReservation->converted_at !== null || $lockedReservation->released_at !== null) {
                 throw ValidationException::withMessages([
-                    'reservation' => 'این رزرو به سند ثبت‌شده متصل است و فقط از مسیر همان سند قابل آزادسازی است.',
+                    'reservation' => 'این رزرو به سند ثبت‌شده متصل است و از این صفحه قابل آزادسازی نیست.',
                 ]);
             }
 

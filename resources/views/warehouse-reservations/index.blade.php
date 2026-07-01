@@ -28,7 +28,7 @@
             'کل رزروهای فعال' => $stats['total_active'],
             'رزروهای موقت فعال' => $stats['draft_active'],
             'موقت بالای ۲۰ ساعت' => $stats['draft_over_20h'],
-            'پیش‌فاکتورهای ثبت‌شده' => $stats['preinvoice_active'],
+            'رزروهای پیش‌فاکتور فعال' => $stats['preinvoice_active'],
             'مشکوک قابل آزادسازی' => $stats['suspicious_releasable'],
         ] as $label => $value)
             <div class="col-6 col-lg"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small text-truncate">{{ $label }}</div><div class="fs-4 fw-bold">{{ number_format($value) }}</div></div></div></div>
@@ -41,7 +41,7 @@
                 <div><label class="form-label">جستجوی کالا / کد / تنوع</label><input name="q" value="{{ $filters['q'] ?? '' }}" class="form-control"></div>
                 <div><label class="form-label">ثبت‌کننده</label><select name="user_id" class="form-select"><option value="">همه</option>@foreach($users as $user)<option value="{{ $user->id }}" @selected(($filters['user_id'] ?? '') == $user->id)>{{ $user->name }}</option>@endforeach</select></div>
                 <div><label class="form-label">مشتری</label><select name="customer_id" class="form-select"><option value="">همه</option>@foreach($customers as $customer)<option value="{{ $customer->id }}" @selected(($filters['customer_id'] ?? '') == $customer->id)>{{ $customer->display_name ?: $customer->mobile }}</option>@endforeach</select></div>
-                <div><label class="form-label">نوع رزرو</label><select name="type" class="form-select"><option value="">همه</option><option value="draft" @selected(($filters['type'] ?? '')==='draft')>رزرو موقت</option><option value="preinvoice" @selected(($filters['type'] ?? '')==='preinvoice')>پیش‌فاکتور</option><option value="invoice" @selected(($filters['type'] ?? '')==='invoice')>فاکتور</option><option value="transfer" @selected(($filters['type'] ?? '')==='transfer')>حواله</option></select></div>
+                <div><label class="form-label">نوع رزرو</label><select name="type" class="form-select"><option value="">همه</option><option value="draft_reservation" @selected(($filters['type'] ?? '')==='draft_reservation')>رزرو موقت</option><option value="preinvoice_reservation" @selected(($filters['type'] ?? '')==='preinvoice_reservation')>رزرو پیش‌فاکتور</option></select></div>
                 <div><label class="form-label">از تاریخ</label><input type="date" name="date_from" value="{{ $filters['date_from'] ?? '' }}" class="form-control"></div>
                 <div><label class="form-label">تا تاریخ</label><input type="date" name="date_to" value="{{ $filters['date_to'] ?? '' }}" class="form-control"></div>
                 <div class="form-check"><input class="form-check-input" type="checkbox" name="older_than_20" value="1" @checked(!empty($filters['older_than_20'])) id="old20"><label class="form-check-label" for="old20">فقط بالای ۲۰ ساعت</label></div>
@@ -54,21 +54,22 @@
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead class="table-light"><tr><th style="width: 25%">کالا / تنوع</th><th style="width: 8%">تعداد</th><th style="width: 13%">نوع</th><th style="width: 12%">ثبت‌کننده</th><th style="width: 12%">مشتری</th><th style="width: 9%">مدت</th><th style="width: 11%">وضعیت</th><th style="width: 10%">عملیات</th></tr></thead>
+                <thead class="table-light"><tr><th style="width: 22%">کالا</th><th style="width: 16%">تنوع / کد</th><th style="width: 7%">تعداد</th><th style="width: 12%">نوع رزرو</th><th style="width: 10%">فروشنده</th><th style="width: 10%">مشتری</th><th style="width: 10%">پیش‌فاکتور / مدت</th><th style="width: 7%">وضعیت</th><th style="width: 6%">عملیات</th></tr></thead>
                 <tbody>
                 @forelse($rows as $row)
                     <tr>
-                        <td><span class="fw-bold text-truncate-rtl" title="{{ $row['product'] }}">{{ $row['product'] }}</span><span class="small text-muted text-truncate-rtl" title="{{ $row['variant'] }} | {{ $row['sku'] }}">{{ $row['variant'] }} | {{ $row['sku'] }}</span></td>
+                        <td><span class="fw-bold text-truncate-rtl" title="{{ $row['product'] }}">{{ $row['product'] }}</span></td>
+                        <td><span class="small text-muted text-truncate-rtl" title="{{ $row['variant'] }} | {{ $row['sku'] }}">{{ $row['variant'] }} | {{ $row['sku'] }}</span></td>
                         <td>{{ $row['quantity'] }}</td>
                         <td><span class="text-truncate-rtl" title="{{ $row['type_label'] }}">{{ $row['type_label'] }}</span></td>
                         <td><span class="text-truncate-rtl" title="{{ $row['user'] }}">{{ $row['user'] }}</span></td>
                         <td><span class="text-truncate-rtl" title="{{ $row['customer'] }}">{{ $row['customer'] }}</span></td>
-                        <td>{{ $row['age_hours'] }} ساعت</td>
+                        <td><span class="text-truncate-rtl" title="{{ $row['document_no'] }}">{{ $row['document_no'] }}</span><span class="small text-muted">{{ $row['age_hours'] }} ساعت</span></td>
                         <td>@if($row['alert']==='red')<span class="badge bg-danger">قرمز</span>@elseif($row['alert']==='yellow')<span class="badge bg-warning text-dark">زرد</span>@else<span class="badge bg-success">عادی</span>@endif @unless($row['releasable'])<span class="badge bg-secondary mt-1">متصل به سند</span>@endunless</td>
-                        <td><div class="actions-wrap">@if($row['releasable'] && $row['reservation']) @canPermission('warehouse.reservations.release')<button class="btn btn-sm btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#release-{{ $row['source_id'] }}">آزادسازی</button>@endcanPermission <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#details-{{ $row['source_id'] }}">جزئیات</button>@else @if($row['document_url'])<a class="btn btn-sm btn-outline-secondary" href="{{ $row['document_url'] }}">مشاهده</a>@endif @endif</div></td>
+                        <td><div class="actions-wrap">@if($row['releasable'] && $row['reservation']) @canPermission('warehouse.reservations.release')<button class="btn btn-sm btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#release-{{ $row['source_id'] }}">آزادسازی رزرو</button>@endcanPermission <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#details-{{ $row['source_id'] }}">جزئیات</button>@else @if($row['document_url'])<a class="btn btn-sm btn-outline-secondary" href="{{ $row['document_url'] }}">مشاهده</a>@endif @endif</div></td>
                     </tr>
-                    <tr class="collapse" id="details-{{ $row['source_id'] }}"><td colspan="8" class="bg-light small"><div class="d-flex flex-wrap gap-3"><span>شماره سند: {{ $row['document_no'] }}</span><span>وضعیت سند: {{ $row['document_status'] }}</span><span>زمان ایجاد: {{ $row['created_at']->format('Y-m-d H:i') }}</span>@if($row['reservation'])<span>توکن: <span dir="ltr">{{ $row['reservation']->token }}</span></span><span>expires_at: {{ $row['reservation']->expires_at?->format('Y-m-d H:i') ?? '—' }}</span>@else<span class="text-muted">از مسیر سند قابل اصلاح است.</span>@endif</div></td></tr>
-                @empty <tr><td colspan="8" class="text-center text-muted py-4">رزروی یافت نشد.</td></tr>@endforelse
+                    <tr class="collapse" id="details-{{ $row['source_id'] }}"><td colspan="9" class="bg-light small"><div class="d-flex flex-wrap gap-3"><span>شماره سند: {{ $row['document_no'] }}</span><span>وضعیت سند: {{ $row['document_status'] }}</span><span>زمان ایجاد: {{ $row['created_at']->format('Y-m-d H:i') }}</span>@if($row['reservation'])<span>توکن: <span dir="ltr">{{ $row['reservation']->token }}</span></span><span>expires_at: {{ $row['reservation']->expires_at?->format('Y-m-d H:i') ?? '—' }}</span>@else<span class="text-muted">از مسیر سند قابل اصلاح است.</span>@endif</div></td></tr>
+                @empty <tr><td colspan="9" class="text-center text-muted py-4">رزروی یافت نشد.</td></tr>@endforelse
                 </tbody>
             </table>
         </div>

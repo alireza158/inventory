@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
-use App\Models\InvoiceItem;
 use App\Models\PreinvoiceDraftReservation;
 use App\Models\PreinvoiceOrder;
 use App\Models\PreinvoiceOrderItem;
 use App\Models\User;
-use App\Models\WarehouseTransferItem;
 use App\Services\InventoryReservationReleaseService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -31,17 +29,15 @@ class WarehouseReservationController extends Controller
         $allRows = collect()
             ->merge($this->draftRows($filters))
             ->merge($this->preinvoiceRows($filters))
-            ->merge($this->invoiceRows($filters))
-            ->merge($this->transferRows($filters))
             ->filter(fn (array $row) => $this->passesFilters($row, $filters))
             ->sortByDesc('created_at_ts')
             ->values();
 
         $stats = [
             'total_active' => $allRows->count(),
-            'draft_active' => $allRows->where('type', 'draft')->count(),
-            'draft_over_20h' => $allRows->where('type', 'draft')->where('age_hours', '>', 20)->count(),
-            'preinvoice_active' => $allRows->where('type', 'preinvoice')->count(),
+            'draft_active' => $allRows->where('type', 'draft_reservation')->count(),
+            'draft_over_20h' => $allRows->where('type', 'draft_reservation')->where('age_hours', '>', 20)->count(),
+            'preinvoice_active' => $allRows->where('type', 'preinvoice_reservation')->count(),
             'suspicious_releasable' => $allRows->where('releasable', true)->where('age_hours', '>', 20)->count(),
         ];
 
@@ -130,7 +126,7 @@ class WarehouseReservationController extends Controller
             ->when($filters['user_id'] ?? null, fn ($q, $id) => $q->where('user_id', $id))
             ->when($filters['date_from'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '>=', $date))
             ->when($filters['date_to'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '<=', $date))
-            ->get()->map(fn ($r) => $this->row('draft', $r, $r->product, $r->variant, $r->quantity, $r->created_at, $r->user, null, 'رزرو موقت فرم پیش‌فاکتور', 'فعال', null, null, true, $r));
+            ->get()->map(fn ($r) => $this->row('draft_reservation', $r, $r->product, $r->variant, $r->quantity, $r->created_at, $r->user, null, 'رزرو موقت ثبت‌نشده', 'فعال', null, null, true, $r));
     }
 
     private function preinvoiceRows(array $filters): Collection
@@ -139,26 +135,10 @@ class WarehouseReservationController extends Controller
             ->whereHas('order', fn ($q) => $q->whereIn('status', self::ACTIVE_PREINVOICE_STATUSES)->whereNull('stock_released_at'))
             ->get()->map(function ($item) {
                 $order = $item->order;
-                return $this->row('preinvoice', $item, $item->product, $item->variant, $item->quantity, $order?->created_at ?? $item->created_at, $order?->creator, $order?->customer, 'رزرو پیش‌فاکتور ثبت‌شده', PreinvoiceOrder::statusLabels()[$order?->status] ?? $order?->status, $order?->uuid, $order ? route('archive.preinvoices.show', $order->uuid) : null, false, null);
-            });
-    }
+                $row = $this->row('preinvoice_reservation', $item, $item->product, $item->variant, $item->quantity, $order?->created_at ?? $item->created_at, $order?->creator, $order?->customer, 'رزرو پیش‌فاکتور', PreinvoiceOrder::statusLabels()[$order?->status] ?? $order?->status, $order?->uuid, $order ? route('archive.preinvoices.show', $order->uuid) : null, false, null);
+                $row['customer'] = $order?->customer_name ?: $row['customer'];
 
-    private function invoiceRows(array $filters): Collection
-    {
-        return InvoiceItem::query()->with(['product', 'variant', 'invoice.customer', 'invoice.preinvoiceOrder.creator'])
-            ->get()->map(function ($item) {
-                $invoice = $item->invoice;
-                return $this->row('invoice', $item, $item->product, $item->variant, $item->quantity, $invoice?->created_at ?? $item->created_at, $invoice?->preinvoiceOrder?->creator, $invoice?->customer, 'فاکتور', $invoice?->status, $invoice?->uuid, $invoice ? route('archive.invoices.show', $invoice->uuid) : null, false, null);
-            });
-    }
-
-    private function transferRows(array $filters): Collection
-    {
-        return WarehouseTransferItem::query()->with(['product', 'variant', 'transfer.user', 'transfer.customer'])
-            ->whereHas('transfer', fn ($q) => $q->where('voucher_type', 'sale'))
-            ->get()->map(function ($item) {
-                $transfer = $item->transfer;
-                return $this->row('transfer', $item, $item->product, $item->variant, $item->quantity, $transfer?->transferred_at ?? $transfer?->created_at ?? $item->created_at, $transfer?->user, $transfer?->customer, 'حواله فروش', $transfer?->reference, $transfer?->reference ?: $transfer?->id, $transfer ? route('vouchers.show', $transfer->id) : null, false, null);
+                return $row;
             });
     }
 
