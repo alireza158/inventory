@@ -536,24 +536,38 @@ document.addEventListener('DOMContentLoaded', function () {
         invoiceProductsBase: @json(url('/vouchers/invoice')),
     };
 
-    const oldRelatedInvoiceUuid = @json(old('related_invoice_uuid', $voucher->relatedInvoice->uuid ?? ''));
-    const oldItems = @json(old('items', isset($voucher) ? $voucher->items->map(fn ($item) => [
-        'invoice_item_id' => $item->invoice_item_id,
-        'product_id' => $item->product_id,
-        'variant_id' => $item->product_variant_id,
-        'quantity' => $item->quantity,
-        'unit_price' => $item->unit_price,
-        'category_id' => $item->product?->category_id,
-    ])->values()->all() : []));
-    const editingVoucherId = @json($voucher->id ?? null);
-    const existingInvoice = @json(isset($voucher) && $voucher->relatedInvoice ? [
-        'uuid' => $voucher->relatedInvoice->uuid,
-        'invoice_date' => optional($voucher->relatedInvoice->created_at)->format('Y-m-d H:i'),
-        'created_at' => optional($voucher->relatedInvoice->created_at)->format('Y-m-d H:i'),
-        'total' => (int) ($voucher->relatedInvoice->total ?? 0),
-    ] : null);
+    @php
+        $returnOldItems = old('items', isset($voucher) ? $voucher->items->map(fn ($item) => [
+            'invoice_item_id' => $item->invoice_item_id,
+            'product_id' => $item->product_id,
+            'variant_id' => $item->product_variant_id,
+            'quantity' => $item->quantity,
+            'unit_price' => $item->unit_price,
+            'category_id' => $item->product?->category_id,
+        ])->values()->all() : []);
+
+        $returnExistingInvoice = isset($voucher) && $voucher->relatedInvoice ? [
+            'uuid' => $voucher->relatedInvoice->uuid,
+            'invoice_date' => optional($voucher->relatedInvoice->created_at)->format('Y-m-d H:i'),
+            'created_at' => optional($voucher->relatedInvoice->created_at)->format('Y-m-d H:i'),
+            'total' => (int) ($voucher->relatedInvoice->total ?? 0),
+        ] : null;
+
+        $returnOldRelatedInvoiceUuid = old('related_invoice_uuid', $voucher->relatedInvoice->uuid ?? '');
+        $returnEditingVoucherId = $voucher->id ?? null;
+        $returnCategories = $categories->map(fn ($category) => [
+            'id' => (int) $category->id,
+            'name' => (string) $category->name,
+            'code' => (string) ($category->code ?? ''),
+        ])->values();
+    @endphp
+
+    const oldRelatedInvoiceUuid = @json($returnOldRelatedInvoiceUuid);
+    const oldItems = @json($returnOldItems);
+    const editingVoucherId = @json($returnEditingVoucherId);
+    const existingInvoice = @json($returnExistingInvoice);
     const products = @json($manualReturnProducts);
-    const categories = @json($categories->map(fn ($category) => ['id' => (int) $category->id, 'name' => (string) $category->name, 'code' => (string) ($category->code ?? '')])->values());
+    const categories = @json($returnCategories);
 
     let customerInvoices = [];
     let selectedInvoice = null;
