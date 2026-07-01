@@ -11,12 +11,15 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
+use App\Models\User;
 use App\Exports\SalesReturnsExport;
 use App\Models\WarehouseTransfer;
 use App\Services\WarehouseStockService;
 use App\Support\SalesDocumentTotals;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 class VoucherController extends Controller
@@ -190,6 +193,7 @@ class VoucherController extends Controller
                 'fromWarehouse',
                 'toWarehouse',
                 'user',
+                'receiverUser',
                 'relatedInvoice',
                 'customer',
                 'items.product',
@@ -1140,7 +1144,7 @@ class VoucherController extends Controller
 
     public function show(WarehouseTransfer $voucher)
     {
-        $voucher->load(['fromWarehouse', 'toWarehouse', 'user', 'customer', 'relatedInvoice', 'items.product', 'items.variant']);
+        $voucher->load(['fromWarehouse', 'toWarehouse', 'user', 'receiverUser', 'customer', 'relatedInvoice', 'items.product', 'items.variant']);
 
         return view('vouchers.show', [
             'voucher' => $voucher,
@@ -1219,7 +1223,29 @@ class VoucherController extends Controller
         $fromWarehouses = $warehouses->where('type', '!=', 'personnel')->values();
         $personnelWarehouses = $warehouses->where('type', 'personnel')->whereNotNull('parent_id')->values();
 
-        return view('vouchers.personnel.create', compact('categories', 'products', 'variants', 'fromWarehouses', 'personnelWarehouses'));
+        $receiverUsers = $this->selectableUsersForPersonnel();
+
+        return view('vouchers.personnel.create', compact('categories', 'products', 'variants', 'fromWarehouses', 'personnelWarehouses', 'receiverUsers'));
+    }
+
+
+    private function selectableUsersForPersonnel()
+    {
+        return User::query()
+            ->when(Schema::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', true))
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone', 'email', 'personnel_code']);
+    }
+
+    private function activeUserRule()
+    {
+        $rule = Rule::exists('users', 'id');
+
+        if (Schema::hasColumn('users', 'is_active')) {
+            $rule->where('is_active', true);
+        }
+
+        return $rule;
     }
 
     private function transferCreate()
@@ -1440,6 +1466,7 @@ class VoucherController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
             'related_invoice_uuid' => ['nullable', 'string', 'exists:invoices,uuid'],
             'beneficiary_name' => ['nullable', 'string', 'max:255'],
+            'receiver_user_id' => ['nullable', 'integer', $this->activeUserRule()],
             'return_reason' => ['nullable', 'in:' . $returnReasons],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:categories,id'],
@@ -1467,6 +1494,10 @@ class VoucherController extends Controller
 
         if ($voucherType === WarehouseTransfer::TYPE_PERSONNEL_ASSET && !$toWarehouse->isPersonnelLeaf()) {
             abort(422, 'در حواله اموال پرسنل، مقصد باید فقط یکی از پرسنل تعریف‌شده باشد.');
+        }
+
+        if ($voucherType === WarehouseTransfer::TYPE_PERSONNEL_ASSET && empty($data['receiver_user_id'])) {
+            abort(422, 'انتخاب تحویل‌گیرنده الزامی است.');
         }
 
         if (in_array($voucherType, [WarehouseTransfer::TYPE_BETWEEN_WAREHOUSES, WarehouseTransfer::TYPE_SHOWROOM], true)) {
@@ -1610,6 +1641,13 @@ class VoucherController extends Controller
             $relatedInvoice = Invoice::where('uuid', $data['related_invoice_uuid'])->firstOrFail();
         }
 
+        $receiverUser = null;
+        if ($voucherType === WarehouseTransfer::TYPE_PERSONNEL_ASSET && !empty($data['receiver_user_id'])) {
+            $receiverUser = User::query()
+                ->when(Schema::hasColumn('users', 'is_active'), fn ($q) => $q->where('is_active', true))
+                ->findOrFail((int) $data['receiver_user_id']);
+        }
+
         $transfer = WarehouseTransfer::create([
             'reference' => $data['reference'] ?? null,
             'voucher_type' => $voucherType,
@@ -1619,7 +1657,9 @@ class VoucherController extends Controller
             'return_type' => $data['return_type'] ?? WarehouseTransfer::RETURN_SOURCE_INTERNAL_INVOICE,
             'external_invoice_number' => $data['external_invoice_number'] ?? null,
             'customer_id' => $relatedInvoice?->customer_id ?? ($data['customer_id'] ?? null),
-            'beneficiary_name' => $data['beneficiary_name'] ?? null,
+            'beneficiary_name' => $receiverUser?->name ?? ($data['beneficiary_name'] ?? null),
+            'receiver_user_id' => $receiverUser?->id,
+            'receiver_name_snapshot' => $receiverUser?->name,
             'return_reason' => $data['return_reason'] ?? null,
             'user_id' => auth()->id(),
             'transferred_at' => $transferredAt,
