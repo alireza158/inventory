@@ -136,7 +136,7 @@
     <div class="d-flex align-items-center gap-2 flex-wrap">
         @canPermission('account_statements.adjust')
             <button type="button" class="btn btn-outline-warning" id="openAdjustmentModalBtn">
-                اصلاح دستی مانده
+                تنظیم دستی مانده
             </button>
         @endcanPermission
         <button type="button" class="btn btn-success" id="openPaymentModalBtn">
@@ -196,7 +196,7 @@
         <div class="d-flex gap-2 flex-wrap">
             @canPermission('account_statements.adjust')
                 <button type="button" class="btn btn-outline-warning" id="openAdjustmentModalBtnSecondary">
-                    اصلاح دستی مانده
+                    تنظیم دستی مانده
                 </button>
             @endcanPermission
             <button type="button" class="btn btn-success" id="openPaymentModalBtnSecondary">
@@ -296,8 +296,8 @@
     <div class="payment-modal-dialog" style="max-width: 620px;">
         <div class="payment-modal-header">
             <div>
-                <h5 class="payment-modal-title">اصلاح دستی مانده</h5>
-                <div class="payment-modal-subtitle">ثبت ردیف اصلاح دستی در گردش حساب {{ $customer->display_name ?: 'این مشتری' }}</div>
+                <h5 class="payment-modal-title">تنظیم دستی مانده</h5>
+                <div class="payment-modal-subtitle">تنظیم مانده نهایی گردش حساب {{ $customer->display_name ?: 'این مشتری' }}</div>
             </div>
 
             <button type="button" class="payment-modal-close" id="closeAdjustmentModalBtn" aria-label="بستن">
@@ -311,18 +311,26 @@
 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">نوع اصلاح</label>
-                        <select name="adjustment_type" class="form-select @error('adjustment_type', 'manualAdjustment') is-invalid @enderror" required>
-                            <option value="debit" @selected(old('adjustment_type') === 'debit')>بدهکار</option>
-                            <option value="credit" @selected(old('adjustment_type') === 'credit')>بستانکار</option>
+                        <label class="form-label">نوع مانده نهایی</label>
+                        <select name="balance_type" id="manualAdjustmentBalanceType" class="form-select @error('balance_type', 'manualAdjustment') is-invalid @enderror" required>
+                            <option value="debit" @selected(old('balance_type') === 'debit')>بدهکار</option>
+                            <option value="credit" @selected(old('balance_type') === 'credit')>بستانکار</option>
                         </select>
-                        @error('adjustment_type', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        @error('balance_type', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">مبلغ</label>
-                        <input type="number" min="1" step="1" class="form-control @error('amount', 'manualAdjustment') is-invalid @enderror" name="amount" value="{{ old('amount') }}" required>
+                        <label class="form-label">مبلغ مانده نهایی</label>
+                        <input type="text" inputmode="numeric" dir="ltr" class="form-control text-start @error('amount', 'manualAdjustment') is-invalid @enderror" id="manualAdjustmentAmount" name="amount" value="{{ old('amount') }}" required autocomplete="off">
                         @error('amount', 'manualAdjustment')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div class="col-12">
+                        <div class="alert alert-info small mb-0">عدد واردشده به مانده فعلی اضافه نمی‌شود؛ مانده حساب شخص دقیقاً روی همین مبلغ تنظیم می‌شود.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="text-muted small" id="manualAdjustmentPreview">بعد از ثبت، مانده نهایی این شخص: —</div>
                     </div>
 
                     <div class="col-12">
@@ -476,8 +484,43 @@
         ].filter(Boolean);
         const closeButton = document.getElementById('closeAdjustmentModalBtn');
         const cancelButton = document.getElementById('cancelAdjustmentModalBtn');
+        const amountInput = document.getElementById('manualAdjustmentAmount');
+        const balanceTypeSelect = document.getElementById('manualAdjustmentBalanceType');
+        const preview = document.getElementById('manualAdjustmentPreview');
+        const form = document.getElementById('accountStatementAdjustmentForm');
 
         if (!modal || !backdrop) return;
+
+        function normalizeDigits(value) {
+            const map = {
+                '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+                '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+                '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+            };
+
+            return String(value || '').replace(/[۰-۹٠-٩]/g, (char) => map[char] || char);
+        }
+
+        function rawAmount() {
+            return normalizeDigits(amountInput ? amountInput.value : '').replace(/[^0-9]/g, '');
+        }
+
+        function formatAmount(value) {
+            const raw = normalizeDigits(value).replace(/[^0-9]/g, '');
+            return raw === '' ? '' : raw.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        function updatePreview() {
+            if (!preview || !balanceTypeSelect) return;
+
+            const raw = rawAmount();
+            const label = balanceTypeSelect.value === 'credit' ? 'بستانکار' : 'بدهکار';
+
+            preview.textContent = raw === ''
+                ? 'بعد از ثبت، مانده نهایی این شخص: —'
+                : `بعد از ثبت، مانده نهایی این شخص: ${label} ${formatAmount(raw)} ریال خواهد شد.`;
+        }
 
         function openModal() {
             modal.classList.add('is-open');
@@ -492,6 +535,20 @@
             modal.setAttribute('aria-hidden', 'true');
             body.classList.remove('overflow-hidden');
         }
+
+        if (amountInput) {
+            amountInput.value = formatAmount(amountInput.value);
+            amountInput.addEventListener('input', function () {
+                amountInput.value = formatAmount(amountInput.value);
+                updatePreview();
+            });
+        }
+
+        balanceTypeSelect && balanceTypeSelect.addEventListener('change', updatePreview);
+        form && form.addEventListener('submit', function () {
+            if (amountInput) amountInput.value = rawAmount();
+        });
+        updatePreview();
 
         openButtons.forEach((btn) => btn.addEventListener('click', openModal));
         closeButton && closeButton.addEventListener('click', closeModal);

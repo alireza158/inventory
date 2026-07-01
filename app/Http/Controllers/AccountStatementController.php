@@ -177,24 +177,50 @@ class AccountStatementController extends Controller
 
     public function storeManualAdjustment(Request $request, Customer $customer)
     {
+        $request->merge([
+            'amount' => $this->normalizeIntegerAmount($request->input('amount')),
+        ]);
+
         $data = $request->validateWithBag('manualAdjustment', [
-            'adjustment_type' => ['required', 'in:debit,credit'],
+            'balance_type' => ['required', 'in:debit,credit'],
             'amount' => ['required', 'integer', 'min:1'],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $amount = (int) $data['amount'];
+        $targetBalance = $data['balance_type'] === 'debit' ? $amount : -$amount;
+        $balanceLabel = $data['balance_type'] === 'debit' ? 'بدهکار' : 'بستانکار';
         $user = $request->user();
         $userName = $user?->name ?: 'کاربر نامشخص';
         $userNote = trim((string) ($data['note'] ?? ''));
-        $ledgerNote = $userNote === ''
-            ? 'اصلاح دستی گردش حساب توسط مالی'
-            : 'اصلاح دستی گردش حساب - ' . $userNote;
+        $ledgerNote = 'تنظیم دستی مانده حساب به ' . $balanceLabel . ' ' . number_format($amount) . ' ریال';
 
-        DB::transaction(function () use ($customer, $data, $ledgerNote, $user, $userName, $userNote): void {
+        if ($userNote !== '') {
+            $ledgerNote .= ' - ' . $userNote;
+        }
+
+        $createdLedger = DB::transaction(function () use ($customer, $data, $amount, $targetBalance, $ledgerNote, $user, $userName, $userNote) {
+            $totalDebit = (int) CustomerLedger::query()
+                ->where('customer_id', $customer->id)
+                ->where('type', 'debit')
+                ->sum('amount');
+
+            $totalCredit = (int) CustomerLedger::query()
+                ->where('customer_id', $customer->id)
+                ->where('type', 'credit')
+                ->sum('amount');
+
+            $currentBalance = (int) $customer->opening_balance + $totalDebit - $totalCredit;
+            $delta = $targetBalance - $currentBalance;
+
+            if ($delta === 0) {
+                return null;
+            }
+
             $ledger = CustomerLedger::create([
                 'customer_id' => $customer->id,
-                'type' => $data['adjustment_type'],
-                'amount' => (int) $data['amount'],
+                'type' => $delta > 0 ? 'debit' : 'credit',
+                'amount' => abs($delta),
                 'reference_type' => null,
                 'reference_id' => null,
                 'note' => $ledgerNote,
@@ -209,19 +235,44 @@ class AccountStatementController extends Controller
                     'description' => 'اصلاح دستی گردش حساب مشتری توسط ' . $userName,
                     'properties' => [
                         'customer_id' => $customer->id,
-                        'amount' => (int) $data['amount'],
-                        'adjustment_type' => $data['adjustment_type'],
+                        'amount' => $amount,
+                        'balance_type' => $data['balance_type'],
+                        'target_balance' => $targetBalance,
+                        'previous_balance' => $currentBalance,
+                        'delta' => $delta,
+                        'ledger_type' => $ledger->type,
+                        'ledger_amount' => (int) $ledger->amount,
                         'user_id' => $user?->id,
                         'note' => $userNote === '' ? null : $userNote,
                     ],
                     'occurred_at' => now(),
                 ]);
             }
+
+            return $ledger;
         });
+
+        if ($createdLedger === null) {
+            return redirect()
+                ->route('account-statements.show', $customer)
+                ->with('success', 'مانده حساب همین الان با مبلغ واردشده برابر است.');
+        }
 
         return redirect()
             ->route('account-statements.show', $customer)
-            ->with('success', 'اصلاح دستی گردش حساب با موفقیت ثبت شد.');
+            ->with('success', 'مانده حساب با موفقیت روی مبلغ واردشده تنظیم شد.');
+    }
+
+    private function normalizeIntegerAmount(mixed $value): string
+    {
+        $normalized = strtr((string) $value, [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]);
+
+        return preg_replace('/[^0-9]/', '', $normalized) ?? '';
     }
 
     public function showInvoice(string $uuid)
