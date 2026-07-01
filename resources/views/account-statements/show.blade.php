@@ -326,14 +326,13 @@
                         >
                     </div>
 
-                    <div class="col-md-4">
+                    <div class="col-md-4 as-cash-fields">
                         <label class="form-label">تاریخ پرداخت</label>
                         <input
                             type="date"
                             class="form-control"
                             name="paid_at"
                             value="{{ old('paid_at') }}"
-                            required
                         >
                     </div>
 
@@ -355,68 +354,32 @@
 
                     <div class="col-12 as-cheque-fields d-none">
                         <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label">شماره چک</label>
+                            <div class="col-md-6">
+                                <label class="form-label">شماره سریال چک</label>
                                 <input type="text" class="form-control" name="cheque_number" value="{{ old('cheque_number') }}">
                             </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label">نام بانک</label>
-                                <input type="text" class="form-control" name="cheque_bank_name" value="{{ old('cheque_bank_name') }}">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">نام شعبه</label>
-                                <input type="text" class="form-control" name="cheque_branch_name" value="{{ old('cheque_branch_name') }}">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">تاریخ سررسید</label>
-                                <input type="date" class="form-control" name="cheque_due_date" value="{{ old('cheque_due_date') }}">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">تاریخ دریافت چک</label>
-                                <input type="date" class="form-control" name="cheque_received_at" value="{{ old('cheque_received_at') }}">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">نام مشتری</label>
-                                <input type="text" class="form-control" name="cheque_customer_name" value="{{ old('cheque_customer_name', $customer->display_name) }}">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">کد/شناسه مشتری</label>
-                                <input type="text" class="form-control" name="cheque_customer_code" value="{{ old('cheque_customer_code') }}">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">شماره حساب/شبا</label>
-                                <input type="text" class="form-control" name="cheque_account_number" value="{{ old('cheque_account_number') }}">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">صاحب حساب</label>
-                                <input type="text" class="form-control" name="cheque_account_holder" value="{{ old('cheque_account_holder') }}">
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">وضعیت چک</label>
-                                <select name="cheque_status" class="form-select">
-                                    <option value="pending" @selected(old('cheque_status', 'pending') === 'pending')>در انتظار وصول</option>
-                                    <option value="cleared" @selected(old('cheque_status') === 'cleared')>وصول شده</option>
-                                    <option value="bounced" @selected(old('cheque_status') === 'bounced')>برگشتی</option>
-                                </select>
+                            <div class="col-md-6">
+                                <label class="form-label">تاریخ ثبت چک</label>
+                                <input type="date" class="form-control" name="received_at" value="{{ old('received_at') }}">
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">تصویر چک</label>
-                                <input type="file" class="form-control" name="cheque_image" accept="image/*">
+                                <label class="form-label">تاریخ سررسید چک</label>
+                                <input type="date" class="form-control" name="due_date" value="{{ old('due_date') }}">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">وضعیت چک</label>
+                                <select name="status" class="form-select">
+                                    <option value="registered" @selected(old('status') === 'registered')>ثبت‌شده</option>
+                                    <option value="unregistered" @selected(old('status') === 'unregistered')>ثبت‌نشده</option>
+                                </select>
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-12">
+                    <div class="col-12 as-cash-fields">
                         <label class="form-label">یادداشت</label>
                         <textarea name="note" class="form-control" rows="3" placeholder="اختیاری">{{ old('note') }}</textarea>
                     </div>

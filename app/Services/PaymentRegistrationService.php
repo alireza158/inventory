@@ -34,7 +34,7 @@ class PaymentRegistrationService
                 ? ($payload['cheque_number'] ?? $payload['payment_identifier'] ?? null)
                 : ($payload['payment_identifier'] ?? null),
             'receipt_image' => $receiptImagePath,
-            'note' => $payload['note'] ?? null,
+            'note' => $method === 'cheque' ? null : ($payload['note'] ?? null),
         ]);
 
         if ($method === 'cheque') {
