@@ -22,8 +22,18 @@ class NotificationController extends Controller
 
     public function latest(Request $request): JsonResponse
     {
-        $items = SystemNotification::query()->forUser($request->user())->latest('id')->limit(10)->get();
-        return response()->json($items);
+        $afterId = max((int) $request->query('after_id', 0), 0);
+        $query = SystemNotification::query()->forUser($request->user());
+        if ($afterId > 0) {
+            $query->where('id', '>', $afterId);
+        }
+
+        $items = $query->latest('id')->limit(10)->get();
+
+        return response()->json([
+            'latest_id' => (int) (SystemNotification::query()->forUser($request->user())->max('id') ?? 0),
+            'items' => $items,
+        ]);
     }
 
     public function unreadCount(Request $request): JsonResponse

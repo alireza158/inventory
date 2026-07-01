@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SystemNotification;
+use App\Models\User;
 
 class NotificationService
 {
@@ -16,6 +17,34 @@ class NotificationService
             'message' => $message,
             'link' => $link,
         ], $meta);
+    }
+
+
+    public function notifyRoles(array $roles, string $type, string $title, ?string $message, ?string $link, array $meta = []): array
+    {
+        $notifications = [];
+        foreach (array_unique($roles) as $role) {
+            $roleMeta = $meta;
+            if (!empty($roleMeta['unique_key'])) {
+                $roleMeta['unique_key'] .= ':role:' . $role;
+            }
+            $notifications[] = $this->notifyRole($role, $type, $title, $message, $link, $roleMeta);
+        }
+
+        return $notifications;
+    }
+
+    public function notifyUsersWithAnyRole(array $roles, string $type, string $title, ?string $message, ?string $link, array $meta = []): array
+    {
+        $users = User::role($roles)->where('is_active', true)->pluck('id');
+
+        return $users->map(function (int $userId) use ($type, $title, $message, $link, $meta) {
+            $userMeta = $meta;
+            if (!empty($userMeta['unique_key'])) {
+                $userMeta['unique_key'] .= ':user:' . $userId;
+            }
+            return $this->notifyUser($userId, $type, $title, $message, $link, $userMeta);
+        })->all();
     }
 
     public function notifyUser(int $userId, string $type, string $title, ?string $message, ?string $link, array $meta = []): SystemNotification
