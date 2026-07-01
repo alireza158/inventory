@@ -50,7 +50,11 @@ class WarehouseReservationController extends Controller
             'stats' => $stats,
             'filters' => $filters,
             'users' => User::query()->orderBy('name')->get(['id', 'name']),
-            'customers' => Customer::query()->orderBy('name')->limit(500)->get(['id', 'name', 'phone']),
+            'customers' => Customer::query()
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->limit(500)
+                ->get(['id', 'first_name', 'last_name', 'mobile']),
             'statusLabels' => PreinvoiceOrder::statusLabels(),
         ]);
     }
@@ -149,7 +153,7 @@ class WarehouseReservationController extends Controller
             'type' => $type, 'source_id' => $source->id, 'product' => $product?->name ?? '—',
             'variant' => $variant?->variant_name ?? $variant?->variety_name ?? '—', 'sku' => $variant?->variant_code ?? $variant?->variety_code ?? $product?->sku ?? $product?->code ?? '—',
             'quantity' => $quantity, 'type_label' => $typeLabel, 'age_hours' => $age,
-            'user_id' => $user?->id, 'customer_id' => $customer?->id, 'user' => $user?->name ?? '—', 'customer' => $customer?->name ?? ($customer?->phone ?? 'نامشخص'),
+            'user_id' => $user?->id, 'customer_id' => $customer?->id, 'user' => $user?->name ?? '—', 'customer' => $customer ? ($customer->display_name ?: ($customer->mobile ?: 'نامشخص')) : 'نامشخص',
             'document_no' => $documentNo ?: '—', 'document_status' => $status ?: '—', 'created_at' => $createdAt,
             'created_at_ts' => $createdAt->timestamp, 'alert' => $age > 20 ? 'red' : ($age >= 6 ? 'yellow' : 'normal'),
             'releasable' => $releasable, 'document_url' => $documentUrl, 'reservation' => $reservation,
