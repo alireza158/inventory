@@ -7,7 +7,7 @@
     $productsActive = $isRoute('products.*', 'admin.product-exports.*', 'product-deactivation-documents.*', 'categories.*', 'model-lists.*')
         && !$isRoute('products.create');
 
-    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*', 'preinvoice.warehouse.*', 'warehouse.reviews.*', 'products.create', 'warehouse-map.*');
+    $warehouseActive = $isRoute('purchases.*', 'vouchers.*', 'stocktake.*', 'stocktake.index', 'asset.*', 'preinvoice.warehouse.*', 'warehouse.reviews.*', 'products.create', 'warehouse-map.*', 'warehouse.reservations.*');
 
     $salesActive = $isRoute('preinvoice.create', 'preinvoice.my.*', 'customers.*', 'persons.*');
 
@@ -239,7 +239,7 @@
 
 
         {{-- Warehouse --}}
-        @canAnyPermission(['products.create','stock_in.view','stock_in.create','stock_out.view','issues.view','inventory.count.view','assets.view','warehouse_map.view','preinvoices.warehouse.view','preinvoices.warehouse.reviews.view'])
+        @canAnyPermission(['products.create','stock_in.view','stock_in.create','stock_out.view','issues.view','inventory.count.view','assets.view','warehouse_map.view','preinvoices.warehouse.view','preinvoices.warehouse.reviews.view','warehouse.reservations.view'])
         <div class="sidebar-accordion-item {{ $warehouseActive ? 'is-open' : '' }}" data-accordion-section="warehouse">
             <button type="button"
                     class="sidebar-section-title sidebar-accordion-trigger {{ $warehouseActive ? 'is-active' : '' }}"
@@ -266,6 +266,9 @@
                     @endcanPermission
                     @canPermission('preinvoices.warehouse.reviews.view')
                     <a class="sidebar-sublink {{ $is('warehouse.reviews.*') }}" href="{{ route('warehouse.reviews.index') }}">سوابق تأیید انبار</a>
+                    @endcanPermission
+                    @canPermission('warehouse.reservations.view')
+                    <a class="sidebar-sublink {{ $is('warehouse.reservations.*') }}" href="{{ route('warehouse.reservations.index') }}">ردیابی رزروها</a>
                     @endcanPermission
                     @canPermission('stock_out.view')
                     <a class="sidebar-sublink {{ $is('vouchers.sales.queue', 'vouchers.sales.shipped') }}" href="{{ route('vouchers.sales.queue') }}">صف جمع‌آوری و ارسال انبار</a>
