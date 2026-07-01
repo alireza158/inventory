@@ -13,7 +13,6 @@ use App\Services\WarehouseStockService;
 use App\Support\IranLocations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -324,15 +323,6 @@ class PreinvoiceApiController extends Controller
                         ]);
                     }
                 }
-
-                Log::debug('PREINVOICE_DRAFT_RESERVE', [
-                    'user_id' => $userId,
-                    'token' => $token,
-                    'variant_id' => $variantId,
-                    'quantity' => $newQty,
-                    'old_quantity' => $oldQty,
-                    'delta' => $newQty - $oldQty,
-                ]);
 
                 $delta = $newQty - $oldQty;
                 if ($delta > 0) {
