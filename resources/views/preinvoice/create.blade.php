@@ -2304,6 +2304,13 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         return Math.max(variantStock(v), currentQty);
     }
 
+    function variantSaleWarning(v, price, stock, qty) {
+        if (v?.sale_warning) return String(v.sale_warning);
+        if (Number(price || 0) <= 0) return 'قیمت فروش ثبت نشده';
+        if (Number(stock || 0) <= 0 && Number(qty || 0) <= 0) return 'موجودی آزاد ندارد';
+        return '';
+    }
+
     function renderPickerRows() {
         const wrap = document.getElementById('groupPickerRows');
         const rows = filteredModalItems();
@@ -2319,9 +2326,10 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
             const max = modalMaxQty(v);
             const qty = Number(modalQuantities.get(id) || 0);
             const price = variantPrice(v, activeProduct);
+            const warning = variantSaleWarning(v, price, stock, qty);
             const selectedClass = qty > 0 ? 'row-selected' : '';
-            const noStockClass = stock <= 0 && qty <= 0 ? 'row-empty-stock' : '';
-            const disabled = stock <= 0 && qty <= 0 ? 'disabled' : '';
+            const noStockClass = warning && qty <= 0 ? 'row-empty-stock' : '';
+            const disabled = warning && qty <= 0 ? 'disabled' : '';
             return `
         <div class="variant-row ${selectedClass} ${noStockClass}" data-row-variant="${id}">
             <div>
@@ -2333,6 +2341,7 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
                     <span class="badge-soft">پیش‌فاکتور شده: ${formatNum(reserved)}</span>
                     <span class="badge-soft">کل موجودی: ${formatNum(totalStock)}</span>
                     <span class="badge-soft">قیمت: ${formatMoney(price)}</span>
+                    ${warning ? `<span class="badge-soft badge-no-stock">${esc(warning)}</span>` : ''}
                     ${v?.is_current_preinvoice_item ? `<span class="badge-soft badge-brand">در پیش‌فاکتور موجود است${stock <= 0 ? ' / موجودی فعلی ناکافی است' : ''}</span>` : ''}
                     ${qty > 0 ? `<span class="badge-soft badge-brand">انتخاب: ${formatNum(qty)}</span>` : ''}
                 </div>
@@ -2351,6 +2360,14 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
         const item = activeModalItems.find(v => variantId(v) === id);
         if (!item) return;
         const max = modalMaxQty(item);
+        const stock = variantStock(item);
+        const price = variantPrice(item, activeProduct);
+        if (variantSaleWarning(item, price, stock, Number(modalQuantities.get(id) || 0)) && Number(modalQuantities.get(id) || 0) <= 0) {
+            modalQuantities.set(id, 0);
+            updateModalSummary();
+            if (shouldRender) renderPickerRows();
+            return;
+        }
         const cleanedValue = toEnglishDigits(value).replace(/[^0-9]/g, '');
         let qty = parseInt(cleanedValue || '0', 10);
         if (!Number.isFinite(qty)) qty = 0;
@@ -2409,19 +2426,31 @@ $oldPreinvoiceDescription = old('description', $order->description ?? '');
     async function saveGroupSelection() {
         if (!activeProductId || !activeProduct) return;
         const items = [];
+        let blockedWarning = '';
         activeModalItems.forEach(v => {
             const id = variantId(v);
             const qty = Number(modalQuantities.get(id) || 0);
+            const price = variantPrice(v, activeProduct);
+            const stock = variantStock(v);
+            const warning = variantSaleWarning(v, price, stock, qty);
+            if (qty > 0 && warning) {
+                blockedWarning = warning;
+                return;
+            }
             if (qty > 0) items.push({
                 variant_id: id,
                 quantity: qty,
-                price: variantPrice(v, activeProduct),
+                price,
                 model: variantModel(v),
                 design: variantDesign(v),
                 variant: variantName(v),
                 label: buildVariantTitle(v)
             });
         });
+        if (blockedWarning) {
+            alert(blockedWarning);
+            return;
+        }
         if (!items.length) {
             alert('حداقل یک کالا را انتخاب کنید.');
             return;
