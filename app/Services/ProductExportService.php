@@ -122,18 +122,54 @@ class ProductExportService
                     $warehouseFilterActive
                 );
 
-                return match ($stockStatus) {
-                    'in_stock' => $stock > 0,
-
-                    'out_of_stock' => $stock <= 0,
-
-                    'low_stock' => $stock > 0
-                        && $stock <= self::LOW_STOCK_THRESHOLD,
-
-                    default => true,
-                };
+                return $this->matchesStockStatus($stock, $stockStatus);
             })
             ->values();
+    }
+
+    public function exportStats(array $filters, ?int $stopAfterProducts = null, ?int $stopAfterVariants = null): array
+    {
+        $warehouseFilterActive = ! empty($filters['warehouse_id']);
+        $stockStatus = $filters['stock_status'] ?? 'all';
+        $productsCount = 0;
+        $variantsCount = 0;
+
+        $this->query($filters)
+            ->reorder('products.id')
+            ->chunkById(100, function (Collection $products) use (
+                $filters,
+                $stockStatus,
+                $warehouseFilterActive,
+                $stopAfterProducts,
+                $stopAfterVariants,
+                &$productsCount,
+                &$variantsCount
+            ) {
+                foreach ($products as $product) {
+                    $stock = $this->stock($product, $warehouseFilterActive);
+
+                    if (! $this->matchesStockStatus($stock, $stockStatus)) {
+                        continue;
+                    }
+
+                    $productsCount++;
+                    $variantsCount += $this->displayVariants($product, $filters)->count();
+
+                    if (
+                        ($stopAfterProducts !== null && $productsCount > $stopAfterProducts)
+                        || ($stopAfterVariants !== null && $variantsCount > $stopAfterVariants)
+                    ) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }, 'products.id', 'id');
+
+        return [
+            'products_count' => $productsCount,
+            'variants_count' => $variantsCount,
+        ];
     }
 
     /**
@@ -163,12 +199,7 @@ class ProductExportService
                 foreach ($products as $product) {
                     $stock = $this->stock($product, $warehouseFilterActive);
 
-                    $matchesStockStatus = match ($stockStatus) {
-                        'in_stock' => $stock > 0,
-                        'out_of_stock' => $stock <= 0,
-                        'low_stock' => $stock > 0 && $stock <= self::LOW_STOCK_THRESHOLD,
-                        default => true,
-                    };
+                    $matchesStockStatus = $this->matchesStockStatus($stock, $stockStatus);
 
                     if (! $matchesStockStatus) {
                         continue;
@@ -181,6 +212,16 @@ class ProductExportService
             }, 'products.id', 'id');
 
         return $index;
+    }
+
+    private function matchesStockStatus(int $stock, string $stockStatus): bool
+    {
+        return match ($stockStatus) {
+            'in_stock' => $stock > 0,
+            'out_of_stock' => $stock <= 0,
+            'low_stock' => $stock > 0 && $stock <= self::LOW_STOCK_THRESHOLD,
+            default => true,
+        };
     }
 
     /**

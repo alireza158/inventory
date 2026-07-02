@@ -16,6 +16,9 @@ use Throwable;
 
 class ProductExportController extends Controller
 {
+    private const MAX_PDF_PRODUCTS = 300;
+    private const MAX_PDF_VARIANTS = 1500;
+
     public function __construct(
         private readonly ProductExportService $service
     ) {
@@ -60,6 +63,18 @@ class ProductExportController extends Controller
         $filters = $this->validatedFilters($request, true);
 
         try {
+            $stats = $this->service->exportStats(
+                $filters,
+                self::MAX_PDF_PRODUCTS,
+                self::MAX_PDF_VARIANTS
+            );
+
+            if ($this->pdfExportIsTooLarge($stats)) {
+                return redirect()
+                    ->route('admin.product-exports.index', $this->redirectFilters($filters))
+                    ->with('error', $this->largeExportMessage($stats));
+            }
+
             $this->preparePdfEnvironment();
             $this->prepareLongRunningExport();
 
@@ -148,19 +163,52 @@ class ProductExportController extends Controller
                 ])
                 ->deleteFileAfterSend(true);
         } catch (Throwable $exception) {
-            Log::error('Product PDF export failed.', [
+            $context = [
+                'filters' => $request->all(),
+                'normalized_filters' => $filters,
+                'user_id' => auth()->id(),
                 'message' => $exception->getMessage(),
+                'exception' => get_class($exception),
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
-                'filters' => $filters,
-                'trace' => $exception->getTraceAsString(),
-            ]);
+            ];
 
-            return back()->with(
-                'error',
-                'خطا در ساخت PDF رخ داد. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.'
-            );
+            if (app()->environment('local')) {
+                $context['trace'] = $exception->getTraceAsString();
+            }
+
+            Log::error('Product export PDF failed', $context);
+
+            return redirect()
+                ->route('admin.product-exports.index', $this->redirectFilters($filters))
+                ->with(
+                    'error',
+                    'خطا در ساخت PDF رخ داد. لطفاً چند لحظه بعد دوباره تلاش کنید یا فیلترها را محدودتر کنید.'
+                );
         }
+    }
+
+    private function pdfExportIsTooLarge(array $stats): bool
+    {
+        return ($stats['products_count'] ?? 0) > self::MAX_PDF_PRODUCTS
+            || ($stats['variants_count'] ?? 0) > self::MAX_PDF_VARIANTS;
+    }
+
+    private function largeExportMessage(array $stats): string
+    {
+        return sprintf(
+            'تعداد نتایج برای ساخت PDF زیاد است: %s محصول و %s تنوع. لطفاً فیلترها را محدودتر کنید.',
+            number_format((int) ($stats['products_count'] ?? 0)),
+            number_format((int) ($stats['variants_count'] ?? 0))
+        );
+    }
+
+    private function redirectFilters(array $filters): array
+    {
+        return collect($filters)
+            ->except('format')
+            ->reject(fn ($value) => $value === null || $value === '' || $value === [])
+            ->all();
     }
 
     private function prepareLongRunningExport(): void
@@ -212,14 +260,7 @@ class ProductExportController extends Controller
     {
         $directory = storage_path('app/mpdf-temp');
 
-        if (! File::isDirectory($directory)) {
-            File::makeDirectory(
-                $directory,
-                0775,
-                true,
-                true
-            );
-        }
+        File::ensureDirectoryExists($directory, 0775, true);
     }
 
     private function pdfFooter(array $meta): string

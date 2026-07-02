@@ -170,6 +170,8 @@
         border-color: #dc2626;
     }
     .btn-export-pdf:hover { color: #fff; background: #b91c1c; border-color: #b91c1c; }
+    .export-pdf-action { display: flex; flex-direction: column; gap: .25rem; }
+    .export-pdf-hint { max-width: 230px; color: var(--export-muted); font-size: .72rem; line-height: 1.5; }
     .export-result { position: relative; margin-top: 1.25rem; overflow: hidden; min-height: 180px; }
     .loading-mask {
         position: absolute;
@@ -238,7 +240,9 @@
         .export-toolbar__actions { align-items: stretch; flex-direction: column; }
         .export-toolbar__actions,
         .export-filter-chips { width: 100%; }
-        .export-filter-chip { max-width: 100%; }
+        .export-filter-chip,
+        .export-pdf-action,
+        .export-pdf-hint { max-width: 100%; width: 100%; }
         .export-filter-grid { grid-template-columns: 1fr; }
         .export-filter-modal .modal-dialog { margin: .5rem; max-width: calc(100vw - 1rem); }
         .export-actions { align-items: stretch; flex-direction: column; }
@@ -287,10 +291,13 @@
                     @endif
                 </button>
 
-                <button type="button" data-format="pdf" class="btn btn-export btn-export-pdf">
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    دریافت خروجی PDF
-                </button>
+                <div class="export-pdf-action">
+                    <button type="button" data-format="pdf" class="btn btn-export btn-export-pdf">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        دریافت خروجی PDF
+                    </button>
+                    <small class="export-pdf-hint">برای PDF بهتر است خروجی را با دسته‌بندی یا مدل‌لیست محدود کنید.</small>
+                </div>
 
                 <a href="{{ route('admin.product-exports.index') }}" class="btn btn-outline-secondary btn-export">پاک کردن فیلترها</a>
             </div>
