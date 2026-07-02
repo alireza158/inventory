@@ -126,6 +126,8 @@ Route::get('/vouchers/sales', [InvoiceController::class, 'salesVouchers'])->name
 Route::get('/vouchers/sales/queue', [InvoiceController::class, 'salesQueue'])->middleware('role:admin|Admin|warehouse|Warehouse|manager|Manager')->name('vouchers.sales.queue');
 Route::get('/vouchers/sales/queue/data', [InvoiceController::class, 'salesQueueData'])->middleware('role:admin|Admin|warehouse|Warehouse|manager|Manager')->name('vouchers.sales.queue.data');
 Route::get('/vouchers/sales/shipped', [InvoiceController::class, 'salesShipped'])->middleware('role:admin|Admin|warehouse|Warehouse|manager|Manager')->name('vouchers.sales.shipped');
+Route::get('/warehouse/shipping', [InvoiceController::class, 'shippingIndex'])->middleware('role:admin|Admin|warehouse|Warehouse|manager|Manager')->name('warehouse.shipping.index');
+Route::post('/warehouse/shipping/{uuid}/mark-shipped', [InvoiceController::class, 'markShipped'])->middleware('role:admin|Admin|warehouse|Warehouse|manager|Manager')->name('warehouse.shipping.mark-shipped');
 Route::get('/vouchers/sales/ajax/categories', [InvoiceController::class, 'salesVoucherAjaxCategories'])->name('vouchers.sales.ajax.categories');
 Route::get('/vouchers/sales/ajax/subcategories', [InvoiceController::class, 'salesVoucherAjaxSubcategories'])->name('vouchers.sales.ajax.subcategories');
 Route::get('/vouchers/sales/ajax/products', [InvoiceController::class, 'salesVoucherAjaxProducts'])->name('vouchers.sales.ajax.products');
@@ -288,7 +290,7 @@ Route::delete('/vouchers/{voucher}', [VoucherController::class, 'destroy'])->nam
         Route::get('/{preinvoiceOrder:uuid}/print', [WarehouseReviewController::class, 'print'])->name('print');
     });
 
-    Route::get('/preinvoice/warehouse', [PreinvoiceController::class, 'warehouseQueue'])->name('preinvoice.warehouse.index');
+    Route::get('/preinvoice/warehouse', fn () => redirect()->route('preinvoice.draft.index')->with('info', 'مرحله تایید انبار از روند جدید حذف شده است. پیش‌فاکتورها مستقیم در صف مالی بررسی می‌شوند.'))->name('preinvoice.warehouse.index');
     Route::get('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseReview'])->name('preinvoice.warehouse.review');
     Route::put('/preinvoice/warehouse/{uuid}', [PreinvoiceController::class, 'warehouseSave'])->name('preinvoice.warehouse.save');
     Route::post('/preinvoice/warehouse/{uuid}/approve', [PreinvoiceController::class, 'warehouseApprove'])->name('preinvoice.warehouse.approve');
