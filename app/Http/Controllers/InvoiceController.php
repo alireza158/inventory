@@ -212,6 +212,55 @@ class InvoiceController extends Controller
         ]);
     }
 
+
+    public function shippingIndex(Request $request)
+    {
+        $invoices = Invoice::query()
+            ->with(['items.product', 'items.variant', 'preinvoiceOrder.creator:id,name'])
+            ->where('status', Invoice::STATUS_READY_TO_SHIP)
+            ->where(function ($query) {
+                $query->whereNull('shipping_status')->orWhere('shipping_status', '!=', Invoice::STATUS_SHIPPED);
+            })
+            ->orderBy('collection_completed_at')
+            ->orderBy('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('warehouse.shipping.index', [
+            'invoices' => $invoices,
+            'statusLabels' => $this->statusService->labels(),
+        ]);
+    }
+
+    public function markShipped(string $uuid, Request $request)
+    {
+        $invoice = Invoice::query()->where('uuid', $uuid)->firstOrFail();
+        abort_unless((string) $invoice->status === Invoice::STATUS_READY_TO_SHIP, 422);
+
+        $data = $request->validate([
+            'shipping_note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $invoice->update([
+            'shipping_status' => Invoice::STATUS_SHIPPED,
+            'shipping_note' => $data['shipping_note'] ?? null,
+            'shipped_at' => now(),
+            'shipped_by' => auth()->id(),
+            'status' => Invoice::STATUS_SHIPPED,
+            'status_changed_at' => now(),
+            'status_changed_by' => auth()->id(),
+        ]);
+
+        ActivityLogger::log('invoice_shipped', $invoice->fresh(), 'فاکتور از بخش ارسال بار به وضعیت ارسال‌شده منتقل شد.', [
+            'shipping_note' => $data['shipping_note'] ?? null,
+        ]);
+
+        $this->notifySellerForInvoiceStatus($invoice->fresh(), Invoice::STATUS_SHIPPED, $data['shipping_note'] ?? null);
+        $this->notifyDepartmentsForInvoiceStatus($invoice->fresh(), Invoice::STATUS_SHIPPED, $data['shipping_note'] ?? null);
+
+        return redirect()->route('warehouse.shipping.index')->with('success', '✅ فاکتور ارسال شد و از صف ارسال بار خارج شد.');
+    }
+
     public function salesQueueData(Request $request)
     {
         $invoices = $this->salesQueueQuery(false)->orderBy('status_changed_at')->orderBy('id')->limit(100)->get();
@@ -246,6 +295,8 @@ class InvoiceController extends Controller
     private function queueStatuses(): array
     {
         return [
+            SalesHavalehStatusService::PENDING_COLLECTION,
+            SalesHavalehStatusService::WAREHOUSE_RECEIVED,
             SalesHavalehStatusService::COLLECTING,
             SalesHavalehStatusService::CHECKING_DISCREPANCY,
             SalesHavalehStatusService::FINAL_CHECK,
@@ -566,8 +617,25 @@ class InvoiceController extends Controller
         ]);
 
         $updatedInvoice = $this->salesHavalehService->changeStatus($invoice, $data['status'], $data['note'] ?? null, auth()->id());
+        $stampPayload = [];
+        if ($data['status'] === Invoice::STATUS_WAREHOUSE_RECEIVED) {
+            $stampPayload = ['warehouse_received_at' => now(), 'warehouse_received_by' => auth()->id()];
+        } elseif ($data['status'] === Invoice::STATUS_COLLECTING) {
+            $stampPayload = ['collection_started_at' => now(), 'collection_started_by' => auth()->id()];
+        } elseif ($data['status'] === Invoice::STATUS_READY_TO_SHIP) {
+            $stampPayload = ['collection_completed_at' => now(), 'collection_completed_by' => auth()->id()];
+        }
+        if ($stampPayload) {
+            $updatedInvoice->update($stampPayload);
+            ActivityLogger::log('invoice_collection_status_changed', $updatedInvoice->fresh(), 'وضعیت جمع‌آوری فاکتور بروزرسانی شد.', ['new_status' => $data['status'], 'note' => $data['note'] ?? null]);
+        }
         $this->notifySellerForInvoiceStatus($updatedInvoice, $data['status'], $data['note'] ?? null);
         $this->notifyDepartmentsForInvoiceStatus($updatedInvoice, $data['status'], $data['note'] ?? null);
+
+        if ((string) $updatedInvoice->status === Invoice::STATUS_READY_TO_SHIP) {
+            return redirect()->route('vouchers.sales.queue')
+                ->with('success', '✅ جمع‌آوری تکمیل شد و فاکتور به صف ارسال بار منتقل شد.');
+        }
 
         if ((string) $updatedInvoice->status === Invoice::STATUS_SHIPPED) {
             return redirect()->route('vouchers.sales.queue')
@@ -651,7 +719,6 @@ class InvoiceController extends Controller
     {
         $query = Invoice::query()
             ->select('invoices.*')
-            ->where('invoices.status', '!=', Invoice::STATUS_PENDING_FINANCE_REAPPROVAL)
             ->selectSub('select coalesce(sum(amount), 0) from invoice_payments where invoice_payments.invoice_id = invoices.id', 'paid_total')
             ->when($filters['invoice_number'] !== '', fn ($q) => $q->where('uuid', 'like', '%' . $filters['invoice_number'] . '%'))
             ->when($filters['customer_name'] !== '', function ($query) use ($filters) {
