@@ -157,7 +157,7 @@ class VoucherController extends Controller
             }
 
             $invoice->loadMissing('items');
-            $totals = SalesDocumentTotals::calculate($invoice->items, (int) $invoice->discount_amount, (int) $invoice->shipping_price);
+            $totals = SalesDocumentTotals::calculate($invoice->items, (int) $invoice->discount_amount, (int) $invoice->shipping_price, ['discount_allocation_mode' => $invoice->discount_allocation_mode]);
             $subtotal = $totals['subtotal_before_discount'];
             $total = $totals['grand_total'];
             $invoice->update([
@@ -1007,7 +1007,7 @@ class VoucherController extends Controller
             }
 
             $invoice->loadMissing('items');
-            $totals = SalesDocumentTotals::calculate($invoice->items, (int) $invoice->discount_amount, (int) $invoice->shipping_price);
+            $totals = SalesDocumentTotals::calculate($invoice->items, (int) $invoice->discount_amount, (int) $invoice->shipping_price, ['discount_allocation_mode' => $invoice->discount_allocation_mode]);
             $subtotal = $totals['subtotal_before_discount'];
             $total = $totals['grand_total'];
 
