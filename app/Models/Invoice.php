@@ -20,7 +20,9 @@ class Invoice extends Model
         'uuid','customer_id','preinvoice_order_id','document_date',
         'customer_name','customer_mobile','customer_address',
         'province_id','city_id','shipping_id','shipping_price',
-        'discount_amount','subtotal','total','status','status_changed_at','status_changed_by'
+        'discount_amount','discount_breakdown','invoice_discount_type','invoice_discount_value',
+        'invoice_discount_amount','product_discount_amount','discount_allocation_mode',
+        'subtotal','total','status','status_changed_at','status_changed_by'
         ,'external_order_id', 'items_updated_at', 'items_updated_by'
     ];
 
@@ -28,6 +30,10 @@ class Invoice extends Model
         'document_date' => 'datetime',
         'status_changed_at' => 'datetime',
         'items_updated_at' => 'datetime',
+        'discount_breakdown' => 'array',
+        'invoice_discount_value' => 'integer',
+        'invoice_discount_amount' => 'integer',
+        'product_discount_amount' => 'integer',
     ];
 
     protected static function booted(): void

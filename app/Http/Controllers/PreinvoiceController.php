@@ -24,6 +24,7 @@ use App\Services\WarehouseStockService;
 use App\Services\CentralInventoryService;
 use App\Services\SalesDocumentAccessService;
 use App\Services\SalesPrintDocumentService;
+use App\Services\SalesDiscountAllocationService;
 use App\Services\PaymentRegistrationService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -42,6 +43,7 @@ class PreinvoiceController extends Controller
         private readonly SalesDocumentAccessService $accessService,
         private readonly WarehouseReviewAuditService $warehouseReviewAuditService,
         private readonly WarehousePendingRefreshService $warehousePendingRefreshService,
+        private readonly SalesDiscountAllocationService $discountAllocationService,
     ) {}
 
     public function create()
@@ -396,6 +398,8 @@ class PreinvoiceController extends Controller
             ]);
 
             $validated['products'] = $this->validateAndHydrateDraftItemsForSale($validated['products'], $validated['reservation_token'] ?? null);
+            [$validated['products'], $discountAllocation] = $this->applyDiscountAllocationToProducts($validated['products'], $validated);
+            $order->update($this->allocatedDiscountOrderPayload($discountAllocation));
             $this->syncItems($order, $validated['products']);
             $this->finalizeDraftReservations($order, $validated['reservation_token'] ?? null, $validated['products']);
             $this->syncPreinvoiceReservations($order, true);
@@ -493,6 +497,8 @@ class PreinvoiceController extends Controller
             ]);
 
             $validated['products'] = $this->validateAndHydrateDraftItemsForSale($validated['products'], $validated['reservation_token'] ?? null, $order);
+            [$validated['products'], $discountAllocation] = $this->applyDiscountAllocationToProducts($validated['products'], $validated);
+            $order->update($this->allocatedDiscountOrderPayload($discountAllocation));
             $this->syncItems($order, $validated['products'], true);
 
             if ($stockLocked) {
@@ -584,6 +590,7 @@ class PreinvoiceController extends Controller
             'shipping_price' => 'nullable|integer|min:0',
 
             'discount_amount' => 'nullable|integer|min:0',
+            'discount_breakdown' => 'nullable|string',
             'total_price' => 'nullable|integer|min:0',
 
             'products' => 'required|array|min:1',
@@ -1133,11 +1140,115 @@ class PreinvoiceController extends Controller
         ])->values()->all();
     }
 
+
+    private function allocateDraftDiscounts(array $products, array $validated): array
+    {
+        $rows = [];
+        foreach (array_values($products) as $index => $product) {
+            $rows[(string) $index] = [
+                'key' => (string) $index,
+                'product_id' => (int) ($product['id'] ?? 0),
+                'variant_id' => (int) ($product['variety_id'] ?? 0),
+                'quantity' => (int) ($product['quantity'] ?? 0),
+                'price' => (int) ($product['price'] ?? 0),
+            ];
+        }
+
+        $discountInput = $this->discountInputFromValidatedPayload($validated, $products);
+
+        return $this->discountAllocationService->allocate($rows, $discountInput);
+    }
+
+    private function discountInputFromValidatedPayload(array $validated, array $products): array
+    {
+        $payload = [];
+        $rawBreakdown = (string) ($validated['discount_breakdown'] ?? '');
+        if ($rawBreakdown !== '') {
+            $decoded = json_decode($rawBreakdown, true);
+            if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
+                throw ValidationException::withMessages(['discount_breakdown' => 'ساختار تخفیف معتبر نیست.']);
+            }
+            $payload = $decoded;
+        }
+
+        $availableProductIds = collect($products)->map(fn ($row) => (int) ($row['id'] ?? 0))->filter()->unique()->values()->all();
+        $availableProductSet = array_fill_keys($availableProductIds, true);
+        $productDiscounts = [];
+        foreach (($payload['groups'] ?? $payload['products'] ?? []) as $key => $group) {
+            if (! is_array($group)) {
+                continue;
+            }
+            $productId = (int) ($group['product_id'] ?? $key);
+            if ($productId <= 0) {
+                continue;
+            }
+            if (! isset($availableProductSet[$productId])) {
+                throw ValidationException::withMessages(['discount_breakdown' => 'برای کالایی که در سند وجود ندارد تخفیف ثبت شده است.']);
+            }
+            $type = (string) ($group['type'] ?? $group['discount_type'] ?? 'amount');
+            $value = $group['value'] ?? $group['discount_value'] ?? 0;
+            $productDiscounts[$productId] = $this->validatedDiscountInput($type, $value, "discount_breakdown.products.{$productId}");
+        }
+
+        $invoiceType = (string) ($payload['invoice']['type'] ?? $payload['invoice']['discount_type'] ?? $payload['order_discount_type'] ?? 'amount');
+        $invoiceValue = $payload['invoice']['value'] ?? $payload['invoice']['discount_value'] ?? $payload['order_discount_value'] ?? 0;
+
+        return [
+            'products' => $productDiscounts,
+            'invoice' => $this->validatedDiscountInput($invoiceType, $invoiceValue, 'discount_breakdown.invoice'),
+        ];
+    }
+
+    private function validatedDiscountInput(string $type, mixed $value, string $field): array
+    {
+        if (! in_array($type, ['amount', 'percent'], true)) {
+            throw ValidationException::withMessages([$field => 'نوع تخفیف باید amount یا percent باشد.']);
+        }
+        if (! is_numeric($value)) {
+            throw ValidationException::withMessages([$field => 'مقدار تخفیف باید عددی باشد.']);
+        }
+        $value = (int) floor((float) $value);
+        if ($value < 0) {
+            throw ValidationException::withMessages([$field => 'مقدار تخفیف نمی‌تواند منفی باشد.']);
+        }
+        if ($type === 'percent' && $value > 100) {
+            throw ValidationException::withMessages([$field => 'درصد تخفیف نمی‌تواند بیشتر از ۱۰۰ باشد.']);
+        }
+
+        return ['type' => $type, 'value' => $value];
+    }
+
+    private function applyDiscountAllocationToProducts(array $products, array $validated): array
+    {
+        $allocation = $this->allocateDraftDiscounts($products, $validated);
+        foreach (array_values($products) as $index => $product) {
+            $product['line_discount_amount'] = (int) ($allocation['lines'][(string) $index]['line_discount_amount'] ?? 0);
+            $products[$index] = $product;
+        }
+
+        return [$products, $allocation];
+    }
+
+    private function allocatedDiscountOrderPayload(array $allocation): array
+    {
+        $invoice = $allocation['breakdown']['invoice'] ?? [];
+
+        return [
+            'discount_amount' => (int) $allocation['total_discount_amount'],
+            'discount_breakdown' => $allocation['breakdown'],
+            'invoice_discount_type' => $invoice['discount_type'] ?? 'amount',
+            'invoice_discount_value' => (int) ($invoice['discount_value'] ?? 0),
+            'invoice_discount_amount' => (int) $allocation['invoice_discount_amount'],
+            'product_discount_amount' => (int) $allocation['product_discount_amount'],
+            'discount_allocation_mode' => SalesDiscountAllocationService::MODE_ALLOCATED_LINES,
+        ];
+    }
+
     private function calculateOrderTotal(PreinvoiceOrder $order): int
     {
         $order->loadMissing('items');
 
-        return SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price)['grand_total'];
+        return SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price, ['discount_allocation_mode' => $order->discount_allocation_mode])['grand_total'];
     }
 
     private function itemChangeSignatureFromOrder(PreinvoiceOrder $order): array
@@ -1260,7 +1371,7 @@ class PreinvoiceController extends Controller
             return;
         }
 
-        $totals = SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price);
+        $totals = SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price, ['discount_allocation_mode' => $order->discount_allocation_mode]);
         $subtotal = $totals['subtotal_before_discount'];
         $total = $totals['grand_total'];
 
@@ -1288,6 +1399,12 @@ class PreinvoiceController extends Controller
             'shipping_id' => $order->shipping_id,
             'shipping_price' => (int) $order->shipping_price,
             'discount_amount' => (int) $order->discount_amount,
+            'discount_breakdown' => $order->discount_breakdown,
+            'invoice_discount_type' => $order->invoice_discount_type,
+            'invoice_discount_value' => (int) $order->invoice_discount_value,
+            'invoice_discount_amount' => (int) $order->invoice_discount_amount,
+            'product_discount_amount' => (int) $order->product_discount_amount,
+            'discount_allocation_mode' => $order->discount_allocation_mode,
             'subtotal' => $subtotal,
             'total' => $total,
             'status' => Invoice::STATUS_PENDING_WAREHOUSE_APPROVAL,
@@ -2048,7 +2165,7 @@ class PreinvoiceController extends Controller
                     $variant->save();
                 }
             }
-            $totals = SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price);
+            $totals = SalesDocumentTotals::calculate($order->items, (int) $order->discount_amount, (int) $order->shipping_price, ['discount_allocation_mode' => $order->discount_allocation_mode]);
             $subtotal = $totals['subtotal_before_discount'];
             $total = $totals['grand_total'];
 
@@ -2092,6 +2209,12 @@ class PreinvoiceController extends Controller
                     'shipping_id' => $order->shipping_id,
                     'shipping_price' => (int) $order->shipping_price,
                     'discount_amount' => (int) $order->discount_amount,
+                    'discount_breakdown' => $order->discount_breakdown,
+                    'invoice_discount_type' => $order->invoice_discount_type,
+                    'invoice_discount_value' => (int) $order->invoice_discount_value,
+                    'invoice_discount_amount' => (int) $order->invoice_discount_amount,
+                    'product_discount_amount' => (int) $order->product_discount_amount,
+                    'discount_allocation_mode' => $order->discount_allocation_mode,
                     'subtotal' => (int) $subtotal,
                     'total' => (int) $total,
                     'status' => Invoice::STATUS_COLLECTING,
@@ -2114,6 +2237,12 @@ class PreinvoiceController extends Controller
                     'shipping_id' => $order->shipping_id,
                     'shipping_price' => (int) $order->shipping_price,
                     'discount_amount' => (int) $order->discount_amount,
+                    'discount_breakdown' => $order->discount_breakdown,
+                    'invoice_discount_type' => $order->invoice_discount_type,
+                    'invoice_discount_value' => (int) $order->invoice_discount_value,
+                    'invoice_discount_amount' => (int) $order->invoice_discount_amount,
+                    'product_discount_amount' => (int) $order->product_discount_amount,
+                    'discount_allocation_mode' => $order->discount_allocation_mode,
                     'subtotal' => (int) $subtotal,
                     'total' => (int) $total,
                     'status' => Invoice::STATUS_COLLECTING,
