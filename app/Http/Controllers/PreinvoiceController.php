@@ -300,15 +300,9 @@ class PreinvoiceController extends Controller
             ->orderByDesc('id')
             ->paginate(20);
 
-        $reapprovalInvoices = Invoice::query()
-            ->where('status', Invoice::STATUS_PENDING_FINANCE_REAPPROVAL)
-            ->with(['preinvoiceOrder.creator:id,name'])
-            ->orderByDesc('updated_at')
-            ->get();
-
         $canFinanceApprove = $this->canHandleFinanceActions();
 
-        return view('preinvoice.drafts-index', compact('orders', 'canFinanceApprove', 'reapprovalInvoices'));
+        return view('preinvoice.drafts-index', compact('orders', 'canFinanceApprove'));
     }
 
     public function allIndex(Request $request)
@@ -383,7 +377,7 @@ class PreinvoiceController extends Controller
             $order = PreinvoiceOrder::create([
                 'uuid' => DocumentCodeGenerator::generateUnique5DigitCode(PreinvoiceOrder::class),
                 'created_by' => auth()->id(),
-                'status' => PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE,
+                'status' => PreinvoiceOrder::STATUS_RESERVED_WAITING_WAREHOUSE,
 
                 'customer_id' => $customer?->id,
                 'customer_name' => $this->orderCustomerName($validated, $customer),
@@ -413,17 +407,17 @@ class PreinvoiceController extends Controller
             $this->warehouseReviewAuditService->ensureBeforeSnapshot($order->fresh(['items.product', 'items.variant', 'creator', 'customer']), auth()->id(), null);
 
             $this->notificationService->notifyRole(
-                'finance',
-                'preinvoice_submitted_to_finance',
-                'پیش‌فاکتور جدید در انتظار تایید مالی',
-                "پیش‌فاکتور مشتری {$order->customer_name} با مبلغ " . Currency::formatRialNumber($order->total_price) . " ریال ثبت شد و مستقیم منتظر بررسی مالی است.",
-                route('preinvoice.draft.finance', $order->uuid),
-                ['level' => 'info', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "finance_preinvoice_submitted:{$order->id}"]
+                'warehouse',
+                'preinvoice_submitted_to_warehouse',
+                'پیش‌فاکتور جدید در انتظار تایید انبار',
+                "پیش‌فاکتور مشتری {$order->customer_name} با مبلغ " . Currency::formatRialNumber($order->total_price) . " ریال ثبت شد و منتظر بررسی انبار است.",
+                route('preinvoice.warehouse.review', $order->uuid),
+                ['level' => 'info', 'notifiable_type' => PreinvoiceOrder::class, 'notifiable_id' => $order->id, 'unique_key' => "warehouse_preinvoice_submitted:{$order->id}"]
             );
         });
 
         return redirect()->route('preinvoice.create')
-            ->with('success', '✅ پیش‌فاکتور ثبت و مستقیم برای تایید مالی ارسال شد.');
+            ->with('success', '✅ پیش‌فاکتور ثبت و برای تایید انبار ارسال شد.');
     }
 
     public function editDraft(string $uuid)
@@ -1922,7 +1916,7 @@ class PreinvoiceController extends Controller
         $order = PreinvoiceOrder::with(['items.product', 'items.variant', 'creator:id,name'])
             ->where('uuid', $uuid)
             ->firstOrFail();
-        abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE && ! ($order->invoice && (string) $order->invoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL), 403);
+        abort_if($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE, 403);
 
         $customerBalanceStatus = 'تسویه شده';
         $customerBalanceAmount = 0;
@@ -1953,7 +1947,7 @@ class PreinvoiceController extends Controller
         abort_unless($this->canHandleFinanceActions(), 403);
 
         $order = PreinvoiceOrder::with(['items', 'invoice'])->where('uuid', $uuid)->firstOrFail();
-        if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE && ! ($order->invoice && (string) $order->invoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL)) {
+        if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
             if ($order->invoice) {
                 return redirect()->route('invoices.show', $order->invoice->uuid)
                     ->with('success', 'این سند قبلاً تایید مالی شده و تغییر جدیدی برای تایید ندارد.');
@@ -2031,7 +2025,7 @@ class PreinvoiceController extends Controller
                 $officialInvoiceUuid = $this->safeLegacyConflictInvoiceUuid($order);
             }
 
-            if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE && ! ($existingInvoice && (string) $existingInvoice->status === Invoice::STATUS_PENDING_FINANCE_REAPPROVAL)) {
+            if ($order->status !== PreinvoiceOrder::STATUS_WAREHOUSE_APPROVED_WAITING_FINANCE) {
                 abort(403);
             }
 
@@ -2100,7 +2094,7 @@ class PreinvoiceController extends Controller
                     'discount_amount' => (int) $order->discount_amount,
                     'subtotal' => (int) $subtotal,
                     'total' => (int) $total,
-                    'status' => Invoice::STATUS_PENDING_COLLECTION,
+                    'status' => Invoice::STATUS_COLLECTING,
                     'status_changed_at' => now(),
                     'status_changed_by' => auth()->id(),
                 ]);
@@ -2122,7 +2116,7 @@ class PreinvoiceController extends Controller
                     'discount_amount' => (int) $order->discount_amount,
                     'subtotal' => (int) $subtotal,
                     'total' => (int) $total,
-                    'status' => Invoice::STATUS_PENDING_COLLECTION,
+                    'status' => Invoice::STATUS_COLLECTING,
                     'status_changed_at' => now(),
                     'status_changed_by' => auth()->id(),
                 ]);
@@ -2203,11 +2197,11 @@ class PreinvoiceController extends Controller
                 );
             }
 
-            ActivityLogger::log($isFinanceReapproval ? 'finance_reapproved' : 'finance_approved', $invoice->fresh(), $isFinanceReapproval ? 'فاکتور ویرایش‌شده توسط انبار مجدداً تایید مالی شد و به صف جمع‌آوری برگشت.' : 'پیش‌فاکتور توسط مالی تایید و به فاکتور/حواله در صف جمع‌آوری تبدیل شد.', [
+            ActivityLogger::log($isFinanceReapproval ? 'finance_reapproved' : 'finance_approved', $invoice->fresh(), $isFinanceReapproval ? 'فاکتور ویرایش‌شده توسط انبار مجدداً تایید مالی شد و به صف جمع‌آوری برگشت.' : 'پیش‌فاکتور توسط مالی تایید و به فاکتور/حواله در حال جمع‌آوری تبدیل شد.', [
                 'preinvoice_order_id' => $order->id,
                 'invoice_uuid' => $invoice->uuid,
                 'old_status' => $oldInvoiceStatus,
-                'new_status' => Invoice::STATUS_PENDING_COLLECTION,
+                'new_status' => Invoice::STATUS_COLLECTING,
                 'old_total' => $oldInvoiceTotal,
                 'new_total' => (int) $invoice->total,
                 'total_changed' => $oldInvoiceTotal !== null && $oldInvoiceTotal !== (int) $invoice->total,
