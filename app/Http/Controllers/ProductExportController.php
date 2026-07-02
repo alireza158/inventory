@@ -9,8 +9,6 @@ use App\Services\ProductExportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Mpdf\Config\ConfigVariables;
-use Mpdf\Config\FontVariables;
 use Mpdf\Mpdf;
 use Mpdf\Output\Destination;
 use RuntimeException;
@@ -160,7 +158,7 @@ class ProductExportController extends Controller
 
             return back()->with(
                 'error',
-                'خطا در ساخت PDF: ' . $exception->getMessage()
+                'خطا در ساخت PDF رخ داد. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.'
             );
         }
     }
@@ -178,45 +176,22 @@ class ProductExportController extends Controller
 
     private function createMpdf(): Mpdf
     {
-        $defaultConfig = (new ConfigVariables())->getDefaults();
-        $defaultFonts = (new FontVariables())->getDefaults();
-
         $mpdf = new Mpdf([
             'mode' => 'utf-8',
-
             'format' => 'A4-L',
-
+            'directionality' => 'rtl',
+            'autoScriptToLang' => true,
+            'autoLangToFont' => true,
+            'useSubstitutions' => true,
+            'default_font' => 'dejavusans',
+            'default_font_size' => 9,
             'margin_left' => 8,
             'margin_right' => 8,
             'margin_top' => 10,
             'margin_bottom' => 14,
             'margin_header' => 0,
             'margin_footer' => 6,
-
             'tempDir' => storage_path('app/mpdf-temp'),
-
-            'fontDir' => array_merge(
-                $defaultConfig['fontDir'],
-                [storage_path('fonts')]
-            ),
-
-            'fontdata' => $defaultFonts['fontdata'] + [
-                'vazirmatn' => [
-                    'R' => 'Vazirmatn-Regular.ttf',
-                    'B' => 'Vazirmatn-Bold.ttf',
-                    'useOTL' => 0xFF,
-                    'useKashida' => 75,
-                ],
-            ],
-
-            'default_font' => 'vazirmatn',
-            'default_font_size' => 9,
-
-            'autoScriptToLang' => true,
-            'autoLangToFont' => true,
-            'useSubstitutions' => true,
-
-            'use_kwt' => false,
             'simpleTables' => true,
             'packTableData' => true,
             'shrink_tables_to_fit' => 1,
@@ -235,45 +210,15 @@ class ProductExportController extends Controller
 
     private function preparePdfEnvironment(): void
     {
-        $directories = [
-            storage_path('fonts'),
-            storage_path('app/mpdf-temp'),
-        ];
+        $directory = storage_path('app/mpdf-temp');
 
-        foreach ($directories as $directory) {
-            if (! File::isDirectory($directory)) {
-                File::makeDirectory(
-                    $directory,
-                    0775,
-                    true,
-                    true
-                );
-            }
-        }
-
-        $fonts = [
-            storage_path('fonts/Vazirmatn-Regular.ttf'),
-            storage_path('fonts/Vazirmatn-Bold.ttf'),
-        ];
-
-        foreach ($fonts as $font) {
-            if (! File::isFile($font)) {
-                throw new RuntimeException(
-                    'فایل فونت وجود ندارد: ' . $font
-                );
-            }
-
-            if (! File::isReadable($font)) {
-                throw new RuntimeException(
-                    'فایل فونت قابل خواندن نیست: ' . $font
-                );
-            }
-
-            if (File::size($font) < 10000) {
-                throw new RuntimeException(
-                    'فایل فونت معتبر نیست یا ناقص دانلود شده: ' . $font
-                );
-            }
+        if (! File::isDirectory($directory)) {
+            File::makeDirectory(
+                $directory,
+                0775,
+                true,
+                true
+            );
         }
     }
 

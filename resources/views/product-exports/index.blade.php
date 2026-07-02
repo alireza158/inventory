@@ -6,13 +6,27 @@
 @php
     $filters = $filters ?? [];
     $selectedModelListIds = collect($filters['model_list_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
-    $activeFilterCount = collect([
-        $filters['category_id'] ?? null,
-        $filters['warehouse_id'] ?? null,
-        ($filters['stock_status'] ?? 'all') !== 'all' ? $filters['stock_status'] : null,
-        $filters['search'] ?? null,
-        ! empty($selectedModelListIds) ? $selectedModelListIds : null,
-    ])->filter(fn ($value) => filled($value))->count();
+    $stockStatusLabels = [
+        'all' => 'همه محصولات',
+        'in_stock' => 'فقط کالاهای موجود',
+        'out_of_stock' => 'فقط کالاهای ناموجود',
+        'low_stock' => 'کالاهای کم‌موجودی',
+    ];
+    $selectedCategoryName = filled($filters['category_id'] ?? null)
+        ? optional(($categories ?? collect())->firstWhere('id', (int) $filters['category_id']))->name
+        : null;
+    $selectedWarehouseName = filled($filters['warehouse_id'] ?? null)
+        ? optional(($warehouses ?? collect())->firstWhere('id', (int) $filters['warehouse_id']))->name
+        : null;
+    $selectedStockStatus = $filters['stock_status'] ?? 'all';
+    $activeChips = collect([
+        $selectedCategoryName ? 'دسته‌بندی: ' . $selectedCategoryName : null,
+        $selectedWarehouseName ? 'انبار: ' . $selectedWarehouseName : null,
+        $selectedStockStatus !== 'all' ? 'وضعیت: ' . ($stockStatusLabels[$selectedStockStatus] ?? $selectedStockStatus) : null,
+        filled($filters['search'] ?? null) ? 'جستجو: ' . $filters['search'] : null,
+        ! empty($selectedModelListIds) ? 'مدل‌لیست‌ها: ' . count($selectedModelListIds) . ' انتخاب' : null,
+    ])->filter()->values();
+    $activeFilterCount = $activeChips->count();
 @endphp
 
 <style>
@@ -171,8 +185,23 @@
     }
     .is-loading .loading-mask { display: flex; }
     .export-alert { margin: 1.25rem 0 0; border: 0; border-radius: 14px; }
+    .export-toolbar { margin-top: 1.25rem; padding: 1rem; }
+    .export-toolbar__row { display: flex; align-items: center; justify-content: space-between; gap: .9rem; flex-wrap: wrap; }
+    .export-toolbar__actions { display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; }
+    .export-filter-chips { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; min-width: 0; }
+    .export-filter-chip { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: .42rem .7rem; border-radius: 999px; background: #eefdf8; color: #115e59; font-size: .78rem; font-weight: 850; }
+    .export-filter-chip--empty { background: #f1f5f9; color: var(--export-muted); }
+    .export-filter-modal .modal-dialog { max-width: min(980px, calc(100vw - 1rem)); }
+    .export-filter-modal .modal-content { border: 0; border-radius: 20px; overflow: hidden; }
+    .export-filter-modal .modal-header,
+    .export-filter-modal .modal-footer { border-color: #e2e8f0; }
+    .export-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .export-filter-grid .form-label { margin-bottom: .45rem; color: #334155; font-size: .8rem; font-weight: 850; }
+    .export-filter-grid .form-control,
+    .export-filter-grid .form-select { min-height: 44px; border-color: #dbe4ea; border-radius: 12px; }
+    .export-filter-grid__wide { grid-column: 1 / -1; min-width: 0; }
     .model-list-filter {
-        max-height: 320px;
+        max-height: 280px;
         overflow: auto;
         padding: .85rem;
         border: 1px solid #dbe4ea;
@@ -205,6 +234,13 @@
         .export-threshold { width: 100%; }
         .export-filter-card { padding: 1rem; border-radius: 16px; }
         .export-section-heading { align-items: flex-start; }
+        .export-toolbar__row,
+        .export-toolbar__actions { align-items: stretch; flex-direction: column; }
+        .export-toolbar__actions,
+        .export-filter-chips { width: 100%; }
+        .export-filter-chip { max-width: 100%; }
+        .export-filter-grid { grid-template-columns: 1fr; }
+        .export-filter-modal .modal-dialog { margin: .5rem; max-width: calc(100vw - 1rem); }
         .export-actions { align-items: stretch; flex-direction: column; }
         .export-actions__primary,
         .export-actions__secondary,
@@ -232,94 +268,128 @@
         <div class="alert alert-danger export-alert" role="alert">{{ session('error') }}</div>
     @endif
 
-    <section class="export-card export-filter-card" aria-labelledby="export-filter-title">
-        <div class="export-section-heading">
-            <div>
-                <h2 id="export-filter-title">فیلتر و جستجوی محصولات</h2>
-                <p>برای مشاهده نتیجه دقیق‌تر، یک یا چند فیلتر انتخاب کنید.</p>
+    <section class="export-card export-toolbar" aria-labelledby="export-filter-summary-title">
+        <div class="export-toolbar__row">
+            <div class="export-filter-chips" id="export-filter-summary-title" aria-label="فیلترهای فعال">
+                @forelse($activeChips as $chip)
+                    <span class="export-filter-chip">{{ $chip }}</span>
+                @empty
+                    <span class="export-filter-chip export-filter-chip--empty">بدون فیلتر فعال</span>
+                @endforelse
             </div>
-            @if($activeFilterCount)
-                <span class="active-filter-badge">{{ $activeFilterCount }} فیلتر فعال</span>
-            @endif
-        </div>
 
-        <form id="productExportForm" class="row g-3" method="GET" action="{{ route('admin.product-exports.index') }}">
-            <div class="col-xl-3 col-md-6">
-                <label for="export-category" class="form-label">دسته‌بندی محصول</label>
-                <select id="export-category" name="category_id" class="form-select">
-                    <option value="">همه دسته‌بندی‌ها</option>
-                    @foreach($categories as $category)
-                        <option value="{{ $category->id }}" @selected(($filters['category_id'] ?? '') == $category->id)>{{ $category->name }}</option>
-                    @endforeach
-                </select>
+            <div class="export-toolbar__actions">
+                <button type="button" class="btn btn-primary btn-export" data-bs-toggle="modal" data-bs-target="#productExportFiltersModal">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    فیلترها
+                    @if($activeFilterCount)
+                        <span class="badge text-bg-light">{{ $activeFilterCount }}</span>
+                    @endif
+                </button>
+
+                <button type="button" data-format="pdf" class="btn btn-export btn-export-pdf">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    دریافت خروجی PDF
+                </button>
+
+                <a href="{{ route('admin.product-exports.index') }}" class="btn btn-outline-secondary btn-export">پاک کردن فیلترها</a>
             </div>
-            <div class="col-xl-3 col-md-6">
-                <label class="form-label">مدل‌لیست‌ها</label>
-                <div class="model-list-filter" id="modelListFilter">
-                    <input type="search" class="form-control form-control-sm model-list-filter__search" id="modelListSearch" placeholder="جستجوی مدل یا برند" autocomplete="off">
-                    <div class="model-list-filter__hint">
-                        ابتدا دسته‌بندی را انتخاب کنید، سپس مدل‌های موردنظر را از برندهای مختلف انتخاب کنید.
+        </div>
+    </section>
+
+    <div class="modal fade export-filter-modal" id="productExportFiltersModal" tabindex="-1" aria-labelledby="productExportFiltersModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <form id="productExportForm" method="GET" action="{{ route('admin.product-exports.index') }}">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title" id="productExportFiltersModalLabel">فیلتر و جستجوی محصولات</h5>
+                            <small class="text-muted">فیلترها را تنظیم کنید؛ جدول و PDF از همین مقادیر استفاده می‌کنند.</small>
+                        </div>
+                        <button type="button" class="btn-close m-0" data-bs-dismiss="modal" aria-label="بستن"></button>
                     </div>
-                    @forelse(($modelListsByBrand ?? collect()) as $brand => $modelLists)
-                        <div class="model-list-filter__group" data-model-list-group>
-                            <div class="model-list-filter__brand">{{ $brand ?: 'سایر' }}</div>
-                            <div class="model-list-filter__items">
-                                @foreach($modelLists as $modelList)
-                                    @php
-                                        $modelLabel = trim(($modelList->code ? $modelList->code . ' - ' : '') . $modelList->model_name);
-                                        $searchText = mb_strtolower(trim(($brand ?: 'سایر') . ' ' . $modelList->model_name . ' ' . ($modelList->code ?? '')));
-                                    @endphp
-                                    <label class="model-list-filter__item" data-model-list-item data-search="{{ $searchText }}">
-                                        <input type="checkbox" name="model_list_ids[]" value="{{ $modelList->id }}" @checked(in_array((int) $modelList->id, $selectedModelListIds, true))>
-                                        <span title="{{ $brand }} {{ $modelList->model_name }}">{{ $modelLabel }}</span>
-                                    </label>
-                                @endforeach
+
+                    <div class="modal-body">
+                        <div class="export-filter-grid">
+                            <div>
+                                <label for="export-category" class="form-label">دسته‌بندی محصول</label>
+                                <select id="export-category" name="category_id" class="form-select">
+                                    <option value="">همه دسته‌بندی‌ها</option>
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}" @selected(($filters['category_id'] ?? '') == $category->id)>{{ $category->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="export-warehouse" class="form-label">انبار</label>
+                                <select id="export-warehouse" name="warehouse_id" class="form-select">
+                                    <option value="">همه انبارها</option>
+                                    @foreach($warehouses as $warehouse)
+                                        <option value="{{ $warehouse->id }}" @selected(($filters['warehouse_id'] ?? '') == $warehouse->id)>{{ $warehouse->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="export-stock-status" class="form-label">وضعیت موجودی</label>
+                                <select id="export-stock-status" name="stock_status" class="form-select">
+                                    @foreach($stockStatusLabels as $value => $label)
+                                        <option value="{{ $value }}" @selected(($filters['stock_status'] ?? 'all') === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="export-search" class="form-label">جستجو</label>
+                                <input id="export-search" type="search" name="search" class="form-control" value="{{ $filters['search'] ?? '' }}" placeholder="نام، کد، SKU یا بارکد" autocomplete="off">
+                            </div>
+
+                            <div class="export-filter-grid__wide">
+                                <label class="form-label d-flex align-items-center justify-content-between gap-2">
+                                    <span>مدل‌لیست‌ها</span>
+                                    <span class="text-muted small"><span id="selectedModelListCount">{{ count($selectedModelListIds) }}</span> انتخاب</span>
+                                </label>
+                                <div class="model-list-filter" id="modelListFilter">
+                                    <input type="search" class="form-control form-control-sm model-list-filter__search" id="modelListSearch" placeholder="جستجوی مدل یا برند" autocomplete="off">
+                                    <div class="model-list-filter__hint">
+                                        ابتدا دسته‌بندی را انتخاب کنید، سپس مدل‌های موردنظر را از برندهای مختلف انتخاب کنید.
+                                    </div>
+                                    @forelse(($modelListsByBrand ?? collect()) as $brand => $modelLists)
+                                        <div class="model-list-filter__group" data-model-list-group>
+                                            <div class="model-list-filter__brand">{{ $brand ?: 'سایر' }}</div>
+                                            <div class="model-list-filter__items">
+                                                @foreach($modelLists as $modelList)
+                                                    @php
+                                                        $modelLabel = trim(($modelList->code ? $modelList->code . ' - ' : '') . $modelList->model_name);
+                                                        $searchText = mb_strtolower(trim(($brand ?: 'سایر') . ' ' . $modelList->model_name . ' ' . ($modelList->code ?? '')));
+                                                    @endphp
+                                                    <label class="model-list-filter__item" data-model-list-item data-search="{{ $searchText }}">
+                                                        <input type="checkbox" name="model_list_ids[]" value="{{ $modelList->id }}" @checked(in_array((int) $modelList->id, $selectedModelListIds, true))>
+                                                        <span title="{{ $brand }} {{ $modelList->model_name }}">{{ $modelLabel }}</span>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="model-list-filter__empty">مدلی برای فیلترهای فعلی پیدا نشد.</div>
+                                    @endforelse
+                                </div>
                             </div>
                         </div>
-                    @empty
-                        <div class="model-list-filter__empty">مدلی برای فیلترهای فعلی پیدا نشد.</div>
-                    @endforelse
-                </div>
+                    </div>
+
+                    <div class="modal-footer justify-content-between">
+                        <a href="{{ route('admin.product-exports.index') }}" class="btn btn-outline-secondary">پاک کردن</a>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">بستن</button>
+                            <button type="submit" class="btn btn-primary">اعمال فیلتر</button>
+                        </div>
+                    </div>
+                </form>
             </div>
-            <div class="col-xl-3 col-md-6">
-                <label for="export-warehouse" class="form-label">انبار</label>
-                <select id="export-warehouse" name="warehouse_id" class="form-select">
-                    <option value="">همه انبارها</option>
-                    @foreach($warehouses as $warehouse)
-                        <option value="{{ $warehouse->id }}" @selected(($filters['warehouse_id'] ?? '') == $warehouse->id)>{{ $warehouse->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-xl-3 col-md-6">
-                <label for="export-stock-status" class="form-label">وضعیت موجودی</label>
-                <select id="export-stock-status" name="stock_status" class="form-select">
-                    <option value="all" @selected(($filters['stock_status'] ?? 'all') === 'all')>همه محصولات</option>
-                    <option value="in_stock" @selected(($filters['stock_status'] ?? '') === 'in_stock')>فقط کالاهای موجود</option>
-                    <option value="out_of_stock" @selected(($filters['stock_status'] ?? '') === 'out_of_stock')>فقط کالاهای ناموجود</option>
-                    <option value="low_stock" @selected(($filters['stock_status'] ?? '') === 'low_stock')>کالاهای کم‌موجودی</option>
-                </select>
-            </div>
-            <div class="col-xl-3 col-md-6">
-                <label for="export-search" class="form-label">جستجو</label>
-                <input id="export-search" type="search" name="search" class="form-control" value="{{ $filters['search'] ?? '' }}" placeholder="نام، کد، SKU یا بارکد" autocomplete="off">
-            </div>
-            <div class="col-12 export-actions">
-                <div class="export-actions__primary">
-                    <button type="submit" class="btn btn-primary btn-export">
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 21-4.3-4.3m2.3-5.2a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                        نمایش محصولات
-                    </button>
-                    <a href="{{ route('admin.product-exports.index') }}" class="btn btn-outline-secondary btn-export">پاک کردن فیلترها</a>
-                </div>
-                <div class="export-actions__secondary">
-                    <button type="button" data-format="pdf" class="btn btn-export btn-export-pdf">
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        دریافت خروجی PDF
-                    </button>
-                </div>
-            </div>
-        </form>
-    </section>
+        </div>
+    </div>
 
     <section id="productExportResult" class="export-card export-result" aria-live="polite" aria-busy="false">
         <div class="loading-mask" aria-hidden="true">
@@ -339,6 +409,18 @@
         const buildParams = () => new URLSearchParams(new FormData(form));
 
         const modelListSearch = document.getElementById('modelListSearch');
+        const selectedModelListCount = document.getElementById('selectedModelListCount');
+        const updateSelectedModelListCount = () => {
+            if (!selectedModelListCount || !form) return;
+            selectedModelListCount.textContent = form.querySelectorAll('input[name="model_list_ids[]"]:checked').length;
+        };
+
+        form?.addEventListener('change', (event) => {
+            if (event.target?.matches('input[name="model_list_ids[]"]')) {
+                updateSelectedModelListCount();
+            }
+        });
+        updateSelectedModelListCount();
 
         modelListSearch?.addEventListener('input', () => {
             const term = modelListSearch.value.trim().toLocaleLowerCase();
@@ -380,6 +462,10 @@
 
                 result.innerHTML = loadingMarkup + await response.text();
                 window.history.replaceState({}, '', `${form.action}?${params.toString()}`);
+
+                const modalElement = document.getElementById('productExportFiltersModal');
+                const modalInstance = window.bootstrap?.Modal?.getInstance(modalElement);
+                modalInstance?.hide();
                 result.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } catch (error) {
                 result.insertAdjacentHTML('afterbegin', '<div class="alert alert-danger m-3" role="alert">دریافت اطلاعات با خطا روبه‌رو شد. لطفاً دوباره تلاش کنید.</div>');
