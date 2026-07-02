@@ -5,11 +5,13 @@
 @section('content')
 @php
     $filters = $filters ?? [];
+    $selectedModelListIds = collect($filters['model_list_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
     $activeFilterCount = collect([
         $filters['category_id'] ?? null,
         $filters['warehouse_id'] ?? null,
         ($filters['stock_status'] ?? 'all') !== 'all' ? $filters['stock_status'] : null,
         $filters['search'] ?? null,
+        ! empty($selectedModelListIds) ? $selectedModelListIds : null,
     ])->filter(fn ($value) => filled($value))->count();
 @endphp
 
@@ -169,6 +171,34 @@
     }
     .is-loading .loading-mask { display: flex; }
     .export-alert { margin: 1.25rem 0 0; border: 0; border-radius: 14px; }
+    .model-list-filter {
+        max-height: 320px;
+        overflow: auto;
+        padding: .85rem;
+        border: 1px solid #dbe4ea;
+        border-radius: 14px;
+        background: #f8fafc;
+    }
+    .model-list-filter__search { margin-bottom: .75rem; }
+    .model-list-filter__hint { margin-bottom: .75rem; color: var(--export-muted); font-size: .78rem; }
+    .model-list-filter__group + .model-list-filter__group { margin-top: .8rem; padding-top: .8rem; border-top: 1px dashed #cbd5e1; }
+    .model-list-filter__brand { margin-bottom: .5rem; color: var(--export-ink); font-size: .8rem; font-weight: 950; }
+    .model-list-filter__items { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .45rem .65rem; }
+    .model-list-filter__item {
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        min-width: 0;
+        padding: .42rem .5rem;
+        border: 1px solid rgba(15, 23, 42, .08);
+        border-radius: 10px;
+        background: #fff;
+        font-size: .82rem;
+    }
+    .model-list-filter__item input { flex: 0 0 auto; }
+    .model-list-filter__item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .model-list-filter__empty { color: var(--export-muted); font-size: .85rem; }
+
     @media (max-width: 767.98px) {
         .product-export-page { padding: .75rem; }
         .export-hero { align-items: stretch; flex-direction: column; padding: 1.25rem; border-radius: 18px; }
@@ -222,6 +252,34 @@
                         <option value="{{ $category->id }}" @selected(($filters['category_id'] ?? '') == $category->id)>{{ $category->name }}</option>
                     @endforeach
                 </select>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <label class="form-label">مدل‌لیست‌ها</label>
+                <div class="model-list-filter" id="modelListFilter">
+                    <input type="search" class="form-control form-control-sm model-list-filter__search" id="modelListSearch" placeholder="جستجوی مدل یا برند" autocomplete="off">
+                    <div class="model-list-filter__hint">
+                        ابتدا دسته‌بندی را انتخاب کنید، سپس مدل‌های موردنظر را از برندهای مختلف انتخاب کنید.
+                    </div>
+                    @forelse(($modelListsByBrand ?? collect()) as $brand => $modelLists)
+                        <div class="model-list-filter__group" data-model-list-group>
+                            <div class="model-list-filter__brand">{{ $brand ?: 'سایر' }}</div>
+                            <div class="model-list-filter__items">
+                                @foreach($modelLists as $modelList)
+                                    @php
+                                        $modelLabel = trim(($modelList->code ? $modelList->code . ' - ' : '') . $modelList->model_name);
+                                        $searchText = mb_strtolower(trim(($brand ?: 'سایر') . ' ' . $modelList->model_name . ' ' . ($modelList->code ?? '')));
+                                    @endphp
+                                    <label class="model-list-filter__item" data-model-list-item data-search="{{ $searchText }}">
+                                        <input type="checkbox" name="model_list_ids[]" value="{{ $modelList->id }}" @checked(in_array((int) $modelList->id, $selectedModelListIds, true))>
+                                        <span title="{{ $brand }} {{ $modelList->model_name }}">{{ $modelLabel }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @empty
+                        <div class="model-list-filter__empty">مدلی برای فیلترهای فعلی پیدا نشد.</div>
+                    @endforelse
+                </div>
             </div>
             <div class="col-xl-3 col-md-6">
                 <label for="export-warehouse" class="form-label">انبار</label>
@@ -279,6 +337,23 @@
         const submitButton = form?.querySelector('[type="submit"]');
         const loadingMarkup = result?.querySelector('.loading-mask')?.outerHTML ?? '';
         const buildParams = () => new URLSearchParams(new FormData(form));
+
+        const modelListSearch = document.getElementById('modelListSearch');
+
+        modelListSearch?.addEventListener('input', () => {
+            const term = modelListSearch.value.trim().toLocaleLowerCase();
+
+            document.querySelectorAll('[data-model-list-item]').forEach((item) => {
+                const matches = !term || (item.dataset.search || '').toLocaleLowerCase().includes(term);
+                item.style.display = matches ? '' : 'none';
+            });
+
+            document.querySelectorAll('[data-model-list-group]').forEach((group) => {
+                const hasVisibleItem = Array.from(group.querySelectorAll('[data-model-list-item]'))
+                    .some((item) => item.style.display !== 'none');
+                group.style.display = hasVisibleItem ? '' : 'none';
+            });
+        });
 
         if (!form || !result) return;
 

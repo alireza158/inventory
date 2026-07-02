@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\ModelList;
 use App\Models\Warehouse;
 use App\Services\ProductExportService;
 use Illuminate\Http\Request;
@@ -34,11 +35,14 @@ class ProductExportController extends Controller
             ->orderBy('name')
             ->get();
 
+        $modelListsByBrand = $this->modelListsByBrand($filters);
+
         $rows = collect($this->service->rows($filters));
 
         return view('product-exports.index', compact(
             'categories',
             'warehouses',
+            'modelListsByBrand',
             'filters',
             'rows'
         ));
@@ -522,6 +526,24 @@ class ProductExportController extends Controller
         CSS;
     }
 
+    private function modelListsByBrand(array $filters)
+    {
+        $categoryId = ! empty($filters['category_id'])
+            ? (int) $filters['category_id']
+            : null;
+
+        return ModelList::query()
+            ->when($categoryId !== null, function ($query) use ($categoryId) {
+                $query->whereHas('productVariants.product', function ($productQuery) use ($categoryId) {
+                    $productQuery->where('category_id', $categoryId);
+                });
+            })
+            ->orderBy('brand')
+            ->orderBy('model_name')
+            ->get(['id', 'brand', 'model_name', 'code'])
+            ->groupBy(fn (ModelList $modelList) => $modelList->brand ?: 'سایر');
+    }
+
     private function validatedFilters(
         Request $request,
         bool $requireFormat = false
@@ -546,6 +568,14 @@ class ProductExportController extends Controller
                 'string',
                 'max:255',
             ],
+            'model_list_ids' => [
+                'nullable',
+                'array',
+            ],
+            'model_list_ids.*' => [
+                'integer',
+                'exists:model_lists,id',
+            ],
             'format' => [
                 $requireFormat ? 'required' : 'nullable',
                 'in:pdf',
@@ -557,6 +587,12 @@ class ProductExportController extends Controller
             'warehouse_id' => $validated['warehouse_id'] ?? null,
             'stock_status' => $validated['stock_status'] ?? 'all',
             'search' => trim((string) ($validated['search'] ?? '')),
+            'model_list_ids' => collect($validated['model_list_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all(),
             'format' => 'pdf',
         ];
     }
